@@ -17,7 +17,27 @@
                     Please be patient and do not close this window during the import.
                 </div>
 
-                <form asp-action="ImportWorkOrder" method="post">
+                <form asp-action="ImportWorkOrder" method="post" enctype="multipart/form-data">
+                    <div class="mb-4">
+                        <h5>Select SDF File</h5>
+                        <div class="mb-3">
+                            <div id="dropZone" class="border border-2 border-dashed rounded p-4 text-center bg-light" style="min-height: 150px; cursor: pointer;">
+                                <div class="d-flex flex-column align-items-center justify-content-center h-100">
+                                    <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
+                                    <p class="mb-2"><strong>Drop your SDF file here</strong></p>
+                                    <p class="text-muted mb-0">or click to browse</p>
+                                </div>
+                            </div>
+                            <input type="file" id="sdfFile" name="sdfFile" accept=".sdf" class="d-none" required>
+                            <div id="fileInfo" class="mt-2 d-none">
+                                <div class="alert alert-success">
+                                    <i class="fas fa-file-database me-2"></i>
+                                    <span id="fileName"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="mb-4">
                         <h5>Import Process</h5>
                         <p class="text-muted">
@@ -48,6 +68,64 @@
 
 @section Scripts {
     <script>
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('sdfFile');
+        const fileInfo = document.getElementById('fileInfo');
+        const fileName = document.getElementById('fileName');
+
+        // Click to browse
+        dropZone.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        // Drag and drop
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('border-primary');
+        });
+
+        dropZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-primary');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-primary');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                const file = files[0];
+                if (file.name.toLowerCase().endsWith('.sdf')) {
+                    fileInput.files = files;
+                    showFileInfo(file);
+                } else {
+                    alert('Please select an SDF file.');
+                }
+            }
+        });
+
+        // File input change
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                showFileInfo(file);
+            }
+        });
+
+        function showFileInfo(file) {
+            fileName.textContent = file.name + ' (' + formatBytes(file.size) + ')';
+            fileInfo.classList.remove('d-none');
+        }
+
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
         document.querySelector('form').addEventListener('submit', function(e) {
             const button = document.querySelector('button[type="submit"]');
             button.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Importing... Please wait';

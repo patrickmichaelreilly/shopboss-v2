@@ -111,17 +111,53 @@ public class AdminController : Controller
     }
 
     [HttpPost]
-    public async Task<IActionResult> ImportWorkOrder()
+    public async Task<IActionResult> ImportWorkOrder(IFormFile sdfFile)
     {
+        if (sdfFile == null || sdfFile.Length == 0)
+        {
+            TempData["ErrorMessage"] = "Please select an SDF file to import.";
+            return RedirectToAction(nameof(Import));
+        }
+
+        if (!sdfFile.FileName.EndsWith(".sdf", StringComparison.OrdinalIgnoreCase))
+        {
+            TempData["ErrorMessage"] = "Please select a valid SDF file.";
+            return RedirectToAction(nameof(Import));
+        }
+
         try
         {
-            TempData["InfoMessage"] = "Work order import started. This process may take 2-3 minutes.";
+            // Create a temporary directory for the import process
+            var tempDir = Path.Combine(Path.GetTempPath(), "shopboss_import", Guid.NewGuid().ToString());
+            Directory.CreateDirectory(tempDir);
+
+            // Save the uploaded file
+            var sdfPath = Path.Combine(tempDir, sdfFile.FileName);
+            using (var stream = new FileStream(sdfPath, FileMode.Create))
+            {
+                await sdfFile.CopyToAsync(stream);
+            }
+
+            // TODO: Call the importer tool to process the SDF file
+            // For now, just show a success message
+            TempData["InfoMessage"] = $"SDF file '{sdfFile.FileName}' uploaded successfully. Import process would start here.";
+            
+            // Clean up temporary files
+            try
+            {
+                Directory.Delete(tempDir, true);
+            }
+            catch (Exception cleanupEx)
+            {
+                _logger.LogWarning(cleanupEx, "Failed to clean up temporary directory: {TempDir}", tempDir);
+            }
+
             return RedirectToAction(nameof(Index));
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error starting work order import");
-            TempData["ErrorMessage"] = "An error occurred while starting the import process.";
+            _logger.LogError(ex, "Error processing SDF file upload");
+            TempData["ErrorMessage"] = "An error occurred while processing the SDF file.";
             return RedirectToAction(nameof(Import));
         }
     }
