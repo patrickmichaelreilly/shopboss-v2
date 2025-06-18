@@ -1,0 +1,57 @@
+@{
+    ViewData["Title"] = "Import Work Order";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title mb-0">
+                    <i class="fas fa-upload me-2"></i>Import Work Order
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Important:</strong> The import process takes 2-3 minutes to complete. 
+                    Please be patient and do not close this window during the import.
+                </div>
+
+                <form asp-action="ImportWorkOrder" method="post">
+                    <div class="mb-4">
+                        <h5>Import Process</h5>
+                        <p class="text-muted">
+                            This will import work order data from the Microvellum SDF file using the importer tool. 
+                            The process includes:
+                        </p>
+                        <ul class="text-muted">
+                            <li>Extracting data from SQL CE database</li>
+                            <li>Converting to SQLite format</li>
+                            <li>Processing products, parts, subassemblies, and hardware</li>
+                            <li>Importing into ShopBoss database</li>
+                        </ul>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-play me-2"></i>Start Import Process
+                        </button>
+                        <a asp-action="Index" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left me-2"></i>Back to Work Orders
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.querySelector('form').addEventListener('submit', function(e) {
+            const button = document.querySelector('button[type="submit"]');
+            button.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Importing... Please wait';
+            button.disabled = true;
+        });
+    </script>
+}

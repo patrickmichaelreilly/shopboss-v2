@@ -1,0 +1,111 @@
+﻿@{
+    ViewData["Title"] = "Dashboard";
+}
+
+<div class="row mb-4">
+    <div class="col-12">
+        <h1 class="h2">ShopBoss Dashboard</h1>
+        <p class="text-muted">Microvellum Work Order Management System</p>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-md-6 col-lg-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5 class="card-title">Work Orders</h5>
+                        <p class="card-text h3">--</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-clipboard-list fa-2x"></i>
+                    </div>
+                </div>
+                <a asp-controller="Admin" asp-action="Index" class="stretched-link text-white"></a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-lg-3">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5 class="card-title">Products</h5>
+                        <p class="card-text h3">--</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-box fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-lg-3">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5 class="card-title">Parts</h5>
+                        <p class="card-text h3">--</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-puzzle-piece fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-lg-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5 class="card-title">Hardware</h5>
+                        <p class="card-text h3">--</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-screwdriver-wrench fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-5">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Recent Activity</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">No recent activity. <a asp-controller="Admin" asp-action="Import">Import your first work order</a> to get started.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Quick Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a asp-controller="Admin" asp-action="Import" class="btn btn-primary">
+                        <i class="fas fa-upload me-2"></i>Import Work Order
+                    </a>
+                    <a asp-controller="Admin" asp-action="Index" class="btn btn-outline-primary">
+                        <i class="fas fa-list me-2"></i>View Work Orders
+                    </a>
+                    <a asp-controller="Admin" asp-action="Statistics" class="btn btn-outline-info">
+                        <i class="fas fa-chart-bar me-2"></i>Statistics
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
