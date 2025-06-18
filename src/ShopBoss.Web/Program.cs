@@ -1,14 +1,21 @@
 using Microsoft.EntityFrameworkCore;
 using ShopBoss.Web.Data;
+using ShopBoss.Web.Hubs;
+using ShopBoss.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
+builder.Services.AddSignalR();
 
 // Add Entity Framework
 builder.Services.AddDbContext<ShopBossDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection") ?? "Data Source=shopboss.db;Cache=Shared"));
+
+// Add custom services
+builder.Services.AddScoped<ImporterService>();
+builder.Services.AddScoped<ImportDataTransformService>();
 
 var app = builder.Build();
 
@@ -37,5 +44,7 @@ app.UseAuthorization();
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
+
+app.MapHub<ImportProgressHub>("/importProgress");
 
 app.Run();

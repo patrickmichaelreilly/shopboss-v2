@@ -2,6 +2,59 @@
     ViewData["Title"] = "Import Work Order";
 }
 
+@section Styles {
+    <style>
+        .progress-container {
+            background: #f8f9fa;
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            border: 1px solid #dee2e6;
+        }
+        
+        .tree-view {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            padding: 1rem;
+            background-color: #ffffff;
+        }
+        
+        .tree-node {
+            padding: 0.25rem 0;
+            margin-left: 1rem;
+        }
+        
+        .tree-node:first-child {
+            margin-left: 0;
+        }
+        
+        .tree-toggle {
+            cursor: pointer;
+            user-select: none;
+            color: #6c757d;
+        }
+        
+        .tree-toggle:hover {
+            color: #495057;
+        }
+        
+        .stage-indicator {
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            background-color: #e9ecef;
+            border: 1px solid #ced4da;
+            font-weight: 500;
+        }
+        
+        .stage-indicator.active {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+    </style>
+}
+
 <div class="row justify-content-center">
     <div class="col-md-8">
         <div class="card">
@@ -17,7 +70,8 @@
                     Please be patient and do not close this window during the import.
                 </div>
 
-                <form asp-action="ImportWorkOrder" method="post" enctype="multipart/form-data">
+                <!-- Step 1: File Upload -->
+                <div id="uploadStep" class="step-content">
                     <div class="mb-4">
                         <h5>Select SDF File</h5>
                         <div class="mb-3">
@@ -28,7 +82,7 @@
                                     <p class="text-muted mb-0">or click to browse</p>
                                 </div>
                             </div>
-                            <input type="file" id="sdfFile" name="sdfFile" accept=".sdf" class="d-none" required>
+                            <input type="file" id="sdfFile" accept=".sdf" class="d-none" required>
                             <div id="fileInfo" class="mt-2 d-none">
                                 <div class="alert alert-success">
                                     <i class="fas fa-file-database me-2"></i>
@@ -39,46 +93,204 @@
                     </div>
 
                     <div class="mb-4">
-                        <h5>Import Process</h5>
-                        <p class="text-muted">
-                            This will import work order data from the Microvellum SDF file using the importer tool. 
-                            The process includes:
-                        </p>
-                        <ul class="text-muted">
-                            <li>Extracting data from SQL CE database</li>
-                            <li>Converting to SQLite format</li>
-                            <li>Processing products, parts, subassemblies, and hardware</li>
-                            <li>Importing into ShopBoss database</li>
-                        </ul>
+                        <label for="workOrderName" class="form-label">Work Order Name</label>
+                        <input type="text" id="workOrderName" class="form-control" placeholder="Enter work order name" required>
                     </div>
 
                     <div class="d-grid gap-2">
-                        <button type="submit" class="btn btn-primary btn-lg">
+                        <button type="button" id="startImportBtn" class="btn btn-primary btn-lg" disabled>
                             <i class="fas fa-play me-2"></i>Start Import Process
                         </button>
                         <a asp-action="Index" class="btn btn-secondary">
                             <i class="fas fa-arrow-left me-2"></i>Back to Work Orders
                         </a>
                     </div>
-                </form>
+                </div>
+
+                <!-- Step 2: Progress Tracking -->
+                <div id="progressStep" class="step-content d-none">
+                    <div class="progress-container">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="mb-0">Import Progress</h5>
+                            <button type="button" id="cancelImportBtn" class="btn btn-outline-danger btn-sm">
+                                <i class="fas fa-times me-1"></i>Cancel
+                            </button>
+                        </div>
+                        
+                        <div class="progress mb-3" style="height: 20px;">
+                            <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" 
+                                 role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                                0%
+                            </div>
+                        </div>
+                        
+                        <div class="stage-indicator mb-3">
+                            <i class="fas fa-spinner fa-spin me-2"></i>
+                            <span id="currentStage">Preparing import...</span>
+                        </div>
+                        
+                        <div class="text-muted">
+                            <small>
+                                <i class="fas fa-clock me-1"></i>
+                                Estimated time remaining: <span id="timeRemaining">Calculating...</span>
+                            </small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 3: Preview and Confirm -->
+                <div id="previewStep" class="step-content d-none">
+                    <div class="mb-4">
+                        <h5>Import Preview</h5>
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="card border-primary">
+                                    <div class="card-body text-center">
+                                        <i class="fas fa-boxes fa-2x text-primary mb-2"></i>
+                                        <h4 id="totalProducts" class="mb-1">0</h4>
+                                        <small class="text-muted">Products</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card border-success">
+                                    <div class="card-body text-center">
+                                        <i class="fas fa-puzzle-piece fa-2x text-success mb-2"></i>
+                                        <h4 id="totalParts" class="mb-1">0</h4>
+                                        <small class="text-muted">Parts</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card border-warning">
+                                    <div class="card-body text-center">
+                                        <i class="fas fa-layer-group fa-2x text-warning mb-2"></i>
+                                        <h4 id="totalSubassemblies" class="mb-1">0</h4>
+                                        <small class="text-muted">Subassemblies</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card border-info">
+                                    <div class="card-body text-center">
+                                        <i class="fas fa-tools fa-2x text-info mb-2"></i>
+                                        <h4 id="totalHardware" class="mb-1">0</h4>
+                                        <small class="text-muted">Hardware</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <h5>Data Structure Preview</h5>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div>
+                                <button type="button" id="expandAllBtn" class="btn btn-outline-primary btn-sm">
+                                    <i class="fas fa-expand-alt me-1"></i>Expand All
+                                </button>
+                                <button type="button" id="collapseAllBtn" class="btn btn-outline-secondary btn-sm">
+                                    <i class="fas fa-compress-alt me-1"></i>Collapse All
+                                </button>
+                                <button type="button" id="downloadCsvBtn" class="btn btn-outline-info btn-sm">
+                                    <i class="fas fa-download me-1"></i>Export Raw Data CSV
+                                </button>
+                            </div>
+                            <div>
+                                <input type="text" id="searchFilter" class="form-control form-control-sm" 
+                                       placeholder="Search items..." style="width: 200px;">
+                            </div>
+                        </div>
+                        <div id="treeView" class="tree-view">
+                            <!-- Tree view will be populated by JavaScript -->
+                        </div>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button type="button" id="confirmImportBtn" class="btn btn-success btn-lg">
+                            <i class="fas fa-check me-2"></i>Confirm Import
+                        </button>
+                        <button type="button" id="startOverBtn" class="btn btn-outline-secondary">
+                            <i class="fas fa-redo me-2"></i>Start Over
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
 @section Scripts {
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/7.0.0/signalr.min.js"></script>
     <script>
+        // Global variables
+        let currentSessionId = null;
+        let signalRConnection = null;
+        let importData = null;
+        
+        // DOM elements
         const dropZone = document.getElementById('dropZone');
         const fileInput = document.getElementById('sdfFile');
         const fileInfo = document.getElementById('fileInfo');
         const fileName = document.getElementById('fileName');
+        const workOrderNameInput = document.getElementById('workOrderName');
+        const startImportBtn = document.getElementById('startImportBtn');
+        
+        // Steps
+        const uploadStep = document.getElementById('uploadStep');
+        const progressStep = document.getElementById('progressStep');
+        const previewStep = document.getElementById('previewStep');
+        
+        // Progress elements
+        const progressBar = document.getElementById('progressBar');
+        const currentStage = document.getElementById('currentStage');
+        const timeRemaining = document.getElementById('timeRemaining');
+        const cancelImportBtn = document.getElementById('cancelImportBtn');
+        
+        // Preview elements
+        const totalProducts = document.getElementById('totalProducts');
+        const totalParts = document.getElementById('totalParts');
+        const totalSubassemblies = document.getElementById('totalSubassemblies');
+        const totalHardware = document.getElementById('totalHardware');
+        const treeView = document.getElementById('treeView');
+        const searchFilter = document.getElementById('searchFilter');
+        const expandAllBtn = document.getElementById('expandAllBtn');
+        const collapseAllBtn = document.getElementById('collapseAllBtn');
+        const downloadCsvBtn = document.getElementById('downloadCsvBtn');
+        const confirmImportBtn = document.getElementById('confirmImportBtn');
+        const startOverBtn = document.getElementById('startOverBtn');
 
-        // Click to browse
+        // Initialize SignalR connection
+        async function initializeSignalR() {
+            signalRConnection = new signalR.HubConnectionBuilder()
+                .withUrl("/importProgress")
+                .build();
+
+            signalRConnection.on("ImportProgress", function (data) {
+                updateProgress(data.percentage, data.stage, data.estimatedTimeRemaining);
+            });
+
+            signalRConnection.on("ImportComplete", function (data) {
+                handleImportComplete(data);
+            });
+
+            signalRConnection.on("ImportError", function (data) {
+                handleImportError(data.error);
+            });
+
+            try {
+                await signalRConnection.start();
+                console.log("SignalR connected");
+            } catch (err) {
+                console.error("SignalR connection failed: " + err);
+            }
+        }
+
+        // File upload handlers
         dropZone.addEventListener('click', () => {
             fileInput.click();
         });
 
-        // Drag and drop
         dropZone.addEventListener('dragover', (e) => {
             e.preventDefault();
             dropZone.classList.add('border-primary');
@@ -105,7 +317,6 @@
             }
         });
 
-        // File input change
         fileInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (file) {
@@ -116,8 +327,394 @@
         function showFileInfo(file) {
             fileName.textContent = file.name + ' (' + formatBytes(file.size) + ')';
             fileInfo.classList.remove('d-none');
+            checkFormValid();
         }
 
+        function checkFormValid() {
+            const fileSelected = fileInput.files.length > 0;
+            const nameEntered = workOrderNameInput.value.trim().length > 0;
+            startImportBtn.disabled = !(fileSelected && nameEntered);
+        }
+
+        workOrderNameInput.addEventListener('input', checkFormValid);
+
+        // Import process
+        startImportBtn.addEventListener('click', async () => {
+            const file = fileInput.files[0];
+            const workOrderName = workOrderNameInput.value.trim();
+            
+            if (!file || !workOrderName) {
+                alert('Please select a file and enter a work order name.');
+                return;
+            }
+
+            try {
+                // Upload file
+                const formData = new FormData();
+                formData.append('file', file);
+
+                const uploadResponse = await fetch('/Import/UploadFile', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!uploadResponse.ok) {
+                    const error = await uploadResponse.json();
+                    throw new Error(error.error || 'Upload failed');
+                }
+
+                const uploadResult = await uploadResponse.json();
+                currentSessionId = uploadResult.sessionId;
+
+                // Join SignalR group
+                if (signalRConnection) {
+                    await signalRConnection.invoke("JoinImportGroup", currentSessionId);
+                }
+
+                // Start import
+                const importResponse = await fetch('/Import/StartImport', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        sessionId: currentSessionId,
+                        workOrderName: workOrderName
+                    })
+                });
+
+                if (!importResponse.ok) {
+                    const error = await importResponse.json();
+                    throw new Error(error.error || 'Import failed to start');
+                }
+
+                // Switch to progress view
+                showProgressStep();
+
+            } catch (error) {
+                alert('Error starting import: ' + error.message);
+                console.error('Import error:', error);
+            }
+        });
+
+        // Progress tracking
+        function updateProgress(percentage, stage, estimatedTimeRemaining) {
+            progressBar.style.width = percentage + '%';
+            progressBar.textContent = percentage + '%';
+            progressBar.setAttribute('aria-valuenow', percentage);
+            
+            currentStage.textContent = stage;
+            
+            if (estimatedTimeRemaining > 0) {
+                const minutes = Math.floor(estimatedTimeRemaining / 60);
+                const seconds = Math.floor(estimatedTimeRemaining % 60);
+                timeRemaining.textContent = `${minutes}m ${seconds}s`;
+            } else {
+                timeRemaining.textContent = 'Completing...';
+            }
+        }
+
+        async function handleImportComplete(data) {
+            try {
+                // Fetch the import data
+                const response = await fetch(`/Import/GetImportData?sessionId=${currentSessionId}`);
+                if (response.ok) {
+                    importData = await response.json();
+                    showPreviewStep();
+                } else {
+                    throw new Error('Failed to load import data');
+                }
+            } catch (error) {
+                alert('Error loading import data: ' + error.message);
+            }
+        }
+
+        function handleImportError(error) {
+            alert('Import failed: ' + error);
+            showUploadStep();
+        }
+
+        // Cancel import
+        cancelImportBtn.addEventListener('click', async () => {
+            if (confirm('Are you sure you want to cancel the import?')) {
+                try {
+                    await fetch(`/Import/CancelImport?sessionId=${currentSessionId}`, {
+                        method: 'DELETE'
+                    });
+                    showUploadStep();
+                } catch (error) {
+                    console.error('Cancel error:', error);
+                }
+            }
+        });
+
+        // Step navigation
+        function showUploadStep() {
+            uploadStep.classList.remove('d-none');
+            progressStep.classList.add('d-none');
+            previewStep.classList.add('d-none');
+        }
+
+        function showProgressStep() {
+            uploadStep.classList.add('d-none');
+            progressStep.classList.remove('d-none');
+            previewStep.classList.add('d-none');
+        }
+
+        function showPreviewStep() {
+            uploadStep.classList.add('d-none');
+            progressStep.classList.add('d-none');
+            previewStep.classList.remove('d-none');
+            
+            if (importData) {
+                populatePreview();
+                buildTreeView();
+            }
+        }
+
+        // Preview functionality
+        function populatePreview() {
+            const stats = importData.statistics;
+            totalProducts.textContent = stats.totalProducts;
+            totalParts.textContent = stats.totalParts;
+            totalSubassemblies.textContent = stats.totalSubassemblies;
+            totalHardware.textContent = stats.totalHardware;
+        }
+
+        function buildTreeView() {
+            treeView.innerHTML = '';
+            
+            if (!importData.products || importData.products.length === 0) {
+                treeView.innerHTML = '<p class="text-muted">No products found in import data.</p>';
+                return;
+            }
+
+            const workOrderNode = createTreeNode('📋', `Work Order: ${importData.name}`, 'work-order', true);
+            treeView.appendChild(workOrderNode);
+
+            // Products section
+            const productsContainer = document.createElement('div');
+            productsContainer.className = 'tree-node';
+            workOrderNode.appendChild(productsContainer);
+
+            const productsHeader = createTreeNode('📦', 'Products', 'products-header', true);
+            productsContainer.appendChild(productsHeader);
+
+            const productsContent = document.createElement('div');
+            productsContent.className = 'tree-content';
+            productsContainer.appendChild(productsContent);
+
+            importData.products.forEach(product => {
+                const productNode = createProductNode(product);
+                productsContent.appendChild(productNode);
+            });
+
+            // Hardware section (standalone)
+            if (importData.hardware && importData.hardware.length > 0) {
+                const hardwareContainer = document.createElement('div');
+                hardwareContainer.className = 'tree-node';
+                workOrderNode.appendChild(hardwareContainer);
+
+                const hardwareHeader = createTreeNode('🔧', 'Hardware', 'hardware-header', true);
+                hardwareContainer.appendChild(hardwareHeader);
+
+                const hardwareContent = document.createElement('div');
+                hardwareContent.className = 'tree-content';
+                hardwareContainer.appendChild(hardwareContent);
+
+                importData.hardware.forEach(hardware => {
+                    const hardwareNode = createHardwareNode(hardware);
+                    hardwareContent.appendChild(hardwareNode);
+                });
+            }
+
+            // Detached Products section
+            if (importData.detachedProducts && importData.detachedProducts.length > 0) {
+                const detachedContainer = document.createElement('div');
+                detachedContainer.className = 'tree-node';
+                workOrderNode.appendChild(detachedContainer);
+
+                const detachedHeader = createTreeNode('📦', 'Detached Products', 'detached-header', true);
+                detachedContainer.appendChild(detachedHeader);
+
+                const detachedContent = document.createElement('div');
+                detachedContent.className = 'tree-content';
+                detachedContainer.appendChild(detachedContent);
+
+                importData.detachedProducts.forEach(detached => {
+                    const detachedNode = createDetachedProductNode(detached);
+                    detachedContent.appendChild(detachedNode);
+                });
+            }
+        }
+
+        function createTreeNode(icon, text, type, expanded = false) {
+            const node = document.createElement('div');
+            node.className = 'tree-node';
+            node.innerHTML = `
+                <div class="d-flex align-items-center">
+                    <span class="tree-toggle me-2" data-expanded="${expanded}">
+                        <i class="fas fa-${expanded ? 'minus' : 'plus'}"></i>
+                    </span>
+                    <input type="checkbox" class="form-check-input me-2" checked>
+                    <span class="me-2">${icon}</span>
+                    <span class="flex-grow-1">${text}</span>
+                </div>
+            `;
+
+            const toggle = node.querySelector('.tree-toggle');
+            toggle.addEventListener('click', () => {
+                const isExpanded = toggle.dataset.expanded === 'true';
+                toggle.dataset.expanded = !isExpanded;
+                toggle.querySelector('i').className = `fas fa-${!isExpanded ? 'minus' : 'plus'}`;
+                
+                const content = node.querySelector('.tree-content');
+                if (content) {
+                    content.style.display = !isExpanded ? 'block' : 'none';
+                }
+            });
+
+            return node;
+        }
+
+        function createProductNode(product) {
+            const productNode = createTreeNode('🚪', 
+                `${product.id} - ${product.name} (Qty: ${product.quantity}, ${product.width}mm×${product.height}mm)`, 
+                'product', false);
+            
+            const content = document.createElement('div');
+            content.className = 'tree-content';
+            content.style.display = 'none';
+            productNode.appendChild(content);
+
+            // Add parts
+            product.parts.forEach(part => {
+                const partNode = createPartNode(part);
+                content.appendChild(partNode);
+            });
+
+            // Add subassemblies
+            product.subassemblies.forEach(subassembly => {
+                const subassemblyNode = createSubassemblyNode(subassembly);
+                content.appendChild(subassemblyNode);
+            });
+
+            // Add hardware
+            product.hardware.forEach(hardware => {
+                const hardwareNode = createHardwareNode(hardware);
+                content.appendChild(hardwareNode);
+            });
+
+            return productNode;
+        }
+
+        function createPartNode(part) {
+            return createTreeNode('📄', 
+                `${part.id} - ${part.name} (Qty: ${part.quantity}, ${part.width}mm×${part.height}mm×${part.thickness}mm, ${part.material})`, 
+                'part', false);
+        }
+
+        function createSubassemblyNode(subassembly) {
+            const subassemblyNode = createTreeNode('📁', 
+                `${subassembly.id} - ${subassembly.name} (Qty: ${subassembly.quantity})`, 
+                'subassembly', false);
+            
+            const content = document.createElement('div');
+            content.className = 'tree-content';
+            content.style.display = 'none';
+            subassemblyNode.appendChild(content);
+
+            // Add parts
+            subassembly.parts.forEach(part => {
+                const partNode = createPartNode(part);
+                content.appendChild(partNode);
+            });
+
+            // Add nested subassemblies
+            subassembly.nestedSubassemblies.forEach(nested => {
+                const nestedNode = createSubassemblyNode(nested);
+                content.appendChild(nestedNode);
+            });
+
+            // Add hardware
+            subassembly.hardware.forEach(hardware => {
+                const hardwareNode = createHardwareNode(hardware);
+                content.appendChild(hardwareNode);
+            });
+
+            return subassemblyNode;
+        }
+
+        function createHardwareNode(hardware) {
+            return createTreeNode('🔧', 
+                `${hardware.id} - ${hardware.name} (Qty: ${hardware.quantity})`, 
+                'hardware', false);
+        }
+
+        function createDetachedProductNode(detached) {
+            return createTreeNode('📄', 
+                `${detached.id} - ${detached.name} (Qty: ${detached.quantity}, ${detached.width}mm×${detached.height}mm×${detached.thickness}mm)`, 
+                'detached', false);
+        }
+
+        // Tree view controls
+        expandAllBtn.addEventListener('click', () => {
+            const toggles = treeView.querySelectorAll('.tree-toggle');
+            toggles.forEach(toggle => {
+                toggle.dataset.expanded = 'true';
+                toggle.querySelector('i').className = 'fas fa-minus';
+                const content = toggle.closest('.tree-node').querySelector('.tree-content');
+                if (content) content.style.display = 'block';
+            });
+        });
+
+        collapseAllBtn.addEventListener('click', () => {
+            const toggles = treeView.querySelectorAll('.tree-toggle');
+            toggles.forEach(toggle => {
+                toggle.dataset.expanded = 'false';
+                toggle.querySelector('i').className = 'fas fa-plus';
+                const content = toggle.closest('.tree-node').querySelector('.tree-content');
+                if (content) content.style.display = 'none';
+            });
+        });
+
+        // Search functionality
+        searchFilter.addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            const nodes = treeView.querySelectorAll('.tree-node');
+            
+            nodes.forEach(node => {
+                const text = node.textContent.toLowerCase();
+                const shouldShow = searchTerm === '' || text.includes(searchTerm);
+                node.style.display = shouldShow ? 'block' : 'none';
+            });
+        });
+
+        // CSV download functionality
+        downloadCsvBtn.addEventListener('click', () => {
+            if (currentSessionId) {
+                window.location.href = `/Import/ExportRawDataCsv?sessionId=${currentSessionId}`;
+            } else {
+                alert('No import session available for CSV export.');
+            }
+        });
+
+        // Confirm import
+        confirmImportBtn.addEventListener('click', () => {
+            // This would save the data to the database
+            alert('Import functionality would be implemented here to save the data to the database.');
+        });
+
+        startOverBtn.addEventListener('click', () => {
+            showUploadStep();
+            // Reset form
+            fileInput.value = '';
+            workOrderNameInput.value = '';
+            fileInfo.classList.add('d-none');
+            checkFormValid();
+        });
+
+        // Utility functions
         function formatBytes(bytes) {
             if (bytes === 0) return '0 Bytes';
             const k = 1024;
@@ -126,10 +723,9 @@
             return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
         }
 
-        document.querySelector('form').addEventListener('submit', function(e) {
-            const button = document.querySelector('button[type="submit"]');
-            button.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Importing... Please wait';
-            button.disabled = true;
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeSignalR();
         });
     </script>
 }

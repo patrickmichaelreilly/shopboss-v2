@@ -121,6 +121,16 @@ Created all core entities based on Microvellum SDF structure:
 - **Web Application Startup:** Success (listening on http://localhost:5000)
 - **Entity Framework:** Success (migrations applied, DbContext working)
 
+#### 11. Testing Adjustments and File Upload Foundation
+- **Modified:** `src/ShopBoss.Web/Program.cs` - Added automatic database creation on startup
+- **Modified:** `src/ShopBoss.Web/Controllers/AdminController.cs` - Added file upload processing for testing
+- **Modified:** `src/ShopBoss.Web/Views/Admin/Import.cshtml` - Added file upload form for testing
+- **Added:** `deploy-to-windows.sh` - Windows deployment script for testing
+- File upload functionality for SDF files (50MB limit, .sdf extension validation)
+- Temporary file handling and cleanup for import testing
+- Enhanced error handling and user feedback
+- Ready for actual SDF parser integration in Phase 2
+
 ### Technical Specifications Met
 
 #### Database Design
@@ -191,93 +201,217 @@ Created all core entities based on Microvellum SDF structure:
 - [x] Admin controller with error handling patterns
 - [x] SQLite database with proper schema and relationships
 
-**Phase 1 Status:** COMPLETE   
-**Ready for Phase 2:** Import Tool Integration and Background Processing
+**Phase 1 Status:** COMPLETE (with testing adjustments)  
+**Ready for Phase 2:** SDF Parser Integration and Background Processing
 
 ---
 
-## Phase 2: File Upload and Import Functionality - COMPLETED
+## Phase 2: Data Importer Integration & Tree View - IN PROGRESS
 **Date:** 2025-06-18  
-**Objective:** Implement file upload functionality for SDF files and initialize database structure for import processing.
+**Objective:** Integrate x86 importer executable with background processing, real-time progress tracking, and interactive tree view for data preview.
+
+### Progress Summary
+- **Status:** Major breakthrough achieved - infinite recursion resolved, CSV export implemented
+- **Data Discovery:** Identified that SDF column names don't match expected names, causing hierarchy issues
+- **Import Processing:** Working end-to-end from file upload to data transformation 
+- **Tree View:** Functional but displaying incorrect hierarchy due to data mapping issues
+- **Real-time Progress:** SignalR implementation working with error handling
 
 ### Completed Tasks
 
-#### 1. File Upload Implementation
-- **Modified:** `src/ShopBoss.Web/Views/Admin/Import.cshtml`
-- Added HTML file upload form with proper enctype="multipart/form-data"
-- Implemented Bootstrap 5 styled file input with validation
-- Added progress indicators and user feedback messaging
-- File size limit: 50MB maximum
-- Accepted file types: .sdf files only
+#### 1. ImporterService Implementation
+- **File:** `src/ShopBoss.Web/Services/ImporterService.cs`
+- Process wrapper for x86 importer executable with timeout and error handling
+- Automatic path resolution (searches for win-x86 version instead of win-x64)
+- Progress simulation during 2-3 minute import process
+- JSON output parsing with proper error handling
+- **Path Configuration:** `tools\importer\bin\Release\net8.0\win-x86\Importer.exe`
 
-#### 2. AdminController File Upload Processing
-- **Modified:** `src/ShopBoss.Web/Controllers/AdminController.cs`
-- Added [HttpPost] ImportWorkOrder action to handle file uploads
-- Implemented file validation (extension, size, existence checks)
-- Added proper error handling with user-friendly messages
-- Temporary file storage for processing
-- File cleanup after processing attempt
+#### 2. Import Data Models
+Created complete hierarchy of import preview models:
+- **ImportWorkOrder** - Root container with statistics
+- **ImportProduct** - Products with dimensions and materials
+- **ImportPart** - Parts with edge banding and grain direction
+- **ImportSubassembly** - Subassemblies with nested support (max 2 levels)
+- **ImportHardware** - Hardware with manufacturer and part numbers
+- **ImportDetachedProduct** - Standalone products
+- **ImportStatistics** - Count totals and validation warnings
 
-#### 3. Database Initialization and Migration
-- **Modified:** `src/ShopBoss.Web/Program.cs`
-- Added automatic database creation on application startup
-- Ensures database exists before handling requests
-- Proper error handling for database initialization failures
+#### 3. ImportDataTransformService
+- **File:** `src/ShopBoss.Web/Services/ImportDataTransformService.cs`
+- Transforms raw JSON data from importer into structured import models
+- **CRITICAL FIX:** Implemented circular reference detection to prevent infinite recursion
+- GroupBy logic to handle duplicate IDs in raw data
+- Filtering for empty/null IDs to prevent false circular reference detection
+- Proper hierarchy building (Products -> Subassemblies -> Nested -> Parts/Hardware)
 
-#### 4. Import Processing Foundation
-- File upload saves to temporary location
-- Basic validation of SDF file format
-- Error handling for invalid files or processing failures
-- User feedback through TempData success/error messages
-- Preparation for Phase 3 background processing integration
+#### 4. ImportController with Background Processing
+- **File:** `src/ShopBoss.Web/Controllers/ImportController.cs`
+- File upload with validation (.sdf files, 100MB limit)
+- Session-based import tracking with in-memory storage
+- Background Task.Run processing with SignalR progress updates
+- **NEW:** CSV export endpoint for raw data analysis (`ExportRawDataCsv`)
+- Automatic file cleanup after 1 hour
+- Comprehensive error handling with try-catch around SignalR calls
 
-### Technical Implementation Details
+#### 5. SignalR Real-time Progress Hub
+- **File:** `src/ShopBoss.Web/Hubs/ImportProgressHub.cs`
+- Real-time progress updates during import process
+- Group-based messaging for session isolation
+- Error handling to prevent import failures from SignalR issues
+- Progress stages: "Converting SDF...", "Cleaning SQL...", "Generating JSON...", "Complete!"
 
-#### File Upload Specifications
-- **Maximum file size:** 50MB (52,428,800 bytes)
-- **Accepted extensions:** .sdf only
-- **Upload method:** HTTP POST with multipart/form-data
-- **Storage:** Temporary files in system temp directory
-- **Validation:** File existence, extension, and size checks
+#### 6. Interactive Tree View UI
+- **File:** `src/ShopBoss.Web/Views/Admin/Import.cshtml`
+- Three-step workflow: Upload -> Progress -> Preview
+- Drag-and-drop file upload with visual feedback
+- Real-time progress bar with stage indicators and time estimates
+- **Vanilla JavaScript tree view** with expand/collapse functionality
+- Search filtering and bulk expand/collapse controls
+- **NEW:** CSV export button for raw data download
+- Statistics dashboard with count cards
 
-#### Error Handling
-- Invalid file extension rejection
-- File size limit enforcement
-- Missing file detection
-- Processing failure recovery
-- User-friendly error messages via TempData
+#### 7. Data Structure Debugging Implementation
+- **Dynamic CSV Export:** Discovers all actual column names from SDF data instead of assuming
+- **Column Analysis:** Exports 946 rows with complete field discovery
+- **Relationship Debugging:** Enables identification of actual ID column names
 
-#### Database Ready State
-- Automatic database creation on startup
-- All Entity Framework models properly configured
-- Ready for import data insertion in Phase 3
+### Technical Achievements
 
-### Files Modified
+#### Background Processing Architecture
+- Async Task.Run for non-blocking import processing
+- Session management with ConcurrentDictionary for thread safety
+- Progress reporting through IProgress<T> pattern
+- SignalR integration with proper error isolation
 
-#### Controllers
-- `src/ShopBoss.Web/Controllers/AdminController.cs` - Added file upload processing
+#### Circular Reference Prevention
+```csharp
+// Implemented in TransformSubassembly method
+processedSubassemblies ??= new HashSet<string>();
+if (processedSubassemblies.Contains(subassembly.Id))
+{
+    _logger.LogWarning("Circular reference detected for subassembly {SubassemblyId}. Skipping nested processing.", subassembly.Id);
+    return subassembly;
+}
+```
 
-#### Views
-- `src/ShopBoss.Web/Views/Admin/Import.cshtml` - Added file upload form
+#### Real-time Progress Tracking
+- 4-stage progress simulation with realistic timing
+- Automatic completion detection when importer process exits
+- Error propagation through SignalR with fallback logging
+
+### Current Status & Issues Identified
+
+#### ✅ Working Features
+- Complete file upload to import completion workflow
+- No more infinite recursion crashes
+- Real-time progress updates via SignalR
+- Tree view population and basic interaction
+- CSV export for data analysis
+
+#### 🔍 Issues Requiring Resolution
+1. **Data Mapping Problem:** SDF columns don't match expected names
+   - Missing: ProductId, SubassemblyId, ParentSubassemblyId, PartId, HardwareId
+   - Missing: Thickness, Material, Category, Manufacturer, PartNumber
+   - **Impact:** Incorrect hierarchy construction and inflated counts
+
+2. **Hierarchy Logic Needs Refinement:** 
+   - 946 CSV rows producing much larger preview counts (suggesting duplicates)
+   - Need to identify actual relationship column names
+   - Proposed parsing order: Products → Subassemblies → Nested Subassemblies → Parts/Hardware
+
+3. **Performance Optimization Needed:**
+   - Currently processing all columns; should filter to relevant ones only
+   - Transform logic needs actual column mapping
+
+### Data Analysis Discovery
+
+#### CSV Export Analysis Results
+- **Total Rows:** 946 (including header)
+- **Missing Columns:** All expected ID and relationship columns are empty
+- **Evidence:** Column name mismatch between expected and actual SDF structure
+- **Next Step:** Analyze actual column names to map relationships correctly
+
+#### Proposed Resolution Strategy
+1. **Selective Column Processing:** Only import relevant columns for hierarchy and display
+2. **Systematic Parsing Order:**
+   - Pull products table → populate top level
+   - Parse subassemblies → link to products via actual relationship columns
+   - Differentiate nested subassemblies from regular ones
+   - Associate parts and hardware with correct parents using real link IDs
+3. **Column Mapping:** Create translation layer from actual SDF columns to expected model properties
+
+### Files Created/Modified in Phase 2
+
+#### Services
+- `src/ShopBoss.Web/Services/ImporterService.cs` - Process wrapper for x86 importer
+- `src/ShopBoss.Web/Services/ImportDataTransformService.cs` - Data transformation with circular reference prevention
+
+#### Controllers  
+- `src/ShopBoss.Web/Controllers/ImportController.cs` - Import workflow with CSV export
+
+#### Models (Import namespace)
+- `src/ShopBoss.Web/Models/Import/ImportWorkOrder.cs`
+- `src/ShopBoss.Web/Models/Import/ImportProduct.cs`
+- `src/ShopBoss.Web/Models/Import/ImportPart.cs`
+- `src/ShopBoss.Web/Models/Import/ImportSubassembly.cs`
+- `src/ShopBoss.Web/Models/Import/ImportHardware.cs`
+- `src/ShopBoss.Web/Models/Import/ImportDetachedProduct.cs`
+
+#### Real-time Communication
+- `src/ShopBoss.Web/Hubs/ImportProgressHub.cs` - SignalR hub for progress updates
+
+#### UI
+- `src/ShopBoss.Web/Views/Admin/Import.cshtml` - Complete three-step import interface with tree view
 
 #### Configuration
-- `src/ShopBoss.Web/Program.cs` - Added database initialization
+- `src/ShopBoss.Web/appsettings.json` - Added ImporterPath configuration
+- `src/ShopBoss.Web/appsettings.Development.json` - Windows testing path
+- `src/ShopBoss.Web/Program.cs` - Added SignalR services
 
-### Next Steps for Phase 3
-1. **Background Processing:** Implement async import processing with progress tracking
-2. **SDF Parser Integration:** Connect actual SDF file parsing logic
-3. **SignalR Implementation:** Add real-time progress updates during import
-4. **Import Status Tracking:** Add import history and status monitoring
-5. **Error Recovery:** Enhanced error handling for malformed SDF files
+### Testing Results
 
-### Definition of Done - ACHIEVED
-- [x] File upload form implemented with proper validation
-- [x] File processing endpoint created in AdminController
-- [x] Database initialization on startup
-- [x] Error handling for invalid files
-- [x] User feedback through success/error messages
-- [x] Temporary file handling and cleanup
-- [x] Ready for actual SDF parsing integration
+#### Windows Testing Environment
+- **Deployment Script:** `deploy-to-windows.sh` working correctly
+- **Importer Path Resolution:** Successfully finding win-x86 version
+- **Native Folder Fix:** User successfully moved Native folder to resolve dependencies
+- **End-to-End Success:** Complete workflow from upload to preview page working
 
-**Phase 2 Status:** COMPLETE  
-**Ready for Phase 3:** SDF Parser Integration and Background Processing
+#### Import Processing Verification
+```
+info: Successfully imported SDF file in 46.1 seconds
+info: Starting data transformation. Products: 42, Parts: 495, Subassemblies: 73, Hardware: 335
+info: Successfully transformed import data for work order dfdfsdf
+info: Import completed successfully
+```
+
+### Next Phase Requirements
+
+#### Priority 1: Data Structure Analysis
+1. **Analyze CSV Export:** Identify actual column names and relationship fields
+2. **Create Column Mapping:** Map actual SDF columns to expected model properties  
+3. **Fix Transformation Logic:** Update GetStringValue calls to use correct column names
+4. **Verify Hierarchy:** Ensure proper parent-child relationships
+
+#### Priority 2: Performance Optimization
+1. **Selective Column Import:** Only process relevant columns for speed
+2. **Efficient Parsing Order:** Products → Subassemblies → Nested → Parts/Hardware
+3. **Memory Optimization:** Reduce duplicate data creation
+
+#### Priority 3: Data Validation
+1. **Count Verification:** Ensure preview counts match actual data
+2. **Relationship Validation:** Verify parent-child linkages are correct
+3. **Tree View Accuracy:** Display proper hierarchy in UI
+
+### Definition of Current Achievement
+- [x] Complete import workflow implemented
+- [x] Infinite recursion bug resolved
+- [x] Real-time progress tracking working
+- [x] Tree view UI functional
+- [x] CSV export for debugging implemented
+- [x] All error handling and user feedback working
+- [ ] Data hierarchy mapping requires actual column analysis
+- [ ] Performance optimization pending column identification
+
+**Phase 2 Status:** Core infrastructure complete, data mapping analysis in progress  
+**Next Session Goal:** Analyze CSV export to identify actual SDF column structure and fix transformation logic
