@@ -1160,19 +1160,22 @@
                 const result = await response.json();
 
                 if (response.ok && result.success) {
-                    // Show success message
-                    alert(`Import processing completed successfully!\n\n` +
-                          `Converted:\n` +
+                    // Show success message with database confirmation
+                    alert(`Work Order successfully imported to database!\n\n` +
+                          `Saved:\n` +
                           `• ${result.statistics.convertedProducts} Products\n` +
                           `• ${result.statistics.convertedParts} Parts\n` +
                           `• ${result.statistics.convertedSubassemblies} Subassemblies\n` +
                           `• ${result.statistics.convertedHardware} Hardware\n\n` +
-                          `Work Order ID: ${result.workOrderId}\n\n` +
-                          `Ready for database import.`);
+                          `Work Order ID: ${result.workOrderId}\n` +
+                          `Work Order Name: ${workOrderName}\n\n` +
+                          `The work order is now available in the system.`);
 
-                    // In Phase 4, this would redirect to work order details or import confirmation
-                    // For now, show success and allow user to start over
-                    console.log('Conversion result:', result);
+                    // Redirect to work orders list after successful import
+                    console.log('Import completed successfully:', result);
+                    setTimeout(() => {
+                        window.location.href = '/Admin';
+                    }, 2000);
                     
                 } else {
                     // Show error details

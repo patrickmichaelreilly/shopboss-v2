@@ -22,6 +22,8 @@ public class ImportSelectionService
     {
         var result = new ImportConversionResult();
         
+        using var transaction = await _context.Database.BeginTransactionAsync();
+        
         try
         {
             _logger.LogInformation("Starting conversion of selected items for work order: {WorkOrderName}", selection.WorkOrderName);
@@ -34,6 +36,14 @@ public class ImportSelectionService
                 return result;
             }
 
+            // Check for duplicate work order
+            var duplicateCheck = await CheckForDuplicateWorkOrder(importData.Id, selection.WorkOrderName);
+            if (!duplicateCheck.IsValid)
+            {
+                result.Errors.AddRange(duplicateCheck.Errors);
+                return result;
+            }
+
             // Create the work order entity
             var workOrder = CreateWorkOrderEntity(importData, selection);
             
@@ -42,10 +52,18 @@ public class ImportSelectionService
             ProcessSelectedHardware(importData, selection, workOrder, result);
             ProcessSelectedDetachedProducts(importData, selection, workOrder, result);
 
+            // Save to database
+            _context.WorkOrders.Add(workOrder);
+            await _context.SaveChangesAsync();
+            
+            // Commit transaction
+            await transaction.CommitAsync();
+
             result.Success = true;
             result.WorkOrderId = workOrder.Id;
             
-            _logger.LogInformation("Successfully converted {ProductCount} products, {PartCount} parts, {SubassemblyCount} subassemblies, {HardwareCount} hardware items",
+            _logger.LogInformation("Successfully saved work order {WorkOrderId} with {ProductCount} products, {PartCount} parts, {SubassemblyCount} subassemblies, {HardwareCount} hardware items",
+                workOrder.Id,
                 result.Statistics.ConvertedProducts,
                 result.Statistics.ConvertedParts,
                 result.Statistics.ConvertedSubassemblies,
@@ -54,8 +72,32 @@ public class ImportSelectionService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error converting selected items");
-            result.Errors.Add($"Conversion error: {ex.Message}");
+            _logger.LogError(ex, "Error converting and saving selected items. Rolling back transaction.");
+            await transaction.RollbackAsync();
+            result.Errors.Add($"Import error: {ex.Message}");
+        }
+
+        return result;
+    }
+
+    private async Task<SelectionValidationResult> CheckForDuplicateWorkOrder(string workOrderId, string workOrderName)
+    {
+        var result = new SelectionValidationResult { IsValid = true };
+
+        // Check for duplicate Microvellum ID
+        var existingById = await _context.WorkOrders.FirstOrDefaultAsync(w => w.Id == workOrderId);
+        if (existingById != null)
+        {
+            result.Errors.Add($"Work order with Microvellum ID '{workOrderId}' already exists (imported as '{existingById.Name}' on {existingById.ImportedDate:yyyy-MM-dd})");
+            result.IsValid = false;
+        }
+
+        // Check for duplicate name
+        var existingByName = await _context.WorkOrders.FirstOrDefaultAsync(w => w.Name == workOrderName);
+        if (existingByName != null)
+        {
+            result.Errors.Add($"Work order with name '{workOrderName}' already exists (Microvellum ID: {existingByName.Id}, imported on {existingByName.ImportedDate:yyyy-MM-dd})");
+            result.IsValid = false;
         }
 
         return result;
