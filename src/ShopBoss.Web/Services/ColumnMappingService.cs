@@ -32,6 +32,11 @@ public class ColumnMappingService
 
     public string GetStringValue(Dictionary<string, object?> data, string tableType, string logicalColumnName)
     {
+        if (!HasColumn(tableType, logicalColumnName))
+        {
+            return string.Empty; // Return empty string silently for non-existent columns
+        }
+        
         var actualColumnName = GetActualColumnName(tableType, logicalColumnName);
         
         if (data.TryGetValue(actualColumnName, out var value) && value != null)
@@ -77,9 +82,9 @@ public class ColumnMappingService
                 { "WorkOrderId", "LinkIDWorkOrder" },
                 
                 // Product properties
-                { "Name", "ItemNumber" },
-                { "ProductName", "ItemNumber" },
-                { "ItemNumber", "ItemNumber" },
+                { "ItemNumber", "ItemNumber" }, // Item number from SDF
+                { "Name", "Name" }, // Product name from SDF
+                { "ProductName", "Name" },
                 { "WorkOrderName", "WorkOrderName" },
                 
                 // Dimensions (in millimeters)
@@ -93,6 +98,7 @@ public class ColumnMappingService
                 
                 // Internal ID
                 { "InternalId", "ID" }
+                // Note: Description and Material columns are not available in PRODUCTS table
             },
 
             "SUBASSEMBLIES" => new Dictionary<string, string>
@@ -113,6 +119,7 @@ public class ColumnMappingService
                 
                 // Internal ID
                 { "InternalId", "ID" }
+                // Note: Width, Depth, Quantity, and Height columns are not available in SUBASSEMBLIES table
             },
 
             "PARTS" => new Dictionary<string, string>
@@ -167,6 +174,7 @@ public class ColumnMappingService
                 
                 // Internal ID
                 { "InternalId", "ID" }
+                // Note: Description, GrainDirection, and Notes columns are not available in PARTS table
             },
 
             "HARDWARE" => new Dictionary<string, string>
@@ -190,6 +198,7 @@ public class ColumnMappingService
                 
                 // Internal ID
                 { "InternalId", "ID" }
+                // Note: Notes column is not available in HARDWARE table
             },
 
             "PLACEDSHEETS" => new Dictionary<string, string>

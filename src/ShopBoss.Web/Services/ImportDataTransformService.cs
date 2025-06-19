@@ -16,10 +16,25 @@ public class ImportDataTransformService
 
     public ImportWorkOrder TransformToImportWorkOrder(ImportData rawData, string workOrderName)
     {
+        // Try to extract actual work order name from SDF data
+        string actualWorkOrderName = workOrderName;
+        if (string.IsNullOrEmpty(workOrderName) || workOrderName == "Imported Work Order")
+        {
+            var firstProduct = rawData.Products?.FirstOrDefault();
+            if (firstProduct != null)
+            {
+                var extractedName = _columnMapping.GetStringValue(firstProduct, "PRODUCTS", "WorkOrderName");
+                if (!string.IsNullOrEmpty(extractedName))
+                {
+                    actualWorkOrderName = extractedName;
+                }
+            }
+        }
+
         var workOrder = new ImportWorkOrder
         {
             Id = Guid.NewGuid().ToString(),
-            Name = workOrderName,
+            Name = actualWorkOrderName ?? "Imported Work Order",
             ImportedDate = DateTime.Now
         };
 
@@ -114,16 +129,20 @@ public class ImportDataTransformService
 
     private ImportProduct TransformProduct(Dictionary<string, object?> productData, string workOrderId)
     {
+        var itemNumber = _columnMapping.GetStringValue(productData, "PRODUCTS", "ItemNumber"); // ItemNumber from SDF
+        var productName = _columnMapping.GetStringValue(productData, "PRODUCTS", "Name"); // Product Name from SDF
+        
         return new ImportProduct
         {
             Id = _columnMapping.GetStringValue(productData, "PRODUCTS", "Id"),
-            Name = _columnMapping.GetStringValue(productData, "PRODUCTS", "Name"),
-            Description = _columnMapping.GetStringValue(productData, "PRODUCTS", "Description"),
+            ProductNumber = itemNumber, // ItemNumber from SDF
+            Name = productName, // Product Name from SDF
+            Description = string.Empty, // Description not available in PRODUCTS table
             Quantity = _columnMapping.GetIntValue(productData, "PRODUCTS", "Quantity"),
             Width = _columnMapping.GetDecimalValue(productData, "PRODUCTS", "Width"),
             Height = _columnMapping.GetDecimalValue(productData, "PRODUCTS", "Height"),
             Depth = _columnMapping.GetDecimalValue(productData, "PRODUCTS", "Depth"),
-            Material = _columnMapping.GetStringValue(productData, "PRODUCTS", "Material"),
+            Material = string.Empty, // Material not available in PRODUCTS table  
             WorkOrderId = workOrderId
         };
     }
@@ -134,7 +153,7 @@ public class ImportDataTransformService
         {
             Id = _columnMapping.GetStringValue(partData, "PARTS", "Id"),
             Name = _columnMapping.GetStringValue(partData, "PARTS", "Name"),
-            Description = _columnMapping.GetStringValue(partData, "PARTS", "Description"),
+            Description = string.Empty, // Description not available in PARTS table
             Quantity = _columnMapping.GetIntValue(partData, "PARTS", "Quantity"),
             Width = _columnMapping.GetDecimalValue(partData, "PARTS", "Width"),
             Height = _columnMapping.GetDecimalValue(partData, "PARTS", "Height"),
@@ -146,8 +165,8 @@ public class ImportDataTransformService
                          _columnMapping.GetStringValue(partData, "PARTS", "EdgeBandingRight"),
             ProductId = productId,
             SubassemblyId = subassemblyId,
-            GrainDirection = _columnMapping.GetStringValue(partData, "PARTS", "GrainDirection"),
-            Notes = _columnMapping.GetStringValue(partData, "PARTS", "Notes")
+            GrainDirection = string.Empty, // GrainDirection not available in PARTS table
+            Notes = string.Empty // Notes not available in PARTS table
         };
     }
 
@@ -170,11 +189,11 @@ public class ImportDataTransformService
         {
             Id = subassemblyId,
             Name = _columnMapping.GetStringValue(subassemblyData, "SUBASSEMBLIES", "Name"),
-            Description = _columnMapping.GetStringValue(subassemblyData, "SUBASSEMBLIES", "Description"),
-            Quantity = _columnMapping.GetIntValue(subassemblyData, "SUBASSEMBLIES", "Quantity"),
-            Width = _columnMapping.GetDecimalValue(subassemblyData, "SUBASSEMBLIES", "Width"),
-            Height = _columnMapping.GetDecimalValue(subassemblyData, "SUBASSEMBLIES", "Height"),
-            Depth = _columnMapping.GetDecimalValue(subassemblyData, "SUBASSEMBLIES", "Depth"),
+            Description = string.Empty, // Description not available in SUBASSEMBLIES table
+            Quantity = 1, // Quantity not available in SUBASSEMBLIES table, default to 1
+            Width = 0, // Width not available in SUBASSEMBLIES table
+            Height = 0, // Height not available in SUBASSEMBLIES table
+            Depth = 0, // Depth not available in SUBASSEMBLIES table
             ProductId = productId,
             ParentSubassemblyId = parentSubassemblyId
         };
@@ -226,17 +245,17 @@ public class ImportDataTransformService
         {
             Id = _columnMapping.GetStringValue(hardwareData, "HARDWARE", "Id"),
             Name = _columnMapping.GetStringValue(hardwareData, "HARDWARE", "Name"),
-            Description = _columnMapping.GetStringValue(hardwareData, "HARDWARE", "Description"),
+            Description = string.Empty, // Description not available in HARDWARE table
             Quantity = _columnMapping.GetIntValue(hardwareData, "HARDWARE", "Quantity"),
-            Category = _columnMapping.GetStringValue(hardwareData, "HARDWARE", "Category"),
-            Manufacturer = _columnMapping.GetStringValue(hardwareData, "HARDWARE", "Manufacturer"),
-            PartNumber = _columnMapping.GetStringValue(hardwareData, "HARDWARE", "PartNumber"),
+            Category = string.Empty, // Category not available in HARDWARE table
+            Manufacturer = string.Empty, // Manufacturer not available in HARDWARE table
+            PartNumber = string.Empty, // PartNumber not available in HARDWARE table
             WorkOrderId = workOrderId,
             ProductId = productId,
             SubassemblyId = subassemblyId,
-            Size = _columnMapping.GetStringValue(hardwareData, "HARDWARE", "Size"),
-            Finish = _columnMapping.GetStringValue(hardwareData, "HARDWARE", "Finish"),
-            Notes = _columnMapping.GetStringValue(hardwareData, "HARDWARE", "Notes")
+            Size = string.Empty, // Size not available in HARDWARE table
+            Finish = string.Empty, // Finish not available in HARDWARE table
+            Notes = string.Empty // Notes not available in HARDWARE table
         };
     }
 

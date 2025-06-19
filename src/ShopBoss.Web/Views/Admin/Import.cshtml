@@ -22,21 +22,34 @@
         
         .tree-node {
             padding: 0.25rem 0;
-            margin-left: 1rem;
         }
         
-        .tree-node:first-child {
-            margin-left: 0;
-        }
+        .tree-node.level-0 { margin-left: 0; }
+        .tree-node.level-1 { margin-left: 1.5rem; }
+        .tree-node.level-2 { margin-left: 3rem; }
+        .tree-node.level-3 { margin-left: 4.5rem; }
+        .tree-node.level-4 { margin-left: 6rem; }
         
         .tree-toggle {
             cursor: pointer;
             user-select: none;
             color: #6c757d;
+            display: inline-flex !important;
+            align-items: center;
+            justify-content: center;
+            min-width: 16px;
+            height: 16px;
         }
         
         .tree-toggle:hover {
             color: #495057;
+            background-color: #e9ecef;
+            border-radius: 2px;
+        }
+        
+        .tree-toggle i {
+            font-size: 12px !important;
+            line-height: 1;
         }
         
         .stage-indicator {
@@ -92,11 +105,6 @@
                         </div>
                     </div>
 
-                    <div class="mb-4">
-                        <label for="workOrderName" class="form-label">Work Order Name</label>
-                        <input type="text" id="workOrderName" class="form-control" placeholder="Enter work order name" required>
-                    </div>
-
                     <div class="d-grid gap-2">
                         <button type="button" id="startImportBtn" class="btn btn-primary btn-lg" disabled>
                             <i class="fas fa-play me-2"></i>Start Import Process
@@ -141,7 +149,18 @@
                 <!-- Step 3: Preview and Confirm -->
                 <div id="previewStep" class="step-content d-none">
                     <div class="mb-4">
-                        <h5>Import Preview</h5>
+                        <h5>Work Order Details</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label for="finalWorkOrderName" class="form-label">Work Order Name</label>
+                                <input type="text" id="finalWorkOrderName" class="form-control" placeholder="Work Order Name">
+                                <small class="form-text text-muted">Edit the work order name if needed before importing.</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <h5>Import Statistics</h5>
                         <div class="row">
                             <div class="col-md-3">
                                 <div class="card border-primary">
@@ -233,7 +252,7 @@
         const fileInput = document.getElementById('sdfFile');
         const fileInfo = document.getElementById('fileInfo');
         const fileName = document.getElementById('fileName');
-        const workOrderNameInput = document.getElementById('workOrderName');
+        // workOrderNameInput removed - name will be extracted from SDF data
         const startImportBtn = document.getElementById('startImportBtn');
         
         // Steps
@@ -248,6 +267,7 @@
         const cancelImportBtn = document.getElementById('cancelImportBtn');
         
         // Preview elements
+        const finalWorkOrderName = document.getElementById('finalWorkOrderName');
         const totalProducts = document.getElementById('totalProducts');
         const totalParts = document.getElementById('totalParts');
         const totalSubassemblies = document.getElementById('totalSubassemblies');
@@ -332,19 +352,15 @@
 
         function checkFormValid() {
             const fileSelected = fileInput.files.length > 0;
-            const nameEntered = workOrderNameInput.value.trim().length > 0;
-            startImportBtn.disabled = !(fileSelected && nameEntered);
+            startImportBtn.disabled = !fileSelected;
         }
-
-        workOrderNameInput.addEventListener('input', checkFormValid);
 
         // Import process
         startImportBtn.addEventListener('click', async () => {
             const file = fileInput.files[0];
-            const workOrderName = workOrderNameInput.value.trim();
             
-            if (!file || !workOrderName) {
-                alert('Please select a file and enter a work order name.');
+            if (!file) {
+                alert('Please select a file.');
                 return;
             }
 
@@ -371,7 +387,7 @@
                     await signalRConnection.invoke("JoinImportGroup", currentSessionId);
                 }
 
-                // Start import
+                // Start import (work order name will be extracted from SDF data)
                 const importResponse = await fetch('/Import/StartImport', {
                     method: 'POST',
                     headers: {
@@ -379,7 +395,7 @@
                     },
                     body: JSON.stringify({
                         sessionId: currentSessionId,
-                        workOrderName: workOrderName
+                        workOrderName: null // Will be extracted from SDF data
                     })
                 });
 
@@ -474,6 +490,9 @@
 
         // Preview functionality
         function populatePreview() {
+            // Set work order name (extracted from data or use filename as fallback)
+            finalWorkOrderName.value = importData.name || 'Imported Work Order';
+            
             const stats = importData.statistics;
             totalProducts.textContent = stats.totalProducts;
             totalParts.textContent = stats.totalParts;
@@ -489,98 +508,81 @@
                 return;
             }
 
-            const workOrderNode = createTreeNode('📋', `Work Order: ${importData.name}`, 'work-order', true);
-            treeView.appendChild(workOrderNode);
-
-            // Products section
-            const productsContainer = document.createElement('div');
-            productsContainer.className = 'tree-node';
-            workOrderNode.appendChild(productsContainer);
-
-            const productsHeader = createTreeNode('📦', 'Products', 'products-header', true);
-            productsContainer.appendChild(productsHeader);
-
-            const productsContent = document.createElement('div');
-            productsContent.className = 'tree-content';
-            productsContainer.appendChild(productsContent);
-
+            // Display products directly (no wrapper categories)
             importData.products.forEach(product => {
-                const productNode = createProductNode(product);
-                productsContent.appendChild(productNode);
+                const productNode = createProductNode(product, 0);
+                treeView.appendChild(productNode);
             });
 
-            // Hardware section (standalone)
+            // Add standalone hardware if any
             if (importData.hardware && importData.hardware.length > 0) {
-                const hardwareContainer = document.createElement('div');
-                hardwareContainer.className = 'tree-node';
-                workOrderNode.appendChild(hardwareContainer);
-
-                const hardwareHeader = createTreeNode('🔧', 'Hardware', 'hardware-header', true);
-                hardwareContainer.appendChild(hardwareHeader);
-
-                const hardwareContent = document.createElement('div');
-                hardwareContent.className = 'tree-content';
-                hardwareContainer.appendChild(hardwareContent);
-
                 importData.hardware.forEach(hardware => {
-                    const hardwareNode = createHardwareNode(hardware);
-                    hardwareContent.appendChild(hardwareNode);
+                    const hardwareNode = createHardwareNode(hardware, 0);
+                    treeView.appendChild(hardwareNode);
                 });
             }
 
-            // Detached Products section
+            // Add detached products if any
             if (importData.detachedProducts && importData.detachedProducts.length > 0) {
-                const detachedContainer = document.createElement('div');
-                detachedContainer.className = 'tree-node';
-                workOrderNode.appendChild(detachedContainer);
-
-                const detachedHeader = createTreeNode('📦', 'Detached Products', 'detached-header', true);
-                detachedContainer.appendChild(detachedHeader);
-
-                const detachedContent = document.createElement('div');
-                detachedContent.className = 'tree-content';
-                detachedContainer.appendChild(detachedContent);
-
                 importData.detachedProducts.forEach(detached => {
-                    const detachedNode = createDetachedProductNode(detached);
-                    detachedContent.appendChild(detachedNode);
+                    const detachedNode = createDetachedProductNode(detached, 0);
+                    treeView.appendChild(detachedNode);
                 });
             }
         }
 
-        function createTreeNode(icon, text, type, expanded = false) {
+        function createTreeNode(icon, text, type, expanded = false, level = 0) {
             const node = document.createElement('div');
-            node.className = 'tree-node';
+            node.className = `tree-node level-${level}`;
+            
+            const hasChildren = type === 'work-order' || type === 'products-header' || type === 'hardware-header' || 
+                               type === 'detached-header' || type === 'product' || type === 'subassembly';
+            
             node.innerHTML = `
                 <div class="d-flex align-items-center">
-                    <span class="tree-toggle me-2" data-expanded="${expanded}">
-                        <i class="fas fa-${expanded ? 'minus' : 'plus'}"></i>
-                    </span>
+                    ${hasChildren ? 
+                        `<span class="tree-toggle me-2" data-expanded="${expanded}" style="width: 16px; display: inline-block;">
+                            <i class="fas fa-${expanded ? 'chevron-down' : 'chevron-right'}" style="font-size: 12px;"></i>
+                        </span>` : 
+                        '<span class="me-2" style="width: 16px; display: inline-block;"></span>'
+                    }
                     <input type="checkbox" class="form-check-input me-2" checked>
                     <span class="me-2">${icon}</span>
                     <span class="flex-grow-1">${text}</span>
                 </div>
             `;
 
-            const toggle = node.querySelector('.tree-toggle');
-            toggle.addEventListener('click', () => {
-                const isExpanded = toggle.dataset.expanded === 'true';
-                toggle.dataset.expanded = !isExpanded;
-                toggle.querySelector('i').className = `fas fa-${!isExpanded ? 'minus' : 'plus'}`;
-                
-                const content = node.querySelector('.tree-content');
-                if (content) {
-                    content.style.display = !isExpanded ? 'block' : 'none';
+            if (hasChildren) {
+                const toggle = node.querySelector('.tree-toggle');
+                if (toggle) {
+                    toggle.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const isExpanded = toggle.dataset.expanded === 'true';
+                        toggle.dataset.expanded = !isExpanded;
+                        const icon = toggle.querySelector('i');
+                        if (icon) {
+                            icon.className = `fas fa-chevron-${!isExpanded ? 'down' : 'right'}`;
+                        }
+                        
+                        const content = node.querySelector('.tree-content');
+                        if (content) {
+                            content.style.display = !isExpanded ? 'block' : 'none';
+                        }
+                    });
                 }
-            });
+            }
 
             return node;
         }
 
-        function createProductNode(product) {
-            const productNode = createTreeNode('🚪', 
-                `${product.id} - ${product.name} (Qty: ${product.quantity}, ${product.width}mm×${product.height}mm)`, 
-                'product', false);
+        function createProductNode(product, level = 0) {
+            // If ProductNumber and Name are the same (no separate product name), show just ItemNumber - Qty
+            // Otherwise show ItemNumber - ProductName - Qty
+            const displayName = (product.productNumber && product.productNumber !== product.name) ? 
+                `${product.productNumber} - ${product.name} - Qty. ${product.quantity}` :
+                `${product.productNumber || product.name} - Qty. ${product.quantity}`;
+            
+            const productNode = createTreeNode('🚪', displayName, 'product', false, level);
             
             const content = document.createElement('div');
             content.className = 'tree-content';
@@ -589,35 +591,35 @@
 
             // Add parts
             product.parts.forEach(part => {
-                const partNode = createPartNode(part);
+                const partNode = createPartNode(part, level + 1);
                 content.appendChild(partNode);
             });
 
             // Add subassemblies
             product.subassemblies.forEach(subassembly => {
-                const subassemblyNode = createSubassemblyNode(subassembly);
+                const subassemblyNode = createSubassemblyNode(subassembly, level + 1);
                 content.appendChild(subassemblyNode);
             });
 
             // Add hardware
             product.hardware.forEach(hardware => {
-                const hardwareNode = createHardwareNode(hardware);
+                const hardwareNode = createHardwareNode(hardware, level + 1);
                 content.appendChild(hardwareNode);
             });
 
             return productNode;
         }
 
-        function createPartNode(part) {
+        function createPartNode(part, level = 3) {
             return createTreeNode('📄', 
                 `${part.id} - ${part.name} (Qty: ${part.quantity}, ${part.width}mm×${part.height}mm×${part.thickness}mm, ${part.material})`, 
-                'part', false);
+                'part', false, level);
         }
 
-        function createSubassemblyNode(subassembly) {
+        function createSubassemblyNode(subassembly, level = 3) {
             const subassemblyNode = createTreeNode('📁', 
                 `${subassembly.id} - ${subassembly.name} (Qty: ${subassembly.quantity})`, 
-                'subassembly', false);
+                'subassembly', false, level);
             
             const content = document.createElement('div');
             content.className = 'tree-content';
@@ -626,35 +628,35 @@
 
             // Add parts
             subassembly.parts.forEach(part => {
-                const partNode = createPartNode(part);
+                const partNode = createPartNode(part, level + 1);
                 content.appendChild(partNode);
             });
 
             // Add nested subassemblies
             subassembly.nestedSubassemblies.forEach(nested => {
-                const nestedNode = createSubassemblyNode(nested);
+                const nestedNode = createSubassemblyNode(nested, level + 1);
                 content.appendChild(nestedNode);
             });
 
             // Add hardware
             subassembly.hardware.forEach(hardware => {
-                const hardwareNode = createHardwareNode(hardware);
+                const hardwareNode = createHardwareNode(hardware, level + 1);
                 content.appendChild(hardwareNode);
             });
 
             return subassemblyNode;
         }
 
-        function createHardwareNode(hardware) {
+        function createHardwareNode(hardware, level = 3) {
             return createTreeNode('🔧', 
                 `${hardware.id} - ${hardware.name} (Qty: ${hardware.quantity})`, 
-                'hardware', false);
+                'hardware', false, level);
         }
 
-        function createDetachedProductNode(detached) {
+        function createDetachedProductNode(detached, level = 2) {
             return createTreeNode('📄', 
                 `${detached.id} - ${detached.name} (Qty: ${detached.quantity}, ${detached.width}mm×${detached.height}mm×${detached.thickness}mm)`, 
-                'detached', false);
+                'detached', false, level);
         }
 
         // Tree view controls
@@ -662,7 +664,7 @@
             const toggles = treeView.querySelectorAll('.tree-toggle');
             toggles.forEach(toggle => {
                 toggle.dataset.expanded = 'true';
-                toggle.querySelector('i').className = 'fas fa-minus';
+                toggle.querySelector('i').className = 'fas fa-chevron-down';
                 const content = toggle.closest('.tree-node').querySelector('.tree-content');
                 if (content) content.style.display = 'block';
             });
@@ -672,7 +674,7 @@
             const toggles = treeView.querySelectorAll('.tree-toggle');
             toggles.forEach(toggle => {
                 toggle.dataset.expanded = 'false';
-                toggle.querySelector('i').className = 'fas fa-plus';
+                toggle.querySelector('i').className = 'fas fa-chevron-right';
                 const content = toggle.closest('.tree-node').querySelector('.tree-content');
                 if (content) content.style.display = 'none';
             });
@@ -709,7 +711,6 @@
             showUploadStep();
             // Reset form
             fileInput.value = '';
-            workOrderNameInput.value = '';
             fileInfo.classList.add('d-none');
             checkFormValid();
         });

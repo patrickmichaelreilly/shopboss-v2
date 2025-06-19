@@ -99,9 +99,9 @@ public class ImportController : Controller
     [HttpPost]
     public IActionResult StartImport([FromBody] StartImportRequest request)
     {
-        if (string.IsNullOrEmpty(request.SessionId) || string.IsNullOrEmpty(request.WorkOrderName))
+        if (string.IsNullOrEmpty(request.SessionId))
         {
-            return BadRequest(new { error = "Session ID and Work Order name are required" });
+            return BadRequest(new { error = "Session ID is required" });
         }
 
         if (!_importSessions.TryGetValue(request.SessionId, out var session))
@@ -118,7 +118,7 @@ public class ImportController : Controller
         {
             // Update session status
             session.Status = ImportStatus.Processing;
-            session.WorkOrderName = request.WorkOrderName;
+            session.WorkOrderName = request.WorkOrderName ?? "Imported Work Order";
 
             // Start background import task
             _ = Task.Run(() => ProcessImportAsync(session));

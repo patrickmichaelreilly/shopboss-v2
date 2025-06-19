@@ -4,6 +4,7 @@ public class ImportProduct
 {
     public string Id { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
+    public string ProductNumber { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
     public int Quantity { get; set; } = 1;
     public decimal Width { get; set; }
