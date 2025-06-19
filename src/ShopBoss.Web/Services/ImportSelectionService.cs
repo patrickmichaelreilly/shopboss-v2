@@ -51,6 +51,9 @@ public class ImportSelectionService
             ProcessSelectedProducts(importData, selection, workOrder, result);
             ProcessSelectedHardware(importData, selection, workOrder, result);
             ProcessSelectedDetachedProducts(importData, selection, workOrder, result);
+            
+            // Identify products with only 1 part as detached products
+            ProcessSinglePartProductsAsDetached(workOrder, result);
 
             // Save to database
             _context.WorkOrders.Add(workOrder);
@@ -221,7 +224,7 @@ public class ImportSelectionService
             ProcessSelectedSubassembliesForProduct(importProduct, selection, product, result);
             
             // Process selected hardware for this product
-            ProcessSelectedHardwareForProduct(importProduct, selection, product, result);
+            ProcessSelectedHardwareForProduct(importProduct, selection, product, workOrder, result);
 
             result.Statistics.ConvertedProducts++;
         }
@@ -273,6 +276,7 @@ public class ImportSelectionService
         ImportProduct importProduct,
         SelectionRequest selection,
         Product product,
+        WorkOrder workOrder,
         ImportConversionResult result)
     {
         var selectedHardwareIds = selection.SelectedItemIds
@@ -286,8 +290,8 @@ public class ImportSelectionService
             // For product-level hardware, we'll create it as work order hardware with reference
             var hardware = ConvertToHardwareEntity(importHardware, product.WorkOrderId);
             
-            // Add to work order's hardware collection rather than product's
-            // (based on the current model structure)
+            // Add to work order's hardware collection
+            workOrder.Hardware.Add(hardware);
             result.Statistics.ConvertedHardware++;
         }
     }
@@ -444,6 +448,43 @@ public class ImportSelectionService
             EdgebandingRight = importDetached.EdgeBanding?.Contains("Right") == true ? "Yes" : string.Empty,
             WorkOrderId = workOrderId
         };
+    }
+
+    private void ProcessSinglePartProductsAsDetached(WorkOrder workOrder, ImportConversionResult result)
+    {
+        // Find products with exactly 1 part and treat them as detached products
+        var singlePartProducts = workOrder.Products.Where(p => p.Parts.Count == 1).ToList();
+        
+        foreach (var product in singlePartProducts)
+        {
+            var singlePart = product.Parts.First();
+            
+            // Create a detached product from this single-part product
+            var detachedProduct = new DetachedProduct
+            {
+                Id = $"{product.Id}_detached", // Create unique ID to avoid conflicts
+                ProductNumber = product.ProductNumber,
+                Name = product.Name,
+                Qty = product.Qty,
+                Length = singlePart.Length,
+                Width = singlePart.Width,
+                Thickness = singlePart.Thickness,
+                Material = singlePart.Material,
+                EdgebandingTop = singlePart.EdgebandingTop,
+                EdgebandingBottom = singlePart.EdgebandingBottom,
+                EdgebandingLeft = singlePart.EdgebandingLeft,
+                EdgebandingRight = singlePart.EdgebandingRight,
+                WorkOrderId = workOrder.Id
+            };
+            
+            workOrder.DetachedProducts.Add(detachedProduct);
+            result.Statistics.ConvertedDetachedProducts++;
+        }
+        
+        if (singlePartProducts.Any())
+        {
+            _logger.LogInformation("Identified {Count} single-part products as detached products", singlePartProducts.Count);
+        }
     }
 }
 
