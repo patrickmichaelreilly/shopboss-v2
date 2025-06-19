@@ -1100,9 +1100,100 @@
         });
 
         // Confirm import
-        confirmImportBtn.addEventListener('click', () => {
-            // This would save the data to the database
-            alert('Import functionality would be implemented here to save the data to the database.');
+        confirmImportBtn.addEventListener('click', async () => {
+            if (!validateSelection()) {
+                alert('Please fix the selection issues before proceeding.');
+                return;
+            }
+
+            if (!currentSessionId) {
+                alert('No import session available.');
+                return;
+            }
+
+            const workOrderName = finalWorkOrderName.value.trim();
+            if (!workOrderName) {
+                alert('Please enter a work order name.');
+                finalWorkOrderName.focus();
+                return;
+            }
+
+            try {
+                // Disable button during processing
+                confirmImportBtn.disabled = true;
+                confirmImportBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing...';
+
+                // Prepare selection data
+                const selectedItemIds = [];
+                const selectionDetails = {};
+
+                selectionState.forEach((state, nodeId) => {
+                    if (state.selected) {
+                        selectedItemIds.push(nodeId);
+                    }
+                    selectionDetails[nodeId] = {
+                        itemId: nodeId,
+                        itemType: state.type,
+                        selected: state.selected,
+                        parentId: state.parentId,
+                        childIds: state.childIds || []
+                    };
+                });
+
+                const selectionRequest = {
+                    sessionId: currentSessionId,
+                    workOrderName: workOrderName,
+                    selectedItemIds: selectedItemIds,
+                    selectionDetails: selectionDetails
+                };
+
+                console.log("Sending selection request with", selectedItemIds.length, "selected items");
+
+                const response = await fetch('/Import/ProcessSelectedItems', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(selectionRequest)
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    // Show success message
+                    alert(`Import processing completed successfully!\n\n` +
+                          `Converted:\n` +
+                          `• ${result.statistics.convertedProducts} Products\n` +
+                          `• ${result.statistics.convertedParts} Parts\n` +
+                          `• ${result.statistics.convertedSubassemblies} Subassemblies\n` +
+                          `• ${result.statistics.convertedHardware} Hardware\n\n` +
+                          `Work Order ID: ${result.workOrderId}\n\n` +
+                          `Ready for database import.`);
+
+                    // In Phase 4, this would redirect to work order details or import confirmation
+                    // For now, show success and allow user to start over
+                    console.log('Conversion result:', result);
+                    
+                } else {
+                    // Show error details
+                    let errorMessage = result.error || 'Unknown error occurred';
+                    if (result.details && result.details.length > 0) {
+                        errorMessage += '\n\nDetails:\n• ' + result.details.join('\n• ');
+                    }
+                    if (result.warnings && result.warnings.length > 0) {
+                        errorMessage += '\n\nWarnings:\n• ' + result.warnings.join('\n• ');
+                    }
+                    alert('Import processing failed:\n\n' + errorMessage);
+                }
+
+            } catch (error) {
+                console.error('Import processing error:', error);
+                alert('Error processing import: ' + error.message);
+            } finally {
+                // Re-enable button
+                confirmImportBtn.disabled = false;
+                confirmImportBtn.innerHTML = '<i class="fas fa-check me-2"></i>Confirm Import';
+            }
         });
 
         startOverBtn.addEventListener('click', () => {

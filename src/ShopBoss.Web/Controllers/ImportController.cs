@@ -11,6 +11,7 @@ public class ImportController : Controller
 {
     private readonly ImporterService _importerService;
     private readonly ImportDataTransformService _transformService;
+    private readonly ImportSelectionService _selectionService;
     private readonly IHubContext<ImportProgressHub> _hubContext;
     private readonly ILogger<ImportController> _logger;
     private readonly string _tempUploadPath;
@@ -21,12 +22,14 @@ public class ImportController : Controller
     public ImportController(
         ImporterService importerService,
         ImportDataTransformService transformService,
+        ImportSelectionService selectionService,
         IHubContext<ImportProgressHub> hubContext,
         ILogger<ImportController> logger,
         IWebHostEnvironment environment)
     {
         _importerService = importerService;
         _transformService = transformService;
+        _selectionService = selectionService;
         _hubContext = hubContext;
         _logger = logger;
         _tempUploadPath = Path.Combine(environment.ContentRootPath, "temp", "uploads");
@@ -186,6 +189,82 @@ public class ImportController : Controller
         var fileName = $"raw-import-data-{sessionId[..8]}.csv";
         
         return File(System.Text.Encoding.UTF8.GetBytes(csv), "text/csv", fileName);
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> ProcessSelectedItems([FromBody] SelectionRequest request)
+    {
+        try
+        {
+            _logger.LogInformation("Processing selected items for session {SessionId}", request.SessionId);
+
+            // Validate request
+            if (string.IsNullOrWhiteSpace(request.SessionId))
+            {
+                return BadRequest(new { error = "Session ID is required" });
+            }
+
+            if (string.IsNullOrWhiteSpace(request.WorkOrderName))
+            {
+                return BadRequest(new { error = "Work order name is required" });
+            }
+
+            if (!request.SelectedItemIds.Any())
+            {
+                return BadRequest(new { error = "At least one item must be selected" });
+            }
+
+            // Get import session
+            if (!_importSessions.TryGetValue(request.SessionId, out var session))
+            {
+                return NotFound(new { error = "Import session not found" });
+            }
+
+            if (session.Status != ImportStatus.Completed || session.ImportWorkOrder == null)
+            {
+                return BadRequest(new { error = "Import data not available or import not completed" });
+            }
+
+            // Process selected items through ImportSelectionService
+            var conversionResult = await _selectionService.ConvertSelectedItemsAsync(
+                session.ImportWorkOrder, 
+                request);
+
+            if (!conversionResult.Success)
+            {
+                _logger.LogWarning("Selection processing failed for session {SessionId}. Errors: {Errors}", 
+                    request.SessionId, string.Join(", ", conversionResult.Errors));
+                
+                return BadRequest(new 
+                { 
+                    error = "Selection processing failed", 
+                    details = conversionResult.Errors,
+                    warnings = conversionResult.Warnings
+                });
+            }
+
+            _logger.LogInformation("Successfully processed selected items for session {SessionId}. " +
+                "Converted: {Products} products, {Parts} parts, {Subassemblies} subassemblies, {Hardware} hardware", 
+                request.SessionId,
+                conversionResult.Statistics.ConvertedProducts,
+                conversionResult.Statistics.ConvertedParts,
+                conversionResult.Statistics.ConvertedSubassemblies,
+                conversionResult.Statistics.ConvertedHardware);
+
+            return Ok(new
+            {
+                success = true,
+                workOrderId = conversionResult.WorkOrderId,
+                statistics = conversionResult.Statistics,
+                warnings = conversionResult.Warnings,
+                message = "Selected items converted successfully. Ready for database import."
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error processing selected items for session {SessionId}", request.SessionId);
+            return StatusCode(500, new { error = "Internal server error during selection processing" });
+        }
     }
 
     private string GenerateRawDataCsv(ImportData rawData)
