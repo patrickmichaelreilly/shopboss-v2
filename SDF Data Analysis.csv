@@ -1,0 +1,9 @@
+Table Name,Columns Needed
+Products,"Depth, Height, ItemNumber, LinkID, LinkIDWorkOrder, Quantity, Width, WorkOrderName, ID"
+Placed Sheets,"BarCode, FileName, Index, Length, LinkID, LinkIDWorkOrder, Name, Quantity, Thickness, Width, ID"
+Hardware,"Index, LinkID, LinkIDMaterial, LinkIDProduct, LinkIDWorkOrder, Name, Quantity, ID"
+OptimizationResults,"Face5FileName, Face6FileName, Index, Length, LinkID, LinkIDPart, LinkIDSheet, LinkIDWorkOrder, OptimizedQuantity, Width, ID"
+Parts,"AdjustedCutPartLength, AdjustedCutPartWidth, CutPartLength, CutPartWidth, EdgeNameBottom, EdgeNameLeft, EdgeNameRight, EdgeNameTop, Face6FileName, FileName, Index, Length, LinkID, LinkIDMaterial, LinkIDProduct, LinkIDSubAssembly, LinkIDWorkOrder, MaterialName, MaterialThickness, Name, Quantity, Row_ID, Width, ID"
+SubAssemblies,"LinkID, LinkIDParentProduct, LinkIDParentSubassembly, LinkIDWorkOrder, Name, ID"
+,
+,

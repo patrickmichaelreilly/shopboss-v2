@@ -6,10 +6,12 @@ namespace ShopBoss.Web.Services;
 public class ImportDataTransformService
 {
     private readonly ILogger<ImportDataTransformService> _logger;
+    private readonly ColumnMappingService _columnMapping;
 
-    public ImportDataTransformService(ILogger<ImportDataTransformService> logger)
+    public ImportDataTransformService(ILogger<ImportDataTransformService> logger, ColumnMappingService columnMapping)
     {
         _logger = logger;
+        _columnMapping = columnMapping;
     }
 
     public ImportWorkOrder TransformToImportWorkOrder(ImportData rawData, string workOrderName)
@@ -28,23 +30,23 @@ public class ImportDataTransformService
 
             // Transform Products - handle potential duplicate keys and null collections
             var productLookup = (rawData.Products ?? new List<Dictionary<string, object?>>())
-                .Where(p => !string.IsNullOrEmpty(GetStringValue(p, "ProductId")))
-                .GroupBy(p => GetStringValue(p, "ProductId"))
+                .Where(p => !string.IsNullOrEmpty(_columnMapping.GetStringValue(p, "PRODUCTS", "Id")))
+                .GroupBy(p => _columnMapping.GetStringValue(p, "PRODUCTS", "Id"))
                 .ToDictionary(g => g.Key, g => g.First());
             
             var partLookup = (rawData.Parts ?? new List<Dictionary<string, object?>>())
-                .Where(p => !string.IsNullOrEmpty(GetStringValue(p, "PartId")))
-                .GroupBy(p => GetStringValue(p, "PartId"))
+                .Where(p => !string.IsNullOrEmpty(_columnMapping.GetStringValue(p, "PARTS", "Id")))
+                .GroupBy(p => _columnMapping.GetStringValue(p, "PARTS", "Id"))
                 .ToDictionary(g => g.Key, g => g.First());
             
             var subassemblyLookup = (rawData.Subassemblies ?? new List<Dictionary<string, object?>>())
-                .Where(s => !string.IsNullOrEmpty(GetStringValue(s, "SubassemblyId")))
-                .GroupBy(s => GetStringValue(s, "SubassemblyId"))
+                .Where(s => !string.IsNullOrEmpty(_columnMapping.GetStringValue(s, "SUBASSEMBLIES", "Id")))
+                .GroupBy(s => _columnMapping.GetStringValue(s, "SUBASSEMBLIES", "Id"))
                 .ToDictionary(g => g.Key, g => g.First());
             
             var hardwareLookup = (rawData.Hardware ?? new List<Dictionary<string, object?>>())
-                .Where(h => !string.IsNullOrEmpty(GetStringValue(h, "HardwareId")))
-                .GroupBy(h => GetStringValue(h, "HardwareId"))
+                .Where(h => !string.IsNullOrEmpty(_columnMapping.GetStringValue(h, "HARDWARE", "Id")))
+                .GroupBy(h => _columnMapping.GetStringValue(h, "HARDWARE", "Id"))
                 .ToDictionary(g => g.Key, g => g.First());
 
             // Transform products
@@ -54,10 +56,10 @@ public class ImportDataTransformService
                 
                 // Add parts to product
                 var productParts = (rawData.Parts ?? new List<Dictionary<string, object?>>())
-                    .Where(p => GetStringValue(p, "ProductId") == product.Id).ToList();
+                    .Where(p => _columnMapping.GetStringValue(p, "PARTS", "ProductId") == product.Id).ToList();
                 foreach (var partData in productParts)
                 {
-                    if (string.IsNullOrEmpty(GetStringValue(partData, "SubassemblyId")))
+                    if (string.IsNullOrEmpty(_columnMapping.GetStringValue(partData, "PARTS", "SubassemblyId")))
                     {
                         product.Parts.Add(TransformPart(partData, product.Id, null));
                     }
@@ -65,9 +67,9 @@ public class ImportDataTransformService
 
                 // Add subassemblies to product
                 var productSubassemblies = (rawData.Subassemblies ?? new List<Dictionary<string, object?>>())
-                    .Where(s => GetStringValue(s, "ProductId") == product.Id && 
-                               string.IsNullOrEmpty(GetStringValue(s, "ParentSubassemblyId")) &&
-                               !string.IsNullOrEmpty(GetStringValue(s, "SubassemblyId")))
+                    .Where(s => _columnMapping.GetStringValue(s, "SUBASSEMBLIES", "ProductId") == product.Id && 
+                               string.IsNullOrEmpty(_columnMapping.GetStringValue(s, "SUBASSEMBLIES", "ParentSubassemblyId")) &&
+                               !string.IsNullOrEmpty(_columnMapping.GetStringValue(s, "SUBASSEMBLIES", "Id")))
                     .ToList();
                 
                 foreach (var subassemblyData in productSubassemblies)
@@ -77,13 +79,10 @@ public class ImportDataTransformService
 
                 // Add hardware to product
                 var productHardware = (rawData.Hardware ?? new List<Dictionary<string, object?>>())
-                    .Where(h => GetStringValue(h, "ProductId") == product.Id).ToList();
+                    .Where(h => _columnMapping.GetStringValue(h, "HARDWARE", "ProductId") == product.Id).ToList();
                 foreach (var hardwareData in productHardware)
                 {
-                    if (string.IsNullOrEmpty(GetStringValue(hardwareData, "SubassemblyId")))
-                    {
-                        product.Hardware.Add(TransformHardware(hardwareData, workOrder.Id, product.Id, null));
-                    }
+                    product.Hardware.Add(TransformHardware(hardwareData, workOrder.Id, product.Id, null));
                 }
 
                 workOrder.Products.Add(product);
@@ -91,7 +90,7 @@ public class ImportDataTransformService
 
             // Transform standalone hardware
             var standaloneHardware = (rawData.Hardware ?? new List<Dictionary<string, object?>>())
-                .Where(h => string.IsNullOrEmpty(GetStringValue(h, "ProductId")))
+                .Where(h => string.IsNullOrEmpty(_columnMapping.GetStringValue(h, "HARDWARE", "ProductId")))
                 .ToList();
             
             foreach (var hardwareData in standaloneHardware)
@@ -117,14 +116,14 @@ public class ImportDataTransformService
     {
         return new ImportProduct
         {
-            Id = GetStringValue(productData, "ProductId"),
-            Name = GetStringValue(productData, "Name") ?? GetStringValue(productData, "ProductName"),
-            Description = GetStringValue(productData, "Description") ?? string.Empty,
-            Quantity = GetIntValue(productData, "Quantity"),
-            Width = GetDecimalValue(productData, "Width"),
-            Height = GetDecimalValue(productData, "Height"),
-            Depth = GetDecimalValue(productData, "Depth"),
-            Material = GetStringValue(productData, "Material") ?? string.Empty,
+            Id = _columnMapping.GetStringValue(productData, "PRODUCTS", "Id"),
+            Name = _columnMapping.GetStringValue(productData, "PRODUCTS", "Name"),
+            Description = _columnMapping.GetStringValue(productData, "PRODUCTS", "Description"),
+            Quantity = _columnMapping.GetIntValue(productData, "PRODUCTS", "Quantity"),
+            Width = _columnMapping.GetDecimalValue(productData, "PRODUCTS", "Width"),
+            Height = _columnMapping.GetDecimalValue(productData, "PRODUCTS", "Height"),
+            Depth = _columnMapping.GetDecimalValue(productData, "PRODUCTS", "Depth"),
+            Material = _columnMapping.GetStringValue(productData, "PRODUCTS", "Material"),
             WorkOrderId = workOrderId
         };
     }
@@ -133,19 +132,22 @@ public class ImportDataTransformService
     {
         return new ImportPart
         {
-            Id = GetStringValue(partData, "PartId"),
-            Name = GetStringValue(partData, "Name") ?? GetStringValue(partData, "PartName"),
-            Description = GetStringValue(partData, "Description") ?? string.Empty,
-            Quantity = GetIntValue(partData, "Quantity"),
-            Width = GetDecimalValue(partData, "Width"),
-            Height = GetDecimalValue(partData, "Height"),
-            Thickness = GetDecimalValue(partData, "Thickness"),
-            Material = GetStringValue(partData, "Material") ?? string.Empty,
-            EdgeBanding = GetStringValue(partData, "EdgeBanding") ?? string.Empty,
+            Id = _columnMapping.GetStringValue(partData, "PARTS", "Id"),
+            Name = _columnMapping.GetStringValue(partData, "PARTS", "Name"),
+            Description = _columnMapping.GetStringValue(partData, "PARTS", "Description"),
+            Quantity = _columnMapping.GetIntValue(partData, "PARTS", "Quantity"),
+            Width = _columnMapping.GetDecimalValue(partData, "PARTS", "Width"),
+            Height = _columnMapping.GetDecimalValue(partData, "PARTS", "Height"),
+            Thickness = _columnMapping.GetDecimalValue(partData, "PARTS", "Thickness"),
+            Material = _columnMapping.GetStringValue(partData, "PARTS", "Material"),
+            EdgeBanding = _columnMapping.GetStringValue(partData, "PARTS", "EdgeBandingTop") + "|" + 
+                         _columnMapping.GetStringValue(partData, "PARTS", "EdgeBandingBottom") + "|" +
+                         _columnMapping.GetStringValue(partData, "PARTS", "EdgeBandingLeft") + "|" +
+                         _columnMapping.GetStringValue(partData, "PARTS", "EdgeBandingRight"),
             ProductId = productId,
             SubassemblyId = subassemblyId,
-            GrainDirection = GetStringValue(partData, "GrainDirection") ?? string.Empty,
-            Notes = GetStringValue(partData, "Notes") ?? string.Empty
+            GrainDirection = _columnMapping.GetStringValue(partData, "PARTS", "GrainDirection"),
+            Notes = _columnMapping.GetStringValue(partData, "PARTS", "Notes")
         };
     }
 
@@ -154,7 +156,7 @@ public class ImportDataTransformService
         // Initialize circular reference tracking
         processedSubassemblies ??= new HashSet<string>();
         
-        var subassemblyId = GetStringValue(subassemblyData, "SubassemblyId");
+        var subassemblyId = _columnMapping.GetStringValue(subassemblyData, "SUBASSEMBLIES", "Id");
         
         // Skip subassemblies with empty/null IDs to avoid false circular reference detection
         if (string.IsNullOrEmpty(subassemblyId))
@@ -167,12 +169,12 @@ public class ImportDataTransformService
         var subassembly = new ImportSubassembly
         {
             Id = subassemblyId,
-            Name = GetStringValue(subassemblyData, "Name") ?? GetStringValue(subassemblyData, "SubassemblyName"),
-            Description = GetStringValue(subassemblyData, "Description") ?? string.Empty,
-            Quantity = GetIntValue(subassemblyData, "Quantity"),
-            Width = GetDecimalValue(subassemblyData, "Width"),
-            Height = GetDecimalValue(subassemblyData, "Height"),
-            Depth = GetDecimalValue(subassemblyData, "Depth"),
+            Name = _columnMapping.GetStringValue(subassemblyData, "SUBASSEMBLIES", "Name"),
+            Description = _columnMapping.GetStringValue(subassemblyData, "SUBASSEMBLIES", "Description"),
+            Quantity = _columnMapping.GetIntValue(subassemblyData, "SUBASSEMBLIES", "Quantity"),
+            Width = _columnMapping.GetDecimalValue(subassemblyData, "SUBASSEMBLIES", "Width"),
+            Height = _columnMapping.GetDecimalValue(subassemblyData, "SUBASSEMBLIES", "Height"),
+            Depth = _columnMapping.GetDecimalValue(subassemblyData, "SUBASSEMBLIES", "Depth"),
             ProductId = productId,
             ParentSubassemblyId = parentSubassemblyId
         };
@@ -189,7 +191,7 @@ public class ImportDataTransformService
 
         // Add parts to subassembly
         var subassemblyParts = (rawData.Parts ?? new List<Dictionary<string, object?>>())
-            .Where(p => GetStringValue(p, "SubassemblyId") == subassembly.Id).ToList();
+            .Where(p => _columnMapping.GetStringValue(p, "PARTS", "SubassemblyId") == subassembly.Id).ToList();
         foreach (var partData in subassemblyParts)
         {
             subassembly.Parts.Add(TransformPart(partData, productId, subassembly.Id));
@@ -199,8 +201,8 @@ public class ImportDataTransformService
         if (string.IsNullOrEmpty(parentSubassemblyId)) // Only add nested if we're not already nested
         {
             var nestedSubassemblies = (rawData.Subassemblies ?? new List<Dictionary<string, object?>>())
-                .Where(s => GetStringValue(s, "ParentSubassemblyId") == subassembly.Id &&
-                           !string.IsNullOrEmpty(GetStringValue(s, "SubassemblyId")))
+                .Where(s => _columnMapping.GetStringValue(s, "SUBASSEMBLIES", "ParentSubassemblyId") == subassembly.Id &&
+                           !string.IsNullOrEmpty(_columnMapping.GetStringValue(s, "SUBASSEMBLIES", "Id")))
                 .ToList();
             
             foreach (var nestedData in nestedSubassemblies)
@@ -209,13 +211,8 @@ public class ImportDataTransformService
             }
         }
 
-        // Add hardware to subassembly
-        var subassemblyHardware = (rawData.Hardware ?? new List<Dictionary<string, object?>>())
-            .Where(h => GetStringValue(h, "SubassemblyId") == subassembly.Id).ToList();
-        foreach (var hardwareData in subassemblyHardware)
-        {
-            subassembly.Hardware.Add(TransformHardware(hardwareData, string.Empty, productId, subassembly.Id));
-        }
+        // Add hardware to subassembly - NOTE: Hardware table doesn't have SubassemblyId according to SDF analysis
+        // We'll skip this for now as it may not be needed based on actual SDF structure
 
         // Remove from processed set to allow processing in different branches
         processedSubassemblies.Remove(subassembly.Id);
@@ -227,19 +224,19 @@ public class ImportDataTransformService
     {
         return new ImportHardware
         {
-            Id = GetStringValue(hardwareData, "HardwareId"),
-            Name = GetStringValue(hardwareData, "Name") ?? GetStringValue(hardwareData, "HardwareName"),
-            Description = GetStringValue(hardwareData, "Description") ?? string.Empty,
-            Quantity = GetIntValue(hardwareData, "Quantity"),
-            Category = GetStringValue(hardwareData, "Category") ?? string.Empty,
-            Manufacturer = GetStringValue(hardwareData, "Manufacturer") ?? string.Empty,
-            PartNumber = GetStringValue(hardwareData, "PartNumber") ?? string.Empty,
+            Id = _columnMapping.GetStringValue(hardwareData, "HARDWARE", "Id"),
+            Name = _columnMapping.GetStringValue(hardwareData, "HARDWARE", "Name"),
+            Description = _columnMapping.GetStringValue(hardwareData, "HARDWARE", "Description"),
+            Quantity = _columnMapping.GetIntValue(hardwareData, "HARDWARE", "Quantity"),
+            Category = _columnMapping.GetStringValue(hardwareData, "HARDWARE", "Category"),
+            Manufacturer = _columnMapping.GetStringValue(hardwareData, "HARDWARE", "Manufacturer"),
+            PartNumber = _columnMapping.GetStringValue(hardwareData, "HARDWARE", "PartNumber"),
             WorkOrderId = workOrderId,
             ProductId = productId,
             SubassemblyId = subassemblyId,
-            Size = GetStringValue(hardwareData, "Size") ?? string.Empty,
-            Finish = GetStringValue(hardwareData, "Finish") ?? string.Empty,
-            Notes = GetStringValue(hardwareData, "Notes") ?? string.Empty
+            Size = _columnMapping.GetStringValue(hardwareData, "HARDWARE", "Size"),
+            Finish = _columnMapping.GetStringValue(hardwareData, "HARDWARE", "Finish"),
+            Notes = _columnMapping.GetStringValue(hardwareData, "HARDWARE", "Notes")
         };
     }
 
@@ -275,32 +272,4 @@ public class ImportDataTransformService
         return stats;
     }
 
-    private string GetStringValue(Dictionary<string, object?> data, string key)
-    {
-        if (data.TryGetValue(key, out var value) && value != null)
-        {
-            return value.ToString() ?? string.Empty;
-        }
-        return string.Empty;
-    }
-
-    private int GetIntValue(Dictionary<string, object?> data, string key)
-    {
-        if (data.TryGetValue(key, out var value) && value != null)
-        {
-            if (int.TryParse(value.ToString(), out var intValue))
-                return intValue;
-        }
-        return 1; // Default quantity
-    }
-
-    private decimal GetDecimalValue(Dictionary<string, object?> data, string key)
-    {
-        if (data.TryGetValue(key, out var value) && value != null)
-        {
-            if (decimal.TryParse(value.ToString(), out var decimalValue))
-                return decimalValue;
-        }
-        return 0;
-    }
 }

@@ -16,6 +16,7 @@ builder.Services.AddDbContext<ShopBossDbContext>(options =>
 // Add custom services
 builder.Services.AddScoped<ImporterService>();
 builder.Services.AddScoped<ImportDataTransformService>();
+builder.Services.AddScoped<ColumnMappingService>();
 
 var app = builder.Build();
 
