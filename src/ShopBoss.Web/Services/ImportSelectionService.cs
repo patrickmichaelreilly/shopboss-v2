@@ -392,10 +392,10 @@ public class ImportSelectionService
             Width = importPart.Width,
             Thickness = importPart.Thickness,
             Material = importPart.Material,
-            EdgebandingTop = importPart.EdgeBanding?.Contains("Top") == true ? "Yes" : null,
-            EdgebandingBottom = importPart.EdgeBanding?.Contains("Bottom") == true ? "Yes" : null,
-            EdgebandingLeft = importPart.EdgeBanding?.Contains("Left") == true ? "Yes" : null,
-            EdgebandingRight = importPart.EdgeBanding?.Contains("Right") == true ? "Yes" : null,
+            EdgebandingTop = importPart.EdgeBanding?.Contains("Top") == true ? "Yes" : string.Empty,
+            EdgebandingBottom = importPart.EdgeBanding?.Contains("Bottom") == true ? "Yes" : string.Empty,
+            EdgebandingLeft = importPart.EdgeBanding?.Contains("Left") == true ? "Yes" : string.Empty,
+            EdgebandingRight = importPart.EdgeBanding?.Contains("Right") == true ? "Yes" : string.Empty,
             ProductId = productId,
             SubassemblyId = subassemblyId
         };
@@ -438,10 +438,10 @@ public class ImportSelectionService
             Width = importDetached.Width,
             Thickness = importDetached.Thickness,
             Material = importDetached.Material,
-            EdgebandingTop = importDetached.EdgeBanding?.Contains("Top") == true ? "Yes" : null,
-            EdgebandingBottom = importDetached.EdgeBanding?.Contains("Bottom") == true ? "Yes" : null,
-            EdgebandingLeft = importDetached.EdgeBanding?.Contains("Left") == true ? "Yes" : null,
-            EdgebandingRight = importDetached.EdgeBanding?.Contains("Right") == true ? "Yes" : null,
+            EdgebandingTop = importDetached.EdgeBanding?.Contains("Top") == true ? "Yes" : string.Empty,
+            EdgebandingBottom = importDetached.EdgeBanding?.Contains("Bottom") == true ? "Yes" : string.Empty,
+            EdgebandingLeft = importDetached.EdgeBanding?.Contains("Left") == true ? "Yes" : string.Empty,
+            EdgebandingRight = importDetached.EdgeBanding?.Contains("Right") == true ? "Yes" : string.Empty,
             WorkOrderId = workOrderId
         };
     }
