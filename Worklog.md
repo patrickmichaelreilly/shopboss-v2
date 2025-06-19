@@ -478,3 +478,230 @@ info: Import completed successfully
 - Improved maintainability with centralized column mapping service
 
 **Status:** COMPLETED
+
+---
+
+## Task: Final Data Mapping Fix & Product Display Correction - COMPLETED
+**Date:** 2025-06-19  
+**Priority:** Critical | **Complexity:** Medium  
+**Duration:** ~30 minutes  
+**Deliverable:** Correct product display format showing [ItemNumber] - [Product Name] - Qty. [Quantity]
+
+### Task Requirements:
+Fix product display names in tree view to show individual product information instead of work order names. Update column mapping to correctly use both ItemNumber and Name columns from SDF Products table.
+
+### Completed Work:
+
+#### 1. ✅ Updated ImportDataTransformService.cs
+- **File:** `src/ShopBoss.Web/Services/ImportDataTransformService.cs`
+- Fixed TransformProduct method to correctly extract both ItemNumber and Product Name:
+  ```csharp
+  var itemNumber = _columnMapping.GetStringValue(productData, "PRODUCTS", "ItemNumber"); // ItemNumber from SDF
+  var productName = _columnMapping.GetStringValue(productData, "PRODUCTS", "Name"); // Product Name from SDF
+  
+  return new ImportProduct
+  {
+      ProductNumber = itemNumber, // ItemNumber from SDF
+      Name = productName, // Product Name from SDF
+      // ... other properties
+  };
+  ```
+
+#### 2. ✅ Updated ColumnMappingService.cs
+- **File:** `src/ShopBoss.Web/Services/ColumnMappingService.cs`
+- Corrected PRODUCTS table column mapping to handle both fields:
+  ```csharp
+  "PRODUCTS" => new Dictionary<string, string>
+  {
+      { "ItemNumber", "ItemNumber" }, // Item number from SDF
+      { "Name", "Name" }, // Product name from SDF
+      { "ProductName", "Name" },
+      // ... other mappings
+  }
+  ```
+
+#### 3. ✅ Verified JavaScript Display Logic
+- **File:** `src/ShopBoss.Web/Views/Admin/Import.cshtml`
+- Confirmed existing createProductNode function correctly handles the format:
+  ```javascript
+  const displayName = (product.productNumber && product.productNumber !== product.name) ? 
+      `${product.productNumber} - ${product.name} - Qty. ${product.quantity}` :
+      `${product.productNumber || product.name} - Qty. ${product.quantity}`;
+  ```
+
+### Technical Achievement:
+- **Root Cause:** System was incorrectly using "Name" column for ItemNumber instead of separate "ItemNumber" column
+- **Solution:** Updated data extraction to use correct SDF columns as documented in SDF Data Analysis.csv
+- **Result:** Tree view now displays products as `[ItemNumber] - [Product Name] - Qty. [Quantity]` format
+
+### Build Verification:
+- ✅ Project builds successfully with 0 warnings, 0 errors
+- ✅ All services properly configured and integrated
+- ✅ Data mapping correctly reflects actual SDF structure
+
+### Success Criteria Achieved:
+- [x] Product display shows correct format: [ItemNumber] - [Product Name] - Qty. [Quantity]
+- [x] ItemNumber and Product Name extracted from separate SDF columns
+- [x] No build errors or warnings
+- [x] Tree view displays individual product information instead of work order names
+
+**Status:** COMPLETED  
+**Impact:** Final piece of Phase 1-2 implementation - data mapping and display now fully correct
+
+---
+
+## Phase Status Update: Project Successfully Advanced to Phase 3
+**Date:** 2025-06-19  
+**Achievement:** Phases 1 & 2 fully completed with all data mapping and display issues resolved
+
+### Completed Phases Summary:
+
+#### ✅ Phase 1: Data Structure Analysis & Column Mapping Discovery - COMPLETED
+- Column mapping service implemented with actual SDF column names
+- ImportDataTransformService updated to use real column mappings
+- All terminal warnings eliminated
+- Data transformation accuracy achieved
+
+#### ✅ Phase 2: Hierarchy Logic Refinement & Validation - COMPLETED  
+- Correct parent-child relationships established
+- Preview counts accurate (no inflation)
+- Tree view displays proper hierarchical relationships
+- Clean data processing with no orphaned records
+
+#### ✅ Current Fix: Product Display Format - COMPLETED
+- Tree view now shows `[ItemNumber] - [Product Name] - Qty. [Quantity]` format
+- Individual product names displayed instead of work order names
+- Data extraction correctly uses both ItemNumber and Name columns from SDF
+
+### Current Project State:
+- **Import Workflow:** Fully functional from file upload to tree preview
+- **Data Quality:** Zero warnings, accurate counts, correct hierarchy
+- **Tree View:** Proper display format with individual product identification
+- **System Status:** Ready for Phase 3A - Tree Selection Logic Enhancement
+
+---
+
+## Phase 3A: Tree Selection Logic Enhancement - COMPLETED
+**Date:** 2025-06-19  
+**Objective:** Implement smart tree selection with parent-child validation, visual feedback, and selection management
+**Duration:** ~1 hour  
+**Deliverable:** Enhanced tree view with comprehensive selection logic and validation
+
+### Task Requirements Achieved:
+- [x] Enhanced tree selection JavaScript with parent-child dependencies
+- [x] Implemented selection validation (prevent child selection without parent)
+- [x] Added visual feedback for selected/partially selected nodes
+- [x] Added "Select All Products" and "Clear All" buttons
+- [x] Created JavaScript selection state management for tree hierarchy
+- [x] Updated preview statistics to show selected vs total counts
+- [x] Added selection validation feedback and warnings
+- [x] Enabled/disabled confirm button based on selection validity
+
+### Technical Implementation:
+
+#### 1. ✅ Enhanced Tree Node Structure
+- **File:** `src/ShopBoss.Web/Views/Admin/Import.cshtml`
+- Updated `createTreeNode()` function to include:
+  - Node ID tracking with `data-item-id` attributes
+  - Selection state management with `selectionState` Map
+  - Parent-child relationship tracking
+  - Checkbox event handlers for selection changes
+
+#### 2. ✅ Smart Selection Logic
+- **Parent-Child Dependencies:** Selecting a parent auto-selects all children; deselecting a parent deselects all children
+- **Child-to-Parent Validation:** Child selection automatically updates parent state (selected, partially selected, or deselected)
+- **Recursive Processing:** Selection changes propagate through the entire hierarchy
+- **Orphan Prevention:** Selection validation prevents orphaned parts/subassemblies
+
+#### 3. ✅ Visual Feedback System
+- **CSS Classes Added:**
+  - `.tree-node.selected` - Blue background for fully selected nodes
+  - `.tree-node.partially-selected` - Orange background for partially selected nodes
+  - `.tree-checkbox.indeterminate` - Visual styling for partially selected checkboxes
+- **Checkbox States:** Standard checked, indeterminate (partial), and unchecked states
+- **Real-time Updates:** Visual state updates immediately upon selection changes
+
+#### 4. ✅ Selection State Management
+- **Global State:** `selectionState` Map tracks all node states
+- **State Properties:**
+  ```javascript
+  {
+      selected: boolean,
+      type: string,
+      itemData: object,
+      parentId: string,
+      childIds: array,
+      partiallySelected: boolean
+  }
+  ```
+- **Centralized Updates:** All selection changes go through `handleNodeSelection()`
+
+#### 5. ✅ User Interface Enhancements
+- **Statistics Cards:** Now show both total and selected counts for each item type
+- **Selection Summary:** Displays current selection counts when items are selected
+- **Selection Warnings:** Shows validation issues with specific guidance
+- **Bulk Actions:**
+  - "Select All Products" - Selects all products and their children
+  - "Clear All" - Deselects everything
+
+#### 6. ✅ Selection Validation & Warnings
+- **Incomplete Product Validation:** Warns when products have partial selection
+- **Orphan Detection:** Identifies parts/subassemblies selected without their parents
+- **Dynamic Feedback:** Warning messages update in real-time
+- **Confirm Button Logic:** Only enabled when selection is valid
+
+#### 7. ✅ Enhanced Selection Functions
+- `handleNodeSelection()` - Main selection change handler
+- `selectAllChildren()` / `deselectAllChildren()` - Cascading selection
+- `updateParentState()` - Recursive parent state updates
+- `updateNodeVisualState()` - Visual styling updates
+- `updateSelectionCounts()` - Statistics updates
+- `validateSelection()` - Validation and warning system
+
+### Key Features Implemented:
+
+#### Smart Parent-Child Logic:
+- ✅ Selecting a product automatically selects all its parts, subassemblies, and hardware
+- ✅ Deselecting a product automatically deselects all children
+- ✅ Child selection state determines parent state (selected, partial, or deselected)
+- ✅ Prevents orphaned selections (parts without parent products)
+
+#### Visual State Indicators:
+- ✅ Fully selected nodes: Blue background + checked checkbox
+- ✅ Partially selected nodes: Orange background + indeterminate checkbox
+- ✅ Unselected nodes: White background + unchecked checkbox
+- ✅ Real-time visual updates during interaction
+
+#### Selection Management:
+- ✅ Live count updates for Products, Parts, Subassemblies, Hardware
+- ✅ Selection summary panel appears when items are selected
+- ✅ Warning panel shows validation issues with corrective guidance
+- ✅ Confirm Import button disabled until valid selection is made
+
+#### User Experience:
+- ✅ "Select All Products" - One-click to select everything
+- ✅ "Clear All" - One-click to deselect everything
+- ✅ Preserve existing expand/collapse and search functionality
+- ✅ Intuitive validation messages guide user to correct selections
+
+### Build Verification:
+- ✅ Project builds successfully with 0 warnings, 0 errors
+- ✅ All JavaScript functions properly integrated
+- ✅ CSS styling correctly applied
+- ✅ No breaking changes to existing functionality
+
+### Success Criteria Achieved:
+- [x] Tree view selection works with parent-child validation
+- [x] Selection state properly tracked and displayed
+- [x] Clear user feedback for selection issues
+- [x] Confirm button enabled only for valid selections
+
+**Status:** COMPLETED  
+**Impact:** Phase 3A fully implemented - tree view now provides comprehensive selection management with smart validation
+
+### Next Phase Ready: Phase 3B - Import Selection Service & Data Conversion
+**Focus:** Backend service for processing selected items and converting to database entities
+**Duration:** ~1 hour
+**Deliverable:** ImportSelectionService and controller endpoint for selected data processing
+
+**Project Status:** Phase 3A completed successfully, ready for backend selection processing implementation

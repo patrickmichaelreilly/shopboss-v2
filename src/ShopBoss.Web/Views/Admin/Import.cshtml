@@ -52,6 +52,42 @@
             line-height: 1;
         }
         
+        .tree-checkbox {
+            margin-right: 0.5rem;
+        }
+        
+        .tree-checkbox.indeterminate {
+            opacity: 0.6;
+        }
+        
+        .tree-node.selected {
+            background-color: #e3f2fd;
+            border-radius: 0.25rem;
+            padding: 0.125rem 0.25rem;
+        }
+        
+        .tree-node.partially-selected {
+            background-color: #fff3e0;
+            border-radius: 0.25rem;
+            padding: 0.125rem 0.25rem;
+        }
+        
+        .selection-summary {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .selection-warning {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 0.375rem;
+            padding: 0.75rem;
+            margin-bottom: 1rem;
+        }
+        
         .stage-indicator {
             padding: 0.5rem 1rem;
             border-radius: 0.375rem;
@@ -167,7 +203,10 @@
                                     <div class="card-body text-center">
                                         <i class="fas fa-boxes fa-2x text-primary mb-2"></i>
                                         <h4 id="totalProducts" class="mb-1">0</h4>
-                                        <small class="text-muted">Products</small>
+                                        <small class="text-muted">Products (Total)</small>
+                                        <div class="mt-1">
+                                            <small class="text-success fw-bold">Selected: <span id="selectedProducts">0</span></small>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -176,7 +215,10 @@
                                     <div class="card-body text-center">
                                         <i class="fas fa-puzzle-piece fa-2x text-success mb-2"></i>
                                         <h4 id="totalParts" class="mb-1">0</h4>
-                                        <small class="text-muted">Parts</small>
+                                        <small class="text-muted">Parts (Total)</small>
+                                        <div class="mt-1">
+                                            <small class="text-success fw-bold">Selected: <span id="selectedParts">0</span></small>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -185,7 +227,10 @@
                                     <div class="card-body text-center">
                                         <i class="fas fa-layer-group fa-2x text-warning mb-2"></i>
                                         <h4 id="totalSubassemblies" class="mb-1">0</h4>
-                                        <small class="text-muted">Subassemblies</small>
+                                        <small class="text-muted">Subassemblies (Total)</small>
+                                        <div class="mt-1">
+                                            <small class="text-success fw-bold">Selected: <span id="selectedSubassemblies">0</span></small>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -194,17 +239,52 @@
                                     <div class="card-body text-center">
                                         <i class="fas fa-tools fa-2x text-info mb-2"></i>
                                         <h4 id="totalHardware" class="mb-1">0</h4>
-                                        <small class="text-muted">Hardware</small>
+                                        <small class="text-muted">Hardware (Total)</small>
+                                        <div class="mt-1">
+                                            <small class="text-success fw-bold">Selected: <span id="selectedHardware">0</span></small>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
+                    <!-- Selection Summary -->
+                    <div id="selectionSummary" class="selection-summary d-none">
+                        <h6><i class="fas fa-check-circle me-2"></i>Selection Summary</h6>
+                        <div class="row">
+                            <div class="col-md-3">
+                                <strong>Products:</strong> <span id="summaryProducts">0</span>
+                            </div>
+                            <div class="col-md-3">
+                                <strong>Parts:</strong> <span id="summaryParts">0</span>
+                            </div>
+                            <div class="col-md-3">
+                                <strong>Subassemblies:</strong> <span id="summarySubassemblies">0</span>
+                            </div>
+                            <div class="col-md-3">
+                                <strong>Hardware:</strong> <span id="summaryHardware">0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Selection Warnings -->
+                    <div id="selectionWarnings" class="selection-warning d-none">
+                        <h6><i class="fas fa-exclamation-triangle me-2"></i>Selection Issues</h6>
+                        <ul id="warningsList" class="mb-0">
+                        </ul>
+                    </div>
+
                     <div class="mb-4">
                         <h5>Data Structure Preview</h5>
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <div>
+                                <button type="button" id="selectAllProductsBtn" class="btn btn-outline-success btn-sm">
+                                    <i class="fas fa-check-double me-1"></i>Select All Products
+                                </button>
+                                <button type="button" id="clearAllBtn" class="btn btn-outline-danger btn-sm">
+                                    <i class="fas fa-times me-1"></i>Clear All
+                                </button>
                                 <button type="button" id="expandAllBtn" class="btn btn-outline-primary btn-sm">
                                     <i class="fas fa-expand-alt me-1"></i>Expand All
                                 </button>
@@ -246,6 +326,13 @@
         let currentSessionId = null;
         let signalRConnection = null;
         let importData = null;
+        let selectionState = new Map(); // Track selection state by node ID
+        let selectionCounts = {
+            products: 0,
+            parts: 0,
+            subassemblies: 0,
+            hardware: 0
+        };
         
         // DOM elements
         const dropZone = document.getElementById('dropZone');
@@ -272,13 +359,26 @@
         const totalParts = document.getElementById('totalParts');
         const totalSubassemblies = document.getElementById('totalSubassemblies');
         const totalHardware = document.getElementById('totalHardware');
+        const selectedProducts = document.getElementById('selectedProducts');
+        const selectedParts = document.getElementById('selectedParts');
+        const selectedSubassemblies = document.getElementById('selectedSubassemblies');
+        const selectedHardware = document.getElementById('selectedHardware');
         const treeView = document.getElementById('treeView');
         const searchFilter = document.getElementById('searchFilter');
+        const selectAllProductsBtn = document.getElementById('selectAllProductsBtn');
+        const clearAllBtn = document.getElementById('clearAllBtn');
         const expandAllBtn = document.getElementById('expandAllBtn');
         const collapseAllBtn = document.getElementById('collapseAllBtn');
         const downloadCsvBtn = document.getElementById('downloadCsvBtn');
         const confirmImportBtn = document.getElementById('confirmImportBtn');
         const startOverBtn = document.getElementById('startOverBtn');
+        const selectionSummary = document.getElementById('selectionSummary');
+        const selectionWarnings = document.getElementById('selectionWarnings');
+        const warningsList = document.getElementById('warningsList');
+        const summaryProducts = document.getElementById('summaryProducts');
+        const summaryParts = document.getElementById('summaryParts');
+        const summarySubassemblies = document.getElementById('summarySubassemblies');
+        const summaryHardware = document.getElementById('summaryHardware');
 
         // Initialize SignalR connection
         async function initializeSignalR() {
@@ -502,6 +602,7 @@
 
         function buildTreeView() {
             treeView.innerHTML = '';
+            selectionState.clear(); // Reset selection state
             
             if (!importData.products || importData.products.length === 0) {
                 treeView.innerHTML = '<p class="text-muted">No products found in import data.</p>';
@@ -529,14 +630,34 @@
                     treeView.appendChild(detachedNode);
                 });
             }
+
+            // Initialize selection counts and summary
+            updateSelectionCounts();
+            updateSelectionSummary();
+            validateSelection();
         }
 
-        function createTreeNode(icon, text, type, expanded = false, level = 0) {
+        function createTreeNode(icon, text, type, expanded = false, level = 0, itemId = null, itemData = null) {
             const node = document.createElement('div');
             node.className = `tree-node level-${level}`;
+            node.dataset.type = type;
+            node.dataset.itemId = itemId || `${type}-${Math.random().toString(36).substr(2, 9)}`;
             
             const hasChildren = type === 'work-order' || type === 'products-header' || type === 'hardware-header' || 
                                type === 'detached-header' || type === 'product' || type === 'subassembly';
+            
+            const nodeId = node.dataset.itemId;
+            
+            // Initialize selection state
+            if (!selectionState.has(nodeId)) {
+                selectionState.set(nodeId, {
+                    selected: true, // Default to selected for backward compatibility
+                    type: type,
+                    itemData: itemData,
+                    parentId: null,
+                    childIds: []
+                });
+            }
             
             node.innerHTML = `
                 <div class="d-flex align-items-center">
@@ -546,12 +667,13 @@
                         </span>` : 
                         '<span class="me-2" style="width: 16px; display: inline-block;"></span>'
                     }
-                    <input type="checkbox" class="form-check-input me-2" checked>
+                    <input type="checkbox" class="tree-checkbox form-check-input me-2" checked data-node-id="${nodeId}">
                     <span class="me-2">${icon}</span>
                     <span class="flex-grow-1">${text}</span>
                 </div>
             `;
 
+            // Handle expand/collapse
             if (hasChildren) {
                 const toggle = node.querySelector('.tree-toggle');
                 if (toggle) {
@@ -572,6 +694,15 @@
                 }
             }
 
+            // Handle checkbox changes
+            const checkbox = node.querySelector('.tree-checkbox');
+            if (checkbox) {
+                checkbox.addEventListener('change', (e) => {
+                    e.stopPropagation();
+                    handleNodeSelection(nodeId, checkbox.checked);
+                });
+            }
+
             return node;
         }
 
@@ -582,84 +713,351 @@
                 `${product.productNumber} - ${product.name} - Qty. ${product.quantity}` :
                 `${product.productNumber || product.name} - Qty. ${product.quantity}`;
             
-            const productNode = createTreeNode('🚪', displayName, 'product', false, level);
+            const productNode = createTreeNode('🚪', displayName, 'product', false, level, product.id, product);
+            const productId = productNode.dataset.itemId;
             
             const content = document.createElement('div');
             content.className = 'tree-content';
             content.style.display = 'none';
             productNode.appendChild(content);
 
+            // Track child relationships
+            const childIds = [];
+
             // Add parts
             product.parts.forEach(part => {
-                const partNode = createPartNode(part, level + 1);
+                const partNode = createPartNode(part, level + 1, productId);
                 content.appendChild(partNode);
+                childIds.push(partNode.dataset.itemId);
             });
 
             // Add subassemblies
             product.subassemblies.forEach(subassembly => {
-                const subassemblyNode = createSubassemblyNode(subassembly, level + 1);
+                const subassemblyNode = createSubassemblyNode(subassembly, level + 1, productId);
                 content.appendChild(subassemblyNode);
+                childIds.push(subassemblyNode.dataset.itemId);
             });
 
             // Add hardware
             product.hardware.forEach(hardware => {
-                const hardwareNode = createHardwareNode(hardware, level + 1);
+                const hardwareNode = createHardwareNode(hardware, level + 1, productId);
                 content.appendChild(hardwareNode);
+                childIds.push(hardwareNode.dataset.itemId);
             });
+
+            // Update parent-child relationships
+            const productState = selectionState.get(productId);
+            if (productState) {
+                productState.childIds = childIds;
+                childIds.forEach(childId => {
+                    const childState = selectionState.get(childId);
+                    if (childState) {
+                        childState.parentId = productId;
+                    }
+                });
+            }
 
             return productNode;
         }
 
-        function createPartNode(part, level = 3) {
+        function createPartNode(part, level = 3, parentId = null) {
             return createTreeNode('📄', 
                 `${part.id} - ${part.name} (Qty: ${part.quantity}, ${part.width}mm×${part.height}mm×${part.thickness}mm, ${part.material})`, 
-                'part', false, level);
+                'part', false, level, part.id, part);
         }
 
-        function createSubassemblyNode(subassembly, level = 3) {
+        function createSubassemblyNode(subassembly, level = 3, parentId = null) {
             const subassemblyNode = createTreeNode('📁', 
                 `${subassembly.id} - ${subassembly.name} (Qty: ${subassembly.quantity})`, 
-                'subassembly', false, level);
+                'subassembly', false, level, subassembly.id, subassembly);
+            const subassemblyId = subassemblyNode.dataset.itemId;
             
             const content = document.createElement('div');
             content.className = 'tree-content';
             content.style.display = 'none';
             subassemblyNode.appendChild(content);
 
+            // Track child relationships
+            const childIds = [];
+
             // Add parts
             subassembly.parts.forEach(part => {
-                const partNode = createPartNode(part, level + 1);
+                const partNode = createPartNode(part, level + 1, subassemblyId);
                 content.appendChild(partNode);
+                childIds.push(partNode.dataset.itemId);
             });
 
             // Add nested subassemblies
             subassembly.nestedSubassemblies.forEach(nested => {
-                const nestedNode = createSubassemblyNode(nested, level + 1);
+                const nestedNode = createSubassemblyNode(nested, level + 1, subassemblyId);
                 content.appendChild(nestedNode);
+                childIds.push(nestedNode.dataset.itemId);
             });
 
             // Add hardware
             subassembly.hardware.forEach(hardware => {
-                const hardwareNode = createHardwareNode(hardware, level + 1);
+                const hardwareNode = createHardwareNode(hardware, level + 1, subassemblyId);
                 content.appendChild(hardwareNode);
+                childIds.push(hardwareNode.dataset.itemId);
             });
+
+            // Update parent-child relationships
+            const subassemblyState = selectionState.get(subassemblyId);
+            if (subassemblyState) {
+                subassemblyState.childIds = childIds;
+                childIds.forEach(childId => {
+                    const childState = selectionState.get(childId);
+                    if (childState) {
+                        childState.parentId = subassemblyId;
+                    }
+                });
+            }
 
             return subassemblyNode;
         }
 
-        function createHardwareNode(hardware, level = 3) {
+        function createHardwareNode(hardware, level = 3, parentId = null) {
             return createTreeNode('🔧', 
                 `${hardware.id} - ${hardware.name} (Qty: ${hardware.quantity})`, 
-                'hardware', false, level);
+                'hardware', false, level, hardware.id, hardware);
         }
 
         function createDetachedProductNode(detached, level = 2) {
             return createTreeNode('📄', 
                 `${detached.id} - ${detached.name} (Qty: ${detached.quantity}, ${detached.width}mm×${detached.height}mm×${detached.thickness}mm)`, 
-                'detached', false, level);
+                'detached', false, level, detached.id, detached);
+        }
+
+        // Selection Management Functions
+        function handleNodeSelection(nodeId, isSelected) {
+            const nodeState = selectionState.get(nodeId);
+            if (!nodeState) return;
+
+            // Update selection state
+            nodeState.selected = isSelected;
+
+            // Handle parent-child dependencies
+            if (isSelected) {
+                // When selecting a node, auto-select all children
+                selectAllChildren(nodeId);
+                // Update parent state (might become partially selected)
+                updateParentState(nodeState.parentId);
+            } else {
+                // When deselecting a node, deselect all children
+                deselectAllChildren(nodeId);
+                // Update parent state
+                updateParentState(nodeState.parentId);
+            }
+
+            // Update UI
+            updateNodeVisualState(nodeId);
+            updateSelectionCounts();
+            updateSelectionSummary();
+            validateSelection();
+        }
+
+        function selectAllChildren(parentId) {
+            const parentState = selectionState.get(parentId);
+            if (!parentState) return;
+
+            parentState.childIds.forEach(childId => {
+                const childState = selectionState.get(childId);
+                if (childState && !childState.selected) {
+                    childState.selected = true;
+                    updateNodeVisualState(childId);
+                    selectAllChildren(childId); // Recursively select grandchildren
+                }
+            });
+        }
+
+        function deselectAllChildren(parentId) {
+            const parentState = selectionState.get(parentId);
+            if (!parentState) return;
+
+            parentState.childIds.forEach(childId => {
+                const childState = selectionState.get(childId);
+                if (childState && childState.selected) {
+                    childState.selected = false;
+                    updateNodeVisualState(childId);
+                    deselectAllChildren(childId); // Recursively deselect grandchildren
+                }
+            });
+        }
+
+        function updateParentState(parentId) {
+            if (!parentId) return;
+
+            const parentState = selectionState.get(parentId);
+            if (!parentState) return;
+
+            // Check children selection states
+            const selectedChildren = parentState.childIds.filter(childId => {
+                const childState = selectionState.get(childId);
+                return childState && childState.selected;
+            });
+
+            const allSelected = selectedChildren.length === parentState.childIds.length;
+            const noneSelected = selectedChildren.length === 0;
+
+            if (allSelected) {
+                parentState.selected = true;
+                parentState.partiallySelected = false;
+            } else if (noneSelected) {
+                parentState.selected = false;
+                parentState.partiallySelected = false;
+            } else {
+                parentState.selected = false;
+                parentState.partiallySelected = true;
+            }
+
+            updateNodeVisualState(parentId);
+            updateParentState(parentState.parentId); // Recursively update grandparents
+        }
+
+        function updateNodeVisualState(nodeId) {
+            const nodeState = selectionState.get(nodeId);
+            if (!nodeState) return;
+
+            const nodeElement = document.querySelector(`[data-item-id="${nodeId}"]`);
+            if (!nodeElement) return;
+
+            const checkbox = nodeElement.querySelector('.tree-checkbox');
+            if (checkbox) {
+                checkbox.checked = nodeState.selected;
+                checkbox.indeterminate = nodeState.partiallySelected || false;
+                checkbox.classList.toggle('indeterminate', nodeState.partiallySelected || false);
+            }
+
+            // Update visual styling
+            nodeElement.classList.remove('selected', 'partially-selected');
+            if (nodeState.selected) {
+                nodeElement.classList.add('selected');
+            } else if (nodeState.partiallySelected) {
+                nodeElement.classList.add('partially-selected');
+            }
+        }
+
+        function updateSelectionCounts() {
+            // Reset counts
+            selectionCounts = {
+                products: 0,
+                parts: 0,
+                subassemblies: 0,
+                hardware: 0
+            };
+
+            // Count selected items by type
+            selectionState.forEach(state => {
+                if (state.selected) {
+                    switch (state.type) {
+                        case 'product':
+                            selectionCounts.products++;
+                            break;
+                        case 'part':
+                            selectionCounts.parts++;
+                            break;
+                        case 'subassembly':
+                            selectionCounts.subassemblies++;
+                            break;
+                        case 'hardware':
+                            selectionCounts.hardware++;
+                            break;
+                    }
+                }
+            });
+
+            // Update UI
+            selectedProducts.textContent = selectionCounts.products;
+            selectedParts.textContent = selectionCounts.parts;
+            selectedSubassemblies.textContent = selectionCounts.subassemblies;
+            selectedHardware.textContent = selectionCounts.hardware;
+        }
+
+        function updateSelectionSummary() {
+            const hasSelection = selectionCounts.products > 0 || selectionCounts.parts > 0 || 
+                               selectionCounts.subassemblies > 0 || selectionCounts.hardware > 0;
+
+            if (hasSelection) {
+                selectionSummary.classList.remove('d-none');
+                summaryProducts.textContent = selectionCounts.products;
+                summaryParts.textContent = selectionCounts.parts;
+                summarySubassemblies.textContent = selectionCounts.subassemblies;
+                summaryHardware.textContent = selectionCounts.hardware;
+            } else {
+                selectionSummary.classList.add('d-none');
+            }
+        }
+
+        function validateSelection() {
+            const warnings = [];
+            let hasValidSelection = false;
+
+            // Check for products with incomplete selections
+            selectionState.forEach((state, nodeId) => {
+                if (state.type === 'product' && state.partiallySelected) {
+                    warnings.push(`Product "${state.itemData?.productNumber || nodeId}" has incomplete selection. Select all parts or deselect the product.`);
+                }
+                if (state.selected && (state.type === 'product' || state.type === 'hardware' || state.type === 'detached')) {
+                    hasValidSelection = true;
+                }
+            });
+
+            // Check for orphaned parts/subassemblies (selected without parent)
+            selectionState.forEach((state, nodeId) => {
+                if (state.selected && (state.type === 'part' || state.type === 'subassembly') && state.parentId) {
+                    const parentState = selectionState.get(state.parentId);
+                    if (parentState && !parentState.selected && !parentState.partiallySelected) {
+                        warnings.push(`${state.type === 'part' ? 'Part' : 'Subassembly'} "${state.itemData?.name || nodeId}" is selected but its parent is not. Select the parent product first.`);
+                    }
+                }
+            });
+
+            // Update warnings UI
+            if (warnings.length > 0) {
+                selectionWarnings.classList.remove('d-none');
+                warningsList.innerHTML = warnings.map(warning => `<li>${warning}</li>`).join('');
+            } else {
+                selectionWarnings.classList.add('d-none');
+            }
+
+            // Enable/disable confirm button
+            const isValid = hasValidSelection && warnings.length === 0;
+            confirmImportBtn.disabled = !isValid;
+            
+            return isValid;
         }
 
         // Tree view controls
+        selectAllProductsBtn.addEventListener('click', () => {
+            // Select all products (which will auto-select their children)
+            selectionState.forEach((state, nodeId) => {
+                if (state.type === 'product' || state.type === 'hardware' || state.type === 'detached') {
+                    if (!state.selected) {
+                        state.selected = true;
+                        updateNodeVisualState(nodeId);
+                        selectAllChildren(nodeId);
+                    }
+                }
+            });
+            updateSelectionCounts();
+            updateSelectionSummary();
+            validateSelection();
+        });
+
+        clearAllBtn.addEventListener('click', () => {
+            // Deselect everything
+            selectionState.forEach((state, nodeId) => {
+                if (state.selected) {
+                    state.selected = false;
+                    state.partiallySelected = false;
+                    updateNodeVisualState(nodeId);
+                }
+            });
+            updateSelectionCounts();
+            updateSelectionSummary();
+            validateSelection();
+        });
+
         expandAllBtn.addEventListener('click', () => {
             const toggles = treeView.querySelectorAll('.tree-toggle');
             toggles.forEach(toggle => {

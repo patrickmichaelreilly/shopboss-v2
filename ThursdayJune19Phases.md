@@ -25,184 +25,182 @@ Workorder
 
 ## Project Context Summary
 
-- **Current State**: Phase 2 infrastructure complete - import workflow functional but data mapping incorrect
-- **Core Issue**: SDF column names don't match expected names (ProductId, SubassemblyId, etc.), causing hierarchy problems
-- **Evidence**: 946 raw CSV rows producing inflated counts in preview (duplicates/wrong relationships)
+- **Current State**: Phase 3 partially complete - import workflow functional with correct data mapping
+- **Phase 1 & 2 Complete**: Column mapping service implemented, hierarchy logic working, tree view displaying correct relationships
+- **Recent Fix**: Product display names now show [ItemNumber] - [Product Name] - Qty. [Quantity] format correctly
 - **External Tool**: x86 Importer wrapper (Erik's converter + Sqlite3) triggered via web UI
-- **SDF Analysis Available**: `SDF Data Analysis.csv` shows actual table structure and required columns
+- **Data Quality**: No warnings in terminal, preview counts accurate, tree view hierarchy working
 - **Helpful notes**: All the SDFs will be well-formed with the same tables and columns.
 ---
 
-## Work Plan - 5 Focused Phases (~1 hour each)
+## Work Plan - Remaining Focused Phases (~1 hour each)
 
-### Phase 1: Data Structure Analysis & Column Mapping Discovery
-**Duration**: ~1 hour  
-**Deliverable**: Column mapping translation layer and updated transformation logic
+### ✅ COMPLETED: Phase 1 & 2 - Data Structure Analysis & Import Foundation
+**Status**: COMPLETED  
+**Achievement**: Column mapping service, hierarchy logic, tree view with correct product display
 
-#### Detailed Tasks:
-1. **Analyze SDF Data Analysis.csv**
-   - Map actual column names from each table (Products, Parts, Subassemblies, Hardware, etc.)
-   - Identify relationship columns (LinkID, LinkIDProduct, LinkIDSubAssembly, etc.)
-   - Document column name translation requirements
-
-2. **Create Column Mapping Service**
-   - Build ColumnMappingService.cs to translate actual SDF columns to expected model properties
-   - Handle variations in column naming across different SDF versions
-   - Provide fallback logic for optional columns
-
-3. **Update ImportDataTransformService**
-   - Replace hardcoded column names (ProductId, SubassemblyId) with actual SDF column names
-   - Update GetStringValue calls to use real column names from mapping service
-   - Fix hierarchy construction logic to use correct parent-child relationship columns
-
-4. **Test Updated Transformation**
-   - Run import with sample SDF file to verify correct data extraction
-   - Validate that hierarchy relationships are now properly constructed
-   - Confirm preview counts are reasonable and match expectations
-
-#### Success Criteria:
-- [ ] All actual SDF column names documented and mapped
-- [ ] ImportDataTransformService uses real column names
-- [ ] No more "empty column" warnings in transformation logs
-- [ ] Preview data shows realistic counts and proper hierarchy
+#### Completed Deliverables:
+- ✅ Column mapping translation layer (ColumnMappingService.cs)
+- ✅ Updated transformation logic with real SDF column names
+- ✅ Correct parent-child relationships and accurate preview counts
+- ✅ Tree view displaying proper hierarchical relationships
+- ✅ Product display format: [ItemNumber] - [Product Name] - Qty. [Quantity]
+- ✅ No terminal warnings, clean data processing
 
 ---
 
-### Phase 2: Hierarchy Logic Refinement & Validation
+### Phase 3A: Tree Selection Logic Enhancement
 **Duration**: ~1 hour  
-**Deliverable**: Correct parent-child relationships and accurate preview counts
+**Deliverable**: Enhanced tree view with smart selection logic
 
 #### Detailed Tasks:
-1. **Implement Systematic Parsing Order**
-   - Products first (root level items using Products table)
-   - Subassemblies linked to products via LinkIDProduct/LinkIDParentProduct
-   - Nested subassemblies differentiated from regular subassemblies
-   - Parts and hardware associated with correct parents using LinkID fields
+1. **Enhance Tree Selection JavaScript**
+   - Implement parent-child selection dependencies (selecting parent auto-selects children)
+   - Add selection validation (prevent child selection without parent)
+   - Implement visual feedback for selected/partially selected nodes
+   - Add "Select All Products" and "Clear All" buttons
 
-2. **Fix Relationship Linking Logic**
-   - Use actual LinkID column names from SDF analysis
-   - Implement proper parent-child association using real relationship fields
-   - Handle cases where relationship fields may be null or empty
+2. **Create Selection State Management**
+   - Build JavaScript selection tracking for tree hierarchy
+   - Maintain selected item counts by type (products, parts, subassemblies, hardware)
+   - Update preview statistics to show selected vs. total counts
+   - Validate selection completeness before allowing confirmation
 
-3. **Add Data Validation**
-   - Verify no orphaned records (children without valid parents)
-   - Ensure all parent-child associations are valid
-   - Add warnings for incomplete or suspicious data structures
-
-4. **Resolve Count Inflation Issue**
-   - Debug why 946 raw rows become inflated counts in preview
-   - Fix duplicate creation in transformation logic
-   - Ensure each SDF record maps to exactly one preview item
-
-#### Success Criteria:
-- [ ] Preview counts match actual SDF data (no inflation)
-- [ ] Tree view displays correct hierarchical relationships
-- [ ] No orphaned records or invalid parent-child links
-- [ ] Transformation logs show clean data processing
-
----
-
-### Phase 3: Selective Import Implementation
-**Duration**: ~1 hour  
-**Deliverable**: Tree view with selection logic and database persistence preparation
-
-#### Detailed Tasks:
-1. **Implement Tree View Selection Logic**
-   - Add checkbox functionality to tree view nodes
-   - Implement smart selection: parent selection automatically includes children
-   - Ensure child nodes cannot be selected without parent selection
-
-2. **Add Selection Validation**
-   - Validate that all parent dependencies are met
-   - Warn users about incomplete product imports
-   - Handle independent selections for hardware and detached products
-
-3. **Create ImportSelectionService**
-   - Build service to track selected items across tree hierarchy
-   - Convert selected import models to database entity models
-   - Maintain selection state and provide validation feedback
-
-4. **Prepare Database Persistence Logic**
-   - Design atomic transaction approach for selected item import
-   - Handle conversion from import models to ShopBoss database entities
-   - Implement rollback logic for failed imports
+3. **Add Selection Validation Feedback**
+   - Show warnings for incomplete product selections
+   - Highlight dependency issues in tree view
+   - Provide clear messaging about selection requirements
+   - Enable/disable confirm button based on selection validity
 
 #### Success Criteria:
 - [ ] Tree view selection works with parent-child validation
-- [ ] Selection state is properly maintained and tracked
-- [ ] Import models can be converted to database entities
-- [ ] Validation prevents invalid selection combinations
+- [ ] Selection state properly tracked and displayed
+- [ ] Clear user feedback for selection issues
+- [ ] Confirm button enabled only for valid selections
 
 ---
 
-### Phase 4: Import Confirmation & Database Integration
+### Phase 3B: Import Selection Service & Data Conversion
 **Duration**: ~1 hour  
-**Deliverable**: Complete import workflow with database storage
+**Deliverable**: Backend service for processing selected items
 
 #### Detailed Tasks:
-1. **Implement Confirm Import Functionality**
-   - Convert selected import models to ShopBoss database entities
-   - Execute database transaction with all selected items
-   - Handle foreign key relationships and entity dependencies
+1. **Create ImportSelectionService**
+   - Build service to process selected tree items from frontend
+   - Convert import models to ShopBoss database entities (WorkOrder, Product, Part, etc.)
+   - Handle parent-child relationship mapping during conversion
+   - Implement selection filtering (only process selected items)
 
-2. **Add Duplicate Detection**
+2. **Add Controller Endpoint for Selection Processing**
+   - Create POST endpoint to receive selected item data from frontend
+   - Validate selection data and dependencies
+   - Call ImportSelectionService to process conversion
+   - Return success/error feedback to frontend
+
+3. **Implement Entity Relationship Handling**
+   - Ensure foreign key relationships are properly set during conversion
+   - Handle WorkOrder → Product → Parts/Subassemblies → Hardware hierarchy
+   - Preserve Microvellum IDs exactly as imported
+   - Set up proper entity navigation properties
+
+#### Success Criteria:
+- [ ] ImportSelectionService converts import models to database entities
+- [ ] Controller endpoint processes selection data correctly
+- [ ] Entity relationships properly established
+- [ ] Selected items ready for database persistence
+
+---
+
+### Phase 4: Database Persistence & Duplicate Detection
+**Duration**: ~1 hour  
+**Deliverable**: Complete database import with conflict resolution
+
+#### Detailed Tasks:
+1. **Implement Database Transaction Logic**
+   - Execute atomic transaction for all selected entities
+   - Handle rollback on any failure during import
+   - Ensure data consistency across all related entities
+   - Implement proper error handling and logging
+
+2. **Add Duplicate Detection System**
    - Check existing Microvellum IDs in database before import
-   - Warn users about potential duplicates
-   - Provide options for handling duplicate scenarios
+   - Identify potential conflicts with existing work orders
+   - Provide user options: Skip, Replace, or Cancel on duplicates
+   - Handle partial duplicates (some products exist, others don't)
 
-3. **Create Import Summary Reports**
+3. **Create Import Confirmation UI**
+   - Show final confirmation dialog with import summary
+   - Display duplicate warnings and resolution options
+   - Allow user to review what will be imported before final commit
+   - Provide clear feedback during database save process
+
+#### Success Criteria:
+- [ ] Database transactions work atomically
+- [ ] Duplicate detection prevents data conflicts
+- [ ] Users can resolve duplicate scenarios
+- [ ] Import confirmation provides clear feedback
+
+---
+
+### Phase 5: Import Summary & Audit Trail
+**Duration**: ~1 hour  
+**Deliverable**: Complete import tracking and reporting system
+
+#### Detailed Tasks:
+1. **Create Import Summary Reports**
    - Generate detailed report of what was successfully imported
    - Include statistics: products, parts, subassemblies, hardware counts
    - Show any warnings or errors encountered during import
+   - Display import completion time and user information
 
-4. **Implement Audit Trail**
+2. **Implement Import History & Audit Trail**
    - Track what was imported, when, and by whom
-   - Store import session details and results
-   - Enable import history review and troubleshooting
+   - Store import session details and results in database
+   - Create import history view for administrators
+   - Enable import session review and troubleshooting
+
+3. **Add Post-Import Navigation**
+   - Redirect to imported work order after successful import
+   - Provide links to view imported work order details
+   - Add breadcrumb navigation back to import process
+   - Enable users to start new import or view work orders list
 
 #### Success Criteria:
-- [ ] Selected items are successfully saved to database
-- [ ] Duplicate detection prevents data conflicts
 - [ ] Import summary provides comprehensive feedback
 - [ ] Audit trail captures all import activity
+- [ ] Import history accessible for review
+- [ ] Post-import workflow is intuitive
 
 ---
 
-### Phase 5: Testing, Validation & Polish
+### Phase 6: Testing, Validation & Polish
 **Duration**: ~1 hour  
-**Deliverable**: Production-ready import system with comprehensive error handling
+**Deliverable**: Production-ready import system
 
 #### Detailed Tasks:
-1. **Comprehensive Testing**
-   - Test with various SDF file sizes and structures
-   - Verify import workflow under different scenarios
+1. **End-to-End Testing**
+   - Test complete workflow from upload to database storage
+   - Verify all selection scenarios and validation rules
    - Test error conditions and recovery mechanisms
+   - Confirm system works with various SDF file structures
 
-2. **Performance Optimization**
-   - Optimize transformation logic for large SDF files
-   - Improve tree view rendering for complex hierarchies
+2. **Performance & UX Optimization**
+   - Optimize tree view rendering for large hierarchies
    - Ensure acceptable response times for typical imports
+   - Improve user feedback and loading indicators
+   - Add keyboard shortcuts and accessibility features
 
-3. **Enhanced Error Handling**
-   - Improve user feedback for all error scenarios
-   - Add detailed logging for troubleshooting
-   - Implement graceful degradation for partial failures
-
-4. **Documentation and Code Cleanup**
-   - Update inline documentation for new services
+3. **Documentation & Code Quality**
+   - Update inline documentation for all new services
    - Clean up debugging code and temporary implementations
    - Ensure code follows project standards and conventions
-
-5. **Final Requirements Verification**
-   - Verify all Phase 2 requirements are met
-   - Test complete workflow from file upload to database storage
-   - Confirm system is ready for production use
+   - Create user guide for import process
 
 #### Success Criteria:
-- [ ] All error scenarios handled gracefully
-- [ ] Performance is acceptable for production use
-- [ ] Code is clean, documented, and maintainable
 - [ ] Complete workflow tested and verified
+- [ ] Performance acceptable for production use
+- [ ] Code is clean, documented, and maintainable
+- [ ] System ready for production deployment
 
 ---
 
@@ -237,8 +235,9 @@ Workorder
 
 ## Overall Success Criteria
 
-- [ ] Preview counts match actual SDF data (no inflation)
-- [ ] Tree view displays correct hierarchical relationships
+- [x] Preview counts match actual SDF data (no inflation)
+- [x] Tree view displays correct hierarchical relationships
+- [x] Product display shows [ItemNumber] - [Product Name] - Qty. [Quantity] format
 - [ ] Selection logic works with parent-child validation
 - [ ] Database import completes successfully with audit trail
 - [ ] All error scenarios handled gracefully
