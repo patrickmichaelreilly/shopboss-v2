@@ -390,4 +390,37 @@ Work Order (Name, ImportedDate)
 
 ---
 
+## User Stories
+
+### Admin
+
+* **US‑001 Admin: Import Work Orders** — \*As an \****Admin***, I need to import a work order from Microvellum in SQL CE (`.sdf`) format so that the system captures all relevant data (work‑order header, products, parts, cut sheets, nests, etc.) in its own database.
+* **US‑002 Admin: Manage Work Orders** — \*As an \****Admin***, I need to view, delete, and modify work orders in the database so that production data remains accurate and up to date.
+* **US‑003 Admin: Manage Sorting Racks** — \*As an \****Admin***, I need to add, delete, and define compartments (rows/columns) in each sorting rack so that digital storage matches the physical warehouse.
+* **US‑004 Admin: Override Storage Locations** — \*As an \****Admin***, I need to manually override the contents of any storage location so that I can correct mistakes or handle exceptions.
+
+### CNC Operator
+
+* **US‑005 CNC: Batch Cut Scanning** — \*As a \****CNC operator***, I need to scan the barcode on a nest sheet and have the software automatically mark all related parts as **Cut** so that I avoid dozens of individual scans.
+
+### Sorting Operator
+
+* **US‑006 Sort: Slot Assignment** — \*As a \****Sorting operator***, I need the software to tell me where to store a part once I scan its barcode so that parts are organized efficiently.
+* **US‑007 Sort: Rack Visualization** — \*As a \****Sorting operator***, I need a visual view of the current sorting rack showing which slots are filled/empty and highlighting where to place the scanned part.
+* **US‑008 Sort: Product Grouping** — \*As a \****Sorting operator***, I need the software to recognize parts that belong to the same product and instruct me to store them together in preparation for assembly.
+* **US‑009 Sort: Special Rack for Doors/Drawer Fronts** — \*As a \****Sorting operator***, I need the software to recognize when a part is a door or drawer front and direct me to the special rack reserved for those items.
+* **US‑010 Sort: Status Update** — \*As a \****Sorting operator***, when I sort a part, the software must update that part’s status to **Sorted**.
+
+### Assembly Operator
+
+* **US‑011 Assembly: Carcass Readiness & Completion** — \*As an \****Assembly operator***, I need the software to alert me when all carcass parts of a product are sorted, and after assembly, allow me to scan any part to mark the entire product (and its parts) as **Assembled**, then direct me to the stored doors and drawer fronts for fitting.
+
+### Shipping Operator
+
+* **US‑012 Shipping: Work‑Order Verification** — \*As a \****Shipping operator***, I need to pull up a work order and scan each product, hardware item, and detached product as it is loaded so that the software tallies everything and prevents omissions. The system updates the status for each part and each product I handle to "Shipped".
+
+*(Additional user stories for Production Managers, QA, and future enhancements remain in the Requirements for further elaboration.)*
+
+---
+
 *Document Status: This requirements document serves as the definitive specification for ShopBoss v2 development. All requirements should be validated with stakeholders and updated as needed during development cycles.*
