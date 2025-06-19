@@ -47,9 +47,12 @@ public class ImportSelectionService
             // Create the work order entity
             var workOrder = CreateWorkOrderEntity(importData, selection);
             
+            // Track processed hardware to avoid duplicates
+            var processedHardwareIds = new HashSet<string>();
+            
             // Process selected items
-            ProcessSelectedProducts(importData, selection, workOrder, result);
-            ProcessSelectedHardware(importData, selection, workOrder, result);
+            ProcessSelectedProducts(importData, selection, workOrder, processedHardwareIds, result);
+            ProcessSelectedHardware(importData, selection, workOrder, processedHardwareIds, result);
             ProcessSelectedDetachedProducts(importData, selection, workOrder, result);
             
             // Identify products with only 1 part as detached products
@@ -205,6 +208,7 @@ public class ImportSelectionService
         ImportWorkOrder importData, 
         SelectionRequest selection, 
         WorkOrder workOrder, 
+        HashSet<string> processedHardwareIds,
         ImportConversionResult result)
     {
         var selectedProductIds = selection.SelectedItemIds
@@ -224,7 +228,7 @@ public class ImportSelectionService
             ProcessSelectedSubassembliesForProduct(importProduct, selection, product, result);
             
             // Process selected hardware for this product
-            ProcessSelectedHardwareForProduct(importProduct, selection, product, workOrder, result);
+            ProcessSelectedHardwareForProduct(importProduct, selection, product, workOrder, processedHardwareIds, result);
 
             result.Statistics.ConvertedProducts++;
         }
@@ -277,6 +281,7 @@ public class ImportSelectionService
         SelectionRequest selection,
         Product product,
         WorkOrder workOrder,
+        HashSet<string> processedHardwareIds,
         ImportConversionResult result)
     {
         var selectedHardwareIds = selection.SelectedItemIds
@@ -286,12 +291,19 @@ public class ImportSelectionService
 
         foreach (var importHardware in importProduct.Hardware.Where(h => selectedHardwareIds.Contains(h.Id)))
         {
+            // Skip if this hardware has already been processed
+            if (processedHardwareIds.Contains(importHardware.Id))
+            {
+                continue;
+            }
+            
             // Hardware can be associated with either work order or product
             // For product-level hardware, we'll create it as work order hardware with reference
             var hardware = ConvertToHardwareEntity(importHardware, product.WorkOrderId);
             
             // Add to work order's hardware collection
             workOrder.Hardware.Add(hardware);
+            processedHardwareIds.Add(importHardware.Id);
             result.Statistics.ConvertedHardware++;
         }
     }
@@ -337,6 +349,7 @@ public class ImportSelectionService
         ImportWorkOrder importData,
         SelectionRequest selection,
         WorkOrder workOrder,
+        HashSet<string> processedHardwareIds,
         ImportConversionResult result)
     {
         var selectedHardwareIds = selection.SelectedItemIds
@@ -346,8 +359,15 @@ public class ImportSelectionService
 
         foreach (var importHardware in importData.Hardware.Where(h => selectedHardwareIds.Contains(h.Id)))
         {
+            // Skip if this hardware has already been processed
+            if (processedHardwareIds.Contains(importHardware.Id))
+            {
+                continue;
+            }
+            
             var hardware = ConvertToHardwareEntity(importHardware, workOrder.Id);
             workOrder.Hardware.Add(hardware);
+            processedHardwareIds.Add(importHardware.Id);
             result.Statistics.ConvertedHardware++;
         }
     }
