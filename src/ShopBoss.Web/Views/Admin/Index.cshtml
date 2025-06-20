@@ -7,20 +7,21 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
         <h2>Work Orders</h2>
-        @if (!string.IsNullOrEmpty(ViewBag.ActiveWorkOrderId))
-        {
-            <small class="text-muted">
-                <i class="fas fa-star text-warning me-1"></i>
-                Active Work Order: <strong>@ViewBag.ActiveWorkOrderId</strong>
-            </small>
+        @{
+            var activeWorkOrderName = "None";
+            if (!string.IsNullOrEmpty(ViewBag.ActiveWorkOrderId))
+            {
+                var activeWorkOrder = Model.FirstOrDefault(w => w.Id == ViewBag.ActiveWorkOrderId);
+                if (activeWorkOrder != null)
+                {
+                    activeWorkOrderName = activeWorkOrder.Name;
+                }
+            }
         }
-        else
-        {
-            <small class="text-muted">
-                <i class="fas fa-info-circle me-1"></i>
-                No active work order selected
-            </small>
-        }
+        <small class="text-muted">
+            <i class="fas fa-star @(activeWorkOrderName != "None" ? "text-warning" : "") me-1"></i>
+            Active Work Order: <strong class="@(activeWorkOrderName != "None" ? "text-warning" : "")">@activeWorkOrderName</strong>
+        </small>
     </div>
     <div class="btn-group" role="group">
         <a asp-action="Import" class="btn btn-primary">
@@ -75,8 +76,8 @@ else
                     <th width="40">
                         <input type="checkbox" id="selectAll" class="form-check-input">
                     </th>
-                    <th>Work Order ID</th>
                     <th>Name</th>
+                    <th>Work Order ID</th>
                     <th>Imported Date</th>
                     <th>Products</th>
                     <th>Hardware Items</th>
@@ -100,11 +101,13 @@ else
                                     <i class="fas fa-star text-warning me-2" title="Active Work Order"></i>
                                 }
                                 <a asp-action="WorkOrder" asp-route-id="@workOrder.Id" class="text-decoration-none">
-                                    @workOrder.Id
+                                    @workOrder.Name
                                 </a>
                             </div>
                         </td>
-                        <td>@workOrder.Name</td>
+                        <td>
+                            <small class="text-muted">@workOrder.Id</small>
+                        </td>
                         <td>@workOrder.ImportedDate.ToString("yyyy-MM-dd HH:mm")</td>
                         <td>
                             <span class="badge bg-primary">@workOrder.Products.Count</span>
@@ -224,7 +227,7 @@ else
 
             const workOrderNames = Array.from(checkedBoxes).map(cb => {
                 const row = cb.closest('tr');
-                return row.cells[2].textContent.trim(); // Name column
+                return row.cells[1].textContent.trim(); // Name column (now at index 1)
             });
 
             const confirmMessage = `Are you sure you want to delete ${checkedBoxes.length} work order(s)?\n\n${workOrderNames.join('\n')}\n\nThis action cannot be undone.`;

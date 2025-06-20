@@ -118,24 +118,31 @@
                 .then(response => response.json())
                 .then(data => {
                     const navItem = document.getElementById('activeWorkOrderNavItem');
-                    if (data.success && data.activeWorkOrderId) {
+                    if (data.success && data.activeWorkOrderName) {
                         navItem.innerHTML = `
                             <span class="navbar-text">
                                 <i class="fas fa-star text-warning me-2"></i>
-                                <strong>Active:</strong> <span class="text-warning">${data.activeWorkOrderId}</span>
+                                <strong>Active:</strong> <span class="text-warning">${data.activeWorkOrderName}</span>
                             </span>
                         `;
                     } else {
                         navItem.innerHTML = `
                             <span class="navbar-text text-muted">
-                                <i class="fas fa-info-circle me-2"></i>
-                                No Active Work Order
+                                <i class="fas fa-star me-2"></i>
+                                <strong>Active:</strong> None
                             </span>
                         `;
                     }
                 })
                 .catch(error => {
                     console.error('Error loading active work order status:', error);
+                    const navItem = document.getElementById('activeWorkOrderNavItem');
+                    navItem.innerHTML = `
+                        <span class="navbar-text text-muted">
+                            <i class="fas fa-star me-2"></i>
+                            <strong>Active:</strong> None
+                        </span>
+                    `;
                 });
         }
 

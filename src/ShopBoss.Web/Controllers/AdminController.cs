@@ -368,7 +368,7 @@ public class AdminController : Controller
         }
     }
 
-    public IActionResult GetActiveWorkOrder()
+    public async Task<IActionResult> GetActiveWorkOrder()
     {
         var activeWorkOrderId = HttpContext.Session.GetString("ActiveWorkOrderId");
         if (string.IsNullOrEmpty(activeWorkOrderId))
@@ -376,7 +376,27 @@ public class AdminController : Controller
             return Json(new { success = false, message = "No active work order selected." });
         }
 
-        return Json(new { success = true, activeWorkOrderId = activeWorkOrderId });
+        try
+        {
+            var workOrder = await _context.WorkOrders.FindAsync(activeWorkOrderId);
+            if (workOrder == null)
+            {
+                // Clear invalid active work order from session
+                HttpContext.Session.Remove("ActiveWorkOrderId");
+                return Json(new { success = false, message = "Active work order not found." });
+            }
+
+            return Json(new { 
+                success = true, 
+                activeWorkOrderId = activeWorkOrderId, 
+                activeWorkOrderName = workOrder.Name 
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving active work order {WorkOrderId}", activeWorkOrderId);
+            return Json(new { success = false, message = "Error retrieving active work order." });
+        }
     }
 
     [HttpPost]
