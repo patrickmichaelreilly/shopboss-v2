@@ -105,6 +105,9 @@
         </nav>
     </div>
     <div class="btn-group" role="group">
+        <a asp-action="Modify" asp-route-id="@Model.Id" class="btn btn-warning">
+            <i class="fas fa-edit me-2"></i>Modify Work Order
+        </a>
         <a asp-action="Index" class="btn btn-outline-primary">
             <i class="fas fa-arrow-left me-2"></i>Back to List
         </a>
@@ -239,7 +242,71 @@
     <script>
         // Global variables
         let consolidateHardware = true;
-        let workOrderData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model));
+        let workOrderData = {
+            id: '@Model.Id',
+            name: '@Model.Name',
+            importedDate: '@Model.ImportedDate.ToString("yyyy-MM-dd HH:mm")',
+            products: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Products.Select(p => new {
+                id = p.Id,
+                productNumber = p.ProductNumber,
+                name = p.Name,
+                qty = p.Qty,
+                length = p.Length,
+                width = p.Width,
+                parts = p.Parts.Select(part => new {
+                    id = part.Id,
+                    name = part.Name,
+                    qty = part.Qty,
+                    length = part.Length,
+                    width = part.Width,
+                    thickness = part.Thickness,
+                    material = part.Material
+                }),
+                subassemblies = p.Subassemblies.Select(sub => new {
+                    id = sub.Id,
+                    name = sub.Name,
+                    qty = sub.Qty,
+                    parts = sub.Parts.Select(part => new {
+                        id = part.Id,
+                        name = part.Name,
+                        qty = part.Qty,
+                        length = part.Length,
+                        width = part.Width,
+                        thickness = part.Thickness,
+                        material = part.Material
+                    }),
+                    childSubassemblies = sub.ChildSubassemblies.Select(child => new {
+                        id = child.Id,
+                        name = child.Name,
+                        qty = child.Qty,
+                        parts = child.Parts.Select(part => new {
+                            id = part.Id,
+                            name = part.Name,
+                            qty = part.Qty,
+                            length = part.Length,
+                            width = part.Width,
+                            thickness = part.Thickness,
+                            material = part.Material
+                        })
+                    })
+                })
+            }))),
+            hardware: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Hardware.Select(h => new {
+                id = h.Id,
+                name = h.Name,
+                qty = h.Qty
+            }))),
+            detachedProducts: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.DetachedProducts.Select(d => new {
+                id = d.Id,
+                productNumber = d.ProductNumber,
+                name = d.Name,
+                qty = d.Qty,
+                length = d.Length,
+                width = d.Width,
+                thickness = d.Thickness,
+                material = d.Material
+            })))
+        };
         
         // DOM elements
         const treeView = document.getElementById('treeView');

@@ -5,10 +5,58 @@
 }
 
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>Work Orders</h2>
-    <a asp-action="Import" class="btn btn-primary">
-        <i class="fas fa-upload me-2"></i>Import Work Order
-    </a>
+    <div>
+        <h2>Work Orders</h2>
+        @if (!string.IsNullOrEmpty(ViewBag.ActiveWorkOrderId))
+        {
+            <small class="text-muted">
+                <i class="fas fa-star text-warning me-1"></i>
+                Active Work Order: <strong>@ViewBag.ActiveWorkOrderId</strong>
+            </small>
+        }
+        else
+        {
+            <small class="text-muted">
+                <i class="fas fa-info-circle me-1"></i>
+                No active work order selected
+            </small>
+        }
+    </div>
+    <div class="btn-group" role="group">
+        <a asp-action="Import" class="btn btn-primary">
+            <i class="fas fa-upload me-2"></i>Import Work Order
+        </a>
+    </div>
+</div>
+
+<!-- Search and Bulk Operations -->
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-8">
+                <form asp-action="Index" method="get" class="d-flex">
+                    <input type="text" name="search" class="form-control me-2" 
+                           placeholder="Search by work order name or ID..." 
+                           value="@ViewBag.SearchTerm">
+                    <button type="submit" class="btn btn-outline-secondary">
+                        <i class="fas fa-search"></i>
+                    </button>
+                    @if (!string.IsNullOrEmpty(ViewBag.SearchTerm))
+                    {
+                        <a asp-action="Index" class="btn btn-outline-secondary ms-2">
+                            <i class="fas fa-times"></i>
+                        </a>
+                    }
+                </form>
+            </div>
+            <div class="col-md-4 text-end">
+                <button type="button" class="btn btn-outline-danger" id="bulkDeleteBtn" 
+                        onclick="performBulkDelete()" disabled>
+                    <i class="fas fa-trash me-2"></i>Delete Selected
+                </button>
+            </div>
+        </div>
+    </div>
 </div>
 
 @if (!Model.Any())
@@ -24,6 +72,9 @@ else
         <table class="table table-striped table-hover">
             <thead class="table-dark">
                 <tr>
+                    <th width="40">
+                        <input type="checkbox" id="selectAll" class="form-check-input">
+                    </th>
                     <th>Work Order ID</th>
                     <th>Name</th>
                     <th>Imported Date</th>
@@ -36,11 +87,22 @@ else
             <tbody>
                 @foreach (var workOrder in Model)
                 {
-                    <tr>
+                    var isActive = ViewBag.ActiveWorkOrderId?.ToString() == workOrder.Id;
+                    <tr class="@(isActive ? "table-warning" : "")">
                         <td>
-                            <a asp-action="WorkOrder" asp-route-id="@workOrder.Id" class="text-decoration-none">
-                                @workOrder.Id
-                            </a>
+                            <input type="checkbox" class="form-check-input work-order-checkbox" 
+                                   value="@workOrder.Id" onchange="updateBulkActions()">
+                        </td>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                @if (isActive)
+                                {
+                                    <i class="fas fa-star text-warning me-2" title="Active Work Order"></i>
+                                }
+                                <a asp-action="WorkOrder" asp-route-id="@workOrder.Id" class="text-decoration-none">
+                                    @workOrder.Id
+                                </a>
+                            </div>
                         </td>
                         <td>@workOrder.Name</td>
                         <td>@workOrder.ImportedDate.ToString("yyyy-MM-dd HH:mm")</td>
@@ -55,9 +117,20 @@ else
                         </td>
                         <td>
                             <div class="btn-group" role="group">
+                                @if (!isActive)
+                                {
+                                    <button type="button" class="btn btn-sm btn-outline-success" 
+                                            onclick="setActiveWorkOrder('@workOrder.Id')" title="Set as Active">
+                                        <i class="fas fa-star"></i>
+                                    </button>
+                                }
                                 <a asp-action="WorkOrder" asp-route-id="@workOrder.Id" 
                                    class="btn btn-sm btn-outline-primary" title="View Details">
                                     <i class="fas fa-eye"></i>
+                                </a>
+                                <a asp-action="Modify" asp-route-id="@workOrder.Id" 
+                                   class="btn btn-sm btn-outline-warning" title="Modify">
+                                    <i class="fas fa-edit"></i>
                                 </a>
                                 <button type="button" class="btn btn-sm btn-outline-danger" 
                                         onclick="confirmDelete('@workOrder.Id', '@workOrder.Name')" title="Delete">
@@ -76,8 +149,17 @@ else
     <input type="hidden" id="deleteId" name="id" />
 </form>
 
+<form id="bulkDeleteForm" method="post" style="display: none;">
+    <div id="selectedIdsContainer"></div>
+</form>
+
+<form id="setActiveForm" method="post" style="display: none;">
+    <input type="hidden" id="activeWorkOrderId" name="id" />
+</form>
+
 @section Scripts {
     <script>
+        // Single delete function
         function confirmDelete(id, name) {
             if (confirm(`Are you sure you want to delete work order "${name}"? This action cannot be undone.`)) {
                 document.getElementById('deleteId').value = id;
@@ -85,5 +167,89 @@ else
                 document.getElementById('deleteForm').submit();
             }
         }
+
+        // Set active work order function
+        function setActiveWorkOrder(id) {
+            document.getElementById('activeWorkOrderId').value = id;
+            document.getElementById('setActiveForm').action = '@Url.Action("SetActiveWorkOrder")';
+            document.getElementById('setActiveForm').submit();
+        }
+
+        // Select all checkbox functionality
+        document.getElementById('selectAll').addEventListener('change', function() {
+            const checkboxes = document.querySelectorAll('.work-order-checkbox');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = this.checked;
+            });
+            updateBulkActions();
+        });
+
+        // Update bulk action buttons based on selection
+        function updateBulkActions() {
+            const checkedBoxes = document.querySelectorAll('.work-order-checkbox:checked');
+            const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
+            
+            if (checkedBoxes.length > 0) {
+                bulkDeleteBtn.disabled = false;
+                bulkDeleteBtn.innerHTML = `<i class="fas fa-trash me-2"></i>Delete Selected (${checkedBoxes.length})`;
+            } else {
+                bulkDeleteBtn.disabled = true;
+                bulkDeleteBtn.innerHTML = '<i class="fas fa-trash me-2"></i>Delete Selected';
+            }
+
+            // Update select all checkbox state
+            const allCheckboxes = document.querySelectorAll('.work-order-checkbox');
+            const selectAllCheckbox = document.getElementById('selectAll');
+            
+            if (checkedBoxes.length === allCheckboxes.length && allCheckboxes.length > 0) {
+                selectAllCheckbox.checked = true;
+                selectAllCheckbox.indeterminate = false;
+            } else if (checkedBoxes.length > 0) {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = true;
+            } else {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = false;
+            }
+        }
+
+        // Bulk delete function
+        function performBulkDelete() {
+            const checkedBoxes = document.querySelectorAll('.work-order-checkbox:checked');
+            
+            if (checkedBoxes.length === 0) {
+                alert('Please select work orders to delete.');
+                return;
+            }
+
+            const workOrderNames = Array.from(checkedBoxes).map(cb => {
+                const row = cb.closest('tr');
+                return row.cells[2].textContent.trim(); // Name column
+            });
+
+            const confirmMessage = `Are you sure you want to delete ${checkedBoxes.length} work order(s)?\n\n${workOrderNames.join('\n')}\n\nThis action cannot be undone.`;
+            
+            if (confirm(confirmMessage)) {
+                // Clear container and add selected IDs
+                const container = document.getElementById('selectedIdsContainer');
+                container.innerHTML = '';
+                
+                Array.from(checkedBoxes).forEach(checkbox => {
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = 'selectedIds';
+                    input.value = checkbox.value;
+                    container.appendChild(input);
+                });
+
+                document.getElementById('bulkDeleteForm').action = '@Url.Action("BulkDeleteWorkOrders")';
+                document.getElementById('bulkDeleteForm').submit();
+            }
+        }
+
+        // Initialize bulk actions on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            updateBulkActions();
+        });
     </script>
 }

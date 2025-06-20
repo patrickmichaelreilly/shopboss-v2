@@ -70,7 +70,7 @@ namespace ShopBoss.Web.Migrations
 
                     b.HasIndex("WorkOrderId");
 
-                    b.ToTable("DetachedProducts");
+                    b.ToTable("DetachedProducts", (string)null);
                 });
 
             modelBuilder.Entity("ShopBoss.Web.Models.Hardware", b =>
@@ -93,7 +93,7 @@ namespace ShopBoss.Web.Migrations
 
                     b.HasIndex("WorkOrderId");
 
-                    b.ToTable("Hardware");
+                    b.ToTable("Hardware", (string)null);
                 });
 
             modelBuilder.Entity("ShopBoss.Web.Models.Part", b =>
@@ -149,7 +149,7 @@ namespace ShopBoss.Web.Migrations
 
                     b.HasIndex("SubassemblyId");
 
-                    b.ToTable("Parts");
+                    b.ToTable("Parts", (string)null);
                 });
 
             modelBuilder.Entity("ShopBoss.Web.Models.Product", b =>
@@ -182,7 +182,7 @@ namespace ShopBoss.Web.Migrations
 
                     b.HasIndex("WorkOrderId");
 
-                    b.ToTable("Products");
+                    b.ToTable("Products", (string)null);
                 });
 
             modelBuilder.Entity("ShopBoss.Web.Models.Subassembly", b =>
@@ -215,7 +215,7 @@ namespace ShopBoss.Web.Migrations
 
                     b.HasIndex("ProductId");
 
-                    b.ToTable("Subassemblies");
+                    b.ToTable("Subassemblies", (string)null);
                 });
 
             modelBuilder.Entity("ShopBoss.Web.Models.WorkOrder", b =>
@@ -232,7 +232,7 @@ namespace ShopBoss.Web.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("WorkOrders");
+                    b.ToTable("WorkOrders", (string)null);
                 });
 
             modelBuilder.Entity("ShopBoss.Web.Models.DetachedProduct", b =>

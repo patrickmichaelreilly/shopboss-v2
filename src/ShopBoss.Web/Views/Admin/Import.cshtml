@@ -184,13 +184,33 @@
 
                 <!-- Step 3: Preview and Confirm -->
                 <div id="previewStep" class="step-content d-none">
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle me-2"></i>
+                        <strong>Import Ready:</strong> Review the work order details below and make any necessary adjustments before importing.
+                    </div>
+                    
+                    <!-- Work Order Metadata Section (Unified Pattern) -->
                     <div class="mb-4">
-                        <h5>Work Order Details</h5>
-                        <div class="row">
-                            <div class="col-md-6">
-                                <label for="finalWorkOrderName" class="form-label">Work Order Name</label>
-                                <input type="text" id="finalWorkOrderName" class="form-control" placeholder="Work Order Name">
-                                <small class="form-text text-muted">Edit the work order name if needed before importing.</small>
+                        <h5>Work Order Information</h5>
+                        <div class="card">
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <label for="finalWorkOrderName" class="form-label">Work Order Name</label>
+                                        <input type="text" id="finalWorkOrderName" class="form-control" placeholder="Work Order Name">
+                                        <small class="form-text text-muted">Edit the work order name if needed before importing.</small>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label for="importWorkOrderId" class="form-label">Work Order ID</label>
+                                        <input type="text" id="importWorkOrderId" class="form-control" readonly placeholder="From SDF data">
+                                        <small class="form-text text-muted">Microvellum ID (read-only)</small>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label for="importDate" class="form-label">Import Date</label>
+                                        <input type="text" id="importDate" class="form-control" readonly>
+                                        <small class="form-text text-muted">Current timestamp</small>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -592,6 +612,18 @@
         function populatePreview() {
             // Set work order name (extracted from data or use filename as fallback)
             finalWorkOrderName.value = importData.name || 'Imported Work Order';
+            
+            // Populate unified interface fields
+            const importWorkOrderId = document.getElementById('importWorkOrderId');
+            const importDate = document.getElementById('importDate');
+            
+            if (importWorkOrderId) {
+                importWorkOrderId.value = importData.id || 'Generated from SDF';
+            }
+            
+            if (importDate) {
+                importDate.value = new Date().toLocaleString();
+            }
             
             const stats = importData.statistics;
             totalProducts.textContent = stats.totalProducts;

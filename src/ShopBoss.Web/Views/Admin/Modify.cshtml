@@ -1,0 +1,303 @@
+@model ShopBoss.Web.Models.WorkOrder
+
+@{
+    ViewData["Title"] = $"Modify Work Order - {Model.Name}";
+    ViewBag.Mode = "modify";
+    ViewBag.WorkOrderData = Model;
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2>Modify Work Order</h2>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a asp-action="Index">Work Orders</a></li>
+                <li class="breadcrumb-item"><a asp-action="WorkOrder" asp-route-id="@Model.Id">@Model.Name</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Modify</li>
+            </ol>
+        </nav>
+    </div>
+    <div class="btn-group" role="group">
+        <a asp-action="WorkOrder" asp-route-id="@Model.Id" class="btn btn-outline-primary">
+            <i class="fas fa-eye me-2"></i>View Details
+        </a>
+        <a asp-action="Index" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back to List
+        </a>
+    </div>
+</div>
+
+<div class="alert alert-info">
+    <i class="fas fa-info-circle me-2"></i>
+    <strong>Modify Mode:</strong> You can edit work order metadata and manage entities. 
+    Changes will be saved to the database when you click "Save Changes".
+</div>
+
+<!-- Include the unified work order editor -->
+@await Html.PartialAsync("_WorkOrderEditor", Model)
+
+@section Scripts {
+    <script>
+        // Unified Work Order Editor JavaScript
+        const editorMode = '@ViewBag.Mode';
+        const canEdit = true;
+        let workOrderData = @Html.Raw(ViewBag.WorkOrderDataJson ?? "{}");
+        
+        // Entity management system initialized
+        
+        // Entity management functions
+        function populateEntities() {
+            populateProducts();
+            populateHardware();
+            populateDetachedProducts();
+            updateStatistics();
+        }
+        
+        function populateProducts() {
+            const container = document.getElementById('productsContainer');
+            container.innerHTML = '';
+            
+            if (workOrderData.products) {
+                workOrderData.products.forEach(product => {
+                    container.appendChild(createProductCard(product));
+                });
+            }
+        }
+        
+        function populateHardware() {
+            const container = document.getElementById('hardwareContainer');
+            container.innerHTML = '';
+            
+            if (workOrderData.hardware) {
+                workOrderData.hardware.forEach(hardware => {
+                    container.appendChild(createHardwareCard(hardware));
+                });
+            }
+        }
+        
+        function populateDetachedProducts() {
+            const container = document.getElementById('detachedContainer');
+            container.innerHTML = '';
+            
+            if (workOrderData.detachedProducts) {
+                workOrderData.detachedProducts.forEach(detached => {
+                    container.appendChild(createDetachedCard(detached));
+                });
+            }
+        }
+        
+        function createProductCard(product) {
+            const card = document.createElement('div');
+            card.className = `entity-card ${canEdit ? 'can-edit' : ''} position-relative`;
+            card.dataset.entityId = product.id;
+            card.dataset.entityType = 'product';
+            
+            card.innerHTML = `
+                <div class="entity-header">
+                    <i class="fas fa-boxes me-2"></i>
+                    ${product.productNumber ? product.productNumber + ' - ' : ''}${product.name}
+                </div>
+                <div class="entity-content">
+                    <small class="text-muted">
+                        Qty: ${product.qty || 1} • 
+                        Parts: ${product.parts?.length || 0} • 
+                        Subassemblies: ${product.subassemblies?.length || 0}
+                    </small>
+                </div>
+                ${canEdit ? `
+                <div class="entity-actions">
+                    <button type="button" class="btn btn-sm btn-outline-primary me-1" onclick="editEntity('product', '${product.id}')">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeEntity('product', '${product.id}')">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+                ` : ''}
+            `;
+            
+            return card;
+        }
+        
+        function createHardwareCard(hardware) {
+            const card = document.createElement('div');
+            card.className = `entity-card ${canEdit ? 'can-edit' : ''} position-relative`;
+            card.dataset.entityId = hardware.id;
+            card.dataset.entityType = 'hardware';
+            
+            card.innerHTML = `
+                <div class="entity-header">
+                    <i class="fas fa-tools me-2"></i>
+                    ${hardware.name}
+                </div>
+                <div class="entity-content">
+                    <small class="text-muted">Qty: ${hardware.qty}</small>
+                </div>
+                ${canEdit ? `
+                <div class="entity-actions">
+                    <button type="button" class="btn btn-sm btn-outline-warning me-1" onclick="editEntity('hardware', '${hardware.id}')">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeEntity('hardware', '${hardware.id}')">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+                ` : ''}
+            `;
+            
+            return card;
+        }
+        
+        function createDetachedCard(detached) {
+            const card = document.createElement('div');
+            card.className = `entity-card ${canEdit ? 'can-edit' : ''} position-relative`;
+            card.dataset.entityId = detached.id;
+            card.dataset.entityType = 'detached';
+            
+            const dimensions = [];
+            if (detached.length) dimensions.push(`${detached.length}mm L`);
+            if (detached.width) dimensions.push(`${detached.width}mm W`);
+            if (detached.thickness) dimensions.push(`${detached.thickness}mm T`);
+            const dimStr = dimensions.length > 0 ? ` • ${dimensions.join(' × ')}` : '';
+            
+            card.innerHTML = `
+                <div class="entity-header">
+                    <i class="fas fa-puzzle-piece me-2"></i>
+                    ${detached.productNumber || detached.name}
+                </div>
+                <div class="entity-content">
+                    <small class="text-muted">Qty: ${detached.qty}${dimStr}</small>
+                </div>
+                ${canEdit ? `
+                <div class="entity-actions">
+                    <button type="button" class="btn btn-sm btn-outline-info me-1" onclick="editEntity('detached', '${detached.id}')">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeEntity('detached', '${detached.id}')">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+                ` : ''}
+            `;
+            
+            return card;
+        }
+        
+        function updateStatistics() {
+            const productCount = workOrderData.products?.length || 0;
+            const hardwareCount = workOrderData.hardware?.length || 0;
+            const detachedCount = workOrderData.detachedProducts?.length || 0;
+            
+            // Calculate total items (products + parts + subassemblies + hardware + detached)
+            let totalItems = hardwareCount + detachedCount;
+            if (workOrderData.products) {
+                workOrderData.products.forEach(product => {
+                    totalItems += 1; // The product itself
+                    totalItems += product.parts?.length || 0;
+                    totalItems += product.subassemblies?.length || 0;
+                });
+            }
+            
+            document.getElementById('productCount').textContent = productCount;
+            document.getElementById('hardwareCount').textContent = hardwareCount;
+            document.getElementById('detachedCount').textContent = detachedCount;
+            document.getElementById('totalItems').textContent = totalItems;
+        }
+        
+        // Entity manipulation functions
+        function addEntity(type) {
+            if (!canEdit) return;
+            
+            // This would open a modal or form to add new entity
+            console.log(`Adding new ${type} entity`);
+            // TODO: Implement add entity modal/form
+        }
+        
+        function editEntity(type, id) {
+            if (!canEdit) return;
+            
+            console.log(`Editing ${type} entity with ID: ${id}`);
+            // TODO: Implement edit entity modal/form
+        }
+        
+        function removeEntity(type, id) {
+            if (!canEdit) return;
+            
+            if (confirm(`Are you sure you want to remove this ${type}?`)) {
+                // Remove from data
+                if (type === 'product' && workOrderData.products) {
+                    workOrderData.products = workOrderData.products.filter(p => p.id !== id);
+                } else if (type === 'hardware' && workOrderData.hardware) {
+                    workOrderData.hardware = workOrderData.hardware.filter(h => h.id !== id);
+                } else if (type === 'detached' && workOrderData.detachedProducts) {
+                    workOrderData.detachedProducts = workOrderData.detachedProducts.filter(d => d.id !== id);
+                }
+                
+                // Refresh display
+                populateEntities();
+                console.log(`Removed ${type} entity with ID: ${id}`);
+            }
+        }
+        
+        // Override the save action for modify mode
+        document.addEventListener('DOMContentLoaded', () => {
+            // Initialize entity population
+            populateEntities();
+            
+            const saveBtn = document.getElementById('saveChangesBtn');
+            const discardBtn = document.getElementById('discardChangesBtn');
+            
+            if (saveBtn) {
+                saveBtn.addEventListener('click', async () => {
+                    const workOrderName = document.getElementById('workOrderName').value.trim();
+                    
+                    if (!workOrderName) {
+                        alert('Please enter a work order name.');
+                        return;
+                    }
+                    
+                    try {
+                        saveBtn.disabled = true;
+                        saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Saving...';
+                        
+                        const formData = new FormData();
+                        formData.append('id', '@Model.Id');
+                        formData.append('workOrderName', workOrderName);
+                        
+                        const response = await fetch('@Url.Action("SaveModifications")', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        
+                        if (response.ok) {
+                            // Check if response is a redirect
+                            if (response.redirected) {
+                                window.location.href = response.url;
+                            } else {
+                                // Show success message and redirect
+                                alert('Work order updated successfully!');
+                                window.location.href = '@Url.Action("WorkOrder", new { id = Model.Id })';
+                            }
+                        } else {
+                            throw new Error('Failed to save changes');
+                        }
+                    } catch (error) {
+                        console.error('Save error:', error);
+                        alert('Error saving changes: ' + error.message);
+                    } finally {
+                        saveBtn.disabled = false;
+                        saveBtn.innerHTML = '<i class="fas fa-save me-2"></i>Save Changes';
+                    }
+                });
+            }
+            
+            if (discardBtn) {
+                discardBtn.addEventListener('click', () => {
+                    if (confirm('Are you sure you want to discard all changes?')) {
+                        window.location.href = '@Url.Action("WorkOrder", new { id = Model.Id })';
+                    }
+                });
+            }
+        });
+    </script>
+}
