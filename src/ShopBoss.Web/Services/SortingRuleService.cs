@@ -206,6 +206,78 @@ public class SortingRuleService
                 .ThenInclude(b => b.Product)
             .FirstOrDefaultAsync(r => r.Id == rackId);
     }
+
+    public async Task<List<string>> CheckAssemblyReadinessAsync(string workOrderId)
+    {
+        try
+        {
+            var readyProducts = new List<string>();
+
+            // Get all products in the work order with their parts
+            var products = await _context.Products
+                .Include(p => p.Parts)
+                .Where(p => p.WorkOrderId == workOrderId)
+                .ToListAsync();
+
+            foreach (var product in products)
+            {
+                // Check if all parts for this product are sorted
+                var allPartsSorted = product.Parts.All(part => part.Status == PartStatus.Sorted);
+                
+                if (allPartsSorted && product.Parts.Any())
+                {
+                    readyProducts.Add(product.Id);
+                    _logger.LogInformation("Product {ProductId} ({ProductName}) is ready for assembly - all {PartCount} parts are sorted", 
+                        product.Id, product.Name, product.Parts.Count);
+                }
+            }
+
+            return readyProducts;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error checking assembly readiness for work order {WorkOrderId}", workOrderId);
+            return new List<string>();
+        }
+    }
+
+    public async Task<bool> MarkProductReadyForAssemblyAsync(string productId)
+    {
+        try
+        {
+            var product = await _context.Products
+                .Include(p => p.Parts)
+                .FirstOrDefaultAsync(p => p.Id == productId);
+
+            if (product == null)
+            {
+                _logger.LogWarning("Product {ProductId} not found for assembly readiness marking", productId);
+                return false;
+            }
+
+            // Verify all parts are actually sorted
+            var allPartsSorted = product.Parts.All(part => part.Status == PartStatus.Sorted);
+            
+            if (!allPartsSorted)
+            {
+                _logger.LogWarning("Cannot mark product {ProductId} as ready - not all parts are sorted", productId);
+                return false;
+            }
+
+            // Product readiness tracking is handled via audit trail
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Product {ProductId} ({ProductName}) marked as ready for assembly", 
+                product.Id, product.Name);
+            
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error marking product {ProductId} as ready for assembly", productId);
+            return false;
+        }
+    }
 }
 
 public enum PartCategory

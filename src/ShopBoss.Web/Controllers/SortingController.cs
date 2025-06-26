@@ -289,6 +289,58 @@ public class SortingController : Controller
                     timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss")
                 });
 
+            // Check for assembly readiness after successful part sorting
+            try
+            {
+                var readyProducts = await _sortingRules.CheckAssemblyReadinessAsync(activeWorkOrderId);
+                
+                if (readyProducts.Any())
+                {
+                    foreach (var productId in readyProducts)
+                    {
+                        // Get product details for notification
+                        var readyProduct = await _context.Products.FindAsync(productId);
+                        if (readyProduct != null)
+                        {
+                            // Mark product as ready for assembly
+                            await _sortingRules.MarkProductReadyForAssemblyAsync(productId);
+                            
+                            // Send assembly readiness notification to all stations
+                            await _hubContext.Clients.Groups($"workorder-{activeWorkOrderId}")
+                                .SendAsync("ProductReadyForAssembly", new
+                                {
+                                    productId = readyProduct.Id,
+                                    productName = readyProduct.Name,
+                                    productNumber = readyProduct.ProductNumber,
+                                    workOrderId = activeWorkOrderId,
+                                    timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss"),
+                                    sortingStation = station
+                                });
+
+                            // Send specific notification to assembly station
+                            await _hubContext.Clients.Group("assembly-station")
+                                .SendAsync("NewProductReady", new
+                                {
+                                    productId = readyProduct.Id,
+                                    productName = readyProduct.Name,
+                                    productNumber = readyProduct.ProductNumber,
+                                    workOrderId = activeWorkOrderId,
+                                    readyTime = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss"),
+                                    message = $"Product '{readyProduct.Name}' is ready for assembly - all parts sorted!"
+                                });
+
+                            _logger.LogInformation("Product {ProductId} ({ProductName}) marked as ready for assembly after sorting part {PartId}", 
+                                readyProduct.Id, readyProduct.Name, part.Id);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error checking assembly readiness after sorting part {PartId}", part.Id);
+                // Don't fail the sort operation if assembly checking fails
+            }
+
             _logger.LogInformation("Successfully sorted part {PartId} ({PartName}) to rack {RackId} bin {BinLabel} via barcode {Barcode}", 
                 part.Id, part.Name, rackId, updateData.binLabel, cleanBarcode);
 

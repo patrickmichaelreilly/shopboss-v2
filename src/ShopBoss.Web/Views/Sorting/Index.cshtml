@@ -624,7 +624,103 @@ else
                 const rackId = firstTab.id.split('-')[1];
                 loadRackDetails(rackId);
             }
+            
+            // Setup SignalR connection for real-time updates
+            setupSignalRConnection();
         });
+
+        // SignalR real-time updates
+        function setupSignalRConnection() {
+            const connection = new signalR.HubConnectionBuilder()
+                .withUrl("/hubs/status")
+                .build();
+
+            connection.start().then(function () {
+                console.log("SignalR Connected - Sorting Station");
+                
+                // Join sorting station group
+                connection.invoke("JoinGroup", "sorting-station").catch(err => console.error(err));
+                
+                // Join work order group if active work order exists
+                const activeWorkOrderId = '@ViewBag.ActiveWorkOrderId';
+                if (activeWorkOrderId) {
+                    connection.invoke("JoinGroup", `workorder-${activeWorkOrderId}`).catch(err => console.error(err));
+                }
+                
+            }).catch(function (err) {
+                console.error("SignalR Connection Error: " + err.toString());
+            });
+
+            // Handle part sorted updates
+            connection.on("PartSorted", function (data) {
+                showToast(`Part '${data.partName}' sorted to ${data.binLabel}`, 'success');
+                
+                // Refresh current rack if it's the updated one
+                const currentRackId = getCurrentlySelectedRackId();
+                if (currentRackId === data.rackId) {
+                    loadRackDetails(data.rackId);
+                }
+            });
+
+            // Handle product ready for assembly notifications
+            connection.on("ProductReadyForAssembly", function (data) {
+                showAssemblyReadyNotification(data);
+            });
+
+            // Handle status updates
+            connection.on("StatusUpdate", function (data) {
+                if (data.type === "part-sorted") {
+                    // Update UI as needed
+                    console.log("Part sorted update:", data);
+                }
+            });
+
+            // Connection closed handler
+            connection.onclose(function () {
+                console.log("SignalR Connection Closed");
+                // Attempt to reconnect after 5 seconds
+                setTimeout(() => setupSignalRConnection(), 5000);
+            });
+        }
+
+        function getCurrentlySelectedRackId() {
+            const activeTab = document.querySelector('.nav-link.active');
+            if (activeTab && activeTab.id) {
+                return activeTab.id.split('-')[1];
+            }
+            return null;
+        }
+
+        function showAssemblyReadyNotification(data) {
+            // Create special assembly ready notification
+            const toastContainer = document.getElementById('toast-container') || createToastContainer();
+            const toast = document.createElement('div');
+            toast.className = 'toast align-items-center text-white bg-success border-0';
+            toast.setAttribute('role', 'alert');
+            toast.setAttribute('data-bs-autohide', 'false'); // Keep visible until manually dismissed
+            toast.innerHTML = `
+                <div class="d-flex">
+                    <div class="toast-body">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-check-circle fa-2x me-3"></i>
+                            <div>
+                                <div class="fw-bold">Product Ready for Assembly!</div>
+                                <div class="small">
+                                    ${data.productName} (${data.productNumber || data.productId})
+                                </div>
+                                <div class="small text-light">All parts have been sorted</div>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                </div>
+            `;
+            toastContainer.appendChild(toast);
+            const bsToast = new bootstrap.Toast(toast);
+            bsToast.show();
+            
+            toast.addEventListener('hidden.bs.toast', () => toast.remove());
+        }
     </script>
 
     <style>
