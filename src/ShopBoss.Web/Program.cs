@@ -27,6 +27,7 @@ builder.Services.AddScoped<ImporterService>();
 builder.Services.AddScoped<ImportDataTransformService>();
 builder.Services.AddScoped<ColumnMappingService>();
 builder.Services.AddScoped<ImportSelectionService>();
+builder.Services.AddScoped<AuditTrailService>();
 
 var app = builder.Build();
 

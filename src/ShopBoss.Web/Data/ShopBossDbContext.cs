@@ -17,6 +17,8 @@ public class ShopBossDbContext : DbContext
     public DbSet<Hardware> Hardware { get; set; }
     public DbSet<DetachedProduct> DetachedProducts { get; set; }
     public DbSet<NestSheet> NestSheets { get; set; }
+    public DbSet<AuditLog> AuditLogs { get; set; }
+    public DbSet<ScanHistory> ScanHistory { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -122,6 +124,45 @@ public class ShopBossDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
                 
             entity.HasIndex(e => e.Barcode).IsUnique();
+        });
+
+        modelBuilder.Entity<AuditLog>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Timestamp).IsRequired();
+            entity.Property(e => e.Action).IsRequired();
+            entity.Property(e => e.EntityType).IsRequired();
+            entity.Property(e => e.EntityId).IsRequired();
+            entity.Property(e => e.Station).IsRequired();
+            entity.Property(e => e.Details).IsRequired();
+            
+            entity.HasIndex(e => e.Timestamp);
+            entity.HasIndex(e => new { e.EntityType, e.EntityId });
+            entity.HasIndex(e => e.WorkOrderId);
+        });
+
+        modelBuilder.Entity<ScanHistory>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Timestamp).IsRequired();
+            entity.Property(e => e.Barcode).IsRequired();
+            entity.Property(e => e.Station).IsRequired();
+            entity.Property(e => e.IsSuccessful).IsRequired();
+            entity.Property(e => e.Details).IsRequired();
+            
+            entity.HasOne(e => e.NestSheet)
+                .WithMany()
+                .HasForeignKey(e => e.NestSheetId)
+                .OnDelete(DeleteBehavior.SetNull);
+                
+            entity.HasOne(e => e.WorkOrder)
+                .WithMany()
+                .HasForeignKey(e => e.WorkOrderId)
+                .OnDelete(DeleteBehavior.SetNull);
+            
+            entity.HasIndex(e => e.Timestamp);
+            entity.HasIndex(e => e.Barcode);
+            entity.HasIndex(e => e.Station);
         });
     }
 }
