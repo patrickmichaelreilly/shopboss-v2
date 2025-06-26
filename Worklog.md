@@ -1471,3 +1471,109 @@ HttpContext.Session.Remove("ActiveWorkOrderId");
 
 **Status:** COMPLETED  
 **Impact:** Phase 5B fully implemented - CNC Operation Workflow provides professional-grade barcode scanning with comprehensive validation, visual feedback, error handling, and complete audit trail integration. The enhanced workflow ensures reliable operations with detailed tracking and operator-friendly feedback systems.
+
+---
+
+## Phase 6A: Sorting Rack Visualization - Claude Code - 2025-06-26
+
+**Objective:** Create the Sorting View Sub-tab with rack-by-rack navigation. Display visual representation of sorting racks showing filled/empty bins with the ability to switch between different racks and carts. Implement intelligent part placement rules for doors, adjustable shelves, drawer fronts (to special racks) and carcass parts (grouped by product).
+
+### Phase 6A Requirements Analysis:
+Based on Phases.md Phase 6A requirements:
+- Visual rack display with bin status indicators
+- Rack/cart navigation interface for switching between storage locations
+- Intelligent placement rule engine for optimal part organization
+- Special handling for doors/drawer fronts requiring dedicated racks
+- Product-based carcass part grouping for efficient assembly workflow
+
+### Implementation Plan:
+1. **Create Storage Models:** StorageRack and Bin entities for rack management
+2. **Build SortingController:** Handle rack visualization and navigation logic
+3. **Implement Visual Interface:** Responsive rack display with bin status indicators
+4. **Add Navigation System:** Rack/cart switching with real-time updates
+5. **Build Rule Engine:** Intelligent part placement based on type and product grouping
+
+### Completed Implementation:
+
+#### Storage Models Created:
+✅ **StorageRack Model:** Complete rack management with multiple types:
+- RackType enum: Standard, DoorsAndDrawerFronts, AdjustableShelves, Hardware, Cart
+- Comprehensive properties: dimensions, location, capacity tracking
+- Computed properties for occupancy metrics and availability
+- Support for portable carts and fixed racks
+
+✅ **Bin Model:** Individual storage bin management:
+- BinStatus enum: Empty, Partial, Full, Reserved, Blocked
+- Detailed assignment tracking: Part, Product, WorkOrder relationships
+- Capacity management with percentage calculations
+- Automatic bin labeling (A01, A02, B01, etc.)
+
+#### Database Integration:
+✅ **DbContext Updates:** Added StorageRacks and Bins DbSets with proper relationships
+✅ **Entity Configuration:** Comprehensive indexing and foreign key constraints
+✅ **Database Migration:** AddStorageRackAndBin migration created successfully
+✅ **Data Seeding:** StorageRackSeedService creates 5 default racks with bins
+
+#### Intelligent Sorting Rules:
+✅ **SortingRuleService:** Advanced placement logic implementation:
+- Part categorization engine (Carcass, DoorsAndDrawerFronts, AdjustableShelves, Hardware)
+- Optimal bin assignment based on part type and rack capacity
+- Product-based grouping for carcass parts to improve assembly workflow
+- Special handling for doors/drawer fronts requiring dedicated racks
+- Fuzzy placement with fallback to standard racks when specialized unavailable
+
+#### SortingController Implementation:
+✅ **Complete Controller Actions:**
+- Index(): Rack visualization with active work order integration
+- GetRackDetails(): 2D grid generation with real-time bin status
+- ScanPart(): Comprehensive barcode scanning with intelligent placement
+- GetCutParts(): Active work order cut parts listing
+
+✅ **Advanced Barcode Processing:**
+- Part validation and status checking (Cut → Sorted transition)
+- Real-time bin assignment with audit trail logging
+- SignalR integration for cross-station updates
+- Comprehensive error handling with typed responses
+
+#### Visual Interface Implementation:
+✅ **Responsive Rack Display:** Professional tablet-optimized interface:
+- Dynamic rack selection tabs with occupancy indicators
+- Interactive 2D grid visualization with color-coded bin status
+- Hover effects and detailed bin tooltips
+- Mobile-responsive design for shop floor tablets
+
+✅ **Navigation System:**
+- Rack/cart switching with real-time updates
+- Type-based organization (Standard, Doors, Shelves, Carts)
+- Visual rack statistics and location display
+- Portable rack indicators
+
+✅ **Scanning Interface:**
+- Modal-based part scanning with real-time feedback
+- Placement guidance display showing assigned bin location
+- Cut parts list modal for quick sorting access
+- Professional loading states and status indicators
+
+#### SignalR Real-time Updates:
+✅ **Cross-Station Communication:**
+- PartSorted events for real-time rack updates
+- StatusUpdate events for dashboard notifications
+- Work order group integration for targeted updates
+- Toast notifications for operator feedback
+
+#### Service Registration:
+✅ **Dependency Injection:** SortingRuleService registered in Program.cs
+✅ **Navigation Integration:** Sorting Station link added to main navigation
+✅ **Build Verification:** Clean build with 0 errors, 0 warnings
+
+### Success Criteria Achieved:
+- [x] Visual rack display with bin status indicators and responsive design
+- [x] Rack/cart navigation interface with type-based organization
+- [x] Intelligent placement rule engine with part categorization
+- [x] Special handling for doors/drawer fronts with dedicated rack types
+- [x] Product-based carcass part grouping for efficient assembly workflow
+- [x] Real-time updates and cross-station communication
+- [x] Professional operator interface optimized for shop floor tablets
+
+**Status:** COMPLETED  
+**Impact:** Phase 6A fully implemented - Sorting Rack Visualization provides a comprehensive visual interface for rack management with intelligent part placement rules. The system includes 5 different rack types, real-time bin status visualization, and advanced sorting logic that optimizes part placement for efficient assembly workflow. The responsive interface works seamlessly on shop floor tablets with professional visual feedback and cross-station real-time updates.

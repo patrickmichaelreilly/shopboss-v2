@@ -1,0 +1,283 @@
+Git Crash Course: Collaborative Development Cheat Sheet
+Essential Git Concepts
+Repository (Repo): Project folder containing your code + Git history Commit: Snapshot of your code at a specific point in time Branch: Parallel version of your code for developing features Remote: Copy of your repo hosted elsewhere (GitHub, GitLab, etc.) Working Directory: Current files you're editing Staging Area: Files prepared for the next commit HEAD: Pointer to your current commit/branch
+
+Initial Setup & Configuration
+bash
+# Set your identity (do this first!)
+git config --global user.name "Your Name"
+git config --global user.email "your.email@example.com"
+
+# Useful global settings
+git config --global init.defaultBranch main
+git config --global pull.rebase false
+git config --global core.autocrlf input  # Linux/Mac
+git config --global core.autocrlf true   # Windows
+
+# Check your config
+git config --list
+Starting a New Project
+bash
+# Initialize new repo
+git init
+git add .
+git commit -m "Initial commit"
+
+# Connect to remote repository
+git remote add origin https://github.com/username/repo.git
+git push -u origin main
+
+# Clone existing repo
+git clone https://github.com/username/repo.git
+cd repo
+Core Workflow Commands
+bash
+# Check status (use this constantly!)
+git status
+
+# Stage files for commit
+git add filename.txt          # Single file
+git add .                     # All files in current directory
+git add -A                    # All files in repo
+git add *.js                  # All JS files
+
+# Commit changes
+git commit -m "Descriptive commit message"
+git commit -am "Add and commit tracked files"
+
+# Push to remote
+git push
+git push origin branch-name
+
+# Pull latest changes
+git pull
+git pull origin main
+Branching Strategy for Collaboration
+Best Practice: Never work directly on main. Always create feature branches.
+
+bash
+# Create and switch to new branch
+git checkout -b feature/user-authentication
+git switch -c feature/user-authentication  # Modern syntax
+
+# Switch between branches
+git checkout main
+git switch main              # Modern syntax
+git checkout feature-branch
+
+# List branches
+git branch                   # Local branches
+git branch -r               # Remote branches
+git branch -a               # All branches
+
+# Delete branch
+git branch -d feature-name   # Safe delete (merged only)
+git branch -D feature-name   # Force delete
+Collaborative Workflow Best Practices
+1. Feature Branch Workflow
+bash
+# Start new feature
+git checkout main
+git pull origin main
+git checkout -b feature/new-feature
+
+# Work on feature
+git add .
+git commit -m "Add new feature functionality"
+
+# Push feature branch
+git push origin feature/new-feature
+
+# Create Pull Request on GitHub/GitLab
+# After review and merge, clean up
+git checkout main
+git pull origin main
+git branch -d feature/new-feature
+2. Keeping Branches Updated
+bash
+# Update your feature branch with latest main
+git checkout feature/your-feature
+git rebase main              # Preferred: replays commits on top of main
+# OR
+git merge main               # Alternative: creates merge commit
+
+# If conflicts occur during rebase
+git status                   # See conflicted files
+# Edit files to resolve conflicts
+git add resolved-file.txt
+git rebase --continue
+Handling Merge Conflicts
+bash
+# When conflicts occur
+git status                   # Shows conflicted files
+
+# Open conflicted files, look for:
+<<<<<<< HEAD
+Your changes
+=======
+Their changes
+>>>>>>> branch-name
+
+# Edit to resolve, then:
+git add resolved-file.txt
+git commit                   # If merging
+git rebase --continue        # If rebasing
+Conflict Resolution Tips:
+
+Communicate with your team about who's working on what
+Keep feature branches small and short-lived
+Pull latest changes frequently
+Use descriptive commit messages
+Advanced Features for Collaboration
+Git Worktrees (Multiple Working Directories)
+bash
+# Create separate working directory for different branch
+git worktree add ../project-feature feature-branch
+
+# List worktrees
+git worktree list
+
+# Remove worktree
+git worktree remove ../project-feature
+Stashing (Temporary Storage)
+bash
+# Save current work without committing
+git stash
+git stash push -m "Work in progress on feature X"
+
+# List stashes
+git stash list
+
+# Apply stashed changes
+git stash pop                # Apply and remove from stash
+git stash apply              # Apply but keep in stash
+
+# Stash specific files
+git stash push filename.txt
+Cherry-picking (Copy Commits Between Branches)
+bash
+# Copy specific commit to current branch
+git cherry-pick commit-hash
+
+# Copy multiple commits
+git cherry-pick commit1..commit2
+Commit Message Best Practices
+Format: type: description
+
+Types:
+
+feat: New feature
+fix: Bug fix
+docs: Documentation changes
+style: Code formatting
+refactor: Code restructuring
+test: Adding tests
+chore: Maintenance tasks
+Examples:
+
+feat: add user authentication system
+fix: resolve null pointer exception in login
+docs: update API documentation for endpoints
+refactor: extract user validation logic
+Viewing History & Information
+bash
+# View commit history
+git log                      # Full history
+git log --oneline           # Compact view
+git log --graph --oneline   # Visual branch history
+git log -n 5                # Last 5 commits
+
+# See changes
+git diff                    # Working directory vs staging
+git diff --staged           # Staging vs last commit
+git diff HEAD~1             # Current vs previous commit
+git diff branch1..branch2   # Compare branches
+
+# Show specific commit
+git show commit-hash
+
+# Find who changed what
+git blame filename.txt
+Undoing Changes
+bash
+# Discard working directory changes
+git checkout -- filename.txt
+git restore filename.txt     # Modern syntax
+
+# Unstage files
+git reset HEAD filename.txt
+git restore --staged filename.txt  # Modern syntax
+
+# Undo last commit (keep changes)
+git reset --soft HEAD~1
+
+# Undo last commit (discard changes)
+git reset --hard HEAD~1
+
+# Revert commit (creates new commit)
+git revert commit-hash
+Remote Repository Management
+bash
+# List remotes
+git remote -v
+
+# Add remote
+git remote add upstream https://github.com/original/repo.git
+
+# Fetch from remote (no merge)
+git fetch origin
+
+# Sync with upstream (for forks)
+git fetch upstream
+git checkout main
+git merge upstream/main
+git push origin main
+Collaboration Emergency Commands
+bash
+# Force update your branch (DANGEROUS - only for your own branches)
+git reset --hard origin/main
+
+# Abort merge
+git merge --abort
+
+# Abort rebase
+git rebase --abort
+
+# See what changed since last pull
+git log HEAD..origin/main
+
+# Find lost commits
+git reflog
+Daily Collaboration Checklist
+Starting Work:
+git checkout main
+git pull origin main
+git checkout -b feature/descriptive-name
+During Work:
+git status (frequently)
+git add . and git commit -m "Clear message"
+git push origin feature-name (regularly)
+Ending Work:
+git push origin feature-name
+Create Pull Request
+After merge: update main and delete feature branch
+Before Pull Requests:
+git rebase main (update with latest)
+Test thoroughly
+Review your own changes: git diff main..feature-branch
+Common Collaboration Patterns
+Git Flow: main → develop → feature branches → develop → main GitHub Flow: main → feature branches → main (simpler, recommended) GitLab Flow: main → feature branches → main + environment branches
+
+Team Communication Best Practices
+Commit often: Small, logical commits are easier to review
+Push regularly: Don't hoard local commits
+Pull before pushing: Avoid conflicts
+Use descriptive branch names: feature/user-auth not branch1
+Write clear commit messages: Future you will thank you
+Review code: Use Pull Requests for all changes
+Communicate: Let team know about major changes
+Troubleshooting Common Issues
+"Your branch is behind": git pull "Your branch is ahead": git push "Merge conflict": Resolve conflicts, then git add and git commit "Detached HEAD": git checkout main "Permission denied": Check SSH keys or use HTTPS "Already up to date": You're good! No changes to pull.
+
+Remember: Git is forgiving. Most mistakes can be undone. When in doubt, make a backup branch: git checkout -b backup-branch before trying fixes.
+

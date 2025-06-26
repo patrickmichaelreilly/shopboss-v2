@@ -154,10 +154,12 @@ The core infrastructure is complete. This roadmap implements the remaining **use
 
 ## Phase 5: Shop Tab - CNC Station Interface (3-4 hours)
 
-### Phase 5A: Nest Sheet Management (2 hours)
+### Phase 5A: Nest Sheet Management (3 hours)
 
 **Prompt for Claude Code:**
 > **PHASE 5A:** Create the CNC View Sub-tab displaying a list of Nest Sheets associated with the Active Work Order. Show indicators for cut/uncut status, part counts per sheet, material specifications, and sheet dimensions. Implement barcode scanning functionality that marks all associated parts as "Cut" when a nest sheet barcode is scanned.
+>
+> **CRITICAL ARCHITECTURAL UPDATE:** Nest Sheets must be integrated into the import process as imported entities. Every Part comes from a nest sheet and must have a required NestSheetId. Update the import process to handle nest sheet data, add nest sheets as a fourth top-level category in data preview and work order views (alongside Products, Hardware, Detached Products), and modify CNC scanning logic to find parts by nest sheet name within the active work order.
 
 **Deliverables:**
 - [ ] Nest Sheet list view with status indicators
@@ -165,6 +167,10 @@ The core infrastructure is complete. This roadmap implements the remaining **use
 - [ ] Material and dimension display
 - [ ] Barcode scanning integration for batch part marking
 - [ ] Real-time status updates when sheets are processed
+- [ ] **NEW:** ImportNestSheet model and import process integration
+- [ ] **NEW:** Part.NestSheetId as required field with database migration
+- [ ] **NEW:** Nest Sheets as fourth top-level category in UI tree views
+- [ ] **NEW:** Updated CNC scanning logic to find parts by nest sheet name
 
 ### Phase 5B: CNC Operation Workflow (1.5 hours)
 **Prompt for Claude Code:**
