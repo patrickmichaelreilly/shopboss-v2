@@ -14,6 +14,10 @@ public class ImportPart
     public string ProductId { get; set; } = string.Empty;
     public string? SubassemblyId { get; set; }
     
+    // Nest Sheet reference - every part comes from a nest sheet
+    public string NestSheetName { get; set; } = string.Empty;
+    public string NestSheetId { get; set; } = string.Empty;
+    
     // Additional properties from import data
     public string GrainDirection { get; set; } = string.Empty;
     public string Notes { get; set; } = string.Empty;

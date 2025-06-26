@@ -150,8 +150,8 @@
 </div>
 
 <div class="row mb-4">
-    <div class="col-md-4">
-        <div class="card border-primary">
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card border-primary h-100">
             <div class="card-body text-center">
                 <i class="fas fa-boxes fa-2x text-primary mb-2"></i>
                 <h4 class="mb-1">@Model.Products.Count</h4>
@@ -165,8 +165,8 @@
             </div>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="card border-warning">
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card border-warning h-100">
             <div class="card-body text-center">
                 <i class="fas fa-tools fa-2x text-warning mb-2"></i>
                 <h4 class="mb-1" id="uniqueHardwareCount">@Model.Hardware.Count</h4>
@@ -179,8 +179,8 @@
             </div>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="card border-info">
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card border-info h-100">
             <div class="card-body text-center">
                 <i class="fas fa-puzzle-piece fa-2x text-info mb-2"></i>
                 <h4 class="mb-1">@Model.DetachedProducts.Count</h4>
@@ -188,6 +188,20 @@
                 <div class="mt-2">
                     <small class="text-info">
                         Total Qty: @Model.DetachedProducts.Sum(d => d.Qty)
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card border-secondary h-100">
+            <div class="card-body text-center">
+                <i class="fas fa-cut fa-2x text-secondary mb-2"></i>
+                <h4 class="mb-1">@Model.NestSheets.Count</h4>
+                <small class="text-muted">Nest Sheets</small>
+                <div class="mt-2">
+                    <small class="text-info">
+                        @Model.NestSheets.Sum(n => n.Parts.Count) Parts Total
                     </small>
                 </div>
             </div>
@@ -305,6 +319,23 @@
                 width = d.Width,
                 thickness = d.Thickness,
                 material = d.Material
+            }))),
+            nestSheets: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.NestSheets.Select(n => new {
+                id = n.Id,
+                name = n.Name,
+                length = n.Length,
+                width = n.Width,
+                thickness = n.Thickness,
+                material = n.Material,
+                parts = n.Parts.Select(p => new {
+                    id = p.Id,
+                    name = p.Name,
+                    qty = p.Qty,
+                    length = p.Length,
+                    width = p.Width,
+                    thickness = p.Thickness,
+                    material = p.Material
+                })
             })))
         };
         
@@ -320,10 +351,11 @@
         function buildWorkOrderTree() {
             treeView.innerHTML = '';
             
-            // Create the three main categories
+            // Create the four main categories
             createProductsSection();
             createHardwareSection();
             createDetachedProductsSection();
+            createNestSheetsSection();
         }
         
         function createProductsSection() {
@@ -389,6 +421,24 @@
             workOrderData.detachedProducts.forEach(detached => {
                 const detachedNode = createDetachedProductNode(detached);
                 content.appendChild(detachedNode);
+            });
+            
+            categoryNode.appendChild(content);
+        }
+        
+        function createNestSheetsSection() {
+            if (!workOrderData.nestSheets || workOrderData.nestSheets.length === 0) return;
+            
+            const categoryNode = createCategoryHeader('Nest Sheets', workOrderData.nestSheets.length, 'fas fa-cut', 'nestsheets');
+            treeView.appendChild(categoryNode);
+            
+            const content = document.createElement('div');
+            content.className = 'tree-content';
+            content.style.display = 'block'; // Start expanded
+            
+            workOrderData.nestSheets.forEach(nestSheet => {
+                const nestSheetNode = createNestSheetNode(nestSheet);
+                content.appendChild(nestSheetNode);
             });
             
             categoryNode.appendChild(content);
@@ -537,6 +587,21 @@
             return createTreeNode('📄', 
                 `${detached.productNumber || detached.name} - Qty: ${detached.qty}${dimStr}${material}`, 
                 'detached', false, 1);
+        }
+        
+        function createNestSheetNode(nestSheet) {
+            const dimensions = [];
+            if (nestSheet.length) dimensions.push(`${nestSheet.length}mm L`);
+            if (nestSheet.width) dimensions.push(`${nestSheet.width}mm W`);
+            if (nestSheet.thickness) dimensions.push(`${nestSheet.thickness}mm T`);
+            
+            const dimStr = dimensions.length > 0 ? ` (${dimensions.join(' × ')})` : '';
+            const material = nestSheet.material ? `, ${nestSheet.material}` : '';
+            const partsCount = nestSheet.parts ? ` - ${nestSheet.parts.length} parts` : '';
+            
+            return createTreeNode('📋', 
+                `${nestSheet.name}${dimStr}${material}${partsCount}`, 
+                'nestsheet', false, 1);
         }
         
         function createTreeNode(icon, text, type, expanded = false, level = 0) {

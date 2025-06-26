@@ -50,6 +50,9 @@ public class ImportSelectionService
             // Track processed hardware to avoid duplicates
             var processedHardwareIds = new HashSet<string>();
             
+            // Process nest sheets first (they're needed for parts)
+            ProcessSelectedNestSheets(importData, selection, workOrder, result);
+            
             // Process selected items
             ProcessSelectedProducts(importData, selection, workOrder, processedHardwareIds, result);
             ProcessSelectedHardware(importData, selection, workOrder, processedHardwareIds, result);
@@ -144,6 +147,11 @@ public class ImportSelectionService
         {
             allImportItemIds.Add(detached.Id);
         }
+        
+        foreach (var nestSheet in importData.NestSheets)
+        {
+            allImportItemIds.Add(nestSheet.Id);
+        }
 
         // Check for invalid selection IDs
         var invalidIds = selection.SelectedItemIds.Where(id => !allImportItemIds.Contains(id)).ToList();
@@ -222,10 +230,10 @@ public class ImportSelectionService
             workOrder.Products.Add(product);
 
             // Process selected parts for this product
-            ProcessSelectedPartsForProduct(importProduct, selection, product, result);
+            ProcessSelectedPartsForProduct(importProduct, selection, product, workOrder, result);
             
             // Process selected subassemblies for this product
-            ProcessSelectedSubassembliesForProduct(importProduct, selection, product, result);
+            ProcessSelectedSubassembliesForProduct(importProduct, selection, product, workOrder, result);
             
             // Process selected hardware for this product
             ProcessSelectedHardwareForProduct(importProduct, selection, product, workOrder, processedHardwareIds, result);
@@ -238,6 +246,7 @@ public class ImportSelectionService
         ImportProduct importProduct,
         SelectionRequest selection,
         Product product,
+        WorkOrder workOrder,
         ImportConversionResult result)
     {
         var selectedPartIds = selection.SelectedItemIds
@@ -247,7 +256,7 @@ public class ImportSelectionService
 
         foreach (var importPart in importProduct.Parts.Where(p => selectedPartIds.Contains(p.Id)))
         {
-            var part = ConvertToPartEntity(importPart, product.Id, null);
+            var part = ConvertToPartEntity(importPart, product.Id, null, workOrder);
             product.Parts.Add(part);
             result.Statistics.ConvertedParts++;
         }
@@ -257,6 +266,7 @@ public class ImportSelectionService
         ImportProduct importProduct,
         SelectionRequest selection,
         Product product,
+        WorkOrder workOrder,
         ImportConversionResult result)
     {
         var selectedSubassemblyIds = selection.SelectedItemIds
@@ -270,7 +280,7 @@ public class ImportSelectionService
             product.Subassemblies.Add(subassembly);
 
             // Recursively process selected items within this subassembly
-            ProcessSelectedItemsInSubassembly(importSubassembly, selection, subassembly, result);
+            ProcessSelectedItemsInSubassembly(importSubassembly, selection, subassembly, workOrder, result);
 
             result.Statistics.ConvertedSubassemblies++;
         }
@@ -312,6 +322,7 @@ public class ImportSelectionService
         ImportSubassembly importSubassembly,
         SelectionRequest selection,
         Subassembly subassembly,
+        WorkOrder workOrder,
         ImportConversionResult result)
     {
         var selectedPartIds = selection.SelectedItemIds
@@ -327,7 +338,7 @@ public class ImportSelectionService
         // Process parts in this subassembly
         foreach (var importPart in importSubassembly.Parts.Where(p => selectedPartIds.Contains(p.Id)))
         {
-            var part = ConvertToPartEntity(importPart, subassembly.ProductId, subassembly.Id);
+            var part = ConvertToPartEntity(importPart, subassembly.ProductId, subassembly.Id, workOrder);
             subassembly.Parts.Add(part);
             result.Statistics.ConvertedParts++;
         }
@@ -339,7 +350,7 @@ public class ImportSelectionService
             subassembly.ChildSubassemblies.Add(nested);
 
             // Recursively process items in nested subassembly
-            ProcessSelectedItemsInSubassembly(importNested, selection, nested, result);
+            ProcessSelectedItemsInSubassembly(importNested, selection, nested, workOrder, result);
 
             result.Statistics.ConvertedSubassemblies++;
         }
@@ -405,8 +416,11 @@ public class ImportSelectionService
         };
     }
 
-    private Part ConvertToPartEntity(ImportPart importPart, string? productId, string? subassemblyId)
+    private Part ConvertToPartEntity(ImportPart importPart, string? productId, string? subassemblyId, WorkOrder workOrder)
     {
+        // Find the nest sheet for this part
+        var nestSheet = FindNestSheetForPart(importPart, workOrder);
+        
         return new Part
         {
             Id = importPart.Id, // Preserve Microvellum ID
@@ -421,7 +435,9 @@ public class ImportSelectionService
             EdgebandingLeft = importPart.EdgeBanding?.Contains("Left") == true ? "Yes" : string.Empty,
             EdgebandingRight = importPart.EdgeBanding?.Contains("Right") == true ? "Yes" : string.Empty,
             ProductId = productId,
-            SubassemblyId = subassemblyId
+            SubassemblyId = subassemblyId,
+            NestSheetId = nestSheet?.Id ?? CreateDefaultNestSheet(workOrder).Id,
+            Status = PartStatus.Pending // Set initial status
         };
     }
 
@@ -468,6 +484,84 @@ public class ImportSelectionService
             EdgebandingRight = importDetached.EdgeBanding?.Contains("Right") == true ? "Yes" : string.Empty,
             WorkOrderId = workOrderId
         };
+    }
+
+    private void ProcessSelectedNestSheets(
+        ImportWorkOrder importData,
+        SelectionRequest selection,
+        WorkOrder workOrder,
+        ImportConversionResult result)
+    {
+        var selectedNestSheetIds = selection.SelectedItemIds
+            .Where(id => selection.SelectionDetails.ContainsKey(id) && 
+                        selection.SelectionDetails[id].ItemType == "nestsheet")
+            .ToHashSet();
+
+        foreach (var importNestSheet in importData.NestSheets.Where(n => selectedNestSheetIds.Contains(n.Id)))
+        {
+            var nestSheet = ConvertToNestSheetEntity(importNestSheet, workOrder.Id);
+            workOrder.NestSheets.Add(nestSheet);
+            result.Statistics.ConvertedNestSheets++;
+        }
+    }
+
+    private NestSheet ConvertToNestSheetEntity(ImportNestSheet importNestSheet, string workOrderId)
+    {
+        return new NestSheet
+        {
+            Id = importNestSheet.Id,
+            Name = importNestSheet.Name,
+            Material = importNestSheet.Material ?? string.Empty,
+            Length = importNestSheet.Length,
+            Width = importNestSheet.Width,
+            Thickness = importNestSheet.Thickness,
+            Barcode = importNestSheet.Barcode ?? importNestSheet.Name,
+            WorkOrderId = workOrderId,
+            CreatedDate = DateTime.UtcNow,
+            IsProcessed = false
+        };
+    }
+
+    private NestSheet? FindNestSheetForPart(ImportPart importPart, WorkOrder workOrder)
+    {
+        // Try to find by nest sheet name first
+        if (!string.IsNullOrEmpty(importPart.NestSheetName))
+        {
+            return workOrder.NestSheets.FirstOrDefault(n => n.Name == importPart.NestSheetName);
+        }
+
+        // If no specific nest sheet name, try to find by nest sheet ID
+        if (!string.IsNullOrEmpty(importPart.NestSheetId))
+        {
+            return workOrder.NestSheets.FirstOrDefault(n => n.Id == importPart.NestSheetId);
+        }
+
+        return null;
+    }
+
+    private NestSheet CreateDefaultNestSheet(WorkOrder workOrder)
+    {
+        // Check if default nest sheet already exists
+        var defaultNestSheet = workOrder.NestSheets.FirstOrDefault(n => n.Name == "Default Nest Sheet");
+        if (defaultNestSheet != null)
+        {
+            return defaultNestSheet;
+        }
+
+        // Create a default nest sheet for orphaned parts
+        defaultNestSheet = new NestSheet
+        {
+            Id = Guid.NewGuid().ToString(),
+            Name = "Default Nest Sheet",
+            Material = "Unknown",
+            Barcode = "DEFAULT",
+            WorkOrderId = workOrder.Id,
+            CreatedDate = DateTime.UtcNow,
+            IsProcessed = false
+        };
+
+        workOrder.NestSheets.Add(defaultNestSheet);
+        return defaultNestSheet;
     }
 
     private void ProcessSinglePartProductsAsDetached(WorkOrder workOrder, ImportConversionResult result)

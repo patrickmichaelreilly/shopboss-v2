@@ -58,5 +58,6 @@ app.MapControllerRoute(
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
 app.MapHub<ImportProgressHub>("/importProgress");
+app.MapHub<StatusHub>("/hubs/status");
 
 app.Run();

@@ -40,8 +40,8 @@ public class ImportDataTransformService
 
         try
         {
-            _logger.LogInformation("Starting data transformation. Products: {ProductCount}, Parts: {PartCount}, Subassemblies: {SubassemblyCount}, Hardware: {HardwareCount}", 
-                rawData.Products?.Count ?? 0, rawData.Parts?.Count ?? 0, rawData.Subassemblies?.Count ?? 0, rawData.Hardware?.Count ?? 0);
+            _logger.LogInformation("Starting data transformation. Products: {ProductCount}, Parts: {PartCount}, Subassemblies: {SubassemblyCount}, Hardware: {HardwareCount}, NestSheets: {NestSheetCount}", 
+                rawData.Products?.Count ?? 0, rawData.Parts?.Count ?? 0, rawData.Subassemblies?.Count ?? 0, rawData.Hardware?.Count ?? 0, rawData.NestSheets?.Count ?? 0);
 
             // Transform Products - handle potential duplicate keys and null collections
             var productLookup = (rawData.Products ?? new List<Dictionary<string, object?>>())
@@ -62,6 +62,11 @@ public class ImportDataTransformService
             var hardwareLookup = (rawData.Hardware ?? new List<Dictionary<string, object?>>())
                 .Where(h => !string.IsNullOrEmpty(_columnMapping.GetStringValue(h, "HARDWARE", "Id")))
                 .GroupBy(h => _columnMapping.GetStringValue(h, "HARDWARE", "Id"))
+                .ToDictionary(g => g.Key, g => g.First());
+            
+            var nestSheetLookup = (rawData.NestSheets ?? new List<Dictionary<string, object?>>())
+                .Where(n => !string.IsNullOrEmpty(_columnMapping.GetStringValue(n, "PLACEDSHEETS", "FileName")))
+                .GroupBy(n => _columnMapping.GetStringValue(n, "PLACEDSHEETS", "FileName"))
                 .ToDictionary(g => g.Key, g => g.First());
 
             // Transform products
@@ -113,6 +118,15 @@ public class ImportDataTransformService
                 workOrder.Hardware.Add(TransformHardware(hardwareData, workOrder.Id, null, null));
             }
 
+            // Transform nest sheets
+            foreach (var nestSheetData in rawData.NestSheets ?? new List<Dictionary<string, object?>>())
+            {
+                workOrder.NestSheets.Add(TransformNestSheet(nestSheetData, workOrder.Id));
+            }
+
+            // Establish nest sheet to part relationships using OptimizationResults
+            EstablishNestSheetPartRelationships(rawData, workOrder);
+
             // Calculate statistics
             workOrder.Statistics = CalculateStatistics(workOrder);
 
@@ -147,11 +161,31 @@ public class ImportDataTransformService
         };
     }
 
-    private ImportPart TransformPart(Dictionary<string, object?> partData, string productId, string? subassemblyId)
+    private ImportPart TransformPart(Dictionary<string, object?> partData, string productId, string? subassemblyId, Dictionary<string, string>? partToNestSheetMapping = null)
     {
+        var partId = _columnMapping.GetStringValue(partData, "PARTS", "Id");
+        
+        // Get nest sheet information from OptimizationResults mapping if available
+        var nestSheetName = string.Empty;
+        var nestSheetId = string.Empty;
+        
+        if (partToNestSheetMapping != null && !string.IsNullOrEmpty(partId) && partToNestSheetMapping.ContainsKey(partId))
+        {
+            nestSheetId = partToNestSheetMapping[partId];
+            // We'll set the name later when we have access to the nest sheet data
+        }
+        else
+        {
+            // Fallback: try to get nest sheet name from part data directly
+            nestSheetName = _columnMapping.GetStringValue(partData, "PARTS", "SheetName") ?? 
+                           _columnMapping.GetStringValue(partData, "PARTS", "NestSheet") ??
+                           _columnMapping.GetStringValue(partData, "PARTS", "PlacedSheet") ??
+                           string.Empty;
+        }
+
         return new ImportPart
         {
-            Id = _columnMapping.GetStringValue(partData, "PARTS", "Id"),
+            Id = partId,
             Name = _columnMapping.GetStringValue(partData, "PARTS", "Name"),
             Description = string.Empty, // Description not available in PARTS table
             Quantity = _columnMapping.GetIntValue(partData, "PARTS", "Quantity"),
@@ -165,6 +199,8 @@ public class ImportDataTransformService
                          _columnMapping.GetStringValue(partData, "PARTS", "EdgeBandingRight"),
             ProductId = productId,
             SubassemblyId = subassemblyId,
+            NestSheetName = nestSheetName,
+            NestSheetId = nestSheetId,
             GrainDirection = string.Empty, // GrainDirection not available in PARTS table
             Notes = string.Empty // Notes not available in PARTS table
         };
@@ -268,7 +304,8 @@ public class ImportDataTransformService
                            workOrder.Products.Sum(p => p.Hardware.Count + 
                                                      p.Subassemblies.Sum(s => s.Hardware.Count + 
                                                                               s.NestedSubassemblies.Sum(ns => ns.Hardware.Count))),
-            TotalDetachedProducts = workOrder.DetachedProducts.Count
+            TotalDetachedProducts = workOrder.DetachedProducts.Count,
+            TotalNestSheets = workOrder.NestSheets.Count
         };
 
         foreach (var product in workOrder.Products)
@@ -289,6 +326,131 @@ public class ImportDataTransformService
         }
 
         return stats;
+    }
+
+    private ImportNestSheet TransformNestSheet(Dictionary<string, object?> nestSheetData, string workOrderId)
+    {
+        var nestSheetName = _columnMapping.GetStringValue(nestSheetData, "PLACEDSHEETS", "Name"); // Material name
+        var nestSheetFileName = _columnMapping.GetStringValue(nestSheetData, "PLACEDSHEETS", "FileName");
+        var nestSheetId = _columnMapping.GetStringValue(nestSheetData, "PLACEDSHEETS", "Id");
+        
+        return new ImportNestSheet
+        {
+            Id = nestSheetId ?? Guid.NewGuid().ToString(), // Use LinkID from SDF or generate new ID
+            Name = nestSheetFileName, // Use FileName for the actual nest sheet name
+            Material = nestSheetName, // Use Name field for material (e.g., "19 Plywood")
+            Length = _columnMapping.GetDecimalValue(nestSheetData, "PLACEDSHEETS", "Length"),
+            Width = _columnMapping.GetDecimalValue(nestSheetData, "PLACEDSHEETS", "Width"),
+            Thickness = _columnMapping.GetDecimalValue(nestSheetData, "PLACEDSHEETS", "Thickness"),
+            Barcode = nestSheetFileName, // Use FileName as barcode for scanning
+            Description = _columnMapping.GetStringValue(nestSheetData, "PLACEDSHEETS", "Description") ?? string.Empty,
+            Notes = _columnMapping.GetStringValue(nestSheetData, "PLACEDSHEETS", "Notes") ?? string.Empty
+        };
+    }
+
+    private void EstablishNestSheetPartRelationships(ImportData rawData, ImportWorkOrder workOrder)
+    {
+        try
+        {
+            _logger.LogInformation("Processing OptimizationResults. Total records: {Count}", 
+                rawData.OptimizationResults?.Count ?? 0);
+
+            // Create a mapping of LinkIDPart to LinkIDSheet from OptimizationResults
+            var partToSheetMapping = new Dictionary<string, string>();
+            
+            foreach (var optimizationResult in rawData.OptimizationResults ?? new List<Dictionary<string, object?>>())
+            {
+                // Debug: Log the keys available in optimization result
+                _logger.LogDebug("OptimizationResult keys: {Keys}", string.Join(", ", optimizationResult.Keys));
+
+                var linkIdPart = _columnMapping.GetStringValue(optimizationResult, "OPTIMIZATIONRESULTS", "PartId");
+                var linkIdSheet = _columnMapping.GetStringValue(optimizationResult, "OPTIMIZATIONRESULTS", "SheetId");
+                
+                _logger.LogDebug("LinkIDPart: {Part}, LinkIDSheet: {Sheet}", linkIdPart, linkIdSheet);
+                
+                if (!string.IsNullOrEmpty(linkIdPart) && !string.IsNullOrEmpty(linkIdSheet))
+                {
+                    partToSheetMapping[linkIdPart] = linkIdSheet;
+                }
+            }
+
+            _logger.LogInformation("Created part to sheet mapping with {Count} entries", partToSheetMapping.Count);
+
+            // Create a lookup of nest sheet LinkID to nest sheet name
+            var sheetIdToNameMapping = new Dictionary<string, string>();
+            foreach (var nestSheet in workOrder.NestSheets)
+            {
+                if (!string.IsNullOrEmpty(nestSheet.Id))
+                {
+                    sheetIdToNameMapping[nestSheet.Id] = nestSheet.Name;
+                    _logger.LogDebug("Nest sheet mapping: {Id} -> {Name}", nestSheet.Id, nestSheet.Name);
+                }
+            }
+
+            // Update parts with proper nest sheet information
+            UpdatePartsWithNestSheetInfo(workOrder.Products, partToSheetMapping, sheetIdToNameMapping);
+
+            _logger.LogInformation("Established nest sheet relationships for {PartCount} parts using OptimizationResults", 
+                partToSheetMapping.Count);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error establishing nest sheet part relationships");
+        }
+    }
+
+    private void UpdatePartsWithNestSheetInfo(
+        List<ImportProduct> products, 
+        Dictionary<string, string> partToSheetMapping, 
+        Dictionary<string, string> sheetIdToNameMapping)
+    {
+        foreach (var product in products)
+        {
+            // Update parts in product
+            foreach (var part in product.Parts)
+            {
+                UpdatePartNestSheetInfo(part, partToSheetMapping, sheetIdToNameMapping);
+            }
+
+            // Update parts in subassemblies
+            foreach (var subassembly in product.Subassemblies)
+            {
+                UpdatePartsInSubassembly(subassembly, partToSheetMapping, sheetIdToNameMapping);
+            }
+        }
+    }
+
+    private void UpdatePartsInSubassembly(
+        ImportSubassembly subassembly, 
+        Dictionary<string, string> partToSheetMapping, 
+        Dictionary<string, string> sheetIdToNameMapping)
+    {
+        foreach (var part in subassembly.Parts)
+        {
+            UpdatePartNestSheetInfo(part, partToSheetMapping, sheetIdToNameMapping);
+        }
+
+        // Handle nested subassemblies
+        foreach (var nested in subassembly.NestedSubassemblies)
+        {
+            UpdatePartsInSubassembly(nested, partToSheetMapping, sheetIdToNameMapping);
+        }
+    }
+
+    private void UpdatePartNestSheetInfo(
+        ImportPart part, 
+        Dictionary<string, string> partToSheetMapping, 
+        Dictionary<string, string> sheetIdToNameMapping)
+    {
+        if (partToSheetMapping.ContainsKey(part.Id))
+        {
+            part.NestSheetId = partToSheetMapping[part.Id];
+            
+            if (sheetIdToNameMapping.ContainsKey(part.NestSheetId))
+            {
+                part.NestSheetName = sheetIdToNameMapping[part.NestSheetId];
+            }
+        }
     }
 
 }

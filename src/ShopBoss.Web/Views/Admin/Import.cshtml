@@ -218,50 +218,62 @@
                     <div class="mb-4">
                         <h5>Import Statistics</h5>
                         <div class="row">
-                            <div class="col-md-3">
-                                <div class="card border-primary">
+                            <div class="col-lg-2 col-md-4 col-6 mb-3">
+                                <div class="card border-primary h-100">
                                     <div class="card-body text-center">
                                         <i class="fas fa-boxes fa-2x text-primary mb-2"></i>
                                         <h4 id="totalProducts" class="mb-1">0</h4>
-                                        <small class="text-muted">Products (Total)</small>
+                                        <small class="text-muted">Products</small>
                                         <div class="mt-1">
                                             <small class="text-success fw-bold">Selected: <span id="selectedProducts">0</span></small>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-3">
-                                <div class="card border-success">
+                            <div class="col-lg-2 col-md-4 col-6 mb-3">
+                                <div class="card border-success h-100">
                                     <div class="card-body text-center">
                                         <i class="fas fa-puzzle-piece fa-2x text-success mb-2"></i>
                                         <h4 id="totalParts" class="mb-1">0</h4>
-                                        <small class="text-muted">Parts (Total)</small>
+                                        <small class="text-muted">Parts</small>
                                         <div class="mt-1">
                                             <small class="text-success fw-bold">Selected: <span id="selectedParts">0</span></small>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-3">
-                                <div class="card border-warning">
+                            <div class="col-lg-2 col-md-4 col-6 mb-3">
+                                <div class="card border-warning h-100">
                                     <div class="card-body text-center">
                                         <i class="fas fa-layer-group fa-2x text-warning mb-2"></i>
                                         <h4 id="totalSubassemblies" class="mb-1">0</h4>
-                                        <small class="text-muted">Subassemblies (Total)</small>
+                                        <small class="text-muted">Subassemblies</small>
                                         <div class="mt-1">
                                             <small class="text-success fw-bold">Selected: <span id="selectedSubassemblies">0</span></small>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-3">
-                                <div class="card border-info">
+                            <div class="col-lg-2 col-md-4 col-6 mb-3">
+                                <div class="card border-info h-100">
                                     <div class="card-body text-center">
                                         <i class="fas fa-tools fa-2x text-info mb-2"></i>
                                         <h4 id="totalHardware" class="mb-1">0</h4>
-                                        <small class="text-muted">Hardware (Total)</small>
+                                        <small class="text-muted">Hardware</small>
                                         <div class="mt-1">
                                             <small class="text-success fw-bold">Selected: <span id="selectedHardware">0</span></small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-lg-2 col-md-4 col-6 mb-3">
+                                <div class="card border-secondary h-100">
+                                    <div class="card-body text-center">
+                                        <i class="fas fa-cut fa-2x text-secondary mb-2"></i>
+                                        <h4 id="totalNestSheets" class="mb-1">0</h4>
+                                        <small class="text-muted">Nest Sheets</small>
+                                        <div class="mt-1">
+                                            <small class="text-success fw-bold">Selected: <span id="selectedNestSheets">0</span></small>
                                         </div>
                                     </div>
                                 </div>
@@ -273,17 +285,20 @@
                     <div id="selectionSummary" class="selection-summary d-none">
                         <h6><i class="fas fa-check-circle me-2"></i>Selection Summary</h6>
                         <div class="row">
-                            <div class="col-md-3">
+                            <div class="col-lg-2 col-md-4 col-6">
                                 <strong>Products:</strong> <span id="summaryProducts">0</span>
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-lg-2 col-md-4 col-6">
                                 <strong>Parts:</strong> <span id="summaryParts">0</span>
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-lg-2 col-md-4 col-6">
                                 <strong>Subassemblies:</strong> <span id="summarySubassemblies">0</span>
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-lg-2 col-md-4 col-6">
                                 <strong>Hardware:</strong> <span id="summaryHardware">0</span>
+                            </div>
+                            <div class="col-lg-2 col-md-4 col-6">
+                                <strong>Nest Sheets:</strong> <span id="summaryNestSheets">0</span>
                             </div>
                         </div>
                     </div>
@@ -301,6 +316,9 @@
                             <div>
                                 <button type="button" id="selectAllProductsBtn" class="btn btn-outline-success btn-sm">
                                     <i class="fas fa-check-double me-1"></i>Select All Products
+                                </button>
+                                <button type="button" id="selectAllNestSheetsBtn" class="btn btn-outline-secondary btn-sm">
+                                    <i class="fas fa-check-double me-1"></i>Select All Nest Sheets
                                 </button>
                                 <button type="button" id="clearAllBtn" class="btn btn-outline-danger btn-sm">
                                     <i class="fas fa-times me-1"></i>Clear All
@@ -351,7 +369,8 @@
             products: 0,
             parts: 0,
             subassemblies: 0,
-            hardware: 0
+            hardware: 0,
+            nestSheets: 0
         };
         
         // DOM elements
@@ -379,13 +398,16 @@
         const totalParts = document.getElementById('totalParts');
         const totalSubassemblies = document.getElementById('totalSubassemblies');
         const totalHardware = document.getElementById('totalHardware');
+        const totalNestSheets = document.getElementById('totalNestSheets');
         const selectedProducts = document.getElementById('selectedProducts');
         const selectedParts = document.getElementById('selectedParts');
         const selectedSubassemblies = document.getElementById('selectedSubassemblies');
         const selectedHardware = document.getElementById('selectedHardware');
+        const selectedNestSheets = document.getElementById('selectedNestSheets');
         const treeView = document.getElementById('treeView');
         const searchFilter = document.getElementById('searchFilter');
         const selectAllProductsBtn = document.getElementById('selectAllProductsBtn');
+        const selectAllNestSheetsBtn = document.getElementById('selectAllNestSheetsBtn');
         const clearAllBtn = document.getElementById('clearAllBtn');
         const expandAllBtn = document.getElementById('expandAllBtn');
         const collapseAllBtn = document.getElementById('collapseAllBtn');
@@ -399,6 +421,7 @@
         const summaryParts = document.getElementById('summaryParts');
         const summarySubassemblies = document.getElementById('summarySubassemblies');
         const summaryHardware = document.getElementById('summaryHardware');
+        const summaryNestSheets = document.getElementById('summaryNestSheets');
 
         // Initialize SignalR connection
         async function initializeSignalR() {
@@ -630,6 +653,7 @@
             totalParts.textContent = stats.totalParts;
             totalSubassemblies.textContent = stats.totalSubassemblies;
             totalHardware.textContent = stats.totalHardware;
+            totalNestSheets.textContent = stats.totalNestSheets;
         }
 
         function buildTreeView() {
@@ -663,6 +687,31 @@
                 });
             }
 
+            // Add nest sheets if any (always auto-selected)
+            if (importData.nestSheets && importData.nestSheets.length > 0) {
+                const nestSheetsHeader = createTreeNode('📄', `Nest Sheets (${importData.nestSheets.length})`, 'nestsheets-header', true, 0);
+                treeView.appendChild(nestSheetsHeader);
+                
+                importData.nestSheets.forEach(nestSheet => {
+                    const nestSheetNode = createNestSheetNode(nestSheet, 1);
+                    treeView.appendChild(nestSheetNode);
+                    
+                    // Auto-select all nest sheets and make them non-interactive
+                    const nestSheetId = nestSheetNode.dataset.itemId;
+                    const nestSheetState = selectionState.get(nestSheetId);
+                    if (nestSheetState) {
+                        nestSheetState.selected = true;
+                        // Disable the checkbox since nest sheets are always imported
+                        const checkbox = nestSheetNode.querySelector('.tree-checkbox');
+                        if (checkbox) {
+                            checkbox.checked = true;
+                            checkbox.disabled = true;
+                            checkbox.title = "Nest sheets are always imported";
+                        }
+                    }
+                });
+            }
+
             // Initialize selection counts and summary
             updateSelectionCounts();
             updateSelectionSummary();
@@ -676,7 +725,7 @@
             node.dataset.itemId = itemId || `${type}-${Math.random().toString(36).substr(2, 9)}`;
             
             const hasChildren = type === 'work-order' || type === 'products-header' || type === 'hardware-header' || 
-                               type === 'detached-header' || type === 'product' || type === 'subassembly';
+                               type === 'detached-header' || type === 'nestsheets-header' || type === 'product' || type === 'subassembly';
             
             const nodeId = node.dataset.itemId;
             
@@ -860,6 +909,12 @@
                 'detached', false, level, detached.id, detached);
         }
 
+        function createNestSheetNode(nestSheet, level = 1) {
+            return createTreeNode('📋', 
+                `${nestSheet.name} (${nestSheet.material || 'Unknown Material'}, ${nestSheet.length}mm×${nestSheet.width}mm×${nestSheet.thickness}mm)`, 
+                'nestsheet', false, level, nestSheet.id, nestSheet);
+        }
+
         // Selection Management Functions
         function handleNodeSelection(nodeId, isSelected) {
             const nodeState = selectionState.get(nodeId);
@@ -975,7 +1030,8 @@
                 products: 0,
                 parts: 0,
                 subassemblies: 0,
-                hardware: 0
+                hardware: 0,
+                nestSheets: 0
             };
 
             // Count selected items by type
@@ -994,6 +1050,9 @@
                         case 'hardware':
                             selectionCounts.hardware++;
                             break;
+                        case 'nestsheet':
+                            selectionCounts.nestSheets++;
+                            break;
                     }
                 }
             });
@@ -1003,11 +1062,12 @@
             selectedParts.textContent = selectionCounts.parts;
             selectedSubassemblies.textContent = selectionCounts.subassemblies;
             selectedHardware.textContent = selectionCounts.hardware;
+            selectedNestSheets.textContent = selectionCounts.nestSheets;
         }
 
         function updateSelectionSummary() {
             const hasSelection = selectionCounts.products > 0 || selectionCounts.parts > 0 || 
-                               selectionCounts.subassemblies > 0 || selectionCounts.hardware > 0;
+                               selectionCounts.subassemblies > 0 || selectionCounts.hardware > 0 || selectionCounts.nestSheets > 0;
 
             if (hasSelection) {
                 selectionSummary.classList.remove('d-none');
@@ -1015,6 +1075,7 @@
                 summaryParts.textContent = selectionCounts.parts;
                 summarySubassemblies.textContent = selectionCounts.subassemblies;
                 summaryHardware.textContent = selectionCounts.hardware;
+                summaryNestSheets.textContent = selectionCounts.nestSheets;
             } else {
                 selectionSummary.classList.add('d-none');
             }
@@ -1064,6 +1125,22 @@
             // Select all products (which will auto-select their children)
             selectionState.forEach((state, nodeId) => {
                 if (state.type === 'product' || state.type === 'hardware' || state.type === 'detached') {
+                    if (!state.selected) {
+                        state.selected = true;
+                        updateNodeVisualState(nodeId);
+                        selectAllChildren(nodeId);
+                    }
+                }
+            });
+            updateSelectionCounts();
+            updateSelectionSummary();
+            validateSelection();
+        });
+
+        selectAllNestSheetsBtn.addEventListener('click', () => {
+            // Select all nest sheets
+            selectionState.forEach((state, nodeId) => {
+                if (state.type === 'nestsheet') {
                     if (!state.selected) {
                         state.selected = true;
                         updateNodeVisualState(nodeId);
@@ -1160,9 +1237,18 @@
                 const selectionDetails = {};
 
                 selectionState.forEach((state, nodeId) => {
-                    if (state.selected) {
+                    // Only include actual items, not header/category nodes
+                    const isHeaderNode = state.type.includes('-header') || 
+                                       state.type === 'work-order' || 
+                                       state.type === 'products-header' || 
+                                       state.type === 'hardware-header' || 
+                                       state.type === 'detached-header' ||
+                                       state.type === 'nestsheets-header';
+                    
+                    if (state.selected && !isHeaderNode) {
                         selectedItemIds.push(nodeId);
                     }
+                    
                     selectionDetails[nodeId] = {
                         itemId: nodeId,
                         itemType: state.type,
@@ -1198,7 +1284,8 @@
                           `• ${result.statistics.convertedProducts} Products\n` +
                           `• ${result.statistics.convertedParts} Parts\n` +
                           `• ${result.statistics.convertedSubassemblies} Subassemblies\n` +
-                          `• ${result.statistics.convertedHardware} Hardware\n\n` +
+                          `• ${result.statistics.convertedHardware} Hardware\n` +
+                          `• ${result.statistics.convertedNestSheets} Nest Sheets\n\n` +
                           `Work Order ID: ${result.workOrderId}\n` +
                           `Work Order Name: ${workOrderName}\n\n` +
                           `The work order is now available in the system.`);

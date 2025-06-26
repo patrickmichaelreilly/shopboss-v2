@@ -14,6 +14,9 @@ public class Part
     [ForeignKey("Subassembly")]
     public string? SubassemblyId { get; set; }
     
+    [ForeignKey("NestSheet")]
+    public string NestSheetId { get; set; } = string.Empty;
+    
     public string Name { get; set; } = string.Empty;
     
     public int Qty { get; set; }
@@ -34,7 +37,13 @@ public class Part
     
     public string EdgebandingRight { get; set; } = string.Empty;
     
+    public PartStatus Status { get; set; } = PartStatus.Pending;
+    
+    public DateTime? StatusUpdatedDate { get; set; }
+    
     public Product? Product { get; set; }
     
     public Subassembly? Subassembly { get; set; }
+    
+    public NestSheet NestSheet { get; set; } = null!;
 }

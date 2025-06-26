@@ -16,4 +16,6 @@ public class WorkOrder
     public List<Hardware> Hardware { get; set; } = new();
     
     public List<DetachedProduct> DetachedProducts { get; set; } = new();
+    
+    public List<NestSheet> NestSheets { get; set; } = new();
 }

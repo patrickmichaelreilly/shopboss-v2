@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ShopBoss.Web.Data;
 
@@ -10,9 +11,11 @@ using ShopBoss.Web.Data;
 namespace ShopBoss.Web.Migrations
 {
     [DbContext(typeof(ShopBossDbContext))]
-    partial class ShopBossDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250620183907_AddNestSheetAndPartStatus")]
+    partial class AddNestSheetAndPartStatus
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.0");
@@ -178,7 +181,6 @@ namespace ShopBoss.Web.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("NestSheetId")
-                        .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<string>("ProductId")
@@ -334,8 +336,7 @@ namespace ShopBoss.Web.Migrations
                     b.HasOne("ShopBoss.Web.Models.NestSheet", "NestSheet")
                         .WithMany("Parts")
                         .HasForeignKey("NestSheetId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("ShopBoss.Web.Models.Product", "Product")
                         .WithMany("Parts")

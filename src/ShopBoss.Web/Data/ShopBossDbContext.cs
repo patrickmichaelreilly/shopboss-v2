@@ -16,6 +16,7 @@ public class ShopBossDbContext : DbContext
     public DbSet<Subassembly> Subassemblies { get; set; }
     public DbSet<Hardware> Hardware { get; set; }
     public DbSet<DetachedProduct> DetachedProducts { get; set; }
+    public DbSet<NestSheet> NestSheets { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -46,6 +47,7 @@ public class ShopBossDbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Name).IsRequired();
             entity.Property(e => e.Qty).IsRequired();
+            entity.Property(e => e.Status).IsRequired();
             
             entity.HasOne(e => e.Product)
                 .WithMany(p => p.Parts)
@@ -55,6 +57,11 @@ public class ShopBossDbContext : DbContext
             entity.HasOne(e => e.Subassembly)
                 .WithMany(s => s.Parts)
                 .HasForeignKey(e => e.SubassemblyId)
+                .OnDelete(DeleteBehavior.Cascade);
+                
+            entity.HasOne(e => e.NestSheet)
+                .WithMany(n => n.Parts)
+                .HasForeignKey(e => e.NestSheetId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
@@ -98,6 +105,23 @@ public class ShopBossDbContext : DbContext
                 .WithMany(w => w.DetachedProducts)
                 .HasForeignKey(e => e.WorkOrderId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<NestSheet>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).IsRequired();
+            entity.Property(e => e.Material).IsRequired();
+            entity.Property(e => e.Barcode).IsRequired();
+            entity.Property(e => e.CreatedDate).IsRequired();
+            entity.Property(e => e.IsProcessed).IsRequired();
+            
+            entity.HasOne(e => e.WorkOrder)
+                .WithMany(w => w.NestSheets)
+                .HasForeignKey(e => e.WorkOrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+                
+            entity.HasIndex(e => e.Barcode).IsUnique();
         });
     }
 }

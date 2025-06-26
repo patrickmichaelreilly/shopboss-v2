@@ -207,4 +207,7 @@ public class ImportData
     public List<Dictionary<string, object?>> Hardware { get; set; } = new();
     public List<Dictionary<string, object?>> Subassemblies { get; set; } = new();
     public List<Dictionary<string, object?>> OptimizationResults { get; set; } = new();
+    
+    // Alias for PlacedSheets to make it clearer in code
+    public List<Dictionary<string, object?>> NestSheets => PlacedSheets;
 }

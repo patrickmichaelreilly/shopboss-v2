@@ -33,5 +33,6 @@ public class ConversionStatistics
     public int ConvertedSubassemblies { get; set; }
     public int ConvertedHardware { get; set; }
     public int ConvertedDetachedProducts { get; set; }
+    public int ConvertedNestSheets { get; set; }
     public int SkippedItems { get; set; }
 }

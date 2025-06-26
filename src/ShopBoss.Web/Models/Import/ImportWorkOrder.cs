@@ -9,6 +9,7 @@ public class ImportWorkOrder
     public List<ImportProduct> Products { get; set; } = new();
     public List<ImportHardware> Hardware { get; set; } = new();
     public List<ImportDetachedProduct> DetachedProducts { get; set; } = new();
+    public List<ImportNestSheet> NestSheets { get; set; } = new();
     
     // Import statistics
     public ImportStatistics Statistics { get; set; } = new();
@@ -21,5 +22,6 @@ public class ImportStatistics
     public int TotalSubassemblies { get; set; }
     public int TotalHardware { get; set; }
     public int TotalDetachedProducts { get; set; }
+    public int TotalNestSheets { get; set; }
     public List<string> Warnings { get; set; } = new();
 }
