@@ -28,6 +28,7 @@ builder.Services.AddScoped<ImportDataTransformService>();
 builder.Services.AddScoped<ColumnMappingService>();
 builder.Services.AddScoped<ImportSelectionService>();
 builder.Services.AddScoped<AuditTrailService>();
+builder.Services.AddScoped<SortingRuleService>();
 
 var app = builder.Build();
 
@@ -36,6 +37,9 @@ using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<ShopBossDbContext>();
     context.Database.EnsureCreated();
+    
+    // Seed default storage racks
+    await StorageRackSeedService.SeedDefaultRacksAsync(context);
 }
 
 // Configure the HTTP request pipeline.

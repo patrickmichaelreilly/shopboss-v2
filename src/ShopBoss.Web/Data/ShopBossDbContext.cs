@@ -19,6 +19,8 @@ public class ShopBossDbContext : DbContext
     public DbSet<NestSheet> NestSheets { get; set; }
     public DbSet<AuditLog> AuditLogs { get; set; }
     public DbSet<ScanHistory> ScanHistory { get; set; }
+    public DbSet<StorageRack> StorageRacks { get; set; }
+    public DbSet<Bin> Bins { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -163,6 +165,58 @@ public class ShopBossDbContext : DbContext
             entity.HasIndex(e => e.Timestamp);
             entity.HasIndex(e => e.Barcode);
             entity.HasIndex(e => e.Station);
+        });
+
+        modelBuilder.Entity<StorageRack>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.Type).IsRequired();
+            entity.Property(e => e.Rows).IsRequired();
+            entity.Property(e => e.Columns).IsRequired();
+            entity.Property(e => e.IsActive).IsRequired();
+            entity.Property(e => e.CreatedDate).IsRequired();
+            
+            entity.HasIndex(e => e.Name);
+            entity.HasIndex(e => e.Type);
+            entity.HasIndex(e => e.IsActive);
+        });
+
+        modelBuilder.Entity<Bin>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.StorageRackId).IsRequired();
+            entity.Property(e => e.Row).IsRequired();
+            entity.Property(e => e.Column).IsRequired();
+            entity.Property(e => e.Status).IsRequired();
+            entity.Property(e => e.PartsCount).IsRequired();
+            entity.Property(e => e.MaxCapacity).IsRequired();
+            
+            entity.HasOne(e => e.StorageRack)
+                .WithMany(r => r.Bins)
+                .HasForeignKey(e => e.StorageRackId)
+                .OnDelete(DeleteBehavior.Cascade);
+                
+            entity.HasOne(e => e.Part)
+                .WithMany()
+                .HasForeignKey(e => e.PartId)
+                .OnDelete(DeleteBehavior.SetNull);
+                
+            entity.HasOne(e => e.Product)
+                .WithMany()
+                .HasForeignKey(e => e.ProductId)
+                .OnDelete(DeleteBehavior.SetNull);
+                
+            entity.HasOne(e => e.WorkOrder)
+                .WithMany()
+                .HasForeignKey(e => e.WorkOrderId)
+                .OnDelete(DeleteBehavior.SetNull);
+            
+            entity.HasIndex(e => e.StorageRackId);
+            entity.HasIndex(e => new { e.StorageRackId, e.Row, e.Column }).IsUnique();
+            entity.HasIndex(e => e.Status);
+            entity.HasIndex(e => e.PartId);
+            entity.HasIndex(e => e.ProductId);
         });
     }
 }
