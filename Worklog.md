@@ -1309,3 +1309,165 @@ HttpContext.Session.Remove("ActiveWorkOrderId");
 
 **Status:** COMPLETED  
 **Impact:** Phase 5A fully implemented - CNC Station Interface provides professional shop floor interface for nest sheet management with real-time barcode scanning, batch part processing, and comprehensive status tracking. All architectural updates for nest sheet integration are complete.
+
+---
+
+## Phase 5B: CNC Operation Workflow - Claude Code - 2025-06-26
+
+**Objective:** Implement the CNC operator workflow including scan validation, error handling, and status reporting. Add visual feedback for successful scans and integration with the shop floor tracking system. Ensure all part status changes are logged in the audit trail.
+
+### Implementation Plan:
+1. **Enhanced Scan Validation:**
+   - Improve barcode validation logic with comprehensive error checking
+   - Add duplicate scan detection and prevention
+   - Implement scan history tracking for operators
+
+2. **Visual Feedback Improvements:**
+   - Enhanced success/error visual indicators
+   - Real-time scan feedback animations
+   - Improved status notifications and confirmations
+
+3. **Error Handling Enhancement:**
+   - Detailed error messages for various scan scenarios
+   - Invalid barcode handling with helpful suggestions
+   - Duplicate scan prevention with clear messaging
+
+4. **Audit Trail Integration:**
+   - Log all scan operations with timestamps and operator context
+   - Track status changes with detailed audit information
+   - Integration with existing audit trail system
+
+5. **Real-time Dashboard Updates:**
+   - Enhanced SignalR notifications
+   - Cross-station status synchronization
+   - Improved progress tracking and reporting
+
+### Implementation Results:
+
+**Phase 5B: Complete ✅**
+
+#### Enhanced Scan Validation and Processing:
+✅ **Advanced Barcode Validation:** `/Controllers/CncController.cs` - ValidateBarcodeInternal() method with:
+- Length validation (2-100 characters)
+- Dangerous character detection and filtering
+- Input sanitization and trimming
+- Comprehensive error messaging with emoji indicators
+
+✅ **Duplicate Scan Prevention:** Enhanced ProcessNestSheet() with:
+- 30-second duplicate scan detection using audit trail
+- Recent scan history tracking via AuditTrailService
+- Session-based duplicate prevention
+- Clear user messaging for duplicate attempts
+
+✅ **Similar Barcode Suggestions:** Smart error handling with:
+- Levenshtein distance calculation for fuzzy matching
+- Up to 3 character difference tolerance
+- Suggestions displayed for "not found" errors
+- Both barcode and name matching support
+
+#### Visual Feedback Improvements:
+✅ **Enhanced Scan Modal:** `/Views/Cnc/Index.cshtml` - Professional interface featuring:
+- Real-time barcode validation with visual feedback
+- Input validation indicators with color-coded messages
+- Processing status display with spinners and icons
+- Success animations and auto-close functionality
+- Suggestion buttons for similar barcodes
+
+✅ **Real-time Feedback System:**
+- Debounced validation (500ms) as user types
+- Visual status indicators (✅ success, ⚠️ warnings, ❌ errors)
+- Progress spinners during processing
+- Animated success confirmations
+- Context-specific error icons by error type
+
+✅ **Recent Scan History Modal:** New functionality providing:
+- Last 5 scan operations display
+- Success/failure status indicators
+- Timestamp, barcode, and result details
+- Scrollable table with color-coded rows
+- Auto-refresh when modal is opened
+
+#### Comprehensive Error Handling:
+✅ **Error Type Classification:** Detailed error handling for:
+- **Validation errors:** Input format and character validation
+- **Not found errors:** Barcode/name not in active work order
+- **Duplicate errors:** Recent scan prevention (30-second window)
+- **Already processed:** Clear messaging with processed date
+- **Session errors:** No active work order selected
+- **System errors:** Database and unexpected errors
+
+✅ **User-Friendly Error Messages:**
+- Emoji-enhanced error messages for quick recognition
+- Specific guidance for each error type
+- Helpful suggestions for similar barcodes
+- Clear next-step instructions for operators
+
+#### Audit Trail Integration:
+✅ **Comprehensive Audit Logging:** New AuditTrailService with:
+- All scan operations logged (successful and failed)
+- Detailed audit trail for nest sheet processing
+- Individual part status change tracking
+- Session ID, IP address, and timestamp recording
+- Structured JSON logging for old/new values
+
+✅ **New Database Tables:**
+- **AuditLog:** Complete activity tracking with entity relationships
+- **ScanHistory:** Barcode scan operations with success/failure details
+- **Database Migration:** AddAuditTrailAndScanHistory migration applied
+- **Indexed queries:** Optimized for performance with proper indexes
+
+✅ **Audit Trail Features:**
+- Entity-specific audit trails (GetEntityAuditTrailAsync)
+- Recent scan history retrieval (GetRecentScansAsync)
+- Duplicate scan detection (HasRecentDuplicateScanAsync)
+- JSON serialization for complex object changes
+- Cross-referencing between audit logs and scan history
+
+#### Real-time Dashboard Updates:
+✅ **Enhanced SignalR Integration:** Improved real-time notifications:
+- More detailed update payloads with material and timestamp info
+- Cross-station progress updates (ProgressUpdate event)
+- Enhanced error handling and retry logic
+- Structured data for better client-side processing
+
+✅ **Advanced Toast Notifications:**
+- Context-aware notifications with appropriate icons
+- Error type-specific messaging and styling
+- Auto-dismissing success notifications
+- Persistent error notifications requiring user action
+
+#### New Controller Actions:
+✅ **GetRecentScans():** Returns last 5 scan operations for operator feedback
+✅ **ValidateBarcode():** Real-time barcode validation endpoint
+✅ **Enhanced ProcessNestSheet():** Complete workflow with audit trail integration
+
+#### User Experience Enhancements:
+✅ **Operator Workflow Improvements:**
+- Auto-focus on barcode input when modal opens
+- Enter key support for quick scanning
+- Real-time validation feedback
+- Smart suggestion system for typos
+- Recent scan history for verification
+
+✅ **Professional Visual Design:**
+- Loading states with spinners
+- Color-coded status indicators
+- Responsive button layouts
+- Clear progress indication
+- Accessibility-friendly error messaging
+
+### Build Verification:
+✅ **Project Build:** Clean build with 0 errors, 0 warnings
+✅ **Database Migration:** Successfully applied AddAuditTrailAndScanHistory
+✅ **Service Registration:** AuditTrailService properly configured in Program.cs
+✅ **Method Resolution:** Fixed duplicate ValidateBarcode method conflict
+
+### Success Criteria Achieved:
+- [x] Barcode scan validation and processing with comprehensive input validation
+- [x] Visual feedback for scan operations with real-time status indicators
+- [x] Error handling for invalid/duplicate scans with specific error types and suggestions
+- [x] Audit trail integration logging all scan operations and status changes
+- [x] Real-time dashboard updates with enhanced SignalR notifications
+
+**Status:** COMPLETED  
+**Impact:** Phase 5B fully implemented - CNC Operation Workflow provides professional-grade barcode scanning with comprehensive validation, visual feedback, error handling, and complete audit trail integration. The enhanced workflow ensures reliable operations with detailed tracking and operator-friendly feedback systems.
