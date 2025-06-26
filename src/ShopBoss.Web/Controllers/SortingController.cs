@@ -78,17 +78,18 @@ public class SortingController : Controller
                 return Json(new { success = false, message = "Rack not found." });
             }
 
-            // Create a 2D grid representation of the rack
-            var grid = new object[rack.Rows, rack.Columns];
+            // Create a list of rows, each containing a list of bins
+            var grid = new List<List<object>>();
             for (int row = 1; row <= rack.Rows; row++)
             {
+                var binRow = new List<object>();
                 for (int col = 1; col <= rack.Columns; col++)
                 {
                     var bin = rack.Bins.FirstOrDefault(b => b.Row == row && b.Column == col);
                     if (bin == null)
                     {
                         // Create empty bin representation
-                        grid[row - 1, col - 1] = new
+                        binRow.Add(new
                         {
                             row = row,
                             column = col,
@@ -102,11 +103,11 @@ public class SortingController : Controller
                             productName = "",
                             partName = "",
                             isAvailable = true
-                        };
+                        });
                     }
                     else
                     {
-                        grid[row - 1, col - 1] = new
+                        binRow.Add(new
                         {
                             id = bin.Id,
                             row = bin.Row,
@@ -123,9 +124,10 @@ public class SortingController : Controller
                             isAvailable = bin.IsAvailable,
                             assignedDate = bin.AssignedDate?.ToString("yyyy-MM-dd HH:mm"),
                             notes = bin.Notes
-                        };
+                        });
                     }
                 }
+                grid.Add(binRow);
             }
 
             var rackData = new
