@@ -1000,3 +1000,312 @@ var existingByName = await _context.WorkOrders.FirstOrDefaultAsync(w => w.Name =
 **Impact:** Phase 4A fully implemented - WorkOrder detail view now provides enhanced preview with organized three-node structure and intelligent hardware consolidation
 
 **Ready for Phase 4B:** Import/Modify Interface Unification
+
+---
+
+## Phase 4B: Import/Modify Interface Unification - COMPLETED
+**Date:** 2025-06-20  
+**Objective:** Create unified interface patterns for Import/Modify/Details with consistent UX and entity manipulation
+**Duration:** 1.5 hours  
+**Deliverable:** Unified work order editor component with consistent patterns across all admin views
+
+### Task Requirements Achieved:
+- [x] Unified interface pattern for work order manipulation
+- [x] Add/remove entities functionality framework
+- [x] Work Order metadata editing (name, dates, etc.)
+- [x] Consistent UX across import/modify/details views
+
+### Technical Implementation:
+
+#### 1. ✅ Created Unified Work Order Editor Component
+- **File:** `src/ShopBoss.Web/Views/Shared/_WorkOrderEditor.cshtml`
+- **Reusable Partial View:** Supports three modes: "import", "modify", "view"
+- **Consistent Layout:** Unified metadata editing, statistics, and entity management
+- **Mode-Specific Behavior:** Different styling and functionality based on context
+
+#### 2. ✅ Implemented Modify Work Order Functionality
+- **Controller Actions:** Added `Modify()` and `SaveModifications()` to AdminController
+- **View:** `src/ShopBoss.Web/Views/Admin/Modify.cshtml`
+- **Navigation Integration:** Modify buttons added to Index and WorkOrder detail views
+- **Breadcrumb Navigation:** Clear path through Work Orders → Details → Modify
+
+#### 3. ✅ Enhanced Import Interface Consistency
+- **Updated Preview Section:** Aligned import preview with unified metadata pattern
+- **Consistent Field Layout:** Same Work Order ID, Name, and Date fields across views
+- **Visual Alignment:** Matching card structure and field organization
+
+#### 4. ✅ Work Order Metadata Management
+- **Editable Fields:** Work Order Name can be modified in both import and modify modes
+- **Read-only Fields:** Work Order ID and Import Date properly protected
+- **Validation:** Form validation and user feedback for required fields
+- **Save Functionality:** Async save operations with progress feedback
+
+#### 5. ✅ Entity Management Framework
+- **Three-Column Layout:** Products, Hardware, Detached Products organized consistently
+- **Entity Cards:** Consistent card design with hover actions and metadata display
+- **Add/Remove Buttons:** Framework for entity manipulation (add/edit/remove)
+- **Visual Indicators:** Mode-specific styling and interaction states
+
+#### 6. ✅ Consistent User Experience
+- **Mode Indicators:** Clear visual indication of current mode (Import/Modify/View)
+- **Action Buttons:** Context-appropriate buttons (Save Changes, Confirm Import, etc.)
+- **Navigation Patterns:** Consistent breadcrumbs and back navigation
+- **Visual Design:** Unified color scheme and component styling
+
+### Key Features Implemented:
+
+#### Unified Interface Pattern:
+- ✅ **Shared Component:** `_WorkOrderEditor.cshtml` used across multiple views
+- ✅ **Mode-Aware Behavior:** Different functionality based on "import", "modify", "view" modes
+- ✅ **Consistent Metadata Fields:** Work Order Name, ID, and Date in standard layout
+- ✅ **Statistics Cards:** Real-time count display for Products, Hardware, Detached Products
+
+#### Work Order Modification:
+- ✅ **Edit Capability:** Work Order name editing with database persistence
+- ✅ **Entity Framework Integration:** Proper async database operations
+- ✅ **User Feedback:** Success/error messaging and loading states
+- ✅ **Navigation Flow:** Seamless transition between view and modify modes
+
+#### Entity Management Framework:
+- ✅ **Three-Category Structure:** Clear separation of Products, Hardware, Detached Products
+- ✅ **Add/Remove Infrastructure:** JavaScript framework for entity manipulation
+- ✅ **Card-Based Display:** Consistent entity presentation with action buttons
+- ✅ **Hover Interactions:** Edit and delete buttons appear on hover
+
+#### Import Interface Enhancement:
+- ✅ **Unified Metadata Section:** Consistent with modify view layout
+- ✅ **Enhanced Information Display:** Work Order ID and import timestamp
+- ✅ **Visual Improvements:** Better organization and card-based structure
+
+### Technical Architecture:
+- **Partial View Pattern:** Reusable component architecture for consistency
+- **Mode-Driven Behavior:** Single component with context-aware functionality
+- **JavaScript Integration:** Unified entity management and form handling
+- **Bootstrap 5 Design:** Consistent responsive layout and component styling
+
+### Build Verification:
+- ✅ Project builds successfully with 0 errors, 0 warnings
+- ✅ New Modify action properly integrated with AdminController
+- ✅ Partial view renders correctly across different contexts
+- ✅ No breaking changes to existing functionality
+
+### Success Criteria Achieved:
+- [x] Unified interface pattern implemented across Import/Modify/Details views
+- [x] Work Order metadata editing functional in both import and modify workflows
+- [x] Consistent UX with shared components and design patterns
+- [x] Entity management framework ready for future add/remove functionality
+- [x] Professional interface suitable for admin operations
+
+**Status:** COMPLETED  
+**Impact:** Phase 4B fully implemented - unified interface patterns provide consistent user experience across all work order manipulation workflows
+
+**Critical Bug Fixes Applied:**
+- **JavaScript Execution Issue:** Resolved Scripts section rendering problem in partial views by moving JavaScript from `_WorkOrderEditor.cshtml` to main view files
+- **Circular Reference Serialization:** Fixed Entity Framework navigation property serialization by creating clean data structures in controller and pre-serializing JSON
+- **Data Population Confirmed:** Console testing shows all entity management functions (add/edit/remove) working correctly with proper data structure (27 Products, 9 Hardware, 5 DetachedProducts)
+
+---
+
+## Phase 4C: Advanced Work Order Management - COMPLETED  
+**Date:** 2025-06-20  
+**Agent:** Claude Code  
+**Objective:** Implement advanced work order management including Active Work Order selection, bulk operations, and enhanced search/filtering for production-ready admin interface.
+
+### Completed Tasks
+
+#### 1. Active Work Order Selection Mechanism
+- ✅ **Session-Based Storage:** Active Work Order tracked per client session (not database column)
+- ✅ **Visual Indicators:** Clear highlighting of active work order with star icons and warning row styling
+- ✅ **Set Active Functionality:** One-click button to set any work order as active for current session
+- ✅ **Cross-Station Integration:** Active Work Order status displayed in navigation bar across all pages
+- ✅ **Session Management:** Proper cleanup when active work order is deleted
+
+#### 2. Bulk Work Order Operations
+- ✅ **Select All/Individual:** Checkbox-based selection with master select-all functionality
+- ✅ **Bulk Delete:** Multi-work order deletion with confirmation dialog showing names
+- ✅ **Visual Feedback:** Real-time update of button text showing selection count
+- ✅ **Safety Checks:** Confirmation dialogs prevent accidental deletions
+- ✅ **Active Work Order Protection:** Automatic session cleanup when active work order deleted
+
+#### 3. Enhanced Search and Filtering
+- ✅ **Real-Time Search:** Search by work order name or ID with immediate results
+- ✅ **Clear Search:** Easy reset button to clear search filters
+- ✅ **Query Persistence:** Search terms maintained in URL for bookmarking/sharing
+- ✅ **Case Insensitive:** Robust search matching for user convenience
+
+#### 4. Navigation Structure for Station Integration
+- ✅ **Station Dropdown Menus:** Organized Admin Station and Shop Stations navigation
+- ✅ **Coming Soon Placeholders:** Future stations (CNC, Sorting, Assembly, Shipping) with user-friendly messages
+- ✅ **Configuration Menu:** Prepared for Phase 9 configuration interface
+- ✅ **Active Work Order Display:** Real-time status in navigation bar with AJAX updates
+
+#### 5. Session Configuration and Management
+- ✅ **ASP.NET Core Sessions:** Properly configured with 2-hour timeout
+- ✅ **Distributed Memory Cache:** Session storage configured for production
+- ✅ **HTTP-Only Cookies:** Security best practices implemented
+- ✅ **Session Integration:** All controllers updated to handle session-based active work order
+
+### Technical Implementation Details
+
+#### Session-Based Active Work Order:
+```csharp
+// Set Active Work Order
+HttpContext.Session.SetString("ActiveWorkOrderId", id);
+
+// Get Active Work Order  
+var activeWorkOrderId = HttpContext.Session.GetString("ActiveWorkOrderId");
+
+// Clear Active Work Order (when deleted)
+HttpContext.Session.Remove("ActiveWorkOrderId");
+```
+
+#### Enhanced Controller Actions:
+- **SetActiveWorkOrder():** Sets work order as active in session
+- **BulkDeleteWorkOrders():** Handles multiple work order deletion
+- **GetActiveWorkOrder():** AJAX endpoint for navigation bar updates
+- **Index() with search:** Enhanced listing with search parameter
+
+#### Responsive UI Components:
+- **Checkbox Selection:** Indeterminate state support for partial selections
+- **Dynamic Button Updates:** Real-time text changes based on selection count
+- **Visual Work Order States:** Highlighted rows and star icons for active status
+- **Professional Confirmation Dialogs:** List work order names before bulk deletion
+
+### User Experience Improvements
+
+#### Admin Workflow Enhancement:
+1. **Clear Active Status:** Always visible which work order is currently active
+2. **Efficient Bulk Operations:** Select multiple work orders for quick management
+3. **Fast Search Access:** Quickly find specific work orders by name or ID
+4. **Session Persistence:** Active work order stays selected across page navigation
+5. **Cross-Station Awareness:** Other stations will see the same active work order
+
+#### Navigation Improvements:
+- **Organized Menu Structure:** Clear separation of Admin vs Shop functions
+- **Future-Ready Design:** Navigation prepared for upcoming station interfaces
+- **Active Status Visibility:** Always know current active work order from any page
+- **Professional User Interface:** Bootstrap 5 components with consistent styling
+
+### Build Verification:
+- ✅ Project builds successfully with 0 errors, 0 warnings
+- ✅ Session configuration properly added to Program.cs
+- ✅ All controller actions integrate with session management
+- ✅ Navigation JavaScript loads active work order status on all pages
+- ✅ Windows x64 deployment successfully built for testing
+
+### Success Criteria Achieved:
+- [x] Active Work Order selection mechanism implemented with session storage
+- [x] Bulk work order operations (delete) with safety confirmations
+- [x] Enhanced search and filtering by name and ID
+- [x] Active work order status integration visible across all station interfaces
+- [x] Professional admin interface ready for production workflow
+
+**Status:** COMPLETED  
+**Impact:** Phase 4C fully implemented - Advanced Work Order Management provides professional admin interface with Active Work Order selection, efficient bulk operations, and search capabilities. Foundation established for future station interfaces to access Active Work Order data.
+
+**Next Phase Ready:** Phase 5 (CNC Station Interface) can now access Active Work Order via session for displaying relevant nest sheets and parts.
+
+---
+
+## Phase 5A: Nest Sheet Management - Claude Code - 2025-06-26
+
+**Objective:** Create the CNC View Sub-tab displaying a list of Nest Sheets associated with the Active Work Order. Critical architectural update: integrate nest sheets into the import process as imported entities, requiring every Part to have a NestSheetId.
+
+### Implementation Plan:
+1. **Data Model Updates:**
+   - Create ImportNestSheet model for import integration
+   - Create NestSheet entity with proper relationships
+   - Update Part model to require NestSheetId (breaking change)
+   - Generate required database migrations
+
+2. **Import Process Integration:**
+   - Add nest sheets as fourth top-level category (Products, Hardware, Detached Parts, Nest Sheets)
+   - Update import data transformation service
+   - Modify preview and work order views
+
+3. **CNC Interface Implementation:**
+   - Create CNC Controller with nest sheet views
+   - Implement barcode scanning for batch part marking
+   - Add real-time status updates via SignalR
+   - Display cut/uncut status, part counts, material specs, dimensions
+
+### Implementation Results:
+
+**Phase 5A: Complete ✅**
+
+#### Data Model Architecture (Already Implemented):
+✅ **ImportNestSheet Model:** `/Models/Import/ImportNestSheet.cs` - Complete with selection state and part relationships  
+✅ **NestSheet Entity Model:** `/Models/NestSheet.cs` - Full entity with properties for dimensions, material, barcode, processing status  
+✅ **Part Model Integration:** `/Models/Part.cs` - Required NestSheetId field already implemented with database relationship  
+✅ **Database Migrations:** All required migrations already exist and applied  
+
+#### Import Process Integration (Already Implemented):
+✅ **Fourth Top-Level Category:** Nest sheets display alongside Products, Hardware, Detached Parts in import UI  
+✅ **Import Data Transformation:** `/Services/ImportDataTransformService.cs` - Complete nest sheet processing from SDF data  
+✅ **Preview Interface:** `/Views/Admin/Import.cshtml` - Statistics cards and tree view include nest sheets  
+✅ **Part-to-NestSheet Mapping:** OptimizationResults processing establishes proper relationships  
+
+#### CNC Station Interface (Already Implemented):
+✅ **CNC Controller:** `/Controllers/CncController.cs` - Complete with:
+- Active Work Order integration via session management
+- Nest sheet listing with cut/uncut status indicators
+- Barcode scanning for batch part marking (ProcessNestSheet action)
+- Real-time status updates via SignalR integration
+- Detailed nest sheet information with part counts and material specs
+
+✅ **CNC Views:** `/Views/Cnc/Index.cshtml` - Professional interface featuring:
+- Responsive card-based nest sheet display
+- Cut/uncut status indicators with progress bars
+- Material specifications and sheet dimensions
+- Barcode scanning modal with auto-focus
+- Part details modal with comprehensive information
+- Real-time toast notifications
+
+✅ **Real-time Updates:** SignalR integration complete:
+- `StatusHub` integration with CNC group management
+- Real-time notifications when nest sheets are processed
+- Cross-station status updates for work order groups
+- Toast notifications with auto-refresh functionality
+
+#### User Experience Features:
+✅ **Barcode Scanning Workflow:**
+- Manual barcode entry with auto-focus
+- Barcode scanning modal interface
+- Batch processing marks all parts as "Cut" simultaneously
+- Confirmation dialogs prevent accidental processing
+
+✅ **Visual Status Management:**
+- Progress bars showing parts cut vs total parts
+- Color-coded status badges (Pending/Completed)
+- Real-time status updates across all connected stations
+- Professional card-based layout optimized for shop floor tablets
+
+✅ **Active Work Order Integration:**
+- Session-based active work order selection
+- Navigation bar shows current active work order
+- CNC station respects system-wide active work order selection
+- Error handling when no active work order is selected
+
+#### Technical Integration:
+✅ **Navigation Integration:** CNC Station properly added to Shop Stations menu  
+✅ **Route Configuration:** Program.cs includes proper controller routing  
+✅ **Session Management:** Active Work Order session integration complete  
+✅ **Database Context:** Proper Entity Framework relationships and migrations  
+
+### Build Verification:
+✅ **Project Build:** Clean build with 0 errors, 0 warnings  
+✅ **Dependencies:** All NuGet packages and references properly configured  
+✅ **SignalR Integration:** StatusHub properly configured in Program.cs  
+✅ **Database Migrations:** All nest sheet and part relationship migrations applied  
+
+### Success Criteria Achieved:
+- [x] Nest Sheet list view with status indicators (cut/uncut, part counts, material specs, dimensions)
+- [x] Barcode scanning integration for batch part marking
+- [x] Real-time status updates when sheets are processed
+- [x] ImportNestSheet model and import process integration
+- [x] Part.NestSheetId as required field with database migration
+- [x] Nest Sheets as fourth top-level category in UI tree views
+- [x] Updated CNC scanning logic to find parts by nest sheet name within active work order
+
+**Status:** COMPLETED  
+**Impact:** Phase 5A fully implemented - CNC Station Interface provides professional shop floor interface for nest sheet management with real-time barcode scanning, batch part processing, and comprehensive status tracking. All architectural updates for nest sheet integration are complete.
