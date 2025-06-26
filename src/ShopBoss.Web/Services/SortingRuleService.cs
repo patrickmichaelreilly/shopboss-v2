@@ -38,9 +38,13 @@ public class SortingRuleService
                 .Where(r => r.IsActive && 
                            (r.Type == preferredRackType || 
                             (preferredRackType == RackType.Standard && r.Type != RackType.DoorsAndDrawerFronts)))
+                .ToListAsync();
+
+            // Sort in memory since OccupancyPercentage is a computed property
+            suitableRacks = suitableRacks
                 .OrderBy(r => r.Type == preferredRackType ? 0 : 1) // Prefer exact match
                 .ThenBy(r => r.OccupancyPercentage) // Prefer less occupied racks
-                .ToListAsync();
+                .ToList();
 
             if (!suitableRacks.Any())
             {
