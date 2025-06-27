@@ -868,7 +868,7 @@ else
             modal.show();
             
             // Fetch bin details
-            fetch(`/Sorting/GetBinDetails/${rackId}/${row}/${column}`)
+            fetch(`/Sorting/GetBinDetails?rackId=${encodeURIComponent(rackId)}&row=${row}&column=${column}`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {

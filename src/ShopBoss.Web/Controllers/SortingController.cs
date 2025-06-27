@@ -623,7 +623,7 @@ public class SortingController : Controller
                     bin.PartId = null;
                     bin.ProductId = null;
                     bin.WorkOrderId = null;
-                    bin.Contents = null;
+                    bin.Contents = string.Empty;
                     bin.AssignedDate = null;
                 }
                 else
@@ -747,7 +747,7 @@ public class SortingController : Controller
             bin.PartId = null;
             bin.ProductId = null;
             bin.WorkOrderId = null;
-            bin.Contents = null;
+            bin.Contents = string.Empty;
             bin.AssignedDate = null;
             bin.LastUpdatedDate = DateTime.UtcNow;
 

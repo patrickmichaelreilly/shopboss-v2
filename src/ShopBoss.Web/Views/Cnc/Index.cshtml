@@ -704,8 +704,15 @@ else
         document.getElementById('barcodeInput').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
+                e.stopPropagation();
                 processBarcodeFromModal();
             }
+        });
+
+        // Prevent form submission on enter key
+        document.getElementById('scanForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            processBarcodeFromModal();
         });
 
         // Auto-refresh recent scans when modal is opened
