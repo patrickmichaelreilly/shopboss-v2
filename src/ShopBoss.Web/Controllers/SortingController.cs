@@ -246,10 +246,15 @@ public class SortingController : Controller
                 await _auditTrail.LogScanAsync(cleanBarcode, station, false, 
                     "Cut part not found", workOrderId: activeWorkOrderId, 
                     sessionId: sessionId, ipAddress: ipAddress);
+
+                // Provide helpful suggestions for part not found
+                var suggestions = await GetScanErrorSuggestions(cleanBarcode, activeWorkOrderId);
+
                 return Json(new { 
                     success = false, 
                     message = $"Cut part with barcode '{cleanBarcode}' not found in active work order.", 
-                    type = "not_found"
+                    type = "not_found",
+                    suggestions = suggestions
                 });
             }
 
@@ -421,9 +426,12 @@ public class SortingController : Controller
                 .Include(p => p.NestSheet)
                 .CountAsync(p => p.NestSheet!.WorkOrderId == activeWorkOrderId && p.Status == PartStatus.Cut);
                 
+            // Check if any products became ready for assembly after this sort
+            var assemblyReadinessData = await CheckProductAssemblyReadiness(part.ProductId, activeWorkOrderId);
+
             return Json(new { 
                 success = true, 
-                message = $"✅ Part '{part.Name}' sorted successfully!\n{placementMessage}",
+                message = $"Part '{part.Name}' sorted successfully!",
                 partId = part.Id,
                 partName = part.Name,
                 productName = part.Product?.Name,
@@ -437,7 +445,8 @@ public class SortingController : Controller
                     occupiedBins = updatedRack?.OccupiedBins,
                     totalBins = updatedRack?.TotalBins
                 },
-                remainingCutParts = currentCutParts
+                remainingCutParts = currentCutParts,
+                assemblyReadiness = assemblyReadinessData
             });
         }
         catch (Exception ex)
@@ -755,6 +764,10 @@ public class SortingController : Controller
                 .Include(p => p.NestSheet)
                 .CountAsync(p => p.NestSheet!.WorkOrderId == activeWorkOrderId && p.Status == PartStatus.Cut);
 
+            // Get updated assembly ready count
+            var readyProducts = await GetProductsReadyForAssembly(activeWorkOrderId);
+            var assemblyReadyCount = readyProducts.Count;
+
             _logger.LogInformation("Bin {BinLabel} cleared - {PartsRemoved} parts removed and changed to Cut status", 
                 bin.BinLabel, partsRemoved);
 
@@ -762,7 +775,8 @@ public class SortingController : Controller
                 success = true, 
                 message = $"Bin {bin.BinLabel} cleared successfully.",
                 partsRemoved = partsRemoved,
-                updatedCutPartsCount = updatedCutPartsCount
+                updatedCutPartsCount = updatedCutPartsCount,
+                assemblyReadyCount = assemblyReadyCount
             });
         }
         catch (Exception ex)
@@ -770,5 +784,216 @@ public class SortingController : Controller
             _logger.LogError(ex, "Error clearing bin at rack {RackId} position {Row},{Column}", rackId, row, column);
             return Json(new { success = false, message = "An error occurred while clearing the bin." });
         }
+    }
+
+    // New methods for Phase 6C enhancements
+    public async Task<IActionResult> GetAssemblyReadiness()
+    {
+        try
+        {
+            var activeWorkOrderId = HttpContext.Session.GetString("ActiveWorkOrderId");
+            if (string.IsNullOrEmpty(activeWorkOrderId))
+            {
+                return Json(new { success = false, message = "No active work order selected." });
+            }
+
+            var readyProducts = await GetProductsReadyForAssembly(activeWorkOrderId);
+
+            return Json(new { success = true, products = readyProducts });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving assembly readiness data");
+            return Json(new { success = false, message = "Failed to load assembly readiness data." });
+        }
+    }
+
+    public async Task<IActionResult> GetAssemblyReadinessCount()
+    {
+        try
+        {
+            var activeWorkOrderId = HttpContext.Session.GetString("ActiveWorkOrderId");
+            if (string.IsNullOrEmpty(activeWorkOrderId))
+            {
+                return Json(new { success = false, count = 0 });
+            }
+
+            var readyProducts = await GetProductsReadyForAssembly(activeWorkOrderId);
+            return Json(new { success = true, count = readyProducts.Count });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving assembly readiness count");
+            return Json(new { success = false, count = 0 });
+        }
+    }
+
+    private async Task<object?> CheckProductAssemblyReadiness(string? productId, string workOrderId)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(productId))
+                return null;
+
+            var product = await _context.Products
+                .Include(p => p.Parts)
+                .FirstOrDefaultAsync(p => p.Id == productId && p.WorkOrderId == workOrderId);
+
+            if (product == null)
+                return null;
+
+            var totalParts = product.Parts.Count;
+            var sortedParts = product.Parts.Count(p => p.Status == PartStatus.Sorted);
+
+            var isReady = totalParts > 0 && sortedParts == totalParts;
+
+            if (isReady)
+            {
+                return new
+                {
+                    isReady = true,
+                    productId = product.Id,
+                    productName = product.Name,
+                    productNumber = product.ProductNumber,
+                    totalParts = totalParts,
+                    sortedParts = sortedParts,
+                    completedDate = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm")
+                };
+            }
+
+            return new { isReady = false };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error checking assembly readiness for product {ProductId}", productId);
+            return null;
+        }
+    }
+
+    private async Task<List<object>> GetProductsReadyForAssembly(string workOrderId)
+    {
+        var products = await _context.Products
+            .Include(p => p.Parts)
+            .Where(p => p.WorkOrderId == workOrderId)
+            .ToListAsync();
+
+        var readyProducts = new List<object>();
+
+        foreach (var product in products)
+        {
+            var totalParts = product.Parts.Count;
+            var sortedParts = product.Parts.Count(p => p.Status == PartStatus.Sorted);
+
+            if (totalParts > 0 && sortedParts == totalParts)
+            {
+                // Get rack locations for this product's parts
+                var rackLocations = await _context.Parts
+                    .Where(p => p.ProductId == product.Id && p.Status == PartStatus.Sorted)
+                    .Select(p => p.Location)
+                    .Where(l => !string.IsNullOrEmpty(l))
+                    .Distinct()
+                    .ToListAsync();
+
+                // Extract rack names from locations (format: "rackId-binLabel")
+                var rackNames = rackLocations
+                    .Where(l => l != null && l.Contains('-'))
+                    .Select(l => l!.Split('-')[0])
+                    .Distinct()
+                    .ToList();
+
+                var rackDisplayNames = new List<string>();
+                foreach (var rackId in rackNames)
+                {
+                    var rack = await _context.StorageRacks.FindAsync(rackId);
+                    if (rack != null)
+                    {
+                        rackDisplayNames.Add(rack.Name);
+                    }
+                }
+
+                readyProducts.Add(new
+                {
+                    id = product.Id,
+                    name = product.Name,
+                    productNumber = product.ProductNumber,
+                    workOrderName = (await _context.WorkOrders.FindAsync(workOrderId))?.Name ?? "Unknown",
+                    totalPartsCount = totalParts,
+                    sortedPartsCount = sortedParts,
+                    completedDate = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm"),
+                    rackLocations = rackDisplayNames
+                });
+            }
+        }
+
+        return readyProducts;
+    }
+
+    private async Task<List<string>> GetScanErrorSuggestions(string barcode, string workOrderId)
+    {
+        var suggestions = new List<string>();
+
+        try
+        {
+            // Check if part exists but in different status
+            var partInDifferentStatus = await _context.Parts
+                .Include(p => p.NestSheet)
+                .Include(p => p.Product)
+                .FirstOrDefaultAsync(p => p.NestSheet!.WorkOrderId == workOrderId && 
+                                         (p.Id == barcode || p.Name == barcode));
+
+            if (partInDifferentStatus != null)
+            {
+                switch (partInDifferentStatus.Status)
+                {
+                    case PartStatus.Pending:
+                        suggestions.Add("This part hasn't been cut yet. Process it at the CNC Station first.");
+                        break;
+                    case PartStatus.Sorted:
+                        suggestions.Add($"This part is already sorted to {partInDifferentStatus.Location}.");
+                        break;
+                    case PartStatus.Assembled:
+                        suggestions.Add("This part has already been assembled.");
+                        break;
+                    case PartStatus.Shipped:
+                        suggestions.Add("This part has already been shipped.");
+                        break;
+                }
+            }
+            else
+            {
+                // Check for similar part names
+                var similarParts = await _context.Parts
+                    .Include(p => p.NestSheet)
+                    .Where(p => p.NestSheet!.WorkOrderId == workOrderId && 
+                               p.Status == PartStatus.Cut &&
+                               (p.Name.Contains(barcode) || barcode.Contains(p.Name)))
+                    .Take(3)
+                    .Select(p => p.Name)
+                    .ToListAsync();
+
+                if (similarParts.Any())
+                {
+                    suggestions.Add($"Similar parts found: {string.Join(", ", similarParts)}");
+                }
+
+                suggestions.Add("Check the barcode is clear and try scanning again.");
+                suggestions.Add("Verify this part belongs to the current active work order.");
+            }
+
+            // General suggestions
+            if (!suggestions.Any())
+            {
+                suggestions.Add("Ensure the part has been cut at the CNC Station.");
+                suggestions.Add("Verify the barcode matches the part name or ID exactly.");
+                suggestions.Add("Check that the correct work order is active.");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error generating scan error suggestions for barcode {Barcode}", barcode);
+            suggestions.Add("Contact support if this problem persists.");
+        }
+
+        return suggestions;
     }
 }
