@@ -672,6 +672,13 @@ else
             
             // Setup SignalR connection for real-time updates
             signalRConnection = setupSignalRConnection();
+            
+            // Add modal cleanup event listeners
+            const binModal = document.getElementById('binDetailModal');
+            binModal.addEventListener('hidden.bs.modal', function() {
+                currentBinDetails = null;
+                cleanupModalState();
+            });
         });
 
         // SignalR real-time updates
@@ -1024,12 +1031,16 @@ else
                 if (data.success) {
                     showToast(`Part "${partName}" removed from bin successfully`, 'success');
                     
-                    // Refresh the bin details - delay to allow DOM updates
-                    setTimeout(() => {
-                        if (currentBinDetails) {
-                            showBinDetailModal(currentBinDetails.rackId, currentBinDetails.row, currentBinDetails.column, currentBinDetails.label);
+                    // Check if bin is now empty and close modal, otherwise refresh
+                    if (data.updatedCutPartsCount !== undefined) {
+                        // If the operation succeeded, check if we should close or refresh the modal
+                        const binModal = bootstrap.Modal.getInstance(document.getElementById('binDetailModal'));
+                        if (binModal) {
+                            binModal.hide();
                         }
-                    }, 100);
+                        // Clean up any stuck modal state
+                        cleanupModalState();
+                    }
                     
                     // Refresh the rack display
                     if (currentRackId) {
@@ -1048,6 +1059,30 @@ else
                 console.error('Error removing part from bin:', error);
                 showToast('An error occurred while removing the part', 'error');
             });
+        }
+
+        function cleanupModalState() {
+            // Force cleanup of any stuck modal state
+            setTimeout(() => {
+                // Remove any modal backdrops
+                const backdrops = document.querySelectorAll('.modal-backdrop');
+                backdrops.forEach(backdrop => backdrop.remove());
+                
+                // Reset body classes and styles
+                document.body.classList.remove('modal-open');
+                document.body.style.removeProperty('overflow');
+                document.body.style.removeProperty('padding-right');
+                
+                // Reset any modal instances
+                const modalElement = document.getElementById('binDetailModal');
+                if (modalElement) {
+                    modalElement.style.display = '';
+                    modalElement.classList.remove('show');
+                    modalElement.setAttribute('aria-hidden', 'true');
+                    modalElement.removeAttribute('aria-modal');
+                    modalElement.removeAttribute('role');
+                }
+            }, 250);
         }
 
         function clearEntireBin() {
@@ -1079,16 +1114,8 @@ else
                     const modal = bootstrap.Modal.getInstance(document.getElementById('binDetailModal'));
                     modal.hide();
                     
-                    // Force backdrop cleanup if it gets stuck
-                    setTimeout(() => {
-                        const backdrop = document.querySelector('.modal-backdrop');
-                        if (backdrop) {
-                            backdrop.remove();
-                        }
-                        document.body.classList.remove('modal-open');
-                        document.body.style.removeProperty('overflow');
-                        document.body.style.removeProperty('padding-right');
-                    }, 300);
+                    // Clean up modal state
+                    cleanupModalState();
                     
                     // Refresh the rack display
                     if (currentRackId) {

@@ -187,13 +187,11 @@ else
                         </div>
                     </div>
                     
-                    <!-- Hidden submit button for enter key support -->
-                    <button type="submit" style="display: none;" aria-hidden="true"></button>
                 </form>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="processBarcodeFromModal()">
+                <button type="submit" form="scanForm" class="btn btn-primary">
                     <i class="fas fa-cut me-2"></i>Process Nest Sheet
                 </button>
             </div>
@@ -320,6 +318,7 @@ else
         // Auto-focus barcode input when modal opens
         document.getElementById('scanModal').addEventListener('shown.bs.modal', function () {
             document.getElementById('barcodeInput').focus();
+            resetScanModal();
         });
 
         // Enhanced barcode validation with visual feedback
@@ -712,9 +711,10 @@ else
             }
         });
 
-        // Prevent form submission on enter key
+        // Handle form submission (both enter key and button click)
         document.getElementById('scanForm').addEventListener('submit', function(e) {
             e.preventDefault();
+            e.stopPropagation();
             processBarcodeFromModal();
         });
 

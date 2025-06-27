@@ -194,7 +194,7 @@ public class SortingRuleService
             var bin = await _context.Bins
                 .FirstOrDefaultAsync(b => b.StorageRackId == rackId && b.Row == row && b.Column == column);
 
-            if (bin == null || !bin.IsAvailable) return false;
+            if (bin == null || bin.Status == BinStatus.Blocked) return false;
 
             // Check if adding this part would exceed capacity
             var newTotalParts = bin.PartsCount + part.Qty;
