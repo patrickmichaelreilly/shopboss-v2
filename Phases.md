@@ -219,6 +219,45 @@ The core infrastructure is complete. This roadmap implements the remaining **use
 - [ ] Clear operator guidance
 - [ ] Integration with assembly station notifications
 
+### Phase 6D: Smart Part Filtering & Specialized Rack Routing (1.5 hours)
+
+**Prompt for Claude Code:**
+> **PHASE 6D:** Implement intelligent part filtering that automatically routes Doors, Drawer Fronts, and Adjustable Shelves to the specialized "Doors & Fronts Rack" instead of standard product racks. Maintain product grouping within the specialized rack so parts from the same product are stored together. Update the Bin Details modal to show Progress (parts scanned vs total carcass parts needed) instead of arbitrary capacity, ensuring the denominator reflects only carcass parts required for assembly readiness (excluding filtered parts).
+
+**Implementation Approach:**
+Create an extensible filtering system that can be easily expanded with additional keywords or rules in the future. For initial implementation, filter based on Part Name containing keywords: "door", "drawer front", or "adjustable shelf" (case-insensitive). Design the filtering logic as a configurable service that can accommodate future rule additions without code changes.
+
+**Technical Requirements:**
+- Extensible part classification service with keyword-based filtering
+- Part type detection logic examining Part.Name for target keywords
+- Automatic routing to appropriate rack types based on part classification
+- Product-based bin assignment within specialized racks
+- Updated assembly readiness calculation excluding filtered parts
+- Modified bin details modal with accurate progress tracking
+
+**Deliverables:**
+- [ ] Extensible `PartFilteringService` with configurable keyword rules
+- [ ] Part type classification system (Doors/Drawer Fronts/Adjustable Shelves vs Carcass Parts)
+- [ ] Initial keyword filtering: "door", "drawer front", "adjustable shelf" (case-insensitive)
+- [ ] Automatic rack routing logic based on part type classification
+- [ ] Product grouping within Doors & Fronts rack (same product parts → same bin)
+- [ ] Updated Bin Details modal showing Progress instead of Capacity
+- [ ] Assembly readiness calculation that accounts for filtered parts
+- [ ] Progress denominator reflecting only carcass parts needed for assembly
+- [ ] Enhanced sorting algorithm that handles multiple rack types intelligently
+
+**Integration Points:**
+- Integrate with existing `SortingRuleService` for rack assignment logic
+- Update `CheckProductAssemblyReadiness()` method to exclude filtered parts
+- Modify bin details modal in Sorting/Index.cshtml
+- Ensure SignalR updates reflect accurate progress across rack types
+
+**Future Extensibility:**
+- Design filtering service to accommodate additional keywords, regex patterns, or complex rules
+- Prepare architecture for potential database-driven filtering configuration
+
+This phase completes the sorting station's intelligent routing capabilities, ensuring parts flow to the appropriate processing streams while maintaining accurate assembly readiness tracking.
+
 ---
 
 ## Phase 7: Shop Tab - Assembly Station Interface (3-4 hours)

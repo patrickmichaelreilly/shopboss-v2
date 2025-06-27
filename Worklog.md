@@ -1951,3 +1951,131 @@ Phase 6C fully implements the real-time sorting interface as specified in the ro
 
 The system is ready for Phase 7 (Assembly Station Interface) development.
 **Impact:** Critical CNC Station functionality restored. The CNC Scan Nest Sheet modal now works identically to the proven Sorting Station Scan Part modal. This fix resolves a blocking issue that was preventing efficient CNC operations and demonstrates the value of comparing working vs broken implementations to identify root causes.
+
+---
+
+## Phase 6D: Smart Part Filtering & Specialized Rack Routing - COMPLETED
+**Date:** 2025-06-27  
+**Objective:** Implement intelligent part filtering that automatically routes Doors, Drawer Fronts, and Adjustable Shelves to specialized racks while maintaining product grouping and updating progress calculations to reflect carcass-only assembly readiness.
+
+### Completed Tasks
+
+#### 1. Extensible PartFilteringService Implementation
+**File:** `src/ShopBoss.Web/Services/PartFilteringService.cs`
+- Created configurable keyword-based filtering system for future extensibility
+- Implemented part classification: Doors, Drawer Fronts, Adjustable Shelves vs Carcass Parts
+- Added support for future rule additions without code changes
+- Provided detailed part routing information and processing stream classification
+
+**Key Methods:**
+- `ShouldFilterPart()` - Determines if part should be routed to specialized racks
+- `ClassifyPart()` - Enhanced part categorization with configurable keywords  
+- `GetCarcassPartsOnly()` - Filters parts for assembly readiness calculations
+- `GetPartFilterInfo()` - Detailed routing and classification information
+
+#### 2. Enhanced Sorting Logic Integration
+**Files Modified:**
+- `src/ShopBoss.Web/Services/SortingRuleService.cs` - Updated to use PartFilteringService
+- `src/ShopBoss.Web/Program.cs` - Added PartFilteringService to dependency injection
+
+**Routing Logic:**
+- Automatic classification of parts based on name keywords ("door", "drawer front", "adjustable shelf")
+- Intelligent rack routing: filtered parts → DoorsAndDrawerFronts/AdjustableShelves racks
+- Maintained product grouping within specialized racks (same product → same bin)
+- Preserved existing rack assignment preferences and manual overrides
+
+#### 3. Assembly Readiness Calculation Enhancement
+**Updated Methods in SortingRuleService:**
+- `CheckAssemblyReadinessAsync()` - Now excludes filtered parts from readiness calculation
+- `MarkProductReadyForAssemblyAsync()` - Validates only carcass parts for assembly
+
+**Key Improvement:**
+Products are now considered "ready for assembly" when ALL carcass parts are sorted, regardless of filtered parts status. Doors, drawer fronts, and adjustable shelves are processed in specialized streams and don't block assembly readiness.
+
+#### 4. Bin Details Modal Progress Enhancement
+**Files Modified:**
+- `src/ShopBoss.Web/Views/Sorting/Index.cshtml` - Changed "Capacity" to "Progress" labels
+- `src/ShopBoss.Web/Controllers/SortingController.cs` - Added enhanced progress calculation
+
+**New Progress Calculation:**
+- `CalculateBinProgressAsync()` - Calculates progress based on actual carcass parts needed vs arbitrary capacity
+- For product-assigned bins: Shows "sorted carcass parts / total carcass parts needed"
+- For unassigned bins: Falls back to existing capacity logic
+- Progress denominators now reflect only carcass parts required for assembly
+
+#### 5. Enhanced SortingController Integration
+**Added Features:**
+- Integrated PartFilteringService into controller dependency injection
+- Enhanced bin progress calculations with product-specific totals  
+- Updated GetRackDetails to provide accurate progress information
+- Maintained backward compatibility with existing functionality
+
+### Technical Implementation Details
+
+**Keyword-Based Filtering:**
+- Case-insensitive part name analysis
+- Configurable keywords: "door", "drawer front", "adjustable shelf"
+- Special logic for "panel" (only when combined with door/front context)
+- Extensible architecture for future rule additions
+
+**Rack Routing Logic:**
+- DoorsAndDrawerFronts parts → RackType.DoorsAndDrawerFronts
+- AdjustableShelves parts → RackType.AdjustableShelves  
+- Carcass parts → RackType.Standard
+- Maintained existing product grouping and capacity management
+
+**Progress Calculation Enhancement:**
+- Product-assigned bins show actual assembly progress
+- Excludes filtered parts from denominator calculation
+- Real-time updates reflect only carcass parts status
+- Fallback to capacity for unassigned bins
+
+### Integration Points Verified
+
+**Cross-Service Integration:**
+- PartFilteringService properly integrated with SortingRuleService
+- Assembly readiness calculations updated across all methods
+- Progress display synchronized between frontend and backend
+- Maintained SignalR real-time updates for enhanced progress
+
+**UI/UX Improvements:**
+- "Capacity" renamed to "Progress" in bin details modal
+- Progress tooltips updated to reflect new terminology
+- Enhanced bin progress accuracy for product-assigned bins
+- Maintained responsive design and existing styling
+
+### Success Criteria Achieved
+
+- [x] **Extensible PartFilteringService:** Configurable keyword rules with future expansion capability
+- [x] **Part type classification:** Automatic routing based on name analysis
+- [x] **Automatic rack routing:** Intelligent assignment to specialized racks
+- [x] **Product grouping:** Same-product parts grouped in specialized racks
+- [x] **Progress vs Capacity:** Bin details show actual assembly progress
+- [x] **Assembly readiness accuracy:** Calculation excludes filtered parts
+- [x] **Enhanced sorting algorithm:** Multiple rack type handling
+
+**Status:** COMPLETED
+
+### Architecture Improvements
+
+**Future Extensibility:**
+- PartFilteringService designed for database-driven configuration
+- Support for regex patterns and complex filtering rules
+- API endpoints ready for admin interface to manage keywords
+- Comprehensive logging for filtering decisions and routing
+
+**Performance Optimization:**
+- Efficient part classification with minimal database queries
+- Cached keyword matching for improved scan performance
+- Smart progress calculations only when bins are product-assigned
+- Maintained existing rack assignment optimization
+
+### Next Steps
+
+Phase 6D successfully completes the intelligent sorting system with specialized rack routing. The sorting station now:
+- Automatically routes doors, drawer fronts, and adjustable shelves to appropriate racks
+- Maintains product grouping within specialized racks
+- Shows accurate assembly progress based on carcass parts only
+- Provides extensible filtering for future enhancements
+
+The system is ready for Phase 7A (Assembly Station Interface) development, with enhanced assembly readiness detection that properly accounts for the filtering workflow.

@@ -15,15 +15,17 @@ public class SortingController : Controller
     private readonly IHubContext<StatusHub> _hubContext;
     private readonly AuditTrailService _auditTrail;
     private readonly SortingRuleService _sortingRules;
+    private readonly PartFilteringService _partFilteringService;
 
     public SortingController(ShopBossDbContext context, ILogger<SortingController> logger, 
-        IHubContext<StatusHub> hubContext, AuditTrailService auditTrail, SortingRuleService sortingRules)
+        IHubContext<StatusHub> hubContext, AuditTrailService auditTrail, SortingRuleService sortingRules, PartFilteringService partFilteringService)
     {
         _context = context;
         _logger = logger;
         _hubContext = hubContext;
         _auditTrail = auditTrail;
         _sortingRules = sortingRules;
+        _partFilteringService = partFilteringService;
     }
 
     public async Task<IActionResult> Index()
@@ -107,6 +109,9 @@ public class SortingController : Controller
                     }
                     else
                     {
+                        // Calculate enhanced progress information for this bin
+                        var (progressPartsCount, progressTotalNeeded, progressPercentage) = await CalculateBinProgressAsync(bin);
+                        
                         binRow.Add(new
                         {
                             id = bin.Id,
@@ -116,9 +121,9 @@ public class SortingController : Controller
                             status = bin.Status.ToString().ToLower(),
                             statusText = bin.Status.ToString(),
                             contents = bin.Contents,
-                            partsCount = bin.PartsCount,
-                            maxCapacity = bin.MaxCapacity,
-                            capacityPercentage = Math.Round(bin.CapacityPercentage, 1),
+                            partsCount = progressPartsCount,
+                            maxCapacity = progressTotalNeeded,
+                            capacityPercentage = Math.Round(progressPercentage, 1),
                             productName = bin.Product?.Name ?? "",
                             partName = bin.Part?.Name ?? "",
                             isAvailable = bin.IsAvailable,
@@ -995,5 +1000,60 @@ public class SortingController : Controller
         }
 
         return suggestions;
+    }
+
+    /// <summary>
+    /// Calculates enhanced progress information for a bin based on actual carcass parts needed vs. arbitrary capacity.
+    /// When a bin is assigned to a specific product, shows progress toward product completion.
+    /// </summary>
+    private async Task<(int partsCount, int totalNeeded, double progressPercentage)> CalculateBinProgressAsync(Bin bin)
+    {
+        if (string.IsNullOrEmpty(bin.ProductId))
+        {
+            // No product assigned - use existing capacity logic
+            return (bin.PartsCount, bin.MaxCapacity, bin.CapacityPercentage);
+        }
+
+        try
+        {
+            // Get the product and its carcass parts (excluding filtered parts)
+            var product = await _context.Products
+                .Include(p => p.Parts)
+                .FirstOrDefaultAsync(p => p.Id == bin.ProductId);
+
+            if (product == null)
+            {
+                return (bin.PartsCount, bin.MaxCapacity, bin.CapacityPercentage);
+            }
+
+            // Get only carcass parts for this product (exclude doors, drawer fronts, adjustable shelves)
+            var carcassParts = _partFilteringService.GetCarcassPartsOnly(product.Parts);
+            
+            // Calculate total carcass parts needed for this product
+            var totalCarcassPartsNeeded = carcassParts.Sum(p => p.Qty);
+            
+            // Count how many carcass parts have been sorted for this product
+            var sortedCarcassPartsCount = carcassParts
+                .Where(p => p.Status == PartStatus.Sorted)
+                .Sum(p => p.Qty);
+
+            // Calculate progress percentage
+            var progressPercentage = totalCarcassPartsNeeded > 0 
+                ? (double)sortedCarcassPartsCount / totalCarcassPartsNeeded * 100
+                : 0;
+
+            _logger.LogDebug("Product {ProductId} progress: {SortedParts}/{TotalParts} carcass parts ({Progress}%)", 
+                bin.ProductId, sortedCarcassPartsCount, totalCarcassPartsNeeded, Math.Round(progressPercentage, 1));
+
+            return (sortedCarcassPartsCount, totalCarcassPartsNeeded, progressPercentage);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error calculating bin progress for bin {BinId} and product {ProductId}", 
+                bin.Id, bin.ProductId);
+            
+            // Fallback to existing capacity logic
+            return (bin.PartsCount, bin.MaxCapacity, bin.CapacityPercentage);
+        }
     }
 }

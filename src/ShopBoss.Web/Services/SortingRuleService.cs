@@ -8,11 +8,13 @@ public class SortingRuleService
 {
     private readonly ShopBossDbContext _context;
     private readonly ILogger<SortingRuleService> _logger;
+    private readonly PartFilteringService _partFilteringService;
 
-    public SortingRuleService(ShopBossDbContext context, ILogger<SortingRuleService> logger)
+    public SortingRuleService(ShopBossDbContext context, ILogger<SortingRuleService> logger, PartFilteringService partFilteringService)
     {
         _context = context;
         _logger = logger;
+        _partFilteringService = partFilteringService;
     }
 
     public async Task<(string? RackId, int? Row, int? Column, string Message)> FindOptimalBinForPartAsync(string partId, string workOrderId, string? preferredRackId = null)
@@ -51,9 +53,9 @@ public class SortingRuleService
             }
             else
             {
-                // Original logic for finding suitable racks based on part type
-                var partCategory = DeterminePartCategory(part);
-                var preferredRackType = GetPreferredRackType(partCategory);
+                // Use enhanced PartFilteringService for better extensibility
+                var partCategory = _partFilteringService.ClassifyPart(part);
+                var preferredRackType = _partFilteringService.GetPreferredRackType(partCategory);
 
                 suitableRacks = await _context.StorageRacks
                     .Include(r => r.Bins)
@@ -70,7 +72,7 @@ public class SortingRuleService
 
                 if (!suitableRacks.Any())
                 {
-                    return (null, null, null, $"No suitable racks available for {DeterminePartCategory(part)} parts");
+                    return (null, null, null, $"No suitable racks available for {partCategory} parts");
                 }
             }
 
@@ -136,50 +138,6 @@ public class SortingRuleService
         return Task.FromResult<Bin?>(null);
     }
 
-    private PartCategory DeterminePartCategory(Part part)
-    {
-        var partName = part.Name.ToLower();
-        
-        // Check for doors and drawer fronts
-        if (partName.Contains("door") || 
-            partName.Contains("drawer front") || 
-            partName.Contains("panel") && (partName.Contains("door") || partName.Contains("front")))
-        {
-            return PartCategory.DoorsAndDrawerFronts;
-        }
-
-        // Check for adjustable shelves
-        if (partName.Contains("adjustable") || 
-            partName.Contains("shelf") && partName.Contains("adj"))
-        {
-            return PartCategory.AdjustableShelves;
-        }
-
-        // Check for hardware (though hardware typically doesn't go in part bins)
-        if (partName.Contains("hinge") || 
-            partName.Contains("handle") || 
-            partName.Contains("knob") ||
-            partName.Contains("screw") ||
-            partName.Contains("bracket"))
-        {
-            return PartCategory.Hardware;
-        }
-
-        // Default to carcass parts (sides, backs, tops, bottoms, etc.)
-        return PartCategory.Carcass;
-    }
-
-    private RackType GetPreferredRackType(PartCategory category)
-    {
-        return category switch
-        {
-            PartCategory.DoorsAndDrawerFronts => RackType.DoorsAndDrawerFronts,
-            PartCategory.AdjustableShelves => RackType.AdjustableShelves,
-            PartCategory.Hardware => RackType.Hardware,
-            PartCategory.Carcass => RackType.Standard,
-            _ => RackType.Standard
-        };
-    }
 
     public async Task<bool> AssignPartToBinAsync(string partId, string rackId, int row, int column, string workOrderId)
     {
@@ -288,14 +246,27 @@ public class SortingRuleService
 
             foreach (var product in products)
             {
-                // Check if all parts for this product are sorted
-                var allPartsSorted = product.Parts.All(part => part.Status == PartStatus.Sorted);
+                // Only consider carcass parts for assembly readiness - filtered parts (doors, drawer fronts, adjustable shelves) 
+                // are processed in specialized streams and don't determine carcass assembly readiness
+                var carcassParts = _partFilteringService.GetCarcassPartsOnly(product.Parts);
                 
-                if (allPartsSorted && product.Parts.Any())
+                if (!carcassParts.Any())
+                {
+                    // Product has no carcass parts, skip assembly readiness check
+                    continue;
+                }
+
+                // Check if all carcass parts for this product are sorted
+                var allCarcassPartsSorted = carcassParts.All(part => part.Status == PartStatus.Sorted);
+                
+                if (allCarcassPartsSorted)
                 {
                     readyProducts.Add(product.Id);
-                    _logger.LogInformation("Product {ProductId} ({ProductName}) is ready for assembly - all {PartCount} parts are sorted", 
-                        product.Id, product.Name, product.Parts.Count);
+                    
+                    var filteredParts = _partFilteringService.GetFilteredParts(product.Parts);
+                    _logger.LogInformation("Product {ProductId} ({ProductName}) is ready for assembly - all {CarcassPartCount} carcass parts are sorted. " +
+                                         "Filtered parts: {FilteredPartCount} (doors/fronts/shelves processed separately)",
+                        product.Id, product.Name, carcassParts.Count, filteredParts.Count);
                 }
             }
 
@@ -322,12 +293,13 @@ public class SortingRuleService
                 return false;
             }
 
-            // Verify all parts are actually sorted
-            var allPartsSorted = product.Parts.All(part => part.Status == PartStatus.Sorted);
+            // Verify all carcass parts are actually sorted (filtered parts processed separately)
+            var carcassParts = _partFilteringService.GetCarcassPartsOnly(product.Parts);
+            var allCarcassPartsSorted = carcassParts.All(part => part.Status == PartStatus.Sorted);
             
-            if (!allPartsSorted)
+            if (!allCarcassPartsSorted)
             {
-                _logger.LogWarning("Cannot mark product {ProductId} as ready - not all parts are sorted", productId);
+                _logger.LogWarning("Cannot mark product {ProductId} as ready - not all carcass parts are sorted", productId);
                 return false;
             }
 

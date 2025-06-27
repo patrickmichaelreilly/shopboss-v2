@@ -399,7 +399,7 @@ else
             if (bin.productName) tooltip += `\nProduct: ${bin.productName}`;
             if (bin.assignedDate) tooltip += `\nAssigned: ${bin.assignedDate}`;
             if (bin.notes) tooltip += `\nNotes: ${bin.notes}`;
-            tooltip += `\nCapacity: ${bin.partsCount}/${bin.maxCapacity} (${bin.capacityPercentage}%)`;
+            tooltip += `\nProgress: ${bin.partsCount}/${bin.maxCapacity} (${bin.capacityPercentage}%)`;
             
             return tooltip;
         }
@@ -1059,7 +1059,7 @@ else
                             <tr><td><strong>Label:</strong></td><td>${bin.label}</td></tr>
                             <tr><td><strong>Position:</strong></td><td>Row ${bin.row}, Column ${bin.column}</td></tr>
                             <tr><td><strong>Status:</strong></td><td><span class="badge bg-${getBinStatusBadgeClass(bin.status)}">${bin.statusText}</span></td></tr>
-                            <tr><td><strong>Capacity:</strong></td><td>${bin.partsCount}/${bin.maxCapacity} parts (${bin.capacityPercentage}%)</td></tr>
+                            <tr><td><strong>Progress:</strong></td><td>${bin.partsCount}/${bin.maxCapacity} parts (${bin.capacityPercentage}%)</td></tr>
                         </table>
                     </div>
                     <div class="col-md-6">

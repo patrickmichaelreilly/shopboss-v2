@@ -29,6 +29,7 @@ builder.Services.AddScoped<ColumnMappingService>();
 builder.Services.AddScoped<ImportSelectionService>();
 builder.Services.AddScoped<AuditTrailService>();
 builder.Services.AddScoped<SortingRuleService>();
+builder.Services.AddScoped<PartFilteringService>();
 
 var app = builder.Build();
 
