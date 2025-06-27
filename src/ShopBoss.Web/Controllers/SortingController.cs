@@ -160,6 +160,52 @@ public class SortingController : Controller
         }
     }
 
+    public async Task<IActionResult> GetRackOccupancy(string id)
+    {
+        try
+        {
+            var rack = await _sortingRules.GetRackWithBinsAsync(id);
+            if (rack == null)
+            {
+                return Json(new { success = false });
+            }
+            
+            return Json(new { 
+                success = true, 
+                occupiedBins = rack.OccupiedBins,
+                totalBins = rack.TotalBins 
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving rack occupancy for {RackId}", id);
+            return Json(new { success = false });
+        }
+    }
+
+    public async Task<IActionResult> GetCurrentCutPartsCount()
+    {
+        try
+        {
+            var activeWorkOrderId = HttpContext.Session.GetString("ActiveWorkOrderId");
+            if (string.IsNullOrEmpty(activeWorkOrderId))
+            {
+                return Json(new { success = false, count = 0 });
+            }
+
+            var cutPartsCount = await _context.Parts
+                .Include(p => p.NestSheet)
+                .CountAsync(p => p.NestSheet!.WorkOrderId == activeWorkOrderId && p.Status == PartStatus.Cut);
+
+            return Json(new { success = true, count = cutPartsCount });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving current cut parts count");
+            return Json(new { success = false, count = 0 });
+        }
+    }
+
     [HttpPost]
     public async Task<IActionResult> ScanPart(string barcode)
     {
@@ -289,6 +335,32 @@ public class SortingController : Controller
                     timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss")
                 });
 
+            // Send rack occupancy update for real-time badge refresh
+            var updatedRack = await _sortingRules.GetRackWithBinsAsync(rackId);
+            if (updatedRack != null)
+            {
+                await _hubContext.Clients.Group("sorting-station")
+                    .SendAsync("RackOccupancyUpdate", new
+                    {
+                        rackId = rackId,
+                        occupiedBins = updatedRack.OccupiedBins,
+                        totalBins = updatedRack.TotalBins,
+                        timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss")
+                    });
+            }
+
+            // Send cut parts count update
+            var currentCutParts = await _context.Parts
+                .Include(p => p.NestSheet)
+                .CountAsync(p => p.NestSheet!.WorkOrderId == activeWorkOrderId && p.Status == PartStatus.Cut);
+                
+            await _hubContext.Clients.Group("sorting-station")
+                .SendAsync("CutPartsCountUpdate", new
+                {
+                    count = currentCutParts,
+                    timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss")
+                });
+
             // Check for assembly readiness after successful part sorting
             try
             {
@@ -344,6 +416,11 @@ public class SortingController : Controller
             _logger.LogInformation("Successfully sorted part {PartId} ({PartName}) to rack {RackId} bin {BinLabel} via barcode {Barcode}", 
                 part.Id, part.Name, rackId, updateData.binLabel, cleanBarcode);
 
+            // Get remaining cut parts count
+            var remainingCutParts = await _context.Parts
+                .Include(p => p.NestSheet)
+                .CountAsync(p => p.NestSheet!.WorkOrderId == activeWorkOrderId && p.Status == PartStatus.Cut);
+                
             return Json(new { 
                 success = true, 
                 message = $"✅ Part '{part.Name}' sorted successfully!\n{placementMessage}",
@@ -353,7 +430,14 @@ public class SortingController : Controller
                 rackId = rackId,
                 binLabel = updateData.binLabel,
                 placementMessage = placementMessage,
-                type = "success"
+                type = "success",
+                updatedRackOccupancy = new
+                {
+                    rackId = rackId,
+                    occupiedBins = updatedRack?.OccupiedBins,
+                    totalBins = updatedRack?.TotalBins
+                },
+                remainingCutParts = currentCutParts
             });
         }
         catch (Exception ex)

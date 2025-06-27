@@ -26,8 +26,8 @@
         <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#scanModal">
             <i class="fas fa-barcode me-2"></i>Scan Part
         </button>
-        <button type="button" class="btn btn-outline-info" onclick="loadCutParts()">
-            <i class="fas fa-list me-2"></i>Cut Parts (@ViewBag.CutPartsCount)
+        <button type="button" class="btn btn-outline-info" onclick="loadCutParts()" id="cutPartsButton">
+            <i class="fas fa-list me-2"></i>Cut Parts (<span id="cutPartsCount">@ViewBag.CutPartsCount</span>)
         </button>
     </div>
 </div>
@@ -90,7 +90,7 @@ else
                                         onclick="loadRackDetails('@rack.Id')">
                                     <i class="@rackTypeIcon me-2"></i>
                                     @rack.Name
-                                    <span class="badge bg-@rackTypeColor ms-2">@rack.OccupiedBins/@rack.TotalBins</span>
+                                    <span class="badge bg-@rackTypeColor ms-2" id="rack-@rack.Id-badge">@rack.OccupiedBins/@rack.TotalBins</span>
                                     @if (rack.IsPortable)
                                     {
                                         <i class="fas fa-dolly ms-1 text-muted" title="Portable"></i>
@@ -206,43 +206,10 @@ else
     <script src="~/lib/signalr/dist/browser/signalr.js"></script>
     <script>
         let currentRackId = null;
+        let currentCutPartsCount = @ViewBag.CutPartsCount;
 
-        // Initialize SignalR connection
-        const connection = new signalR.HubConnectionBuilder()
-            .withUrl("/hubs/status")
-            .build();
-
-        // Start SignalR connection
-        connection.start().then(function () {
-            console.log("SignalR connected");
-            
-            // Join sorting station group for real-time updates
-            connection.invoke("JoinSortingGroup");
-            
-            // Join work order group if active work order is set
-            const activeWorkOrderId = '@ViewBag.ActiveWorkOrderId';
-            if (activeWorkOrderId) {
-                connection.invoke("JoinWorkOrderGroup", activeWorkOrderId);
-            }
-        }).catch(function (err) {
-            console.error("SignalR connection error:", err.toString());
-        });
-
-        // Handle real-time status updates
-        connection.on("StatusUpdate", function (data) {
-            if (data.type === "part-sorted") {
-                showToast(`Part "${data.partName}" sorted to ${data.binLabel}!`, 'success');
-                
-                // Refresh current rack if it matches the updated rack
-                if (currentRackId === data.rackId) {
-                    loadRackDetails(currentRackId);
-                }
-            }
-        });
-
-        connection.on("PartSorted", function (data) {
-            showToast(`Part "${data.partName}" sorted successfully!`, 'success');
-        });
+        // Global SignalR connection
+        let signalRConnection = null;
 
         // Load rack details and display grid
         function loadRackDetails(rackId) {
@@ -403,6 +370,17 @@ else
                     updateScanFeedback(`✅ ${data.message}`, 'text-success');
                     showPlacementGuidance(data.placementMessage);
                     
+                    // Update rack badge and cut parts count immediately
+                    if (data.updatedRackOccupancy) {
+                        updateRackBadge(data.updatedRackOccupancy.rackId, 
+                                       data.updatedRackOccupancy.occupiedBins, 
+                                       data.updatedRackOccupancy.totalBins);
+                    }
+                    
+                    if (data.remainingCutParts !== undefined) {
+                        updateCutPartsCount(data.remainingCutParts);
+                    }
+                    
                     // Close modal after delay
                     setTimeout(() => {
                         const modal = bootstrap.Modal.getInstance(document.getElementById('scanModal'));
@@ -470,6 +448,15 @@ else
             `;
             
             modal.show();
+            
+            // Refresh cut parts count when modal opens
+            fetch('/Sorting/GetCurrentCutPartsCount')
+                .then(response => response.json())
+                .then(countData => {
+                    if (countData.success) {
+                        updateCutPartsCount(countData.count);
+                    }
+                });
             
             fetch('/Sorting/GetCutParts')
                 .then(response => response.json())
@@ -626,13 +613,14 @@ else
             }
             
             // Setup SignalR connection for real-time updates
-            setupSignalRConnection();
+            signalRConnection = setupSignalRConnection();
         });
 
         // SignalR real-time updates
         function setupSignalRConnection() {
             const connection = new signalR.HubConnectionBuilder()
                 .withUrl("/hubs/status")
+                .withAutomaticReconnect()
                 .build();
 
             connection.start().then(function () {
@@ -649,17 +637,32 @@ else
                 
             }).catch(function (err) {
                 console.error("SignalR Connection Error: " + err.toString());
+                // Retry connection in 5 seconds
+                setTimeout(() => setupSignalRConnection(), 5000);
             });
 
             // Handle part sorted updates
             connection.on("PartSorted", function (data) {
+                console.log("PartSorted event received:", data);
                 showToast(`Part '${data.partName}' sorted to ${data.binLabel}`, 'success');
                 
-                // Refresh current rack if it's the updated one
-                const currentRackId = getCurrentlySelectedRackId();
-                if (currentRackId === data.rackId) {
-                    loadRackDetails(data.rackId);
+                // Always refresh current rack to ensure consistency
+                if (currentRackId) {
+                    console.log(`Refreshing rack ${currentRackId} due to PartSorted event`);
+                    loadRackDetails(currentRackId);
                 }
+            });
+
+            // Handle rack occupancy updates (real-time badge updates)
+            connection.on("RackOccupancyUpdate", function (data) {
+                console.log("RackOccupancyUpdate event received:", data);
+                updateRackBadge(data.rackId, data.occupiedBins, data.totalBins);
+            });
+
+            // Handle cut parts count updates (real-time count updates)
+            connection.on("CutPartsCountUpdate", function (data) {
+                console.log("CutPartsCountUpdate event received:", data);
+                updateCutPartsCount(data.count);
             });
 
             // Handle product ready for assembly notifications
@@ -667,20 +670,48 @@ else
                 showAssemblyReadyNotification(data);
             });
 
-            // Handle status updates
+            // Handle status updates with enhanced logging
             connection.on("StatusUpdate", function (data) {
+                console.log("StatusUpdate event received:", data);
                 if (data.type === "part-sorted") {
-                    // Update UI as needed
-                    console.log("Part sorted update:", data);
+                    // Force refresh current rack for any part-sorted update
+                    if (currentRackId) {
+                        console.log(`Refreshing rack ${currentRackId} due to StatusUpdate`);
+                        loadRackDetails(currentRackId);
+                    }
+                    
+                    // Update rack badge if rack info is available
+                    if (data.rackId) {
+                        refreshRackBadge(data.rackId);
+                    }
                 }
             });
 
             // Connection closed handler
             connection.onclose(function () {
                 console.log("SignalR Connection Closed");
-                // Attempt to reconnect after 5 seconds
-                setTimeout(() => setupSignalRConnection(), 5000);
+                showToast("Connection lost - attempting to reconnect...", 'warning');
             });
+
+            // Reconnection handlers
+            connection.onreconnecting(function () {
+                console.log("SignalR Reconnecting...");
+                showToast("Reconnecting to server...", 'info');
+            });
+
+            connection.onreconnected(function () {
+                console.log("SignalR Reconnected");
+                showToast("Reconnected to server", 'success');
+                
+                // Rejoin groups after reconnection
+                connection.invoke("JoinGroup", "sorting-station").catch(err => console.error(err));
+                const activeWorkOrderId = '@ViewBag.ActiveWorkOrderId';
+                if (activeWorkOrderId) {
+                    connection.invoke("JoinGroup", `workorder-${activeWorkOrderId}`).catch(err => console.error(err));
+                }
+            });
+
+            return connection;
         }
 
         function getCurrentlySelectedRackId() {
@@ -689,6 +720,37 @@ else
                 return activeTab.id.split('-')[1];
             }
             return null;
+        }
+
+        function updateRackBadge(rackId, occupiedBins, totalBins) {
+            const badge = document.querySelector(`#rack-${rackId}-badge`);
+            if (badge) {
+                badge.textContent = `${occupiedBins}/${totalBins}`;
+                console.log(`Updated rack ${rackId} badge to ${occupiedBins}/${totalBins}`);
+            } else {
+                console.warn(`Badge not found for rack ${rackId}`);
+            }
+        }
+
+        function refreshRackBadge(rackId) {
+            fetch(`/Sorting/GetRackOccupancy/${rackId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        updateRackBadge(rackId, data.occupiedBins, data.totalBins);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching rack occupancy:', error);
+                });
+        }
+
+        function updateCutPartsCount(count) {
+            currentCutPartsCount = count;
+            const countElement = document.getElementById('cutPartsCount');
+            if (countElement) {
+                countElement.textContent = count;
+            }
         }
 
         function showAssemblyReadyNotification(data) {
