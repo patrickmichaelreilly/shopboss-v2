@@ -113,6 +113,12 @@
             Active Work Order: <strong>@Model.WorkOrder.Name</strong>
         </p>
     </div>
+    <div>
+        <button type="button" class="btn btn-primary btn-lg" onclick="openScanModal()">
+            <i class="fas fa-barcode me-2"></i>
+            Scan Part to Assemble
+        </button>
+    </div>
     <div class="text-end">
         <div class="row g-2">
             <div class="col">
@@ -340,6 +346,63 @@
     </div>
 }
 
+<!-- Barcode Scan Modal -->
+<div class="modal fade" id="assemblyScanModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-barcode me-2"></i>
+                    Scan Part to Assemble Product
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="assemblyScanForm">
+                    <div class="mb-3">
+                        <label for="assemblyBarcodeInput" class="form-label">Part Barcode or Nest Sheet Name</label>
+                        <input type="text" class="form-control form-control-lg" id="assemblyBarcodeInput" 
+                               placeholder="Scan or enter barcode..." autocomplete="off">
+                        <div class="form-text">
+                            Scan any part from a ready product to mark the entire product as assembled.
+                        </div>
+                    </div>
+                    <div id="assemblyScanStatus" class="alert" style="display: none;"></div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="processScanForAssembly()">
+                    <i class="fas fa-tools me-1"></i>Assemble Product
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filtered Parts Guidance Modal -->
+<div class="modal fade" id="filteredPartsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-map-marker-alt me-2"></i>
+                    Next Steps: Collect Finishing Components
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="filteredPartsContent">
+                <!-- Content will be populated dynamically -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">
+                    <i class="fas fa-check me-1"></i>Got it!
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Product Details Modal -->
 <div class="modal fade" id="productDetailsModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
@@ -385,6 +448,14 @@
         // Listen for product assembly notifications
         connection.on("ProductAssembled", function (data) {
             showToast(`Product "${data.ProductName}" has been assembled!`, 'success');
+            setTimeout(() => {
+                location.reload(); // Refresh to show updated status
+            }, 2000);
+        });
+
+        // Listen for barcode scan assembly notifications
+        connection.on("ProductAssembledByScan", function (data) {
+            showToast(`🔧 Product "${data.ProductName}" assembled via scan!`, 'success');
             setTimeout(() => {
                 location.reload(); // Refresh to show updated status
             }, 2000);
@@ -579,6 +650,169 @@
             toastElement.addEventListener('hidden.bs.toast', () => {
                 toastElement.remove();
             });
+        }
+
+        // Barcode scanning functions
+        function openScanModal() {
+            const modal = new bootstrap.Modal(document.getElementById('assemblyScanModal'));
+            resetScanModal();
+            modal.show();
+        }
+
+        function resetScanModal() {
+            document.getElementById('assemblyBarcodeInput').value = '';
+            document.getElementById('assemblyScanStatus').style.display = 'none';
+            document.getElementById('assemblyBarcodeInput').classList.remove('is-invalid', 'is-valid');
+        }
+
+        // Auto-focus on barcode input when modal opens
+        document.getElementById('assemblyScanModal').addEventListener('shown.bs.modal', function () {
+            document.getElementById('assemblyBarcodeInput').focus();
+        });
+
+        // Handle Enter key in barcode input
+        document.getElementById('assemblyBarcodeInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                processScanForAssembly();
+            }
+        });
+
+        function processScanForAssembly() {
+            const barcodeInput = document.getElementById('assemblyBarcodeInput');
+            const barcode = barcodeInput.value.trim();
+            const statusDiv = document.getElementById('assemblyScanStatus');
+
+            if (!barcode) {
+                showScanStatus('Please enter a barcode', 'danger');
+                barcodeInput.focus();
+                return;
+            }
+
+            showScanStatus('🔍 Processing barcode scan...', 'info', true);
+
+            fetch('/Assembly/ScanPartForAssembly', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    barcode: barcode
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showScanStatus(data.message, 'success');
+                    barcodeInput.classList.add('is-valid');
+                    barcodeInput.classList.remove('is-invalid');
+                    
+                    // Show filtered parts guidance if needed
+                    if (data.hasFilteredParts && data.filteredPartsGuidance.length > 0) {
+                        setTimeout(() => {
+                            showFilteredPartsGuidance(data.productName, data.filteredPartsGuidance);
+                            bootstrap.Modal.getInstance(document.getElementById('assemblyScanModal')).hide();
+                        }, 2000);
+                    } else {
+                        setTimeout(() => {
+                            bootstrap.Modal.getInstance(document.getElementById('assemblyScanModal')).hide();
+                            location.reload();
+                        }, 2000);
+                    }
+                } else {
+                    showScanStatus(`❌ ${data.message}`, 'danger');
+                    barcodeInput.classList.add('is-invalid');
+                    barcodeInput.classList.remove('is-valid');
+                }
+            })
+            .catch(error => {
+                console.error('Error processing scan:', error);
+                showScanStatus('❌ Error processing scan', 'danger');
+                barcodeInput.classList.add('is-invalid');
+            });
+        }
+
+        function showScanStatus(message, type, isLoading = false) {
+            const statusDiv = document.getElementById('assemblyScanStatus');
+            statusDiv.className = `alert alert-${type}`;
+            statusDiv.style.display = 'block';
+            
+            if (isLoading) {
+                statusDiv.innerHTML = `<i class="fas fa-spinner fa-spin me-2"></i>${message}`;
+            } else {
+                statusDiv.innerHTML = message;
+            }
+        }
+
+        function showFilteredPartsGuidance(productName, filteredParts) {
+            const modal = new bootstrap.Modal(document.getElementById('filteredPartsModal'));
+            const content = document.getElementById('filteredPartsContent');
+            
+            let html = `
+                <div class="alert alert-success mb-3">
+                    <h6><i class="fas fa-check-circle me-2"></i>Carcass Assembly Complete!</h6>
+                    <p class="mb-0">Product "<strong>${productName}</strong>" carcass is assembled. Now collect these finishing components:</p>
+                </div>
+            `;
+
+            // Group by category
+            const categories = {};
+            filteredParts.forEach(part => {
+                if (!categories[part.Category]) {
+                    categories[part.Category] = [];
+                }
+                categories[part.Category].push(part);
+            });
+
+            Object.keys(categories).forEach(category => {
+                const categoryIcon = category === 'DoorsAndDrawerFronts' ? 'fa-door-open' : 
+                                   category === 'AdjustableShelves' ? 'fa-th-large' : 'fa-cube';
+                
+                html += `
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h6 class="mb-0">
+                                <i class="fas ${categoryIcon} me-2"></i>
+                                ${category.replace(/([A-Z])/g, ' $1').trim()}
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                `;
+
+                categories[category].forEach(part => {
+                    html += `
+                        <div class="col-md-6 mb-2">
+                            <div class="d-flex justify-content-between align-items-center p-2 bg-light rounded">
+                                <div>
+                                    <strong>${part.Name}</strong>
+                                    <br>
+                                    <small class="text-muted">Qty: ${part.Quantity}</small>
+                                </div>
+                                <div class="text-end">
+                                    <span class="badge bg-info">${part.Location}</span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                html += `
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += `
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Next Steps:</strong> Collect the components above from their rack locations and complete the final assembly.
+                </div>
+            `;
+
+            content.innerHTML = html;
+            modal.show();
         }
     </script>
 }

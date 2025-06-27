@@ -155,6 +155,146 @@ public class AssemblyController : Controller
     }
 
     [HttpPost]
+    public async Task<IActionResult> ScanPartForAssembly(string barcode)
+    {
+        try
+        {
+            var activeWorkOrderId = HttpContext.Session.GetString("ActiveWorkOrderId");
+            if (string.IsNullOrEmpty(activeWorkOrderId))
+            {
+                return Json(new { success = false, message = "No active work order selected" });
+            }
+
+            // Validate barcode input
+            if (string.IsNullOrWhiteSpace(barcode))
+            {
+                return Json(new { success = false, message = "Please enter a valid barcode" });
+            }
+
+            barcode = barcode.Trim();
+
+            // Find the part by barcode in the active work order
+            var part = await _context.Parts
+                .Include(p => p.Product)
+                    .ThenInclude(pr => pr.Parts)
+                .Include(p => p.NestSheet)
+                .FirstOrDefaultAsync(p => p.Product.WorkOrderId == activeWorkOrderId && 
+                                    (p.NestSheet.Barcode == barcode || p.NestSheet.Name == barcode));
+
+            if (part == null)
+            {
+                // Try finding by part name as fallback
+                part = await _context.Parts
+                    .Include(p => p.Product)
+                        .ThenInclude(pr => pr.Parts)
+                    .Include(p => p.NestSheet)
+                    .FirstOrDefaultAsync(p => p.Product.WorkOrderId == activeWorkOrderId && 
+                                        p.Name.ToLower().Contains(barcode.ToLower()));
+
+                if (part == null)
+                {
+                    return Json(new { 
+                        success = false, 
+                        message = $"Part with barcode '{barcode}' not found in active work order" 
+                    });
+                }
+            }
+
+            // Check if the part belongs to a product that's ready for assembly
+            var carcassParts = _partFilteringService.GetCarcassPartsOnly(part.Product.Parts);
+            var allCarcassPartsSorted = carcassParts.All(p => p.Status == PartStatus.Sorted);
+
+            if (!allCarcassPartsSorted)
+            {
+                var sortedCount = carcassParts.Count(p => p.Status == PartStatus.Sorted);
+                return Json(new { 
+                    success = false, 
+                    message = $"Product '{part.Product.Name}' is not ready for assembly. Only {sortedCount}/{carcassParts.Count} carcass parts are sorted." 
+                });
+            }
+
+            // Check if product is already assembled
+            var alreadyAssembled = carcassParts.All(p => p.Status == PartStatus.Assembled);
+            if (alreadyAssembled)
+            {
+                return Json(new { 
+                    success = false, 
+                    message = $"Product '{part.Product.Name}' is already assembled" 
+                });
+            }
+
+            // Mark all carcass parts as assembled
+            var assembledParts = 0;
+            foreach (var carcassPart in carcassParts)
+            {
+                if (carcassPart.Status == PartStatus.Sorted)
+                {
+                    carcassPart.Status = PartStatus.Assembled;
+                    carcassPart.StatusUpdatedDate = DateTime.UtcNow;
+                    assembledParts++;
+
+                    // Log the status change
+                    await _auditTrailService.LogAsync(
+                        entityType: "Part",
+                        entityId: carcassPart.Id,
+                        action: "PartScannedForAssembly",
+                        details: $"Part status changed from Sorted to Assembled via barcode scan (scanned: {barcode})",
+                        oldValue: "Sorted",
+                        newValue: "Assembled",
+                        sessionId: HttpContext.Session.Id
+                    );
+                }
+            }
+
+            await _context.SaveChangesAsync();
+
+            // Get filtered parts locations for guidance
+            var filteredParts = _partFilteringService.GetFilteredParts(part.Product.Parts);
+            var filteredPartsGuidance = filteredParts
+                .Where(fp => fp.Status == PartStatus.Sorted)
+                .Select(fp => new
+                {
+                    Name = fp.Name,
+                    Category = _partFilteringService.ClassifyPart(fp).ToString(),
+                    Location = fp.Location ?? "Unknown Location",
+                    Quantity = fp.Qty
+                })
+                .ToList();
+
+            // Send SignalR notification
+            await _hubContext.Clients.Group($"WorkOrder_{activeWorkOrderId}")
+                .SendAsync("ProductAssembledByScan", new
+                {
+                    ProductId = part.Product.Id,
+                    ProductName = part.Product.Name,
+                    ScannedPartName = part.Name,
+                    ScannedBarcode = barcode,
+                    AssembledPartsCount = assembledParts,
+                    FilteredPartsCount = filteredPartsGuidance.Count,
+                    Timestamp = DateTime.UtcNow
+                });
+
+            _logger.LogInformation("Product {ProductId} ({ProductName}) assembled via barcode scan '{Barcode}' - {AssembledParts} carcass parts marked as Assembled",
+                part.Product.Id, part.Product.Name, barcode, assembledParts);
+
+            return Json(new { 
+                success = true, 
+                message = $"✅ Product '{part.Product.Name}' assembly completed!",
+                productId = part.Product.Id,
+                productName = part.Product.Name,
+                assembledPartsCount = assembledParts,
+                filteredPartsGuidance = filteredPartsGuidance,
+                hasFilteredParts = filteredPartsGuidance.Count > 0
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error processing barcode scan for assembly: {Barcode}", barcode);
+            return Json(new { success = false, message = "An error occurred while processing the scan" });
+        }
+    }
+
+    [HttpPost]
     public async Task<IActionResult> StartAssembly(string productId)
     {
         try
