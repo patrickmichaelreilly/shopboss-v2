@@ -207,7 +207,7 @@ public class SortingController : Controller
     }
 
     [HttpPost]
-    public async Task<IActionResult> ScanPart(string barcode)
+    public async Task<IActionResult> ScanPart(string barcode, string? selectedRackId = null)
     {
         var sessionId = HttpContext.Session.Id;
         var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
@@ -265,8 +265,8 @@ public class SortingController : Controller
                 });
             }
 
-            // Find optimal bin placement
-            var (rackId, row, column, placementMessage) = await _sortingRules.FindOptimalBinForPartAsync(part.Id, activeWorkOrderId);
+            // Find optimal bin placement - prefer selected rack if provided
+            var (rackId, row, column, placementMessage) = await _sortingRules.FindOptimalBinForPartAsync(part.Id, activeWorkOrderId, selectedRackId);
 
             if (rackId == null || row == null || column == null)
             {

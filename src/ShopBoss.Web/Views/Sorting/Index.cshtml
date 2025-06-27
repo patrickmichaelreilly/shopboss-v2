@@ -134,9 +134,14 @@ else
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="scanModalLabel">
-                    <i class="fas fa-barcode me-2"></i>Scan Part for Sorting
-                </h5>
+                <div>
+                    <h5 class="modal-title" id="scanModalLabel">
+                        <i class="fas fa-barcode me-2"></i>Scan Part for Sorting
+                    </h5>
+                    <div id="selectedRackInfo" class="small text-muted" style="display: none;">
+                        Sorting to: <span id="selectedRackName" class="fw-bold"></span>
+                    </div>
+                </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
@@ -220,6 +225,7 @@ else
                 .then(data => {
                     if (data.success) {
                         displayRackGrid(data.rack);
+                        updateSelectedRackInfo(data.rack.name);
                     } else {
                         showError('Failed to load rack details: ' + data.message);
                     }
@@ -352,15 +358,27 @@ else
                 return;
             }
             
+            // Check if a rack is selected
+            if (!currentRackId) {
+                updateScanFeedback('Please select a storage rack first by clicking on one of the rack tabs above.', 'text-warning');
+                return;
+            }
+            
             // Show processing state
             showScanStatus('Processing part...', true);
+            
+            // Include current rack ID if one is selected
+            let requestBody = `barcode=${encodeURIComponent(barcode)}`;
+            if (currentRackId) {
+                requestBody += `&selectedRackId=${encodeURIComponent(currentRackId)}`;
+            }
             
             fetch('/Sorting/ScanPart', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
                 },
-                body: `barcode=${encodeURIComponent(barcode)}`
+                body: requestBody
             })
             .then(response => response.json())
             .then(data => {
@@ -426,6 +444,18 @@ else
             const messageDiv = document.getElementById('placementMessage');
             messageDiv.textContent = message;
             guidance.style.display = 'block';
+        }
+
+        function updateSelectedRackInfo(rackName) {
+            const rackInfo = document.getElementById('selectedRackInfo');
+            const rackNameSpan = document.getElementById('selectedRackName');
+            
+            if (rackName && rackInfo && rackNameSpan) {
+                rackNameSpan.textContent = rackName;
+                rackInfo.style.display = 'block';
+            } else if (rackInfo) {
+                rackInfo.style.display = 'none';
+            }
         }
 
         function resetScanModal() {

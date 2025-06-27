@@ -15,7 +15,7 @@ public class SortingRuleService
         _logger = logger;
     }
 
-    public async Task<(string? RackId, int? Row, int? Column, string Message)> FindOptimalBinForPartAsync(string partId, string workOrderId)
+    public async Task<(string? RackId, int? Row, int? Column, string Message)> FindOptimalBinForPartAsync(string partId, string workOrderId, string? preferredRackId = null)
     {
         try
         {
@@ -28,37 +28,60 @@ public class SortingRuleService
                 return (null, null, null, "Part not found");
             }
 
-            // Determine part category for placement rules
-            var partCategory = DeterminePartCategory(part);
-            var preferredRackType = GetPreferredRackType(partCategory);
-
-            // Find suitable racks based on part type
-            var suitableRacks = await _context.StorageRacks
-                .Include(r => r.Bins)
-                .Where(r => r.IsActive && 
-                           (r.Type == preferredRackType || 
-                            (preferredRackType == RackType.Standard && r.Type != RackType.DoorsAndDrawerFronts)))
-                .ToListAsync();
-
-            // Sort in memory since OccupancyPercentage is a computed property
-            suitableRacks = suitableRacks
-                .OrderBy(r => r.Type == preferredRackType ? 0 : 1) // Prefer exact match
-                .ThenBy(r => r.OccupancyPercentage) // Prefer less occupied racks
-                .ToList();
-
-            if (!suitableRacks.Any())
+            // If a preferred rack is specified, only use that rack
+            List<StorageRack> suitableRacks;
+            if (!string.IsNullOrEmpty(preferredRackId))
             {
-                return (null, null, null, $"No suitable racks available for {partCategory} parts");
+                var specificRack = await _context.StorageRacks
+                    .Include(r => r.Bins)
+                    .FirstOrDefaultAsync(r => r.Id == preferredRackId && r.IsActive);
+                    
+                if (specificRack == null)
+                {
+                    return (null, null, null, $"Preferred rack '{preferredRackId}' not found or inactive");
+                }
+                
+                suitableRacks = new List<StorageRack> { specificRack };
+                
+                // Check if rack is completely full
+                if (specificRack.AvailableBins == 0)
+                {
+                    return (null, null, null, $"Rack '{specificRack.Name}' is full - no available bins. Please select a different rack.");
+                }
+            }
+            else
+            {
+                // Original logic for finding suitable racks based on part type
+                var partCategory = DeterminePartCategory(part);
+                var preferredRackType = GetPreferredRackType(partCategory);
+
+                suitableRacks = await _context.StorageRacks
+                    .Include(r => r.Bins)
+                    .Where(r => r.IsActive && 
+                               (r.Type == preferredRackType || 
+                                (preferredRackType == RackType.Standard && r.Type != RackType.DoorsAndDrawerFronts)))
+                    .ToListAsync();
+
+                // Sort in memory since OccupancyPercentage is a computed property
+                suitableRacks = suitableRacks
+                    .OrderBy(r => r.Type == preferredRackType ? 0 : 1) // Prefer exact match
+                    .ThenBy(r => r.OccupancyPercentage) // Prefer less occupied racks
+                    .ToList();
+
+                if (!suitableRacks.Any())
+                {
+                    return (null, null, null, $"No suitable racks available for {DeterminePartCategory(part)} parts");
+                }
             }
 
-            // Try to group carcass parts by product
-            if (partCategory == PartCategory.Carcass && part.ProductId != null)
+            // Try to group parts by product - look for existing bins with same product
+            if (part.ProductId != null)
             {
-                var productGroupBin = await FindProductGroupBinAsync(part.ProductId, suitableRacks);
+                var productGroupBin = await FindProductGroupBinAsync(part.ProductId, suitableRacks, part);
                 if (productGroupBin != null)
                 {
                     return (productGroupBin.StorageRackId, productGroupBin.Row, productGroupBin.Column, 
-                           $"Assigned to product group bin {productGroupBin.BinLabel}");
+                           $"Grouped with product '{part.Product?.Name}' in bin {productGroupBin.BinLabel}");
                 }
             }
 
@@ -79,7 +102,8 @@ public class SortingRuleService
             }
 
             // No available bins found
-            return (null, null, null, "No available bins found in suitable racks");
+            string rackNames = string.Join(", ", suitableRacks.Select(r => r.Name));
+            return (null, null, null, $"No available bins found in racks: {rackNames}");
         }
         catch (Exception ex)
         {
@@ -88,18 +112,23 @@ public class SortingRuleService
         }
     }
 
-    private Task<Bin?> FindProductGroupBinAsync(string productId, List<StorageRack> racks)
+    private Task<Bin?> FindProductGroupBinAsync(string productId, List<StorageRack> racks, Part newPart)
     {
-        // Look for existing bins with same product assignment
+        // Look for existing bins with same product assignment that have capacity for this part
         foreach (var rack in racks)
         {
             var productBin = rack.Bins
-                .Where(b => b.ProductId == productId && b.Status != BinStatus.Full && b.IsAvailable)
+                .Where(b => b.ProductId == productId && 
+                           b.Status != BinStatus.Full && 
+                           b.IsAvailable &&
+                           (b.PartsCount + newPart.Qty) <= b.MaxCapacity) // Ensure new part will fit
                 .OrderBy(b => b.PartsCount) // Prefer bins with fewer parts to balance load
                 .FirstOrDefault();
 
             if (productBin != null)
             {
+                _logger.LogInformation("Found existing product group bin {BinLabel} for product {ProductId} (current: {CurrentParts}, adding: {NewParts}, max: {MaxCapacity})", 
+                    productBin.BinLabel, productId, productBin.PartsCount, newPart.Qty, productBin.MaxCapacity);
                 return Task.FromResult<Bin?>(productBin);
             }
         }
@@ -167,19 +196,52 @@ public class SortingRuleService
 
             if (bin == null || !bin.IsAvailable) return false;
 
-            // Update bin assignment
-            bin.PartId = partId;
-            bin.ProductId = part.ProductId;
-            bin.WorkOrderId = workOrderId;
-            bin.Contents = $"{part.Name} (Qty: {part.Qty})";
-            bin.PartsCount = part.Qty;
-            bin.Status = part.Qty >= bin.MaxCapacity ? BinStatus.Full : BinStatus.Partial;
-            bin.AssignedDate = DateTime.UtcNow;
+            // Check if adding this part would exceed capacity
+            var newTotalParts = bin.PartsCount + part.Qty;
+            if (newTotalParts > bin.MaxCapacity)
+            {
+                _logger.LogWarning("Cannot assign part {PartId} to bin {BinLabel} - would exceed capacity ({Current} + {New} > {Max})", 
+                    partId, bin.BinLabel, bin.PartsCount, part.Qty, bin.MaxCapacity);
+                return false;
+            }
+
+            // Update bin assignment - handle multiple parts in same bin
+            if (bin.Status == BinStatus.Empty)
+            {
+                // First part in bin
+                bin.PartId = partId;
+                bin.ProductId = part.ProductId;
+                bin.WorkOrderId = workOrderId;
+                bin.Contents = $"{part.Product?.Name}: {part.Name} (Qty: {part.Qty})";
+                bin.AssignedDate = DateTime.UtcNow;
+            }
+            else
+            {
+                // Additional part in existing bin - update contents to show multiple parts
+                if (bin.ProductId == part.ProductId)
+                {
+                    // Same product - append part info
+                    bin.Contents += $", {part.Name} (Qty: {part.Qty})";
+                }
+                else
+                {
+                    _logger.LogWarning("Attempting to mix products in bin {BinLabel} - existing: {ExistingProduct}, new: {NewProduct}", 
+                        bin.BinLabel, bin.ProductId, part.ProductId);
+                    // Should not happen with proper grouping, but handle gracefully
+                    bin.Contents += $" + {part.Product?.Name}: {part.Name} (Qty: {part.Qty})";
+                }
+            }
+            
+            bin.PartsCount = newTotalParts;
+            bin.Status = newTotalParts >= bin.MaxCapacity ? BinStatus.Full : BinStatus.Partial;
             bin.LastUpdatedDate = DateTime.UtcNow;
 
             // Update part status to Sorted
             part.Status = PartStatus.Sorted;
             part.StatusUpdatedDate = DateTime.UtcNow;
+
+            _logger.LogInformation("Assigned part {PartId} ({PartName}) to bin {BinLabel} - new total: {TotalParts}/{MaxCapacity}", 
+                partId, part.Name, bin.BinLabel, bin.PartsCount, bin.MaxCapacity);
 
             await _context.SaveChangesAsync();
             return true;
