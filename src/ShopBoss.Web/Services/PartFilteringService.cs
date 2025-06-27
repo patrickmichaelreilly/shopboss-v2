@@ -67,19 +67,29 @@ public class PartFilteringService
     {
         var partName = part.Name.ToLowerInvariant();
         
+        _logger.LogDebug("Classifying part: '{PartName}' -> '{NormalizedName}'", part.Name, partName);
+        
         // Check for doors and drawer fronts
-        if (ContainsKeywords(partName, _categoryKeywords[PartCategory.DoorsAndDrawerFronts]))
+        var doorKeywords = _categoryKeywords[PartCategory.DoorsAndDrawerFronts];
+        var containsDoorKeywords = ContainsKeywords(partName, doorKeywords);
+        
+        _logger.LogDebug("Part '{PartName}' contains door keywords: {ContainsDoorKeywords} (keywords: {Keywords})", 
+            partName, containsDoorKeywords, string.Join(", ", doorKeywords));
+        
+        if (containsDoorKeywords)
         {
             // Special logic for "panel" - only if combined with door/front context
             if (partName.Contains("panel"))
             {
                 if (partName.Contains("door") || partName.Contains("front"))
                 {
+                    _logger.LogDebug("Part '{PartName}' classified as DoorsAndDrawerFronts (panel with door/front)", partName);
                     return PartCategory.DoorsAndDrawerFronts;
                 }
             }
             else
             {
+                _logger.LogDebug("Part '{PartName}' classified as DoorsAndDrawerFronts (direct match)", partName);
                 return PartCategory.DoorsAndDrawerFronts;
             }
         }
@@ -102,6 +112,7 @@ public class PartFilteringService
         }
 
         // Default to carcass parts (sides, backs, tops, bottoms, etc.)
+        _logger.LogDebug("Part '{PartName}' classified as Carcass (default)", partName);
         return PartCategory.Carcass;
     }
 
@@ -110,7 +121,7 @@ public class PartFilteringService
     /// </summary>
     public RackType GetPreferredRackType(PartCategory category)
     {
-        return category switch
+        var rackType = category switch
         {
             PartCategory.DoorsAndDrawerFronts => RackType.DoorsAndDrawerFronts,
             PartCategory.AdjustableShelves => RackType.AdjustableShelves,
@@ -118,6 +129,9 @@ public class PartFilteringService
             PartCategory.Carcass => RackType.Standard,
             _ => RackType.Standard
         };
+        
+        _logger.LogDebug("Part category {Category} mapped to rack type {RackType}", category, rackType);
+        return rackType;
     }
 
     /// <summary>

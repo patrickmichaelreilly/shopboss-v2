@@ -30,10 +30,32 @@ public class SortingRuleService
                 return (null, null, null, "Part not found");
             }
 
-            // If a preferred rack is specified, only use that rack
+            // First, classify the part to determine if it needs specialized routing
+            var partCategory = _partFilteringService.ClassifyPart(part);
+            var preferredRackType = _partFilteringService.GetPreferredRackType(partCategory);
+            
             List<StorageRack> suitableRacks;
-            if (!string.IsNullOrEmpty(preferredRackId))
+            
+            // Check if this part requires specialized routing (doors, drawer fronts, adjustable shelves)
+            if (_partFilteringService.ShouldFilterPart(part))
             {
+                // Filtered parts ALWAYS go to specialized racks, ignoring any preferred rack selection
+                _logger.LogInformation("Part '{PartName}' requires specialized routing to {RackType} - ignoring preferred rack selection", 
+                    part.Name, preferredRackType);
+                
+                suitableRacks = await _context.StorageRacks
+                    .Include(r => r.Bins)
+                    .Where(r => r.IsActive && r.Type == preferredRackType)
+                    .ToListAsync();
+                    
+                if (!suitableRacks.Any())
+                {
+                    return (null, null, null, $"No {preferredRackType} racks available for {partCategory} parts. Please configure appropriate specialized racks.");
+                }
+            }
+            else if (!string.IsNullOrEmpty(preferredRackId))
+            {
+                // Carcass parts can use preferred rack if specified
                 var specificRack = await _context.StorageRacks
                     .Include(r => r.Bins)
                     .FirstOrDefaultAsync(r => r.Id == preferredRackId && r.IsActive);
@@ -53,9 +75,7 @@ public class SortingRuleService
             }
             else
             {
-                // Use enhanced PartFilteringService for better extensibility
-                var partCategory = _partFilteringService.ClassifyPart(part);
-                var preferredRackType = _partFilteringService.GetPreferredRackType(partCategory);
+                // No preferred rack specified for carcass parts - use standard logic
 
                 suitableRacks = await _context.StorageRacks
                     .Include(r => r.Bins)

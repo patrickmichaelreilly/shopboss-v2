@@ -275,6 +275,12 @@ public class SortingController : Controller
                 });
             }
 
+            // Log part classification for debugging
+            var partCategory = _partFilteringService.ClassifyPart(part);
+            var preferredRackType = _partFilteringService.GetPreferredRackType(partCategory);
+            _logger.LogInformation("SCAN DEBUG: Part '{PartName}' classified as {Category} -> preferred rack type {RackType}", 
+                part.Name, partCategory, preferredRackType);
+
             // Find optimal bin placement - prefer selected rack if provided
             var (rackId, row, column, placementMessage) = await _sortingRules.FindOptimalBinForPartAsync(part.Id, activeWorkOrderId, selectedRackId);
 
@@ -289,6 +295,11 @@ public class SortingController : Controller
                     type = "no_placement"
                 });
             }
+
+            // Log which rack was selected for debugging
+            var selectedRack = await _context.StorageRacks.FindAsync(rackId);
+            _logger.LogInformation("SCAN DEBUG: Part '{PartName}' assigned to rack '{RackName}' (Type: {RackType}, ID: {RackId})", 
+                part.Name, selectedRack?.Name ?? "Unknown", selectedRack?.Type ?? RackType.Standard, rackId);
 
             // Assign part to bin
             var assignmentSuccess = await _sortingRules.AssignPartToBinAsync(part.Id, rackId, row.Value, column.Value, activeWorkOrderId);
@@ -552,6 +563,9 @@ public class SortingController : Controller
                 }).Cast<object>().ToList();
             }
 
+            // Calculate enhanced progress information for this bin
+            var (progressPartsCount, progressTotalNeeded, progressPercentage) = await CalculateBinProgressAsync(bin);
+
             var binDetails = new
             {
                 success = true,
@@ -564,9 +578,9 @@ public class SortingController : Controller
                     label = bin.BinLabel,
                     status = bin.Status.ToString().ToLower(),
                     statusText = bin.Status.ToString(),
-                    partsCount = bin.PartsCount,
-                    maxCapacity = bin.MaxCapacity,
-                    capacityPercentage = Math.Round(bin.CapacityPercentage, 1),
+                    partsCount = progressPartsCount,
+                    maxCapacity = progressTotalNeeded,
+                    capacityPercentage = Math.Round(progressPercentage, 1),
                     productName = bin.Product?.Name,
                     workOrderId = bin.WorkOrderId,
                     assignedDate = bin.AssignedDate?.ToString("yyyy-MM-dd HH:mm"),
@@ -1003,8 +1017,10 @@ public class SortingController : Controller
     }
 
     /// <summary>
-    /// Calculates enhanced progress information for a bin based on actual carcass parts needed vs. arbitrary capacity.
-    /// When a bin is assigned to a specific product, shows progress toward product completion.
+    /// Calculates enhanced progress information for a bin based on rack type and appropriate part filtering.
+    /// - Standard racks: Shows carcass parts progress for assembly readiness
+    /// - Doors & Fronts racks: Shows doors/drawer fronts progress for that product
+    /// - Adjustable Shelves racks: Shows adjustable shelf progress for that product
     /// </summary>
     private async Task<(int partsCount, int totalNeeded, double progressPercentage)> CalculateBinProgressAsync(Bin bin)
     {
@@ -1016,7 +1032,14 @@ public class SortingController : Controller
 
         try
         {
-            // Get the product and its carcass parts (excluding filtered parts)
+            // Get the rack information to determine appropriate progress calculation
+            var rack = await _context.StorageRacks.FindAsync(bin.StorageRackId);
+            if (rack == null)
+            {
+                return (bin.PartsCount, bin.MaxCapacity, bin.CapacityPercentage);
+            }
+
+            // Get the product and its parts
             var product = await _context.Products
                 .Include(p => p.Parts)
                 .FirstOrDefaultAsync(p => p.Id == bin.ProductId);
@@ -1026,26 +1049,62 @@ public class SortingController : Controller
                 return (bin.PartsCount, bin.MaxCapacity, bin.CapacityPercentage);
             }
 
-            // Get only carcass parts for this product (exclude doors, drawer fronts, adjustable shelves)
-            var carcassParts = _partFilteringService.GetCarcassPartsOnly(product.Parts);
+            List<Part> relevantParts;
+            string progressType;
+
+            // Calculate progress based on rack type
+            switch (rack.Type)
+            {
+                case RackType.DoorsAndDrawerFronts:
+                    // For doors & fronts racks, track progress of doors and drawer fronts for this product
+                    relevantParts = product.Parts
+                        .Where(p => _partFilteringService.ClassifyPart(p) == PartCategory.DoorsAndDrawerFronts)
+                        .ToList();
+                    progressType = "doors/drawer fronts";
+                    break;
+
+                case RackType.AdjustableShelves:
+                    // For adjustable shelves racks, track progress of adjustable shelves for this product
+                    relevantParts = product.Parts
+                        .Where(p => _partFilteringService.ClassifyPart(p) == PartCategory.AdjustableShelves)
+                        .ToList();
+                    progressType = "adjustable shelves";
+                    break;
+
+                case RackType.Hardware:
+                    // For hardware racks, track progress of hardware parts for this product
+                    relevantParts = product.Parts
+                        .Where(p => _partFilteringService.ClassifyPart(p) == PartCategory.Hardware)
+                        .ToList();
+                    progressType = "hardware";
+                    break;
+
+                case RackType.Standard:
+                case RackType.Cart:
+                default:
+                    // For standard racks and carts, track carcass parts for assembly readiness
+                    relevantParts = _partFilteringService.GetCarcassPartsOnly(product.Parts);
+                    progressType = "carcass parts";
+                    break;
+            }
             
-            // Calculate total carcass parts needed for this product
-            var totalCarcassPartsNeeded = carcassParts.Sum(p => p.Qty);
+            // Calculate totals for the relevant part type
+            var totalPartsNeeded = relevantParts.Sum(p => p.Qty);
             
-            // Count how many carcass parts have been sorted for this product
-            var sortedCarcassPartsCount = carcassParts
+            // Count how many relevant parts have been sorted for this product
+            var sortedPartsCount = relevantParts
                 .Where(p => p.Status == PartStatus.Sorted)
                 .Sum(p => p.Qty);
 
             // Calculate progress percentage
-            var progressPercentage = totalCarcassPartsNeeded > 0 
-                ? (double)sortedCarcassPartsCount / totalCarcassPartsNeeded * 100
+            var progressPercentage = totalPartsNeeded > 0 
+                ? (double)sortedPartsCount / totalPartsNeeded * 100
                 : 0;
 
-            _logger.LogDebug("Product {ProductId} progress: {SortedParts}/{TotalParts} carcass parts ({Progress}%)", 
-                bin.ProductId, sortedCarcassPartsCount, totalCarcassPartsNeeded, Math.Round(progressPercentage, 1));
+            _logger.LogDebug("Product {ProductId} in {RackType} rack progress: {SortedParts}/{TotalParts} {ProgressType} ({Progress}%)", 
+                bin.ProductId, rack.Type, sortedPartsCount, totalPartsNeeded, progressType, Math.Round(progressPercentage, 1));
 
-            return (sortedCarcassPartsCount, totalCarcassPartsNeeded, progressPercentage);
+            return (sortedPartsCount, totalPartsNeeded, progressPercentage);
         }
         catch (Exception ex)
         {
