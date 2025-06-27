@@ -1,8 +1,33 @@
-warn: ShopBoss.Web.Controllers.ImportController[0]
-      Selection processing failed for session bb42a60a-d483-4319-aa55-d2bb1f8d054b. Errors: Invalid item IDs selected: nestsheets-header-2pa63ctox, 255UMRHEML4Q, 255UMRHEMLLQ, 255UMRHEMM2Q, 255UMRHEMMMQ, 255UMRHEMN6Q, 255UMRHEMNTQ, 255UMRHFMPAQ, 255UMRHFMR3Q, 255UMRHFMT5Q, 255UMRHGMU7Q, 255UMRHGMUIQ, 255UMRHGMVBQ, 255UMRHGMW1Q, 255UMRHGMWXQ, 255UMRHHMY8Q, 255UMRHHN0YQ, 255UMRHIN5FQ, 255UMRHIN62Q, 255UMRHIN6YQ, 255UMRHIN76Q, 255UMRHIN7BQ, 255UMRHIN7GQ, 255UMRHIN85Q, 255UMRHIN8AQ, 255UMRHIN8LQ
-dbug: Microsoft.EntityFrameworkCore.Infrastructure[10407]
-      'ShopBossDbContext' disposed.
-dbug: Microsoft.EntityFrameworkCore.Database.Connection[20007]
-      Disposing connection to database 'main' on server 'shopboss.db'.
-dbug: Microsoft.EntityFrameworkCore.Database.Connection[20008]
-      Disposed connection to database 'main' on server 'shopboss.db' (0ms).
+# Console output after clicking the link to the CNC Station (from the Shop Statins dropdown):
+
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:5000/Cnc - - -
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:5000/Cnc - 200 - text/html;+charset=utf-8 13.9244ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:5000/lib/signalr/dist/browser/signalr.js - - -
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:5000/lib/signalr/dist/browser/signalr.js - 404 0 - 0.4571ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[16]
+      Request reached the end of the middleware pipeline without being handled by application code. Request path: GET http://localhost:5000/lib/signalr/dist/browser/signalr.js, Response status code: 404
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:5000/Admin/GetActiveWorkOrder - - -
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:5000/Admin/GetActiveWorkOrder - 200 - application/json;+charset=utf-8 2.2999ms
+
+# Console output after scanning a Nest Sheet barcode in the Scan Nest Sheet Modal:
+
+      info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:5000/Cnc? - - -
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:5000/Cnc? - 200 - text/html;+charset=utf-8 7.7665ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:5000/lib/signalr/dist/browser/signalr.js - - -
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:5000/lib/signalr/dist/browser/signalr.js - 404 0 - 0.4036ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[16]
+      Request reached the end of the middleware pipeline without being handled by application code. Request path: GET http://localhost:5000/lib/signalr/dist/browser/signalr.js, Response status code: 404
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:5000/Admin/GetActiveWorkOrder - - -
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:5000/Admin/GetActiveWorkOrder - 200 - application/json;+charset=utf-8 1.5683ms

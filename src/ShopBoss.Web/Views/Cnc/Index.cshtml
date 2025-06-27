@@ -23,7 +23,7 @@
         }
     </div>
     <div class="btn-group" role="group">
-        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#scanModal">
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#cncScanModal">
             <i class="fas fa-barcode me-2"></i>Scan Nest Sheet
         </button>
         <button type="button" class="btn btn-outline-info" onclick="loadRecentScans()">
@@ -150,17 +150,17 @@ else
 }
 
 <!-- Barcode Scan Modal -->
-<div class="modal fade" id="scanModal" tabindex="-1" aria-labelledby="scanModalLabel" aria-hidden="true">
+<div class="modal fade" id="cncScanModal" tabindex="-1" aria-labelledby="cncScanModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="scanModalLabel">
+                <h5 class="modal-title" id="cncScanModalLabel">
                     <i class="fas fa-barcode me-2"></i>Scan Nest Sheet
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <form id="scanForm">
+                <form id="cncScanForm">
                     <div class="mb-3">
                         <label for="barcodeInput" class="form-label">Barcode</label>
                         <div class="input-group">
@@ -191,7 +191,7 @@ else
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="submit" form="scanForm" class="btn btn-primary">
+                <button type="button" class="btn btn-primary" onclick="processBarcodeFromModal()">
                     <i class="fas fa-cut me-2"></i>Process Nest Sheet
                 </button>
             </div>
@@ -315,11 +315,6 @@ else
             return container;
         }
 
-        // Auto-focus barcode input when modal opens
-        document.getElementById('scanModal').addEventListener('shown.bs.modal', function () {
-            document.getElementById('barcodeInput').focus();
-            resetScanModal();
-        });
 
         // Enhanced barcode validation with visual feedback
         function validateBarcodeInput() {
@@ -428,7 +423,7 @@ else
                     
                     // Close modal after delay
                     setTimeout(() => {
-                        const modal = bootstrap.Modal.getInstance(document.getElementById('scanModal'));
+                        const modal = bootstrap.Modal.getInstance(document.getElementById('cncScanModal'));
                         modal.hide();
                         resetScanModal();
                         location.reload(); // Refresh to show updated status
@@ -692,13 +687,13 @@ else
             }
         });
 
-        // Enhanced modal event handlers
-        document.getElementById('scanModal').addEventListener('shown.bs.modal', function () {
+        // Auto-focus barcode input when modal opens
+        document.getElementById('cncScanModal').addEventListener('shown.bs.modal', function () {
             document.getElementById('barcodeInput').focus();
             resetScanModal();
         });
 
-        document.getElementById('scanModal').addEventListener('hidden.bs.modal', function () {
+        document.getElementById('cncScanModal').addEventListener('hidden.bs.modal', function () {
             resetScanModal();
         });
 
@@ -706,17 +701,10 @@ else
         document.getElementById('barcodeInput').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
-                e.stopPropagation();
                 processBarcodeFromModal();
             }
         });
 
-        // Handle form submission (both enter key and button click)
-        document.getElementById('scanForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            processBarcodeFromModal();
-        });
 
         // Auto-refresh recent scans when modal is opened
         document.getElementById('recentScansModal').addEventListener('shown.bs.modal', function () {

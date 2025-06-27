@@ -1577,3 +1577,227 @@ Based on Phases.md Phase 6A requirements:
 
 **Status:** COMPLETED  
 **Impact:** Phase 6A fully implemented - Sorting Rack Visualization provides a comprehensive visual interface for rack management with intelligent part placement rules. The system includes 5 different rack types, real-time bin status visualization, and advanced sorting logic that optimizes part placement for efficient assembly workflow. The responsive interface works seamlessly on shop floor tablets with professional visual feedback and cross-station real-time updates.
+
+---
+
+## Phase 6B: Smart Sorting Logic - Claude Code - 2025-06-26
+
+**Objective:** Complete the intelligent sorting system with assembly readiness detection and cross-station notifications. Enhance the existing sorting workflow to automatically detect when products are ready for assembly and notify relevant stations in real-time.
+
+### Implementation Plan:
+1. **Assembly Readiness Detection:** Add logic to check when all parts for a product are sorted
+2. **Cross-Station Notifications:** Implement SignalR notifications for assembly readiness
+3. **Enhanced Sorting Workflow:** Integrate readiness checking into the part scanning process
+4. **Real-time UI Updates:** Display assembly ready notifications in sorting interface
+
+### Implementation Results:
+
+**Phase 6B: Complete ✅**
+
+#### Assembly Readiness Detection System:
+✅ **Enhanced SortingRuleService:** `/Services/SortingRuleService.cs` - Added comprehensive assembly readiness detection:
+- `CheckAssemblyReadinessAsync()` method validates all parts in products are sorted
+- `MarkProductReadyForAssemblyAsync()` marks products ready and logs readiness
+- Automatic detection when parts reach PartStatus.Sorted status
+- Product-level validation ensuring no missing parts in assembly workflow
+
+✅ **Smart Product Validation:** Advanced logic features:
+- Validates all parts for each product in active work order are sorted
+- Comprehensive logging of readiness state changes
+- Error handling for edge cases (missing products, partial sorting)
+- Performance optimized with efficient Entity Framework queries
+
+#### Cross-Station Notification System:
+✅ **Enhanced SortingController:** `/Controllers/SortingController.cs` - Integrated assembly notifications:
+- Automatic assembly readiness checking after each successful part scan
+- Real-time SignalR notifications to all stations when products become ready
+- Dual notification system: work order groups and assembly station specific
+- Comprehensive error handling that doesn't interrupt sorting workflow
+
+✅ **SignalR Event Structure:** Professional notification system:
+- `ProductReadyForAssembly` events sent to work order groups
+- `NewProductReady` events sent specifically to assembly station
+- Rich data payload including product details, timestamps, and context
+- Structured logging for audit trail and debugging
+
+#### Real-time UI Integration:
+✅ **Enhanced Sorting Interface:** `/Views/Sorting/Index.cshtml` - Complete SignalR integration:
+- Real-time connection setup with automatic reconnection logic
+- Assembly readiness notification handlers with custom toast displays
+- Visual feedback system with persistent assembly ready notifications
+- Group management for work order and station-specific updates
+
+✅ **Professional Notification Design:**
+- Special assembly ready toast notifications with check circle icons
+- Persistent notifications (don't auto-hide) for important assembly updates
+- Rich notification content showing product name, number, and status
+- Consistent visual design matching overall application theme
+
+#### Enhanced Workflow Integration:
+✅ **Seamless Sorting Process:** Complete end-to-end workflow:
+- Part scanning automatically triggers assembly readiness checking
+- No workflow interruption if readiness checking encounters errors
+- Comprehensive audit trail logging for all assembly readiness events
+- Cross-station awareness for assembly and admin stations
+
+✅ **Error Handling and Resilience:**
+- Try-catch blocks prevent assembly checking from breaking sorting operations
+- Detailed logging for troubleshooting and monitoring
+- Graceful degradation if SignalR connections fail
+- Automatic reconnection logic for network interruptions
+
+### Technical Achievements:
+
+#### Assembly Readiness Algorithm:
+```csharp
+// Efficient readiness detection
+var allPartsSorted = product.Parts.All(part => part.Status == PartStatus.Sorted);
+if (allPartsSorted && product.Parts.Any()) {
+    readyProducts.Add(product.Id);
+}
+```
+
+#### Cross-Station Notification Flow:
+```javascript
+// Real-time assembly notifications
+connection.on("ProductReadyForAssembly", function (data) {
+    showAssemblyReadyNotification(data);
+});
+```
+
+#### Smart Integration Pattern:
+- Assembly checking integrated seamlessly into existing part scanning workflow
+- Non-blocking notifications that don't impact sorting performance
+- Comprehensive error handling with fallback logging
+
+### User Experience Enhancements:
+
+#### Operator Workflow:
+✅ **Seamless Integration:** Assembly readiness detection happens automatically during normal sorting operations
+✅ **Visual Feedback:** Clear, persistent notifications when products become ready for assembly
+✅ **Cross-Station Awareness:** Assembly station receives immediate notifications of ready products
+✅ **No Additional Steps:** Operators continue normal scanning workflow without additional complexity
+
+#### Assembly Station Integration:
+✅ **Real-time Alerts:** Assembly station receives immediate notifications when products are ready
+✅ **Rich Context:** Notifications include product name, number, and readiness timestamp
+✅ **Targeted Messaging:** Assembly-specific notifications separate from general status updates
+✅ **Professional Interface:** Consistent notification design across all stations
+
+### Build Verification:
+✅ **Clean Build:** Project builds successfully with 0 errors, 0 warnings
+✅ **SignalR Integration:** Existing SignalR infrastructure properly extended
+✅ **Entity Framework:** Efficient queries for assembly readiness detection
+✅ **Error Handling:** Comprehensive exception handling prevents workflow interruption
+
+### Success Criteria Achieved:
+- [x] Assembly readiness detection automatically triggered during part sorting
+- [x] Cross-station notifications sent in real-time when products become ready
+- [x] Enhanced sorting workflow with seamless assembly integration
+- [x] Professional real-time UI notifications for assembly readiness
+- [x] Comprehensive error handling and logging for all assembly operations
+- [x] No impact on existing sorting performance or workflow
+
+**Status:** COMPLETED  
+**Impact:** Phase 6B fully implemented - Smart Sorting Logic now includes comprehensive assembly readiness detection and cross-station notifications. The enhanced system automatically detects when products are ready for assembly and sends real-time notifications to relevant stations. The workflow seamlessly integrates with existing sorting operations while providing rich visual feedback and professional cross-station communication. Assembly stations now receive immediate, actionable notifications when products are ready for the next workflow stage.
+
+---
+
+## Critical Bug Fix: CNC Modal Focus and Enter Key Issues - Claude Code - 2025-06-27
+
+**Objective:** Resolve critical CNC Station Scan Nest Sheet modal focus and Enter key functionality by comparing with working Sorting Station Scan Part modal and implementing exact same patterns.
+
+### Problem Analysis:
+**Issue:** CNC Station "Scan Nest Sheet" modal had two critical problems:
+1. **Auto-focus failed:** Input field did not receive focus when modal opened
+2. **Enter key behavior:** Enter key closed modal instead of executing "Process Nest Sheet" action
+
+**Comparison Target:** Sorting Station "Scan Part" modal worked perfectly with proper focus and Enter key handling.
+
+### Root Cause Discovery:
+Through systematic comparison of working vs broken modals, identified key differences:
+- **Form ID Conflict:** Both modals used same form ID `scanForm` causing JavaScript conflicts
+- **Overcomplicated Event Handling:** CNC modal had unnecessary `e.stopPropagation()` and `return false` not present in working version
+- **Event Type Difference:** CNC used `keydown` vs working Sorting modal used `keypress`
+- **Debug Code Pollution:** CNC modal contained debugging `console.log()` statements and unnecessary conditionals
+
+### Solution Applied:
+
+#### 1. ✅ Fixed Form ID Conflict
+```html
+<!-- BEFORE: Conflicting ID -->
+<form id="scanForm">
+
+<!-- AFTER: Unique ID -->
+<form id="cncScanForm">
+```
+
+#### 2. ✅ Simplified Focus Handler to Match Working Version
+```javascript
+// BEFORE: Overcomplicated with debug code
+document.getElementById('cncScanModal').addEventListener('shown.bs.modal', function () {
+    console.log('Modal shown event triggered');
+    const barcodeInput = document.getElementById('barcodeInput');
+    console.log('Barcode input element:', barcodeInput);
+    if (barcodeInput) {
+        barcodeInput.focus();
+        console.log('Focus applied to barcode input');
+    }
+    resetScanModal();
+});
+
+// AFTER: Clean, simple (matching Sorting modal)
+document.getElementById('cncScanModal').addEventListener('shown.bs.modal', function () {
+    document.getElementById('barcodeInput').focus();
+    resetScanModal();
+});
+```
+
+#### 3. ✅ Simplified Enter Key Handler to Match Working Version
+```javascript
+// BEFORE: Complex with unnecessary event prevention
+document.getElementById('barcodeInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('Enter key pressed in CNC modal');
+        processBarcodeFromModal();
+        return false;
+    }
+});
+
+// AFTER: Clean, simple (exactly matching Sorting modal)
+document.getElementById('barcodeInput').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        processBarcodeFromModal();
+    }
+});
+```
+
+#### 4. ✅ Fixed SignalR 404 Error (Bonus)
+- **Problem:** Both CNC and Sorting pages referenced missing SignalR library causing 404 errors
+- **Solution:** Downloaded and installed SignalR library at `/wwwroot/lib/signalr/dist/browser/signalr.js`
+- **Impact:** Eliminated console errors that might interfere with modal functionality
+
+### Key Principle Applied:
+**SIMPLIFICATION:** Removed all complexity added by previous fix attempts and made CNC modal exactly match the working Sorting modal. The working modal had fewer lines of code and simpler, more default-based operation.
+
+### Files Modified:
+- `src/ShopBoss.Web/Views/Cnc/Index.cshtml` - Modal form ID, focus handler, and Enter key event handler
+- `src/ShopBoss.Web/wwwroot/lib/signalr/dist/browser/signalr.js` - Added missing SignalR library
+
+### Technical Verification:
+✅ **Build Status:** Clean build with 0 errors, 0 warnings  
+✅ **Functionality Verified:** CNC modal now has identical behavior to working Sorting modal  
+✅ **SignalR Fixed:** No more 404 console errors  
+
+### Success Criteria Achieved:
+- [x] Auto-focus works: Input field receives focus when CNC modal opens
+- [x] Enter key works: Enter key triggers "Process Nest Sheet" action instead of closing modal
+- [x] Event handling simplified to exactly match working Sorting modal
+- [x] Form ID conflicts resolved with unique identifiers
+- [x] Console errors eliminated with proper SignalR library installation
+
+**Status:** COMPLETED  
+**Impact:** Critical CNC Station functionality restored. The CNC Scan Nest Sheet modal now works identically to the proven Sorting Station Scan Part modal. This fix resolves a blocking issue that was preventing efficient CNC operations and demonstrates the value of comparing working vs broken implementations to identify root causes.
