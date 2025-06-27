@@ -29,6 +29,9 @@
         <button type="button" class="btn btn-outline-info" onclick="loadCutParts()" id="cutPartsButton">
             <i class="fas fa-list me-2"></i>Cut Parts (<span id="cutPartsCount">@ViewBag.CutPartsCount</span>)
         </button>
+        <button type="button" class="btn btn-outline-success" onclick="showAssemblyReadiness()" id="assemblyReadyButton" style="display: none;">
+            <i class="fas fa-tools me-2"></i>Ready for Assembly (<span id="readyProductsCount">0</span>)
+        </button>
     </div>
 </div>
 
@@ -202,6 +205,35 @@ else
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Assembly Readiness Modal -->
+<div class="modal fade" id="assemblyReadinessModal" tabindex="-1" aria-labelledby="assemblyReadinessModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="assemblyReadinessModalLabel">
+                    <i class="fas fa-tools me-2"></i>Products Ready for Assembly
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="assemblyReadinessContent">
+                    <div class="text-center">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-success" onclick="navigateToAssemblyStation()">
+                    <i class="fas fa-arrow-right me-2"></i>Go to Assembly Station
+                </button>
             </div>
         </div>
     </div>
@@ -392,8 +424,8 @@ else
                 return;
             }
             
-            // Show processing state
-            showScanStatus('Processing part...', true);
+            // Enhanced scan feedback - show detailed progress
+            showScanStatus('🔍 Validating part barcode...', true);
             
             // Include current rack ID if one is selected
             let requestBody = `barcode=${encodeURIComponent(barcode)}`;
@@ -413,8 +445,12 @@ else
                 hideScanStatus();
                 
                 if (data.success) {
+                    // Enhanced success feedback with visual confirmation
                     updateScanFeedback(`✅ ${data.message}`, 'text-success');
                     showPlacementGuidance(data.placementMessage);
+                    
+                    // Show scan success animation
+                    showScanSuccessAnimation(data);
                     
                     // Update rack badge and cut parts count immediately
                     if (data.updatedRackOccupancy) {
@@ -427,7 +463,12 @@ else
                         updateCutPartsCount(data.remainingCutParts);
                     }
                     
-                    // Close modal after delay
+                    // Check for assembly readiness
+                    if (data.assemblyReadiness) {
+                        showAssemblyReadinessAlert(data.assemblyReadiness);
+                    }
+                    
+                    // Close modal after delay with enhanced feedback
                     setTimeout(() => {
                         const modal = bootstrap.Modal.getInstance(document.getElementById('scanModal'));
                         modal.hide();
@@ -437,15 +478,24 @@ else
                         if (currentRackId === data.rackId) {
                             loadRackDetails(currentRackId);
                         }
-                    }, 2000);
+                        
+                        // Show completion toast
+                        showToast(`Part sorted successfully to ${data.binLabel || 'assigned bin'}`, 'success');
+                    }, 2500);
                 } else {
+                    // Enhanced error feedback with suggested actions
                     updateScanFeedback(`⚠️ ${data.message}`, 'text-danger');
+                    
+                    // Show suggested next steps for common errors
+                    if (data.suggestions) {
+                        showErrorSuggestions(data.suggestions);
+                    }
                 }
             })
             .catch(error => {
                 console.error('Scan error:', error);
                 hideScanStatus();
-                updateScanFeedback('Scan failed. Please try again.', 'text-danger');
+                updateScanFeedback('Network error - please check connection and try again.', 'text-danger');
             });
         }
 
@@ -679,7 +729,24 @@ else
                 currentBinDetails = null;
                 cleanupModalState();
             });
+            
+            // Check initial assembly readiness
+            checkInitialAssemblyReadiness();
         });
+
+        function checkInitialAssemblyReadiness() {
+            // Check if any products are ready for assembly on page load
+            fetch('/Sorting/GetAssemblyReadinessCount')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.count > 0) {
+                        updateAssemblyReadinessButton(data.count);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error checking initial assembly readiness:', error);
+                });
+        }
 
         // SignalR real-time updates
         function setupSignalRConnection() {
@@ -733,6 +800,11 @@ else
             // Handle product ready for assembly notifications
             connection.on("ProductReadyForAssembly", function (data) {
                 showAssemblyReadyNotification(data);
+                
+                // Update assembly readiness button
+                if (data.totalReadyProducts !== undefined) {
+                    updateAssemblyReadinessButton(data.totalReadyProducts);
+                }
             });
 
             // Handle status updates with enhanced logging
@@ -818,8 +890,71 @@ else
             }
         }
 
+        function showScanSuccessAnimation(data) {
+            // Visual confirmation of successful scan
+            const statusIcon = document.getElementById('scanStatusIcon');
+            if (statusIcon) {
+                statusIcon.innerHTML = '<i class="fas fa-check-circle text-success fa-2x"></i>';
+                statusIcon.style.animation = 'pulse 0.5s ease-in-out';
+            }
+        }
+
+        function showAssemblyReadinessAlert(readinessData) {
+            // Enhanced assembly readiness with clear next steps
+            if (readinessData.isReady) {
+                const guidance = document.getElementById('placementGuidance');
+                const messageDiv = document.getElementById('placementMessage');
+                
+                messageDiv.innerHTML = `
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-tools fa-2x text-success me-3"></i>
+                        <div>
+                            <div class="fw-bold text-success">🎉 Product Ready for Assembly!</div>
+                            <div class="mt-1"><strong>${readinessData.productName}</strong></div>
+                            <div class="small mt-1">
+                                <i class="fas fa-arrow-right me-1"></i>
+                                Next: Move to Assembly Station to complete this product
+                            </div>
+                        </div>
+                    </div>
+                `;
+                guidance.className = 'alert alert-success';
+                guidance.style.display = 'block';
+                
+                // Play success sound (if supported)
+                playSuccessSound();
+            }
+        }
+
+        function showErrorSuggestions(suggestions) {
+            // Show helpful suggestions for scan errors
+            const guidance = document.getElementById('placementGuidance');
+            const messageDiv = document.getElementById('placementMessage');
+            
+            let suggestionHtml = '<div><strong>Suggested actions:</strong><ul class="mt-2">';
+            suggestions.forEach(suggestion => {
+                suggestionHtml += `<li>${suggestion}</li>`;
+            });
+            suggestionHtml += '</ul></div>';
+            
+            messageDiv.innerHTML = suggestionHtml;
+            guidance.className = 'alert alert-warning';
+            guidance.style.display = 'block';
+        }
+
+        function playSuccessSound() {
+            // Play a subtle success sound (browser permitting)
+            try {
+                const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmYgCT2X2O/AciMFl');
+                audio.volume = 0.1;
+                audio.play().catch(() => {}); // Ignore errors if audio can't play
+            } catch (e) {
+                // Ignore audio errors
+            }
+        }
+
         function showAssemblyReadyNotification(data) {
-            // Create special assembly ready notification
+            // Create special assembly ready notification with enhanced content
             const toastContainer = document.getElementById('toast-container') || createToastContainer();
             const toast = document.createElement('div');
             toast.className = 'toast align-items-center text-white bg-success border-0';
@@ -829,13 +964,17 @@ else
                 <div class="d-flex">
                     <div class="toast-body">
                         <div class="d-flex align-items-center">
-                            <i class="fas fa-check-circle fa-2x me-3"></i>
+                            <i class="fas fa-tools fa-2x me-3"></i>
                             <div>
-                                <div class="fw-bold">Product Ready for Assembly!</div>
+                                <div class="fw-bold">🎉 Product Ready for Assembly!</div>
                                 <div class="small">
                                     ${data.productName} (${data.productNumber || data.productId})
                                 </div>
-                                <div class="small text-light">All parts have been sorted</div>
+                                <div class="small text-light">All parts sorted - ready for assembly station</div>
+                                <div class="small mt-1">
+                                    <i class="fas fa-arrow-right me-1"></i>
+                                    Next: Move to Assembly Station
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -843,10 +982,13 @@ else
                 </div>
             `;
             toastContainer.appendChild(toast);
-            const bsToast = new bootstrap.Toast(toast);
+            const bsToast = new bootstrap.Toast(toast, { delay: 10000 }); // Show longer for assembly notifications
             bsToast.show();
             
             toast.addEventListener('hidden.bs.toast', () => toast.remove());
+            
+            // Play success sound for assembly readiness
+            playSuccessSound();
         }
 
         // Bin detail modal functions
@@ -1085,6 +1227,165 @@ else
             }, 250);
         }
 
+        function showAssemblyReadiness() {
+            const modal = new bootstrap.Modal(document.getElementById('assemblyReadinessModal'));
+            const content = document.getElementById('assemblyReadinessContent');
+            
+            // Show loading
+            content.innerHTML = `
+                <div class="text-center">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <div class="mt-2">Loading assembly readiness...</div>
+                </div>
+            `;
+            
+            modal.show();
+            
+            fetch('/Sorting/GetAssemblyReadiness')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        displayAssemblyReadiness(data.products);
+                    } else {
+                        content.innerHTML = `
+                            <div class="alert alert-warning">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                Failed to load assembly readiness: ${data.message}
+                            </div>
+                        `;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading assembly readiness:', error);
+                    content.innerHTML = `
+                        <div class="alert alert-danger">
+                            <i class="fas fa-times-circle me-2"></i>
+                            An error occurred while loading assembly readiness.
+                        </div>
+                    `;
+                });
+        }
+
+        function displayAssemblyReadiness(products) {
+            const content = document.getElementById('assemblyReadinessContent');
+            
+            if (!products || products.length === 0) {
+                content.innerHTML = `
+                    <div class="text-center text-muted">
+                        <i class="fas fa-clock fa-3x mb-3"></i>
+                        <p>No products are ready for assembly yet.</p>
+                        <small>Products will appear here when all their parts have been sorted.</small>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = `
+                <div class="alert alert-success">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-check-circle fa-2x me-3"></i>
+                        <div>
+                            <div class="fw-bold">Great news! You have ${products.length} product(s) ready for assembly.</div>
+                            <div class="small mt-1">All parts for these products have been sorted and are ready to be assembled.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th>Product Number</th>
+                                <th>Parts Count</th>
+                                <th>Sorting Complete</th>
+                                <th>Rack Locations</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+
+            products.forEach(product => {
+                html += `
+                    <tr class="table-success">
+                        <td>
+                            <div class="fw-bold">${product.name}</div>
+                            <div class="small text-muted">${product.workOrderName}</div>
+                        </td>
+                        <td><code>${product.productNumber}</code></td>
+                        <td>
+                            <span class="badge bg-success">${product.sortedPartsCount}/${product.totalPartsCount}</span>
+                        </td>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-check-circle text-success me-2"></i>
+                                <div>
+                                    <div class="small fw-bold text-success">Complete</div>
+                                    <div class="small text-muted">${product.completedDate}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="small">
+                                ${product.rackLocations.map(loc => 
+                                    `<span class="badge bg-secondary me-1">${loc}</span>`
+                                ).join('')}
+                            </div>
+                        </td>
+                        <td>
+                            <button type="button" class="btn btn-sm btn-success" 
+                                    onclick="navigateToAssemblyStationForProduct('${product.id}')">
+                                <i class="fas fa-tools me-1"></i>Assemble
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            html += `
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-3 p-3 bg-light rounded">
+                    <h6><i class="fas fa-lightbulb me-2"></i>Next Steps:</h6>
+                    <ol class="mb-0 small">
+                        <li><strong>Navigate to Assembly Station</strong> - Click the "Go to Assembly Station" button below</li>
+                        <li><strong>Scan any part</strong> from the ready product to mark entire product as assembled</li>
+                        <li><strong>Collect components</strong> - Get doors, drawer fronts, and adjustable shelves from their special racks</li>
+                        <li><strong>Complete assembly</strong> - All product parts will be marked as assembled automatically</li>
+                    </ol>
+                </div>
+            `;
+
+            content.innerHTML = html;
+        }
+
+        function navigateToAssemblyStation() {
+            // Navigate to Assembly Station
+            window.location.href = '/Assembly';
+        }
+
+        function navigateToAssemblyStationForProduct(productId) {
+            // Navigate to Assembly Station with specific product pre-selected
+            window.location.href = `/Assembly?productId=${encodeURIComponent(productId)}`;
+        }
+
+        function updateAssemblyReadinessButton(count) {
+            const button = document.getElementById('assemblyReadyButton');
+            const countSpan = document.getElementById('readyProductsCount');
+            
+            if (count > 0) {
+                countSpan.textContent = count;
+                button.style.display = 'block';
+                button.classList.add('btn-pulse'); // Add pulsing animation
+            } else {
+                button.style.display = 'none';
+                button.classList.remove('btn-pulse');
+            }
+        }
+
         function clearEntireBin() {
             if (!currentBinDetails) return;
             
@@ -1125,6 +1426,11 @@ else
                     // Update cut parts count
                     if (data.updatedCutPartsCount !== undefined) {
                         updateCutPartsCount(data.updatedCutPartsCount);
+                    }
+                    
+                    // Update assembly readiness
+                    if (data.assemblyReadyCount !== undefined) {
+                        updateAssemblyReadinessButton(data.assemblyReadyCount);
                     }
                 } else {
                     showToast(`Failed to clear bin: ${data.message}`, 'error');
@@ -1251,6 +1557,52 @@ else
             
             .rack-grid {
                 border-spacing: 1px;
+            }
+        }
+
+        /* Enhanced animations for better UX */
+        .btn-pulse {
+            animation: btn-pulse 2s infinite;
+        }
+
+        @keyframes btn-pulse {
+            0% {
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(25, 135, 84, 0.7);
+            }
+            70% {
+                transform: scale(1.05);
+                box-shadow: 0 0 0 10px rgba(25, 135, 84, 0);
+            }
+            100% {
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(25, 135, 84, 0);
+            }
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        /* Success feedback animations */
+        .scan-success {
+            animation: scan-success 0.6s ease-out;
+        }
+
+        @keyframes scan-success {
+            0% { 
+                opacity: 0; 
+                transform: translateY(-10px) scale(0.8); 
+            }
+            50% { 
+                opacity: 1; 
+                transform: translateY(0) scale(1.1); 
+            }
+            100% { 
+                opacity: 1; 
+                transform: translateY(0) scale(1); 
             }
         }
     </style>
