@@ -1,0 +1,41 @@
+@{
+    ViewData["Title"] = "Assembly Station - No Active Work Order";
+}
+
+<div class="text-center py-5">
+    <i class="fas fa-exclamation-triangle fa-4x text-warning mb-4"></i>
+    <h2>No Active Work Order Selected</h2>
+    <p class="lead text-muted mb-4">
+        Please select a work order from the Admin Station before using the Assembly Station.
+    </p>
+    
+    <div class="d-grid gap-2 d-md-block">
+        <a href="/Admin" class="btn btn-primary btn-lg">
+            <i class="fas fa-cog me-2"></i>
+            Go to Admin Station
+        </a>
+        <a href="/" class="btn btn-outline-secondary btn-lg">
+            <i class="fas fa-home me-2"></i>
+            Return to Dashboard
+        </a>
+    </div>
+    
+    <div class="mt-5">
+        <div class="card mx-auto" style="max-width: 500px;">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="fas fa-info-circle text-info me-2"></i>
+                    How to Use Assembly Station
+                </h5>
+                <div class="text-start">
+                    <ol class="mb-0">
+                        <li>Go to the Admin Station</li>
+                        <li>Select a work order from the list</li>
+                        <li>Click "Set Active" to make it the current work order</li>
+                        <li>Return to Assembly Station to begin assembly workflow</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
