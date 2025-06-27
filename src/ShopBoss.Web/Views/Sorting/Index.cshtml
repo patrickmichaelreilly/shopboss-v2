@@ -207,6 +207,35 @@ else
     </div>
 </div>
 
+<!-- Bin Detail Modal -->
+<div class="modal fade" id="binDetailModal" tabindex="-1" aria-labelledby="binDetailModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="binDetailModalLabel">
+                    <i class="fas fa-box me-2"></i>Bin Details
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="binDetailContent">
+                    <div class="text-center">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-danger" id="clearBinBtn" onclick="clearEntireBin()" style="display: none;">
+                    <i class="fas fa-trash me-2"></i>Clear Bin
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @section Scripts {
     <script src="~/lib/signalr/dist/browser/signalr.js"></script>
     <script>
@@ -345,8 +374,7 @@ else
 
         function selectBin(label, row, column) {
             if (currentRackId) {
-                showToast(`Selected bin ${label} (Row ${row}, Column ${column})`, 'info');
-                // Could add bin selection functionality here
+                showBinDetailModal(currentRackId, row, column, label);
             }
         }
 
@@ -812,6 +840,260 @@ else
             bsToast.show();
             
             toast.addEventListener('hidden.bs.toast', () => toast.remove());
+        }
+
+        // Bin detail modal functions
+        let currentBinDetails = null;
+
+        function showBinDetailModal(rackId, row, column, label) {
+            const modal = new bootstrap.Modal(document.getElementById('binDetailModal'));
+            const content = document.getElementById('binDetailContent');
+            const clearBtn = document.getElementById('clearBinBtn');
+            
+            // Update modal title
+            document.getElementById('binDetailModalLabel').innerHTML = 
+                `<i class="fas fa-box me-2"></i>Bin ${label} Details`;
+            
+            // Show loading state
+            content.innerHTML = `
+                <div class="text-center">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <div class="mt-2">Loading bin details...</div>
+                </div>
+            `;
+            
+            clearBtn.style.display = 'none';
+            modal.show();
+            
+            // Fetch bin details
+            fetch(`/Sorting/GetBinDetails/${rackId}/${row}/${column}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        currentBinDetails = data.bin;
+                        displayBinDetails(data.bin);
+                        
+                        // Show clear button if bin has contents
+                        if (data.bin.parts && data.bin.parts.length > 0) {
+                            clearBtn.style.display = 'block';
+                        }
+                    } else {
+                        content.innerHTML = `
+                            <div class="alert alert-warning">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                Failed to load bin details: ${data.message}
+                            </div>
+                        `;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading bin details:', error);
+                    content.innerHTML = `
+                        <div class="alert alert-danger">
+                            <i class="fas fa-times-circle me-2"></i>
+                            An error occurred while loading bin details.
+                        </div>
+                    `;
+                });
+        }
+
+        function displayBinDetails(bin) {
+            const content = document.getElementById('binDetailContent');
+            
+            let html = `
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <h6>Bin Information</h6>
+                        <table class="table table-sm">
+                            <tr><td><strong>Label:</strong></td><td>${bin.label}</td></tr>
+                            <tr><td><strong>Position:</strong></td><td>Row ${bin.row}, Column ${bin.column}</td></tr>
+                            <tr><td><strong>Status:</strong></td><td><span class="badge bg-${getBinStatusBadgeClass(bin.status)}">${bin.statusText}</span></td></tr>
+                            <tr><td><strong>Capacity:</strong></td><td>${bin.partsCount}/${bin.maxCapacity} parts (${bin.capacityPercentage}%)</td></tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Assignment Details</h6>
+                        <table class="table table-sm">
+                            <tr><td><strong>Product:</strong></td><td>${bin.productName || 'Not assigned'}</td></tr>
+                            <tr><td><strong>Work Order:</strong></td><td>${bin.workOrderId || 'Not assigned'}</td></tr>
+                            <tr><td><strong>Assigned:</strong></td><td>${bin.assignedDate || 'N/A'}</td></tr>
+                            <tr><td><strong>Last Updated:</strong></td><td>${bin.lastUpdatedDate || 'N/A'}</td></tr>
+                        </table>
+                    </div>
+                </div>
+            `;
+            
+            if (bin.parts && bin.parts.length > 0) {
+                html += `
+                    <h6>Parts in Bin (${bin.parts.length})</h6>
+                    <div class="table-responsive">
+                        <table class="table table-striped table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Part Name</th>
+                                    <th>Product</th>
+                                    <th>Qty</th>
+                                    <th>Material</th>
+                                    <th>Dimensions</th>
+                                    <th>Sorted Date</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+                
+                bin.parts.forEach(part => {
+                    const dimensions = [
+                        part.length && `L:${part.length}`,
+                        part.width && `W:${part.width}`,
+                        part.thickness && `T:${part.thickness}`
+                    ].filter(Boolean).join('×') || 'N/A';
+                    
+                    html += `
+                        <tr>
+                            <td><strong>${part.name}</strong></td>
+                            <td>${part.productName}</td>
+                            <td>${part.qty}</td>
+                            <td>${part.material || 'N/A'}</td>
+                            <td class="small">${dimensions}</td>
+                            <td class="small">${part.sortedDate}</td>
+                            <td>
+                                <button type="button" class="btn btn-sm btn-outline-danger" 
+                                        onclick="removePartFromBin('${part.id}', '${part.name}')"
+                                        title="Remove this part from bin">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                });
+                
+                html += `
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            } else {
+                html += `
+                    <div class="text-center text-muted mt-4">
+                        <i class="fas fa-inbox fa-3x mb-3"></i>
+                        <p>This bin is empty</p>
+                    </div>
+                `;
+            }
+            
+            if (bin.notes) {
+                html += `
+                    <div class="mt-3">
+                        <h6>Notes</h6>
+                        <div class="alert alert-info">${bin.notes}</div>
+                    </div>
+                `;
+            }
+            
+            content.innerHTML = html;
+        }
+
+        function getBinStatusBadgeClass(status) {
+            switch (status) {
+                case 'empty': return 'secondary';
+                case 'partial': return 'info';
+                case 'full': return 'success';
+                case 'blocked': return 'danger';
+                case 'reserved': return 'warning';
+                default: return 'secondary';
+            }
+        }
+
+        function removePartFromBin(partId, partName) {
+            if (!confirm(`Are you sure you want to remove part "${partName}" from this bin?\n\nThis will change the part status back to "Cut" and it will need to be sorted again.`)) {
+                return;
+            }
+            
+            fetch('/Sorting/RemovePartFromBin', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `partId=${encodeURIComponent(partId)}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast(`Part "${partName}" removed from bin successfully`, 'success');
+                    
+                    // Refresh the bin details
+                    if (currentBinDetails) {
+                        showBinDetailModal(currentBinDetails.rackId, currentBinDetails.row, currentBinDetails.column, currentBinDetails.label);
+                    }
+                    
+                    // Refresh the rack display
+                    if (currentRackId) {
+                        loadRackDetails(currentRackId);
+                    }
+                    
+                    // Update cut parts count
+                    if (data.updatedCutPartsCount !== undefined) {
+                        updateCutPartsCount(data.updatedCutPartsCount);
+                    }
+                } else {
+                    showToast(`Failed to remove part: ${data.message}`, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error removing part from bin:', error);
+                showToast('An error occurred while removing the part', 'error');
+            });
+        }
+
+        function clearEntireBin() {
+            if (!currentBinDetails) return;
+            
+            const partCount = currentBinDetails.parts ? currentBinDetails.parts.length : 0;
+            if (partCount === 0) {
+                showToast('Bin is already empty', 'info');
+                return;
+            }
+            
+            if (!confirm(`Are you sure you want to clear bin "${currentBinDetails.label}"?\n\nThis will remove all ${partCount} parts and change their status back to "Cut". They will need to be sorted again.`)) {
+                return;
+            }
+            
+            fetch('/Sorting/ClearBin', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `rackId=${encodeURIComponent(currentBinDetails.rackId)}&row=${currentBinDetails.row}&column=${currentBinDetails.column}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast(`Bin "${currentBinDetails.label}" cleared successfully. ${data.partsRemoved} parts removed.`, 'success');
+                    
+                    // Close the modal
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('binDetailModal'));
+                    modal.hide();
+                    
+                    // Refresh the rack display
+                    if (currentRackId) {
+                        loadRackDetails(currentRackId);
+                    }
+                    
+                    // Update cut parts count
+                    if (data.updatedCutPartsCount !== undefined) {
+                        updateCutPartsCount(data.updatedCutPartsCount);
+                    }
+                } else {
+                    showToast(`Failed to clear bin: ${data.message}`, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error clearing bin:', error);
+                showToast('An error occurred while clearing the bin', 'error');
+            });
         }
     </script>
 

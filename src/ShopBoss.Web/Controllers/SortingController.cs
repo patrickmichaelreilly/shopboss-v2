@@ -494,4 +494,293 @@ public class SortingController : Controller
             return Json(new { success = false, message = "Failed to load cut parts." });
         }
     }
+
+    public async Task<IActionResult> GetBinDetails(string rackId, int row, int column)
+    {
+        try
+        {
+            var bin = await _context.Bins
+                .Include(b => b.Part)
+                .Include(b => b.Product)
+                .FirstOrDefaultAsync(b => b.StorageRackId == rackId && b.Row == row && b.Column == column);
+
+            if (bin == null)
+            {
+                return Json(new { success = false, message = "Bin not found." });
+            }
+
+            // Get all parts that are currently assigned to this bin
+            var partsInBin = await _context.Parts
+                .Include(p => p.Product)
+                .Where(p => p.Status == PartStatus.Sorted)
+                .ToListAsync();
+
+            // Filter parts that are in this specific bin by checking bin assignments
+            var binParts = new List<object>();
+            var activeWorkOrderId = HttpContext.Session.GetString("ActiveWorkOrderId");
+
+            if (!string.IsNullOrEmpty(activeWorkOrderId))
+            {
+                // Get parts that were sorted to this specific bin
+                // Since we don't have a direct BinId field on Part, we need to find parts
+                // that match the bin's assigned product and check audit trail
+                if (bin.ProductId != null)
+                {
+                    var sortedParts = await _context.Parts
+                        .Include(p => p.Product)
+                        .Include(p => p.NestSheet)
+                        .Where(p => p.ProductId == bin.ProductId && 
+                                   p.Status == PartStatus.Sorted &&
+                                   p.NestSheet!.WorkOrderId == activeWorkOrderId)
+                        .ToListAsync();
+
+                    binParts = sortedParts.Select(p => new
+                    {
+                        id = p.Id,
+                        name = p.Name,
+                        qty = p.Qty,
+                        productName = p.Product?.Name ?? "Unknown",
+                        material = p.Material,
+                        length = p.Length,
+                        width = p.Width,
+                        thickness = p.Thickness,
+                        sortedDate = p.StatusUpdatedDate?.ToString("yyyy-MM-dd HH:mm") ?? "Unknown"
+                    }).Cast<object>().ToList();
+                }
+            }
+
+            var binDetails = new
+            {
+                success = true,
+                bin = new
+                {
+                    id = bin.Id,
+                    rackId = bin.StorageRackId,
+                    row = bin.Row,
+                    column = bin.Column,
+                    label = bin.BinLabel,
+                    status = bin.Status.ToString().ToLower(),
+                    statusText = bin.Status.ToString(),
+                    partsCount = bin.PartsCount,
+                    maxCapacity = bin.MaxCapacity,
+                    capacityPercentage = Math.Round(bin.CapacityPercentage, 1),
+                    productName = bin.Product?.Name,
+                    workOrderId = bin.WorkOrderId,
+                    assignedDate = bin.AssignedDate?.ToString("yyyy-MM-dd HH:mm"),
+                    lastUpdatedDate = bin.LastUpdatedDate?.ToString("yyyy-MM-dd HH:mm"),
+                    notes = bin.Notes,
+                    contents = bin.Contents,
+                    parts = binParts
+                }
+            };
+
+            return Json(binDetails);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving bin details for rack {RackId} bin {Row},{Column}", rackId, row, column);
+            return Json(new { success = false, message = "An error occurred while retrieving bin details." });
+        }
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> RemovePartFromBin(string partId)
+    {
+        var sessionId = HttpContext.Session.Id;
+        var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+        var station = "Sorting";
+
+        try
+        {
+            var activeWorkOrderId = HttpContext.Session.GetString("ActiveWorkOrderId");
+            if (string.IsNullOrEmpty(activeWorkOrderId))
+            {
+                return Json(new { success = false, message = "No active work order selected." });
+            }
+
+            var part = await _context.Parts
+                .Include(p => p.Product)
+                .FirstOrDefaultAsync(p => p.Id == partId && p.Status == PartStatus.Sorted);
+
+            if (part == null)
+            {
+                return Json(new { success = false, message = "Part not found or not currently sorted." });
+            }
+
+            // Find the bin this part is currently in
+            var bin = await _context.Bins
+                .FirstOrDefaultAsync(b => b.ProductId == part.ProductId && b.PartsCount > 0);
+
+            if (bin != null)
+            {
+                // Update bin - reduce parts count and adjust status
+                bin.PartsCount = Math.Max(0, bin.PartsCount - part.Qty);
+                
+                if (bin.PartsCount == 0)
+                {
+                    // Bin is now empty
+                    bin.Status = BinStatus.Empty;
+                    bin.PartId = null;
+                    bin.ProductId = null;
+                    bin.WorkOrderId = null;
+                    bin.Contents = null;
+                    bin.AssignedDate = null;
+                }
+                else
+                {
+                    // Update bin status based on remaining capacity
+                    bin.Status = bin.PartsCount >= bin.MaxCapacity ? BinStatus.Full : BinStatus.Partial;
+                    
+                    // Update contents to remove this part
+                    if (!string.IsNullOrEmpty(bin.Contents))
+                    {
+                        // This is a simplified content update - in a real system you'd track parts more precisely
+                        bin.Contents = $"{part.Product?.Name}: {bin.PartsCount} parts";
+                    }
+                }
+                
+                bin.LastUpdatedDate = DateTime.UtcNow;
+            }
+
+            // Change part status back to Cut
+            part.Status = PartStatus.Cut;
+            part.StatusUpdatedDate = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            // Log audit trail
+            await _auditTrail.LogAsync("RemoveFromBin", "Part", part.Id,
+                new { Status = "Sorted", part.StatusUpdatedDate },
+                new { Status = "Cut", StatusUpdatedDate = DateTime.UtcNow },
+                station: station, workOrderId: activeWorkOrderId,
+                details: $"Part '{part.Name}' removed from bin and status changed back to Cut",
+                sessionId: sessionId, ipAddress: ipAddress);
+
+            // Get updated cut parts count
+            var updatedCutPartsCount = await _context.Parts
+                .Include(p => p.NestSheet)
+                .CountAsync(p => p.NestSheet!.WorkOrderId == activeWorkOrderId && p.Status == PartStatus.Cut);
+
+            _logger.LogInformation("Part {PartId} ({PartName}) removed from bin and status changed to Cut", 
+                part.Id, part.Name);
+
+            return Json(new { 
+                success = true, 
+                message = $"Part '{part.Name}' removed from bin successfully.",
+                updatedCutPartsCount = updatedCutPartsCount
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error removing part {PartId} from bin", partId);
+            return Json(new { success = false, message = "An error occurred while removing the part from the bin." });
+        }
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> ClearBin(string rackId, int row, int column)
+    {
+        var sessionId = HttpContext.Session.Id;
+        var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+        var station = "Sorting";
+
+        try
+        {
+            var activeWorkOrderId = HttpContext.Session.GetString("ActiveWorkOrderId");
+            if (string.IsNullOrEmpty(activeWorkOrderId))
+            {
+                return Json(new { success = false, message = "No active work order selected." });
+            }
+
+            var bin = await _context.Bins
+                .FirstOrDefaultAsync(b => b.StorageRackId == rackId && b.Row == row && b.Column == column);
+
+            if (bin == null)
+            {
+                return Json(new { success = false, message = "Bin not found." });
+            }
+
+            if (bin.PartsCount == 0)
+            {
+                return Json(new { success = false, message = "Bin is already empty." });
+            }
+
+            // Find all parts that are currently sorted and belong to this bin's product
+            var partsToRemove = new List<Part>();
+            if (bin.ProductId != null)
+            {
+                partsToRemove = await _context.Parts
+                    .Include(p => p.Product)
+                    .Include(p => p.NestSheet)
+                    .Where(p => p.ProductId == bin.ProductId && 
+                               p.Status == PartStatus.Sorted &&
+                               p.NestSheet!.WorkOrderId == activeWorkOrderId)
+                    .ToListAsync();
+            }
+
+            var partsRemoved = 0;
+            
+            // Change all parts back to Cut status
+            foreach (var part in partsToRemove)
+            {
+                part.Status = PartStatus.Cut;
+                part.StatusUpdatedDate = DateTime.UtcNow;
+                partsRemoved++;
+
+                // Log individual part status change
+                await _auditTrail.LogAsync("ClearBin", "Part", part.Id,
+                    new { Status = "Sorted", part.StatusUpdatedDate },
+                    new { Status = "Cut", StatusUpdatedDate = DateTime.UtcNow },
+                    station: station, workOrderId: activeWorkOrderId,
+                    details: $"Part '{part.Name}' status changed to Cut due to bin clear operation",
+                    sessionId: sessionId, ipAddress: ipAddress);
+            }
+
+            // Clear the bin
+            var originalBin = new { 
+                bin.Status, bin.PartsCount, bin.PartId, bin.ProductId, 
+                bin.WorkOrderId, bin.Contents, bin.AssignedDate 
+            };
+
+            bin.Status = BinStatus.Empty;
+            bin.PartsCount = 0;
+            bin.PartId = null;
+            bin.ProductId = null;
+            bin.WorkOrderId = null;
+            bin.Contents = null;
+            bin.AssignedDate = null;
+            bin.LastUpdatedDate = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            // Log bin clear operation
+            await _auditTrail.LogAsync("ClearBin", "Bin", bin.Id,
+                originalBin,
+                new { bin.Status, bin.PartsCount, bin.PartId, bin.ProductId, 
+                     bin.WorkOrderId, bin.Contents, bin.AssignedDate },
+                station: station, workOrderId: activeWorkOrderId,
+                details: $"Bin {bin.BinLabel} cleared - {partsRemoved} parts removed",
+                sessionId: sessionId, ipAddress: ipAddress);
+
+            // Get updated cut parts count
+            var updatedCutPartsCount = await _context.Parts
+                .Include(p => p.NestSheet)
+                .CountAsync(p => p.NestSheet!.WorkOrderId == activeWorkOrderId && p.Status == PartStatus.Cut);
+
+            _logger.LogInformation("Bin {BinLabel} cleared - {PartsRemoved} parts removed and changed to Cut status", 
+                bin.BinLabel, partsRemoved);
+
+            return Json(new { 
+                success = true, 
+                message = $"Bin {bin.BinLabel} cleared successfully.",
+                partsRemoved = partsRemoved,
+                updatedCutPartsCount = updatedCutPartsCount
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error clearing bin at rack {RackId} position {Row},{Column}", rackId, row, column);
+            return Json(new { success = false, message = "An error occurred while clearing the bin." });
+        }
+    }
 }
