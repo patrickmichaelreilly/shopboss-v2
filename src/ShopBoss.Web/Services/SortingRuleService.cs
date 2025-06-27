@@ -120,7 +120,7 @@ public class SortingRuleService
             var productBin = rack.Bins
                 .Where(b => b.ProductId == productId && 
                            b.Status != BinStatus.Full && 
-                           b.IsAvailable &&
+                           b.Status != BinStatus.Blocked &&
                            (b.PartsCount + newPart.Qty) <= b.MaxCapacity) // Ensure new part will fit
                 .OrderBy(b => b.PartsCount) // Prefer bins with fewer parts to balance load
                 .FirstOrDefault();
@@ -236,12 +236,13 @@ public class SortingRuleService
             bin.Status = newTotalParts >= bin.MaxCapacity ? BinStatus.Full : BinStatus.Partial;
             bin.LastUpdatedDate = DateTime.UtcNow;
 
-            // Update part status to Sorted
+            // Update part status to Sorted and set location
             part.Status = PartStatus.Sorted;
             part.StatusUpdatedDate = DateTime.UtcNow;
+            part.Location = $"{rackId}-{bin.BinLabel}"; // e.g., "RackId-A01"
 
-            _logger.LogInformation("Assigned part {PartId} ({PartName}) to bin {BinLabel} - new total: {TotalParts}/{MaxCapacity}", 
-                partId, part.Name, bin.BinLabel, bin.PartsCount, bin.MaxCapacity);
+            _logger.LogInformation("Assigned part {PartId} ({PartName}) to bin {BinLabel} at location {Location} - new total: {TotalParts}/{MaxCapacity}", 
+                partId, part.Name, bin.BinLabel, part.Location, bin.PartsCount, bin.MaxCapacity);
 
             await _context.SaveChangesAsync();
             return true;

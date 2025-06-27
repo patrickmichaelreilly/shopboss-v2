@@ -17,6 +17,9 @@ public class Part
     [ForeignKey("NestSheet")]
     public string NestSheetId { get; set; } = string.Empty;
     
+    [StringLength(200)]
+    public string? Location { get; set; }
+    
     public string Name { get; set; } = string.Empty;
     
     public int Qty { get; set; }

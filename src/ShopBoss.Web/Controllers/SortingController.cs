@@ -509,44 +509,33 @@ public class SortingController : Controller
                 return Json(new { success = false, message = "Bin not found." });
             }
 
-            // Get all parts that are currently assigned to this bin
-            var partsInBin = await _context.Parts
-                .Include(p => p.Product)
-                .Where(p => p.Status == PartStatus.Sorted)
-                .ToListAsync();
-
-            // Filter parts that are in this specific bin by checking bin assignments
-            var binParts = new List<object>();
+            // Get parts that are currently assigned to this specific bin location
+            var binLocation = $"{rackId}-{bin.BinLabel}";
             var activeWorkOrderId = HttpContext.Session.GetString("ActiveWorkOrderId");
+            var binParts = new List<object>();
 
             if (!string.IsNullOrEmpty(activeWorkOrderId))
             {
-                // Get parts that were sorted to this specific bin
-                // Since we don't have a direct BinId field on Part, we need to find parts
-                // that match the bin's assigned product and check audit trail
-                if (bin.ProductId != null)
-                {
-                    var sortedParts = await _context.Parts
-                        .Include(p => p.Product)
-                        .Include(p => p.NestSheet)
-                        .Where(p => p.ProductId == bin.ProductId && 
-                                   p.Status == PartStatus.Sorted &&
-                                   p.NestSheet!.WorkOrderId == activeWorkOrderId)
-                        .ToListAsync();
+                var sortedParts = await _context.Parts
+                    .Include(p => p.Product)
+                    .Include(p => p.NestSheet)
+                    .Where(p => p.Location == binLocation && 
+                               p.Status == PartStatus.Sorted &&
+                               p.NestSheet!.WorkOrderId == activeWorkOrderId)
+                    .ToListAsync();
 
-                    binParts = sortedParts.Select(p => new
-                    {
-                        id = p.Id,
-                        name = p.Name,
-                        qty = p.Qty,
-                        productName = p.Product?.Name ?? "Unknown",
-                        material = p.Material,
-                        length = p.Length,
-                        width = p.Width,
-                        thickness = p.Thickness,
-                        sortedDate = p.StatusUpdatedDate?.ToString("yyyy-MM-dd HH:mm") ?? "Unknown"
-                    }).Cast<object>().ToList();
-                }
+                binParts = sortedParts.Select(p => new
+                {
+                    id = p.Id,
+                    name = p.Name,
+                    qty = p.Qty,
+                    productName = p.Product?.Name ?? "Unknown",
+                    material = p.Material,
+                    length = p.Length,
+                    width = p.Width,
+                    thickness = p.Thickness,
+                    sortedDate = p.StatusUpdatedDate?.ToString("yyyy-MM-dd HH:mm") ?? "Unknown"
+                }).Cast<object>().ToList();
             }
 
             var binDetails = new
@@ -642,9 +631,10 @@ public class SortingController : Controller
                 bin.LastUpdatedDate = DateTime.UtcNow;
             }
 
-            // Change part status back to Cut
+            // Change part status back to Cut and clear location
             part.Status = PartStatus.Cut;
             part.StatusUpdatedDate = DateTime.UtcNow;
+            part.Location = null;
 
             await _context.SaveChangesAsync();
 
@@ -705,34 +695,32 @@ public class SortingController : Controller
                 return Json(new { success = false, message = "Bin is already empty." });
             }
 
-            // Find all parts that are currently sorted and belong to this bin's product
-            var partsToRemove = new List<Part>();
-            if (bin.ProductId != null)
-            {
-                partsToRemove = await _context.Parts
-                    .Include(p => p.Product)
-                    .Include(p => p.NestSheet)
-                    .Where(p => p.ProductId == bin.ProductId && 
-                               p.Status == PartStatus.Sorted &&
-                               p.NestSheet!.WorkOrderId == activeWorkOrderId)
-                    .ToListAsync();
-            }
+            // Find all parts that are currently sorted to this specific bin location
+            var binLocation = $"{rackId}-{bin.BinLabel}";
+            var partsToRemove = await _context.Parts
+                .Include(p => p.Product)
+                .Include(p => p.NestSheet)
+                .Where(p => p.Location == binLocation && 
+                           p.Status == PartStatus.Sorted &&
+                           p.NestSheet!.WorkOrderId == activeWorkOrderId)
+                .ToListAsync();
 
             var partsRemoved = 0;
             
-            // Change all parts back to Cut status
+            // Change all parts back to Cut status and clear location
             foreach (var part in partsToRemove)
             {
                 part.Status = PartStatus.Cut;
                 part.StatusUpdatedDate = DateTime.UtcNow;
+                part.Location = null;
                 partsRemoved++;
 
                 // Log individual part status change
                 await _auditTrail.LogAsync("ClearBin", "Part", part.Id,
-                    new { Status = "Sorted", part.StatusUpdatedDate },
-                    new { Status = "Cut", StatusUpdatedDate = DateTime.UtcNow },
+                    new { Status = "Sorted", part.StatusUpdatedDate, part.Location },
+                    new { Status = "Cut", StatusUpdatedDate = DateTime.UtcNow, Location = (string?)null },
                     station: station, workOrderId: activeWorkOrderId,
-                    details: $"Part '{part.Name}' status changed to Cut due to bin clear operation",
+                    details: $"Part '{part.Name}' status changed to Cut and location cleared due to bin clear operation",
                     sessionId: sessionId, ipAddress: ipAddress);
             }
 

@@ -1024,10 +1024,12 @@ else
                 if (data.success) {
                     showToast(`Part "${partName}" removed from bin successfully`, 'success');
                     
-                    // Refresh the bin details
-                    if (currentBinDetails) {
-                        showBinDetailModal(currentBinDetails.rackId, currentBinDetails.row, currentBinDetails.column, currentBinDetails.label);
-                    }
+                    // Refresh the bin details - delay to allow DOM updates
+                    setTimeout(() => {
+                        if (currentBinDetails) {
+                            showBinDetailModal(currentBinDetails.rackId, currentBinDetails.row, currentBinDetails.column, currentBinDetails.label);
+                        }
+                    }, 100);
                     
                     // Refresh the rack display
                     if (currentRackId) {
@@ -1073,9 +1075,20 @@ else
                 if (data.success) {
                     showToast(`Bin "${currentBinDetails.label}" cleared successfully. ${data.partsRemoved} parts removed.`, 'success');
                     
-                    // Close the modal
+                    // Close the modal and ensure backdrop is removed
                     const modal = bootstrap.Modal.getInstance(document.getElementById('binDetailModal'));
                     modal.hide();
+                    
+                    // Force backdrop cleanup if it gets stuck
+                    setTimeout(() => {
+                        const backdrop = document.querySelector('.modal-backdrop');
+                        if (backdrop) {
+                            backdrop.remove();
+                        }
+                        document.body.classList.remove('modal-open');
+                        document.body.style.removeProperty('overflow');
+                        document.body.style.removeProperty('padding-right');
+                    }, 300);
                     
                     // Refresh the rack display
                     if (currentRackId) {
