@@ -170,6 +170,7 @@ public class SortingRuleService
             if (part == null) return false;
 
             var bin = await _context.Bins
+                .Include(b => b.StorageRack)
                 .FirstOrDefaultAsync(b => b.StorageRackId == rackId && b.Row == row && b.Column == column);
 
             if (bin == null || bin.Status == BinStatus.Blocked) return false;
@@ -217,7 +218,7 @@ public class SortingRuleService
             // Update part status to Sorted and set location
             part.Status = PartStatus.Sorted;
             part.StatusUpdatedDate = DateTime.UtcNow;
-            part.Location = $"{rackId}-{bin.BinLabel}"; // e.g., "RackId-A01"
+            part.Location = $"{bin.StorageRack.Name}:{bin.BinLabel}"; // e.g., "Standard Rack A:A01"
 
             _logger.LogInformation("Assigned part {PartId} ({PartName}) to bin {BinLabel} at location {Location} - new total: {TotalParts}/{MaxCapacity}", 
                 partId, part.Name, bin.BinLabel, part.Location, bin.PartsCount, bin.MaxCapacity);

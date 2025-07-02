@@ -535,7 +535,9 @@ public class SortingController : Controller
             }
 
             // Get parts that are currently assigned to this specific bin location
-            var binLocation = $"{rackId}-{bin.BinLabel}";
+            // Location format matches what's stored: "{RackName}:{BinLabel}" (e.g., "Standard Rack A:A01")
+            var rack = await _context.StorageRacks.FindAsync(rackId);
+            var binLocation = $"{rack.Name}:{bin.BinLabel}";
             var activeWorkOrderId = HttpContext.Session.GetString("ActiveWorkOrderId");
             var binParts = new List<object>();
 

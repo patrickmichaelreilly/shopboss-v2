@@ -210,7 +210,7 @@
                                             {
                                                 <span class="ms-2">
                                                     <i class="fas fa-filter me-1"></i>
-                                                    @product.FilteredPartsCount filtered parts (doors/fronts/shelves)
+                                                    @product.SortedFilteredPartsCount/@product.FilteredPartsCount filtered parts
                                                 </span>
                                             }
                                         </div>
@@ -708,6 +708,10 @@
                     barcodeInput.classList.remove('is-invalid');
                     
                     // Show filtered parts guidance if needed
+                    console.log('Assembly scan response:', data);
+                    console.log('Has filtered parts:', data.hasFilteredParts);
+                    console.log('Filtered parts guidance:', data.filteredPartsGuidance);
+                    
                     if (data.hasFilteredParts && data.filteredPartsGuidance.length > 0) {
                         setTimeout(() => {
                             showFilteredPartsGuidance(data.productName, data.filteredPartsGuidance);
@@ -745,6 +749,8 @@
         }
 
         function showFilteredPartsGuidance(productName, filteredParts) {
+            console.log('showFilteredPartsGuidance called with:', { productName, filteredParts });
+            
             const modal = new bootstrap.Modal(document.getElementById('filteredPartsModal'));
             const content = document.getElementById('filteredPartsContent');
             
@@ -757,23 +763,26 @@
 
             // Group by category
             const categories = {};
-            filteredParts.forEach(part => {
-                if (!categories[part.Category]) {
-                    categories[part.Category] = [];
+            filteredParts.forEach((part, index) => {
+                console.log(`Part ${index}:`, part);
+                if (!categories[part.category]) {
+                    categories[part.category] = [];
                 }
-                categories[part.Category].push(part);
+                categories[part.category].push(part);
             });
 
             Object.keys(categories).forEach(category => {
-                const categoryIcon = category === 'DoorsAndDrawerFronts' ? 'fa-door-open' : 
-                                   category === 'AdjustableShelves' ? 'fa-th-large' : 'fa-cube';
+                const categoryName = category || 'Unknown Category';
+                const categoryIcon = categoryName === 'DoorsAndDrawerFronts' ? 'fa-door-open' : 
+                                   categoryName === 'AdjustableShelves' ? 'fa-th-large' : 'fa-cube';
+                const displayName = categoryName.replace(/([A-Z])/g, ' $1').trim() || 'Unknown Category';
                 
                 html += `
                     <div class="card mb-3">
                         <div class="card-header">
                             <h6 class="mb-0">
                                 <i class="fas ${categoryIcon} me-2"></i>
-                                ${category.replace(/([A-Z])/g, ' $1').trim()}
+                                ${displayName}
                             </h6>
                         </div>
                         <div class="card-body">
@@ -781,16 +790,20 @@
                 `;
 
                 categories[category].forEach(part => {
+                    const partName = part.name || 'Unknown Part';
+                    const partQuantity = part.quantity || 0;
+                    const partLocation = part.location || 'Location Unknown';
+                    
                     html += `
                         <div class="col-md-6 mb-2">
                             <div class="d-flex justify-content-between align-items-center p-2 bg-light rounded">
                                 <div>
-                                    <strong>${part.Name}</strong>
+                                    <strong>${partName}</strong>
                                     <br>
-                                    <small class="text-muted">Qty: ${part.Quantity}</small>
+                                    <small class="text-muted">Qty: ${partQuantity}</small>
                                 </div>
                                 <div class="text-end">
-                                    <span class="badge bg-info">${part.Location}</span>
+                                    <span class="badge bg-info">${partLocation}</span>
                                 </div>
                             </div>
                         </div>
