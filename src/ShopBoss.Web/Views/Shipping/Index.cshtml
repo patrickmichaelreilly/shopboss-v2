@@ -1,0 +1,630 @@
+@model ShopBoss.Web.Services.ShippingDashboardData
+@{
+    ViewData["Title"] = "Shipping Station";
+}
+
+@section Styles {
+    <style>
+        .shipping-dashboard {
+            min-height: 70vh;
+        }
+        
+        .shipping-section {
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            background: #f8f9fa;
+        }
+        
+        .shipping-section.products {
+            border-color: #0d6efd;
+        }
+        
+        .shipping-section.hardware {
+            border-color: #6f42c1;
+        }
+        
+        .shipping-section.detached {
+            border-color: #fd7e14;
+        }
+        
+        .shipping-section-header {
+            background: #e9ecef;
+            padding: 15px;
+            border-bottom: 1px solid #dee2e6;
+            border-radius: 6px 6px 0 0;
+        }
+        
+        .shipping-section.products .shipping-section-header {
+            background: #cfe2ff;
+            border-color: #0d6efd;
+        }
+        
+        .shipping-section.hardware .shipping-section-header {
+            background: #e2d9f3;
+            border-color: #6f42c1;
+        }
+        
+        .shipping-section.detached .shipping-section-header {
+            background: #fde2d3;
+            border-color: #fd7e14;
+        }
+        
+        .shipping-item {
+            padding: 15px;
+            border-bottom: 1px solid #dee2e6;
+            background: white;
+            transition: background-color 0.2s;
+        }
+        
+        .shipping-item:last-child {
+            border-bottom: none;
+            border-radius: 0 0 6px 6px;
+        }
+        
+        .shipping-item:hover {
+            background: #f8f9fa;
+        }
+        
+        .shipping-item.shipped {
+            background: #d1e7dd;
+            border-left: 4px solid #198754;
+        }
+        
+        .shipping-item.ready {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+        }
+        
+        .shipping-item.not-ready {
+            background: #f8d7da;
+            border-left: 4px solid #dc3545;
+        }
+        
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+        
+        .status-badge.shipped {
+            background: #d1e7dd;
+            color: #0f5132;
+        }
+        
+        .status-badge.ready {
+            background: #fff3cd;
+            color: #664d03;
+        }
+        
+        .status-badge.not-ready {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .scan-interface {
+            position: sticky;
+            top: 20px;
+            z-index: 100;
+        }
+        
+        .scan-card {
+            border: 2px solid #0d6efd;
+            border-radius: 8px;
+            background: white;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .scan-input {
+            border: 2px solid #0d6efd;
+            border-radius: 6px;
+            padding: 12px;
+            font-size: 1.1rem;
+        }
+        
+        .scan-input:focus {
+            border-color: #0a58ca;
+            box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+        }
+        
+        .progress-ring {
+            width: 60px;
+            height: 60px;
+            border: 4px solid #e9ecef;
+            border-top: 4px solid #0d6efd;
+            border-radius: 50%;
+            margin: 0 auto 10px;
+        }
+        
+        .progress-ring.completed {
+            border-top-color: #198754;
+        }
+        
+        .progress-text {
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+        
+        .recent-scans {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .recent-scan-item {
+            padding: 8px 12px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            margin-bottom: 8px;
+        }
+        
+        .recent-scan-item.success {
+            background: #d1e7dd;
+            border-left: 3px solid #198754;
+        }
+        
+        .recent-scan-item.error {
+            background: #f8d7da;
+            border-left: 3px solid #dc3545;
+        }
+        
+        .shipping-complete {
+            background: #d1e7dd;
+            border: 2px solid #198754;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .work-order-header {
+            background: #e9ecef;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+    </style>
+}
+
+<div class="shipping-dashboard">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>
+            <i class="fas fa-shipping-fast text-primary me-2"></i>
+            Shipping Station
+        </h1>
+        <div class="d-flex align-items-center">
+            <div class="progress-ring" id="overallProgressRing"></div>
+            <div class="ms-3">
+                <div class="progress-text" id="overallProgressText">Loading...</div>
+                <small class="text-muted">Overall Progress</small>
+            </div>
+        </div>
+    </div>
+
+    <div class="work-order-header">
+        <h3>
+            <i class="fas fa-clipboard-list text-primary me-2"></i>
+            Work Order: @Model.WorkOrder.Name
+        </h3>
+        <div class="row">
+            <div class="col-md-6">
+                <p class="mb-1"><strong>Work Order ID:</strong> @Model.WorkOrder.Id</p>
+                <p class="mb-1"><strong>Created:</strong> @Model.WorkOrder.ImportedDate.ToString("MMM dd, yyyy")</p>
+            </div>
+            <div class="col-md-6">
+                <p class="mb-1"><strong>Products:</strong> @Model.Products.Count</p>
+                <p class="mb-1"><strong>Hardware Items:</strong> @Model.Hardware.Count</p>
+                <p class="mb-1"><strong>Detached Products:</strong> @Model.DetachedProducts.Count</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="shippingCompleteAlert" class="shipping-complete d-none">
+        <h3><i class="fas fa-check-circle text-success me-2"></i>Work Order Fully Shipped!</h3>
+        <p class="mb-0">All items in this work order have been shipped and are ready for delivery.</p>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <!-- Products Section -->
+            <div class="shipping-section products">
+                <div class="shipping-section-header">
+                    <h4 class="mb-0">
+                        <i class="fas fa-cube text-primary me-2"></i>
+                        Products (@Model.Products.Count(p => p.IsShipped)/@Model.Products.Count shipped)
+                    </h4>
+                </div>
+                @if (Model.Products.Any())
+                {
+                    @foreach (var product in Model.Products)
+                    {
+                        <div class="shipping-item @(product.IsShipped ? "shipped" : product.IsReadyForShipping ? "ready" : "not-ready")">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="mb-1">@product.Product.Name</h6>
+                                    <small class="text-muted">ID: @product.Product.Id</small>
+                                    @if (!string.IsNullOrEmpty(product.Product.ProductNumber))
+                                    {
+                                        <small class="text-muted"> | Product #: @product.Product.ProductNumber</small>
+                                    }
+                                </div>
+                                <div class="d-flex align-items-center">
+                                    <div class="me-3">
+                                        <small class="text-muted">Parts: @product.ShippedPartsCount/@product.TotalPartsCount</small>
+                                    </div>
+                                    <span class="status-badge @(product.IsShipped ? "shipped" : product.IsReadyForShipping ? "ready" : "not-ready")">
+                                        @if (product.IsShipped)
+                                        {
+                                            <i class="fas fa-check me-1"></i><text>Shipped</text>
+                                        }
+                                        else if (product.IsReadyForShipping)
+                                        {
+                                            <i class="fas fa-clock me-1"></i><text>Ready</text>
+                                        }
+                                        else
+                                        {
+                                            <i class="fas fa-exclamation-triangle me-1"></i><text>Not Ready</text>
+                                        }
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="shipping-item">
+                        <p class="text-muted mb-0">No products in this work order</p>
+                    </div>
+                }
+            </div>
+
+            <!-- Hardware Section -->
+            <div class="shipping-section hardware">
+                <div class="shipping-section-header">
+                    <h4 class="mb-0">
+                        <i class="fas fa-wrench text-purple me-2"></i>
+                        Hardware (@Model.Hardware.Count/@Model.Hardware.Count shipped)
+                    </h4>
+                </div>
+                @if (Model.Hardware.Any())
+                {
+                    @foreach (var hardware in Model.Hardware)
+                    {
+                        <div class="shipping-item shipped">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="mb-1">@hardware.Name</h6>
+                                    <small class="text-muted">ID: @hardware.Id</small>
+                                </div>
+                                <div class="d-flex align-items-center">
+                                    <div class="me-3">
+                                        <small class="text-muted">Qty: @hardware.Qty</small>
+                                    </div>
+                                    <span class="status-badge shipped">
+                                        <i class="fas fa-check me-1"></i>Ready
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="shipping-item">
+                        <p class="text-muted mb-0">No hardware items in this work order</p>
+                    </div>
+                }
+            </div>
+
+            <!-- Detached Products Section -->
+            <div class="shipping-section detached">
+                <div class="shipping-section-header">
+                    <h4 class="mb-0">
+                        <i class="fas fa-box text-warning me-2"></i>
+                        Detached Products (@Model.DetachedProducts.Count/@Model.DetachedProducts.Count shipped)
+                    </h4>
+                </div>
+                @if (Model.DetachedProducts.Any())
+                {
+                    @foreach (var detached in Model.DetachedProducts)
+                    {
+                        <div class="shipping-item shipped">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="mb-1">@detached.Name</h6>
+                                    <small class="text-muted">ID: @detached.Id</small>
+                                    @if (!string.IsNullOrEmpty(detached.ProductNumber))
+                                    {
+                                        <small class="text-muted"> | Product #: @detached.ProductNumber</small>
+                                    }
+                                </div>
+                                <div class="d-flex align-items-center">
+                                    <div class="me-3">
+                                        <small class="text-muted">Qty: @detached.Qty</small>
+                                    </div>
+                                    <span class="status-badge shipped">
+                                        <i class="fas fa-check me-1"></i>Ready
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="shipping-item">
+                        <p class="text-muted mb-0">No detached products in this work order</p>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="scan-interface">
+                <div class="scan-card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-barcode me-2"></i>
+                            Scan to Ship
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="barcodeInput" class="form-label">Barcode</label>
+                            <input type="text" class="form-control scan-input" id="barcodeInput" 
+                                   placeholder="Scan or enter barcode..." autofocus>
+                        </div>
+                        <div class="d-grid gap-2">
+                            <button type="button" class="btn btn-primary btn-lg" id="scanButton">
+                                <i class="fas fa-shipping-fast me-2"></i>
+                                Ship Item
+                            </button>
+                        </div>
+                        <div class="mt-3">
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Scan products, hardware, or detached products to mark as shipped
+                            </small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="fas fa-history me-2"></i>
+                            Recent Scans
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div id="recentScans" class="recent-scans">
+                            <p class="text-muted mb-0">No recent scans</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/lib/signalr/dist/browser/signalr.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            // Initialize SignalR connection
+            const connection = new signalR.HubConnectionBuilder()
+                .withUrl("/hubs/status")
+                .build();
+
+            // Start the connection
+            connection.start().then(function () {
+                // Join the shipping station group
+                connection.invoke("JoinGroup", "shipping-station");
+                console.log("Connected to shipping station SignalR hub");
+            }).catch(function (err) {
+                console.error("Error connecting to SignalR hub:", err);
+            });
+
+            // Listen for assembly completions
+            connection.on("ProductReadyForShipping", function (data) {
+                console.log("Product ready for shipping:", data);
+                // Refresh the page to show updated status
+                location.reload();
+            });
+
+            // Listen for general status updates
+            connection.on("StatusUpdate", function (data) {
+                if (data.type === "product-assembled") {
+                    console.log("Product assembled:", data);
+                    // Refresh the page to show updated status
+                    location.reload();
+                }
+            });
+
+            // Initialize page
+            updateOverallProgress();
+            
+            // Barcode scanning functionality
+            $('#barcodeInput').on('keypress', function(e) {
+                if (e.which === 13) { // Enter key
+                    processScan();
+                }
+            });
+
+            $('#scanButton').on('click', function() {
+                processScan();
+            });
+
+            // Auto-focus barcode input
+            $('#barcodeInput').focus();
+
+            function processScan() {
+                const barcode = $('#barcodeInput').val().trim();
+                
+                if (!barcode) {
+                    showAlert('Please enter a barcode', 'warning');
+                    return;
+                }
+
+                // Disable input during processing
+                $('#barcodeInput').prop('disabled', true);
+                $('#scanButton').prop('disabled', true);
+
+                // Try scanning as product first
+                scanProduct(barcode)
+                    .then(result => {
+                        if (result.success) {
+                            handleScanSuccess(result, 'Product');
+                        } else {
+                            // Try as hardware
+                            return scanHardware(barcode);
+                        }
+                    })
+                    .then(result => {
+                        if (result && !result.success) {
+                            // Try as detached product
+                            return scanDetachedProduct(barcode);
+                        }
+                        return result;
+                    })
+                    .then(result => {
+                        if (result && result.success) {
+                            handleScanSuccess(result, 'Hardware/Detached');
+                        } else if (result) {
+                            // If we tried all types and none worked
+                            handleScanError(result.message || 'Item not found');
+                        }
+                    })
+                    .catch(error => {
+                        handleScanError('Error processing scan');
+                        console.error('Scan error:', error);
+                    })
+                    .finally(() => {
+                        // Re-enable input
+                        $('#barcodeInput').prop('disabled', false);
+                        $('#scanButton').prop('disabled', false);
+                        $('#barcodeInput').val('').focus();
+                    });
+            }
+
+            function scanProduct(barcode) {
+                return $.ajax({
+                    url: '/Shipping/ScanProduct',
+                    method: 'POST',
+                    data: { barcode: barcode },
+                    dataType: 'json'
+                });
+            }
+
+            function scanHardware(barcode) {
+                return $.ajax({
+                    url: '/Shipping/ScanHardware',
+                    method: 'POST',
+                    data: { barcode: barcode },
+                    dataType: 'json'
+                });
+            }
+
+            function scanDetachedProduct(barcode) {
+                return $.ajax({
+                    url: '/Shipping/ScanDetachedProduct',
+                    method: 'POST',
+                    data: { barcode: barcode },
+                    dataType: 'json'
+                });
+            }
+
+            function handleScanSuccess(result, type) {
+                showAlert(result.message, 'success');
+                addRecentScan(result.message, true);
+                
+                // Update progress
+                updateOverallProgress();
+                
+                // Refresh page after short delay to show updates
+                setTimeout(() => {
+                    location.reload();
+                }, 1000);
+            }
+
+            function handleScanError(message) {
+                showAlert(message, 'danger');
+                addRecentScan(message, false);
+            }
+
+            function addRecentScan(message, isSuccess) {
+                const recentScans = $('#recentScans');
+                const timestamp = new Date().toLocaleTimeString();
+                
+                // Remove "No recent scans" message
+                if (recentScans.find('p.text-muted').length > 0) {
+                    recentScans.empty();
+                }
+                
+                const scanItem = $(`
+                    <div class="recent-scan-item ${isSuccess ? 'success' : 'error'}">
+                        <div class="d-flex justify-content-between">
+                            <span>${message}</span>
+                            <small>${timestamp}</small>
+                        </div>
+                    </div>
+                `);
+                
+                recentScans.prepend(scanItem);
+                
+                // Keep only last 5 scans
+                if (recentScans.children().length > 5) {
+                    recentScans.children().last().remove();
+                }
+            }
+
+            function updateOverallProgress() {
+                $.get('/Shipping/GetShippingProgress')
+                    .done(function(response) {
+                        if (response.success) {
+                            const data = response.data;
+                            const totalItems = data.Products.Total + data.Hardware.Total + data.DetachedProducts.Total;
+                            const shippedItems = data.Products.Shipped + data.Hardware.Shipped + data.DetachedProducts.Shipped;
+                            
+                            const percentage = totalItems > 0 ? Math.round((shippedItems / totalItems) * 100) : 0;
+                            
+                            $('#overallProgressText').text(`${shippedItems}/${totalItems} (${percentage}%)`);
+                            
+                            const progressRing = $('#overallProgressRing');
+                            if (percentage === 100) {
+                                progressRing.addClass('completed');
+                                $('#shippingCompleteAlert').removeClass('d-none');
+                            } else {
+                                progressRing.removeClass('completed');
+                                $('#shippingCompleteAlert').addClass('d-none');
+                            }
+                        }
+                    })
+                    .fail(function() {
+                        $('#overallProgressText').text('Error loading progress');
+                    });
+            }
+
+            function showAlert(message, type) {
+                const alertHtml = `
+                    <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                        ${message}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                `;
+                
+                // Remove existing alerts
+                $('.alert').remove();
+                
+                // Add new alert at the top of the page
+                $('main').prepend(alertHtml);
+                
+                // Auto-dismiss after 5 seconds
+                setTimeout(() => {
+                    $('.alert').fadeOut();
+                }, 5000);
+            }
+        });
+    </script>
+}

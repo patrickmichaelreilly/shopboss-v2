@@ -1,0 +1,84 @@
+@{
+    ViewData["Title"] = "Shipping Station - No Active Work Order";
+}
+
+<div class="container-fluid py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card border-warning">
+                <div class="card-header bg-warning text-dark">
+                    <h4 class="mb-0">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        No Active Work Order
+                    </h4>
+                </div>
+                <div class="card-body text-center py-5">
+                    <i class="fas fa-shipping-fast text-muted mb-3" style="font-size: 4rem;"></i>
+                    <h5 class="mb-3">Shipping Station Ready</h5>
+                    <p class="text-muted mb-4">
+                        No active work order is currently selected. Please select a work order from the Admin Station 
+                        to begin shipping operations.
+                    </p>
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+                        <a href="/Admin" class="btn btn-primary">
+                            <i class="fas fa-cog me-2"></i>
+                            Go to Admin Station
+                        </a>
+                        <a href="/" class="btn btn-outline-secondary">
+                            <i class="fas fa-home me-2"></i>
+                            Return to Dashboard
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row justify-content-center mt-4">
+        <div class="col-md-8 col-lg-6">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Shipping Station Information
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <h6>What can you do at the Shipping Station?</h6>
+                    <ul class="list-unstyled">
+                        <li class="mb-2">
+                            <i class="fas fa-check text-success me-2"></i>
+                            <strong>Ship Products:</strong> Scan assembled products to mark them as shipped
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-check text-success me-2"></i>
+                            <strong>Ship Hardware:</strong> Scan hardware items to mark them as shipped
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-check text-success me-2"></i>
+                            <strong>Ship Detached Products:</strong> Scan detached products to mark them as shipped
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-check text-success me-2"></i>
+                            <strong>Track Progress:</strong> Monitor shipping completion in real-time
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-check text-success me-2"></i>
+                            <strong>Complete Work Orders:</strong> Finalize work orders when all items are shipped
+                        </li>
+                    </ul>
+                    
+                    <hr>
+                    
+                    <h6>Before you start:</h6>
+                    <ol>
+                        <li>Ensure products are assembled at the Assembly Station</li>
+                        <li>Select an active work order from the Admin Station</li>
+                        <li>Verify all items are ready for shipping</li>
+                        <li>Use barcode scanner or manual entry to ship items</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
