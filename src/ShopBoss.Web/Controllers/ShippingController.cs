@@ -264,10 +264,39 @@ public class ShippingController : Controller
                 });
             }
 
-            // Hardware items are considered always ready to ship
-            // For this implementation, we'll track shipping in the audit log only
+            // Mark hardware as shipped
+            hardware.IsShipped = true;
+            hardware.ShippedDate = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
+
+            // Check if work order is now fully shipped
+            var workOrderFullyShipped = await IsWorkOrderFullyShippedAsync(activeWorkOrderId);
+
+            // Send SignalR notifications
+            await _hubContext.Clients.Group($"WorkOrder_{activeWorkOrderId}")
+                .SendAsync("HardwareShippedByScan", new
+                {
+                    HardwareId = hardware.Id,
+                    HardwareName = hardware.Name,
+                    ScannedBarcode = barcode,
+                    WorkOrderId = activeWorkOrderId,
+                    Timestamp = DateTime.UtcNow,
+                    IsWorkOrderFullyShipped = workOrderFullyShipped
+                });
+
+            await _hubContext.Clients.Group("all-stations")
+                .SendAsync("StatusUpdate", new
+                {
+                    type = "hardware-shipped",
+                    hardwareId = hardware.Id,
+                    hardwareName = hardware.Name,
+                    workOrderId = activeWorkOrderId,
+                    station = "Shipping",
+                    timestamp = DateTime.UtcNow,
+                    isWorkOrderFullyShipped = workOrderFullyShipped,
+                    message = $"Hardware '{hardware.Name}' has been shipped"
+                });
 
             // Log the status change
             await _auditTrailService.LogAsync(
@@ -332,10 +361,39 @@ public class ShippingController : Controller
                 });
             }
 
-            // Detached products are considered always ready to ship
-            // For this implementation, we'll track shipping in the audit log only
+            // Mark detached product as shipped
+            detachedProduct.IsShipped = true;
+            detachedProduct.ShippedDate = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
+
+            // Check if work order is now fully shipped
+            var workOrderFullyShipped = await IsWorkOrderFullyShippedAsync(activeWorkOrderId);
+
+            // Send SignalR notifications
+            await _hubContext.Clients.Group($"WorkOrder_{activeWorkOrderId}")
+                .SendAsync("DetachedProductShippedByScan", new
+                {
+                    DetachedProductId = detachedProduct.Id,
+                    DetachedProductName = detachedProduct.Name,
+                    ScannedBarcode = barcode,
+                    WorkOrderId = activeWorkOrderId,
+                    Timestamp = DateTime.UtcNow,
+                    IsWorkOrderFullyShipped = workOrderFullyShipped
+                });
+
+            await _hubContext.Clients.Group("all-stations")
+                .SendAsync("StatusUpdate", new
+                {
+                    type = "detached-product-shipped",
+                    detachedProductId = detachedProduct.Id,
+                    detachedProductName = detachedProduct.Name,
+                    workOrderId = activeWorkOrderId,
+                    station = "Shipping",
+                    timestamp = DateTime.UtcNow,
+                    isWorkOrderFullyShipped = workOrderFullyShipped,
+                    message = $"Detached product '{detachedProduct.Name}' has been shipped"
+                });
 
             // Log the status change
             await _auditTrailService.LogAsync(
@@ -384,11 +442,11 @@ public class ShippingController : Controller
             var shippedProducts = dashboardData.Products.Count(p => p.IsShipped);
             var totalProducts = dashboardData.Products.Count;
             
-            // For this implementation, hardware and detached products are always considered shipped
-            var shippedHardware = dashboardData.Hardware.Count;
+            // Count actually shipped hardware and detached products
+            var shippedHardware = dashboardData.Hardware.Count(h => h.IsShipped);
             var totalHardware = dashboardData.Hardware.Count;
             
-            var shippedDetachedProducts = dashboardData.DetachedProducts.Count;
+            var shippedDetachedProducts = dashboardData.DetachedProducts.Count(d => d.IsShipped);
             var totalDetachedProducts = dashboardData.DetachedProducts.Count;
 
             return Json(new
@@ -430,10 +488,9 @@ public class ShippingController : Controller
             var allProductsShipped = workOrder.Products.All(p => 
                 p.Parts.Any() && p.Parts.All(part => part.Status == PartStatus.Shipped));
 
-            // For this implementation, hardware and detached products are always considered ready/shipped
-            // In a full implementation, you would add status tracking to these entities
-            var allHardwareShipped = true;
-            var allDetachedProductsShipped = true;
+            // Check if all hardware and detached products are shipped
+            var allHardwareShipped = workOrder.Hardware.All(h => h.IsShipped);
+            var allDetachedProductsShipped = workOrder.DetachedProducts.All(d => d.IsShipped);
 
             return allProductsShipped && allHardwareShipped && allDetachedProductsShipped;
         }
@@ -460,5 +517,151 @@ public class ShippingController : Controller
             _logger.LogError(ex, "Error getting shipped product count for work order {WorkOrderId}", workOrderId);
             return 0;
         }
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> GetWorkOrderCompletionReport()
+    {
+        try
+        {
+            var activeWorkOrderId = HttpContext.Session.GetString("ActiveWorkOrderId");
+            if (string.IsNullOrEmpty(activeWorkOrderId))
+            {
+                return Json(new { success = false, message = "No active work order selected" });
+            }
+
+            var report = await GenerateCompletionReportAsync(activeWorkOrderId);
+            return Json(new { success = true, data = report });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error generating work order completion report");
+            return Json(new { success = false, message = "Error generating completion report" });
+        }
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> CompleteWorkOrder()
+    {
+        try
+        {
+            var activeWorkOrderId = HttpContext.Session.GetString("ActiveWorkOrderId");
+            if (string.IsNullOrEmpty(activeWorkOrderId))
+            {
+                return Json(new { success = false, message = "No active work order selected" });
+            }
+
+            var isFullyShipped = await IsWorkOrderFullyShippedAsync(activeWorkOrderId);
+            if (!isFullyShipped)
+            {
+                return Json(new { success = false, message = "Work order is not fully shipped and cannot be completed" });
+            }
+
+            // Mark work order as completed
+            var workOrder = await _context.WorkOrders.FindAsync(activeWorkOrderId);
+            if (workOrder != null)
+            {
+                // Add completion tracking if needed
+                await _auditTrailService.LogAsync(
+                    action: "WorkOrderCompleted",
+                    entityType: "WorkOrder",
+                    entityId: activeWorkOrderId,
+                    oldValue: "Active",
+                    newValue: "Completed",
+                    station: "Shipping",
+                    workOrderId: activeWorkOrderId,
+                    details: "Work order marked as completed - all items shipped",
+                    sessionId: HttpContext.Session.Id
+                );
+
+                // Notify all stations
+                await _hubContext.Clients.Group("all-stations")
+                    .SendAsync("WorkOrderCompleted", new
+                    {
+                        workOrderId = activeWorkOrderId,
+                        workOrderName = workOrder.Name,
+                        completedAt = DateTime.UtcNow,
+                        station = "Shipping",
+                        message = $"Work order '{workOrder.Name}' has been completed"
+                    });
+
+                _logger.LogInformation("Work order {WorkOrderId} completed at shipping station", activeWorkOrderId);
+            }
+
+            return Json(new { success = true, message = "Work order completed successfully" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error completing work order");
+            return Json(new { success = false, message = "Error completing work order" });
+        }
+    }
+
+    private async Task<object> GenerateCompletionReportAsync(string workOrderId)
+    {
+        var workOrder = await _context.WorkOrders
+            .Include(w => w.Products)
+                .ThenInclude(p => p.Parts)
+            .Include(w => w.Hardware)
+            .Include(w => w.DetachedProducts)
+            .FirstOrDefaultAsync(w => w.Id == workOrderId);
+
+        if (workOrder == null)
+        {
+            return new { error = "Work order not found" };
+        }
+
+        var productStats = workOrder.Products.Select(p => new
+        {
+            id = p.Id,
+            name = p.Name,
+            totalParts = p.Parts.Count,
+            shippedParts = p.Parts.Count(part => part.Status == PartStatus.Shipped),
+            isFullyShipped = p.Parts.Any() && p.Parts.All(part => part.Status == PartStatus.Shipped)
+        }).ToList();
+
+        var hardwareStats = workOrder.Hardware.Select(h => new
+        {
+            id = h.Id,
+            name = h.Name,
+            quantity = h.Qty,
+            isShipped = h.IsShipped,
+            shippedDate = h.ShippedDate
+        }).ToList();
+
+        var detachedProductStats = workOrder.DetachedProducts.Select(d => new
+        {
+            id = d.Id,
+            name = d.Name,
+            quantity = d.Qty,
+            isShipped = d.IsShipped,
+            shippedDate = d.ShippedDate
+        }).ToList();
+
+        return new
+        {
+            workOrder = new
+            {
+                id = workOrder.Id,
+                name = workOrder.Name,
+                importedDate = workOrder.ImportedDate
+            },
+            summary = new
+            {
+                totalProducts = workOrder.Products.Count,
+                shippedProducts = productStats.Count(p => p.isFullyShipped),
+                totalHardware = workOrder.Hardware.Count,
+                shippedHardware = hardwareStats.Count(h => h.isShipped),
+                totalDetachedProducts = workOrder.DetachedProducts.Count,
+                shippedDetachedProducts = detachedProductStats.Count(d => d.isShipped),
+                isFullyShipped = await IsWorkOrderFullyShippedAsync(workOrderId)
+            },
+            details = new
+            {
+                products = productStats,
+                hardware = hardwareStats,
+                detachedProducts = detachedProductStats
+            }
+        };
     }
 }

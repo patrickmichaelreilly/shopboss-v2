@@ -284,25 +284,32 @@
                 <div class="shipping-section-header">
                     <h4 class="mb-0">
                         <i class="fas fa-wrench text-purple me-2"></i>
-                        Hardware (@Model.Hardware.Count/@Model.Hardware.Count shipped)
+                        Hardware (@Model.Hardware.Count(h => h.IsShipped)/@Model.Hardware.Count shipped)
                     </h4>
                 </div>
                 @if (Model.Hardware.Any())
                 {
                     @foreach (var hardware in Model.Hardware)
                     {
-                        <div class="shipping-item shipped">
+                        <div class="shipping-item @(hardware.IsShipped ? "shipped" : "ready")">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
-                                    <h6 class="mb-1">@hardware.Name</h6>
-                                    <small class="text-muted">ID: @hardware.Id</small>
+                                    <h6 class="mb-1">@hardware.Hardware.Name</h6>
+                                    <small class="text-muted">ID: @hardware.Hardware.Id</small>
                                 </div>
                                 <div class="d-flex align-items-center">
                                     <div class="me-3">
-                                        <small class="text-muted">Qty: @hardware.Qty</small>
+                                        <small class="text-muted">Qty: @hardware.Hardware.Qty</small>
                                     </div>
-                                    <span class="status-badge shipped">
-                                        <i class="fas fa-check me-1"></i>Ready
+                                    <span class="status-badge @(hardware.IsShipped ? "shipped" : "ready")">
+                                        @if (hardware.IsShipped)
+                                        {
+                                            <i class="fas fa-check me-1"></i><text>Shipped</text>
+                                        }
+                                        else
+                                        {
+                                            <i class="fas fa-clock me-1"></i><text>Ready</text>
+                                        }
                                     </span>
                                 </div>
                             </div>
@@ -322,29 +329,36 @@
                 <div class="shipping-section-header">
                     <h4 class="mb-0">
                         <i class="fas fa-box text-warning me-2"></i>
-                        Detached Products (@Model.DetachedProducts.Count/@Model.DetachedProducts.Count shipped)
+                        Detached Products (@Model.DetachedProducts.Count(d => d.IsShipped)/@Model.DetachedProducts.Count shipped)
                     </h4>
                 </div>
                 @if (Model.DetachedProducts.Any())
                 {
                     @foreach (var detached in Model.DetachedProducts)
                     {
-                        <div class="shipping-item shipped">
+                        <div class="shipping-item @(detached.IsShipped ? "shipped" : "ready")">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
-                                    <h6 class="mb-1">@detached.Name</h6>
-                                    <small class="text-muted">ID: @detached.Id</small>
-                                    @if (!string.IsNullOrEmpty(detached.ProductNumber))
+                                    <h6 class="mb-1">@detached.DetachedProduct.Name</h6>
+                                    <small class="text-muted">ID: @detached.DetachedProduct.Id</small>
+                                    @if (!string.IsNullOrEmpty(detached.DetachedProduct.ProductNumber))
                                     {
-                                        <small class="text-muted"> | Product #: @detached.ProductNumber</small>
+                                        <small class="text-muted"> | Product #: @detached.DetachedProduct.ProductNumber</small>
                                     }
                                 </div>
                                 <div class="d-flex align-items-center">
                                     <div class="me-3">
-                                        <small class="text-muted">Qty: @detached.Qty</small>
+                                        <small class="text-muted">Qty: @detached.DetachedProduct.Qty</small>
                                     </div>
-                                    <span class="status-badge shipped">
-                                        <i class="fas fa-check me-1"></i>Ready
+                                    <span class="status-badge @(detached.IsShipped ? "shipped" : "ready")">
+                                        @if (detached.IsShipped)
+                                        {
+                                            <i class="fas fa-check me-1"></i><text>Shipped</text>
+                                        }
+                                        else
+                                        {
+                                            <i class="fas fa-clock me-1"></i><text>Ready</text>
+                                        }
                                     </span>
                                 </div>
                             </div>

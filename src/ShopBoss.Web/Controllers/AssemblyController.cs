@@ -96,7 +96,7 @@ public class AssemblyController : Controller
             var totalFilteredParts = filteredParts.Count;
             
             var isReady = readyProductIds.Contains(product.Id);
-            var isCompleted = carcassParts.All(p => p.Status == PartStatus.Assembled);
+            var isCompleted = carcassParts.All(p => p.Status == PartStatus.Assembled) && carcassParts.Any();
 
             // Get simplified rack locations - just carcass bin and doors/fronts bin
             var carcassLocation = carcassParts
@@ -407,7 +407,7 @@ public class AssemblyController : Controller
                 })
                 .ToList();
 
-            // Send SignalR notifications to all stations
+            // Send single consolidated SignalR notification to avoid duplicates
             var assemblyCompletionData = new
             {
                 ProductId = product.Id,
@@ -421,41 +421,14 @@ public class AssemblyController : Controller
                 Status = "Assembled",
                 IsReadyForShipping = true,
                 ReadyForShippingProducts = readyForShippingProducts,
-                IsWorkOrderReadyForShipping = isWorkOrderReadyForShipping
+                IsWorkOrderReadyForShipping = isWorkOrderReadyForShipping,
+                Station = "Assembly",
+                Message = $"Product '{product.Name}' has been assembled and is ready for shipping"
             };
 
-            // Notify all stations about the assembly completion
-            await _hubContext.Clients.Group($"WorkOrder_{activeWorkOrderId}")
-                .SendAsync("ProductAssembledByScan", assemblyCompletionData);
-
-            // Send specific notifications to each station
-            await _hubContext.Clients.Group("sorting-station")
-                .SendAsync("ProductAssembledAtStation", assemblyCompletionData);
-            
-            await _hubContext.Clients.Group("shipping-station")
-                .SendAsync("ProductReadyForShipping", new
-                {
-                    ProductId = product.Id,
-                    ProductName = product.Name,
-                    WorkOrderId = activeWorkOrderId,
-                    ReadyForShippingProducts = readyForShippingProducts,
-                    IsWorkOrderReadyForShipping = isWorkOrderReadyForShipping,
-                    Timestamp = DateTime.UtcNow
-                });
-            
+            // Send a single notification to all stations to avoid duplicates
             await _hubContext.Clients.Group("all-stations")
-                .SendAsync("StatusUpdate", new
-                {
-                    type = "product-assembled",
-                    productId = product.Id,
-                    productName = product.Name,
-                    workOrderId = activeWorkOrderId,
-                    station = "Assembly",
-                    timestamp = DateTime.UtcNow,
-                    readyForShippingCount = readyForShippingProducts.Count,
-                    isWorkOrderReadyForShipping = isWorkOrderReadyForShipping,
-                    message = $"Product '{product.Name}' has been assembled and is ready for shipping"
-                });
+                .SendAsync("ProductAssembledByScan", assemblyCompletionData);
 
             // Log successful scan
             await _auditTrailService.LogScanAsync(
@@ -646,7 +619,7 @@ public class AssemblyController : Controller
             var isWorkOrderReadyForShipping = await _shippingService.IsWorkOrderReadyForShippingAsync(activeWorkOrderId);
             var readyForShippingProducts = await _shippingService.GetProductsReadyForShippingAsync(activeWorkOrderId);
 
-            // Send SignalR notifications to all stations
+            // Send single consolidated SignalR notification to avoid duplicates
             var assemblyCompletionData = new
             {
                 ProductId = productId,
@@ -657,41 +630,14 @@ public class AssemblyController : Controller
                 Status = "Assembled",
                 IsReadyForShipping = true,
                 ReadyForShippingProducts = readyForShippingProducts,
-                IsWorkOrderReadyForShipping = isWorkOrderReadyForShipping
+                IsWorkOrderReadyForShipping = isWorkOrderReadyForShipping,
+                Station = "Assembly",
+                Message = $"Product '{product.Name}' has been assembled and is ready for shipping"
             };
 
-            // Notify all stations about the assembly completion
-            await _hubContext.Clients.Group($"WorkOrder_{activeWorkOrderId}")
-                .SendAsync("ProductAssembled", assemblyCompletionData);
-
-            // Send specific notifications to each station
-            await _hubContext.Clients.Group("sorting-station")
-                .SendAsync("ProductAssembledAtStation", assemblyCompletionData);
-            
-            await _hubContext.Clients.Group("shipping-station")
-                .SendAsync("ProductReadyForShipping", new
-                {
-                    ProductId = productId,
-                    ProductName = product.Name,
-                    WorkOrderId = activeWorkOrderId,
-                    ReadyForShippingProducts = readyForShippingProducts,
-                    IsWorkOrderReadyForShipping = isWorkOrderReadyForShipping,
-                    Timestamp = DateTime.UtcNow
-                });
-            
+            // Send a single notification to all stations to avoid duplicates
             await _hubContext.Clients.Group("all-stations")
-                .SendAsync("StatusUpdate", new
-                {
-                    type = "product-assembled",
-                    productId = productId,
-                    productName = product.Name,
-                    workOrderId = activeWorkOrderId,
-                    station = "Assembly",
-                    timestamp = DateTime.UtcNow,
-                    readyForShippingCount = readyForShippingProducts.Count,
-                    isWorkOrderReadyForShipping = isWorkOrderReadyForShipping,
-                    message = $"Product '{product.Name}' has been assembled and is ready for shipping"
-                });
+                .SendAsync("ProductAssembledManually", assemblyCompletionData);
 
             _logger.LogInformation("Product {ProductId} ({ProductName}) assembled - {UpdatedParts} parts marked as Assembled",
                 productId, product.Name, updatedParts);

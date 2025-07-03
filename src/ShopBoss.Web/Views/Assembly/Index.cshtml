@@ -483,25 +483,46 @@
             const productCard = document.querySelector(`[data-product-id="${productId}"]`);
             if (productCard) {
                 const statusElement = productCard.querySelector('.progress-circle');
-                const buttonContainer = productCard.querySelector('.card-body .d-flex.gap-2');
+                const buttonContainer = productCard.querySelector('.col-auto:last-child');
                 
                 if (status === 'completed' && statusElement) {
                     // Update progress circle to blue (completed)
-                    statusElement.className = 'progress-circle bg-primary';
-                    statusElement.innerHTML = '<i class="fas fa-check text-white"></i>';
+                    statusElement.className = 'progress-circle progress-100';
+                    statusElement.innerHTML = '<i class="fas fa-check"></i>';
+                    
+                    // Update card class
+                    productCard.className = productCard.className.replace(/\b(ready|in-progress|waiting)\b/g, '').trim() + ' completed';
                     
                     // Update button to show completed state
                     if (buttonContainer) {
-                        buttonContainer.innerHTML = `
-                            <span class="badge bg-success fs-6">
-                                <i class="fas fa-check me-1"></i>Assembly Complete
-                            </span>
-                        `;
+                        // Find and replace the button/badge area (but preserve the details button)
+                        const statusArea = buttonContainer.querySelector('.badge, .btn-start-assembly');
+                        if (statusArea) {
+                            statusArea.outerHTML = `
+                                <span class="badge bg-primary fs-6">
+                                    <i class="fas fa-check-circle me-1"></i>Completed
+                                </span>
+                            `;
+                        }
                     }
                 } else if (status === 'ready' && statusElement) {
-                    // Update progress circle to green (ready)
-                    statusElement.className = 'progress-circle bg-success';
-                    statusElement.innerHTML = '<i class="fas fa-tools text-white"></i>';
+                    // Update progress circle to show ready (green)
+                    statusElement.className = 'progress-circle progress-76-99';
+                    
+                    // Update card class
+                    productCard.className = productCard.className.replace(/\b(completed|in-progress|waiting)\b/g, '').trim() + ' ready';
+                    
+                    // Update button to show ready state
+                    if (buttonContainer) {
+                        const statusArea = buttonContainer.querySelector('.badge');
+                        if (statusArea && !buttonContainer.querySelector('.btn-start-assembly')) {
+                            statusArea.outerHTML = `
+                                <button class="btn btn-start-assembly btn-lg me-2" onclick="startAssembly('${productId}')">
+                                    <i class="fas fa-play me-1"></i>Start Assembly
+                                </button>
+                            `;
+                        }
+                    }
                 }
             }
         }

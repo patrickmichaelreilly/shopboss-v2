@@ -77,8 +77,16 @@ public class ShippingService
                     ShippedPartsCount = p.Parts.Count(part => part.Status == PartStatus.Shipped),
                     TotalPartsCount = p.Parts.Count
                 }).ToList(),
-                Hardware = workOrder.Hardware,
-                DetachedProducts = workOrder.DetachedProducts
+                Hardware = workOrder.Hardware.Select(h => new HardwareShippingStatus
+                {
+                    Hardware = h,
+                    IsShipped = h.IsShipped
+                }).ToList(),
+                DetachedProducts = workOrder.DetachedProducts.Select(d => new DetachedProductShippingStatus
+                {
+                    DetachedProduct = d,
+                    IsShipped = d.IsShipped
+                }).ToList()
             };
         }
         catch (Exception ex)
@@ -153,8 +161,8 @@ public class ShippingDashboardData
     public WorkOrder WorkOrder { get; set; } = null!;
     public List<string> ReadyProductIds { get; set; } = new();
     public List<ProductShippingStatus> Products { get; set; } = new();
-    public List<Hardware> Hardware { get; set; } = new();
-    public List<DetachedProduct> DetachedProducts { get; set; } = new();
+    public List<HardwareShippingStatus> Hardware { get; set; } = new();
+    public List<DetachedProductShippingStatus> DetachedProducts { get; set; } = new();
 }
 
 public class ProductShippingStatus
@@ -165,4 +173,16 @@ public class ProductShippingStatus
     public int AssembledPartsCount { get; set; }
     public int ShippedPartsCount { get; set; }
     public int TotalPartsCount { get; set; }
+}
+
+public class HardwareShippingStatus
+{
+    public Hardware Hardware { get; set; } = null!;
+    public bool IsShipped { get; set; }
+}
+
+public class DetachedProductShippingStatus
+{
+    public DetachedProduct DetachedProduct { get; set; } = null!;
+    public bool IsShipped { get; set; }
 }

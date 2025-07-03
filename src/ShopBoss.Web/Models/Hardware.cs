@@ -15,5 +15,9 @@ public class Hardware
     
     public int Qty { get; set; }
     
+    public bool IsShipped { get; set; } = false;
+    
+    public DateTime? ShippedDate { get; set; }
+    
     public WorkOrder WorkOrder { get; set; } = null!;
 }

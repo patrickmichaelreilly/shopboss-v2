@@ -33,5 +33,9 @@ public class DetachedProduct
     
     public string EdgebandingRight { get; set; } = string.Empty;
     
+    public bool IsShipped { get; set; } = false;
+    
+    public DateTime? ShippedDate { get; set; }
+    
     public WorkOrder WorkOrder { get; set; } = null!;
 }

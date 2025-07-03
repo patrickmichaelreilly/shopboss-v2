@@ -1,11 +1,14 @@
 # Overall Project
     Scrub all emojis
     Need direct data audit view / Grid view
+    View audit logs
     Group multiple related work orders (project phases)
     Workflow for re-cuts, supplementary Nest Sheets
-    
+    Multiple quantities of products and parts breaks everything
+
 # Import Process
     Do part filtering now, add field to part data indicating Part Type (which drives storage rack and readiness calc.)
+    Breaks for workorders with different file name
 
 # Dashboard
     Eliminate. Open direct to work order view
