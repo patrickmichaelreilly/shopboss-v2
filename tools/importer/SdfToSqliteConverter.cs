@@ -118,15 +118,36 @@ public class SdfToSqliteConverter
         }
 
 
+        // First try to find the multiple-file pattern (work_0000.sql, work_0001.sql, etc.)
         var workFiles = Directory.GetFiles(directory, "work_*")
                                 .Where(f => !Path.HasExtension(f) || Path.GetExtension(f) == ".sql")
                                 .OrderBy(f => f)
                                 .ToArray();
 
+        // If no multiple files found, look for a single work.sql file
+        if (workFiles.Length == 0)
+        {
+            var singleWorkFile = Path.Combine(directory, "work.sql");
+            if (File.Exists(singleWorkFile))
+            {
+                workFiles = new[] { singleWorkFile };
+            }
+            else
+            {
+                // Look for any file starting with "work" in case the naming is different
+                workFiles = Directory.GetFiles(directory, "work*")
+                                   .Where(f => Path.GetExtension(f) == ".sql" || !Path.HasExtension(f))
+                                   .OrderBy(f => f)
+                                   .ToArray();
+            }
+        }
 
         if (workFiles.Length == 0)
         {
-            throw new InvalidOperationException($"No files found with pattern work_* in directory {directory}");
+            // List all files in directory for debugging
+            var allFiles = Directory.GetFiles(directory);
+            var fileList = string.Join(", ", allFiles.Select(Path.GetFileName));
+            throw new InvalidOperationException($"No SQL files found with pattern 'work*' in directory {directory}. Found files: {fileList}");
         }
 
         using var outputWriter = new StreamWriter(outputPath);
@@ -137,8 +158,21 @@ public class SdfToSqliteConverter
             await outputWriter.WriteAsync(content);
             await outputWriter.WriteLineAsync(); // Add newline between files
             
-            // Clean up the work file
-            File.Delete(workFile);
+            // Clean up work files created by ExportSqlCE40.exe
+            // Always delete files that match work_* pattern, and delete work.sql if we're creating temp.sql
+            if (Path.GetFileName(workFile).StartsWith("work_") || 
+                (Path.GetFileName(workFile) == "work.sql" && outputPath != workFile))
+            {
+                try
+                {
+                    File.Delete(workFile);
+                }
+                catch (Exception ex)
+                {
+                    // Don't fail the import if we can't delete temp files
+                    Console.Error.WriteLine($"Warning: Could not delete temporary file {workFile}: {ex.Message}");
+                }
+            }
         }
         
         await outputWriter.FlushAsync();
