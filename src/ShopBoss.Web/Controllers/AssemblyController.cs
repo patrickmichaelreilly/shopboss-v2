@@ -15,6 +15,7 @@ public class AssemblyController : Controller
     private readonly SortingRuleService _sortingRuleService;
     private readonly PartFilteringService _partFilteringService;
     private readonly AuditTrailService _auditTrailService;
+    private readonly ShippingService _shippingService;
     private readonly IHubContext<StatusHub> _hubContext;
     private readonly ILogger<AssemblyController> _logger;
 
@@ -23,6 +24,7 @@ public class AssemblyController : Controller
         SortingRuleService sortingRuleService,
         PartFilteringService partFilteringService,
         AuditTrailService auditTrailService,
+        ShippingService shippingService,
         IHubContext<StatusHub> hubContext,
         ILogger<AssemblyController> logger)
     {
@@ -30,6 +32,7 @@ public class AssemblyController : Controller
         _sortingRuleService = sortingRuleService;
         _partFilteringService = partFilteringService;
         _auditTrailService = auditTrailService;
+        _shippingService = shippingService;
         _hubContext = hubContext;
         _logger = logger;
     }
@@ -205,6 +208,16 @@ public class AssemblyController : Controller
 
             barcode = barcode.Trim();
 
+            // Log the scan attempt
+            await _auditTrailService.LogScanAsync(
+                barcode: barcode,
+                station: "Assembly",
+                isSuccessful: false, // Will be updated to true if successful
+                workOrderId: activeWorkOrderId,
+                sessionId: HttpContext.Session.Id,
+                details: "Assembly station barcode scan attempt"
+            );
+
             // Find the part by barcode in the active work order (same logic as Sorting station)
             var part = await _context.Parts
                 .Include(p => p.Product)
@@ -276,12 +289,14 @@ public class AssemblyController : Controller
 
                     // Log the status change
                     await _auditTrailService.LogAsync(
+                        action: "PartScannedForAssembly",
                         entityType: "Part",
                         entityId: carcassPart.Id,
-                        action: "PartScannedForAssembly",
-                        details: $"Part status changed from Sorted to Assembled via barcode scan (scanned: {barcode})",
                         oldValue: "Sorted",
                         newValue: "Assembled",
+                        station: "Assembly",
+                        workOrderId: activeWorkOrderId,
+                        details: $"Part status changed from Sorted to Assembled via barcode scan (scanned: {barcode})",
                         sessionId: HttpContext.Session.Id
                     );
                 }
@@ -306,12 +321,14 @@ public class AssemblyController : Controller
 
                     // Log the status change
                     await _auditTrailService.LogAsync(
+                        action: "PartScannedForAssembly",
                         entityType: "Part",
                         entityId: filteredPart.Id,
-                        action: "PartScannedForAssembly",
-                        details: $"Filtered part status changed from Sorted to Assembled via barcode scan (scanned: {barcode})",
                         oldValue: "Sorted",
                         newValue: "Assembled",
+                        station: "Assembly",
+                        workOrderId: activeWorkOrderId,
+                        details: $"Filtered part status changed from Sorted to Assembled via barcode scan (scanned: {barcode})",
                         sessionId: HttpContext.Session.Id
                     );
                 }
@@ -357,12 +374,14 @@ public class AssemblyController : Controller
                         bin.LastUpdatedDate = DateTime.UtcNow;
                         
                         await _auditTrailService.LogAsync(
+                            action: "BinEmptied",
                             entityType: "StorageBin",
                             entityId: bin.Id,
-                            action: "BinEmptied",
-                            details: $"Bin emptied after assembly of product {part.Product.Name}",
                             oldValue: "Occupied",
                             newValue: "Empty",
+                            station: "Assembly",
+                            workOrderId: activeWorkOrderId,
+                            details: $"Bin emptied after assembly of product {part.Product.Name}",
                             sessionId: HttpContext.Session.Id
                         );
                     }
@@ -371,9 +390,13 @@ public class AssemblyController : Controller
 
             await _context.SaveChangesAsync();
 
+            // Check if work order is now ready for shipping
+            var isWorkOrderReadyForShipping = await _shippingService.IsWorkOrderReadyForShippingAsync(activeWorkOrderId);
+            var readyForShippingProducts = await _shippingService.GetProductsReadyForShippingAsync(activeWorkOrderId);
+
             // Get filtered parts locations for guidance
-            var filteredParts = _partFilteringService.GetFilteredParts(product.Parts);
-            var filteredPartsGuidance = filteredParts
+            var filteredPartsForGuidance = _partFilteringService.GetFilteredParts(product.Parts);
+            var filteredPartsGuidance = filteredPartsForGuidance
                 .Where(fp => fp.Status == PartStatus.Sorted)
                 .Select(fp => new
                 {
@@ -384,18 +407,66 @@ public class AssemblyController : Controller
                 })
                 .ToList();
 
-            // Send SignalR notification
+            // Send SignalR notifications to all stations
+            var assemblyCompletionData = new
+            {
+                ProductId = product.Id,
+                ProductName = product.Name,
+                ScannedPartName = part.Name,
+                ScannedBarcode = barcode,
+                AssembledPartsCount = assembledParts,
+                FilteredPartsCount = filteredPartsGuidance.Count,
+                WorkOrderId = activeWorkOrderId,
+                Timestamp = DateTime.UtcNow,
+                Status = "Assembled",
+                IsReadyForShipping = true,
+                ReadyForShippingProducts = readyForShippingProducts,
+                IsWorkOrderReadyForShipping = isWorkOrderReadyForShipping
+            };
+
+            // Notify all stations about the assembly completion
             await _hubContext.Clients.Group($"WorkOrder_{activeWorkOrderId}")
-                .SendAsync("ProductAssembledByScan", new
+                .SendAsync("ProductAssembledByScan", assemblyCompletionData);
+
+            // Send specific notifications to each station
+            await _hubContext.Clients.Group("sorting-station")
+                .SendAsync("ProductAssembledAtStation", assemblyCompletionData);
+            
+            await _hubContext.Clients.Group("shipping-station")
+                .SendAsync("ProductReadyForShipping", new
                 {
                     ProductId = product.Id,
                     ProductName = product.Name,
-                    ScannedPartName = part.Name,
-                    ScannedBarcode = barcode,
-                    AssembledPartsCount = assembledParts,
-                    FilteredPartsCount = filteredPartsGuidance.Count,
+                    WorkOrderId = activeWorkOrderId,
+                    ReadyForShippingProducts = readyForShippingProducts,
+                    IsWorkOrderReadyForShipping = isWorkOrderReadyForShipping,
                     Timestamp = DateTime.UtcNow
                 });
+            
+            await _hubContext.Clients.Group("all-stations")
+                .SendAsync("StatusUpdate", new
+                {
+                    type = "product-assembled",
+                    productId = product.Id,
+                    productName = product.Name,
+                    workOrderId = activeWorkOrderId,
+                    station = "Assembly",
+                    timestamp = DateTime.UtcNow,
+                    readyForShippingCount = readyForShippingProducts.Count,
+                    isWorkOrderReadyForShipping = isWorkOrderReadyForShipping,
+                    message = $"Product '{product.Name}' has been assembled and is ready for shipping"
+                });
+
+            // Log successful scan
+            await _auditTrailService.LogScanAsync(
+                barcode: barcode,
+                station: "Assembly",
+                isSuccessful: true,
+                workOrderId: activeWorkOrderId,
+                partsProcessed: assembledParts,
+                sessionId: HttpContext.Session.Id,
+                details: $"Assembly completed for product '{product.Name}' - {assembledParts} parts marked as Assembled"
+            );
 
             _logger.LogInformation("Product {ProductId} ({ProductName}) assembled via barcode scan '{Barcode}' - {AssembledParts} carcass parts marked as Assembled",
                 product.Id, product.Name, barcode, assembledParts);
@@ -470,12 +541,14 @@ public class AssemblyController : Controller
 
                     // Log the status change
                     await _auditTrailService.LogAsync(
+                        action: "StatusUpdate",
                         entityType: "Part",
                         entityId: part.Id,
-                        action: "StatusUpdate",
-                        details: $"Part status changed from Sorted to Assembled for product {product.Name}",
                         oldValue: "Sorted",
                         newValue: "Assembled",
+                        station: "Assembly",
+                        workOrderId: activeWorkOrderId,
+                        details: $"Part status changed from Sorted to Assembled for product {product.Name}",
                         sessionId: HttpContext.Session.Id
                     );
                 }
@@ -500,12 +573,14 @@ public class AssemblyController : Controller
 
                     // Log the status change
                     await _auditTrailService.LogAsync(
+                        action: "StatusUpdate",
                         entityType: "Part",
                         entityId: filteredPart.Id,
-                        action: "StatusUpdate",
-                        details: $"Filtered part status changed from Sorted to Assembled for product {product.Name}",
                         oldValue: "Sorted",
                         newValue: "Assembled",
+                        station: "Assembly",
+                        workOrderId: activeWorkOrderId,
+                        details: $"Filtered part status changed from Sorted to Assembled for product {product.Name}",
                         sessionId: HttpContext.Session.Id
                     );
                 }
@@ -551,12 +626,14 @@ public class AssemblyController : Controller
                         bin.LastUpdatedDate = DateTime.UtcNow;
                         
                         await _auditTrailService.LogAsync(
+                            action: "BinEmptied",
                             entityType: "StorageBin",
                             entityId: bin.Id,
-                            action: "BinEmptied",
-                            details: $"Bin emptied after manual assembly of product {product.Name}",
                             oldValue: "Occupied",
                             newValue: "Empty",
+                            station: "Assembly",
+                            workOrderId: activeWorkOrderId,
+                            details: $"Bin emptied after manual assembly of product {product.Name}",
                             sessionId: HttpContext.Session.Id
                         );
                     }
@@ -565,14 +642,55 @@ public class AssemblyController : Controller
 
             await _context.SaveChangesAsync();
 
-            // Send SignalR notification
+            // Check if work order is now ready for shipping
+            var isWorkOrderReadyForShipping = await _shippingService.IsWorkOrderReadyForShippingAsync(activeWorkOrderId);
+            var readyForShippingProducts = await _shippingService.GetProductsReadyForShippingAsync(activeWorkOrderId);
+
+            // Send SignalR notifications to all stations
+            var assemblyCompletionData = new
+            {
+                ProductId = productId,
+                ProductName = product.Name,
+                PartsAssembled = updatedParts,
+                WorkOrderId = activeWorkOrderId,
+                Timestamp = DateTime.UtcNow,
+                Status = "Assembled",
+                IsReadyForShipping = true,
+                ReadyForShippingProducts = readyForShippingProducts,
+                IsWorkOrderReadyForShipping = isWorkOrderReadyForShipping
+            };
+
+            // Notify all stations about the assembly completion
             await _hubContext.Clients.Group($"WorkOrder_{activeWorkOrderId}")
-                .SendAsync("ProductAssembled", new
+                .SendAsync("ProductAssembled", assemblyCompletionData);
+
+            // Send specific notifications to each station
+            await _hubContext.Clients.Group("sorting-station")
+                .SendAsync("ProductAssembledAtStation", assemblyCompletionData);
+            
+            await _hubContext.Clients.Group("shipping-station")
+                .SendAsync("ProductReadyForShipping", new
                 {
                     ProductId = productId,
                     ProductName = product.Name,
-                    PartsAssembled = updatedParts,
+                    WorkOrderId = activeWorkOrderId,
+                    ReadyForShippingProducts = readyForShippingProducts,
+                    IsWorkOrderReadyForShipping = isWorkOrderReadyForShipping,
                     Timestamp = DateTime.UtcNow
+                });
+            
+            await _hubContext.Clients.Group("all-stations")
+                .SendAsync("StatusUpdate", new
+                {
+                    type = "product-assembled",
+                    productId = productId,
+                    productName = product.Name,
+                    workOrderId = activeWorkOrderId,
+                    station = "Assembly",
+                    timestamp = DateTime.UtcNow,
+                    readyForShippingCount = readyForShippingProducts.Count,
+                    isWorkOrderReadyForShipping = isWorkOrderReadyForShipping,
+                    message = $"Product '{product.Name}' has been assembled and is ready for shipping"
                 });
 
             _logger.LogInformation("Product {ProductId} ({ProductName}) assembled - {UpdatedParts} parts marked as Assembled",

@@ -30,6 +30,7 @@ builder.Services.AddScoped<ImportSelectionService>();
 builder.Services.AddScoped<AuditTrailService>();
 builder.Services.AddScoped<SortingRuleService>();
 builder.Services.AddScoped<PartFilteringService>();
+builder.Services.AddScoped<ShippingService>();
 
 var app = builder.Build();
 

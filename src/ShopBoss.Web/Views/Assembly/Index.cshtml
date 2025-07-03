@@ -184,7 +184,7 @@
                             _ => "progress-100"
                         };
 
-                        <div class="assembly-card card mb-3 @cardClass">
+                        <div class="assembly-card card mb-3 @cardClass" data-product-id="@product.Product.Id">
                             <div class="card-body">
                                 <div class="row align-items-center">
                                     <div class="col-auto">
@@ -447,27 +447,119 @@
 
         // Listen for product assembly notifications
         connection.on("ProductAssembled", function (data) {
+            console.log("ProductAssembled event received:", data);
             showToast(`Product "${data.ProductName}" has been assembled!`, 'success');
-            setTimeout(() => {
-                location.reload(); // Refresh to show updated status
-            }, 2000);
+            updateProductStatus(data.ProductId, 'completed');
+            updateShippingReadinessStatus(data);
         });
 
         // Listen for barcode scan assembly notifications
         connection.on("ProductAssembledByScan", function (data) {
+            console.log("ProductAssembledByScan event received:", data);
             showToast(`🔧 Product "${data.ProductName}" assembled via scan!`, 'success');
-            setTimeout(() => {
-                location.reload(); // Refresh to show updated status
-            }, 2000);
+            updateProductStatus(data.ProductId, 'completed');
+            updateShippingReadinessStatus(data);
         });
 
         // Listen for new products ready for assembly (from sorting station)
         connection.on("ProductReadyForAssembly", function (data) {
+            console.log("ProductReadyForAssembly event received:", data);
             showToast(`Product "${data.productName}" is now ready for assembly!`, 'info');
-            setTimeout(() => {
-                location.reload(); // Refresh to show updated status
-            }, 2000);
+            updateProductStatus(data.productId, 'ready');
         });
+
+        // Listen for general status updates
+        connection.on("StatusUpdate", function (data) {
+            console.log("StatusUpdate event received:", data);
+            if (data.type === "product-assembled") {
+                updateProductStatus(data.productId, 'completed');
+                updateShippingReadinessStatus(data);
+                showStationNotification(data.station, data.message);
+            }
+        });
+
+        // Functions for dynamic updates
+        function updateProductStatus(productId, status) {
+            const productCard = document.querySelector(`[data-product-id="${productId}"]`);
+            if (productCard) {
+                const statusElement = productCard.querySelector('.progress-circle');
+                const buttonContainer = productCard.querySelector('.card-body .d-flex.gap-2');
+                
+                if (status === 'completed' && statusElement) {
+                    // Update progress circle to blue (completed)
+                    statusElement.className = 'progress-circle bg-primary';
+                    statusElement.innerHTML = '<i class="fas fa-check text-white"></i>';
+                    
+                    // Update button to show completed state
+                    if (buttonContainer) {
+                        buttonContainer.innerHTML = `
+                            <span class="badge bg-success fs-6">
+                                <i class="fas fa-check me-1"></i>Assembly Complete
+                            </span>
+                        `;
+                    }
+                } else if (status === 'ready' && statusElement) {
+                    // Update progress circle to green (ready)
+                    statusElement.className = 'progress-circle bg-success';
+                    statusElement.innerHTML = '<i class="fas fa-tools text-white"></i>';
+                }
+            }
+        }
+
+        function updateShippingReadinessStatus(data) {
+            if (data.IsWorkOrderReadyForShipping) {
+                showToast(`🚛 Work Order is now ready for shipping! (${data.ReadyForShippingProducts?.length || 0} products ready)`, 'info');
+                
+                // Add shipping readiness indicator
+                const headerDiv = document.querySelector('h2').parentElement;
+                let shippingIndicator = document.getElementById('shipping-ready-indicator');
+                if (!shippingIndicator) {
+                    shippingIndicator = document.createElement('div');
+                    shippingIndicator.id = 'shipping-ready-indicator';
+                    shippingIndicator.className = 'alert alert-info mt-3';
+                    shippingIndicator.innerHTML = `
+                        <i class="fas fa-shipping-fast me-2"></i>
+                        <strong>Ready for Shipping!</strong> All products in this work order have been assembled.
+                    `;
+                    headerDiv.appendChild(shippingIndicator);
+                }
+            }
+        }
+
+        function showStationNotification(station, message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const notificationHtml = `
+                <div class="alert alert-info alert-dismissible fade show" role="alert">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>${station} Station:</strong> ${message}
+                    <small class="d-block text-muted mt-1">${timestamp}</small>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            `;
+            
+            // Find or create notifications container
+            let notificationContainer = document.getElementById('station-notifications');
+            if (!notificationContainer) {
+                notificationContainer = document.createElement('div');
+                notificationContainer.id = 'station-notifications';
+                notificationContainer.className = 'mt-3';
+                const mainContent = document.querySelector('.row.g-4');
+                if (mainContent) {
+                    mainContent.parentElement.insertBefore(notificationContainer, mainContent);
+                }
+            }
+            
+            // Add notification
+            notificationContainer.insertAdjacentHTML('afterbegin', notificationHtml);
+            
+            // Auto-remove after 10 seconds
+            setTimeout(() => {
+                const alerts = notificationContainer.querySelectorAll('.alert');
+                if (alerts.length > 3) {
+                    alerts[alerts.length - 1].remove();
+                }
+            }, 10000);
+        }
 
         // Assembly functions
         function startAssembly(productId, productName) {
