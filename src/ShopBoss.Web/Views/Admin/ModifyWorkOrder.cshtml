@@ -1,0 +1,830 @@
+@model ShopBoss.Web.Services.StatusManagementData
+
+@{
+    ViewData["Title"] = "Modify Work Order";
+}
+
+@section Styles {
+    <style>
+        .status-management-container {
+            padding: 1rem;
+        }
+        
+        .tree-view {
+            max-height: 600px;
+            overflow-y: auto;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            padding: 1rem;
+            background-color: #ffffff;
+        }
+        
+        .tree-node {
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #f8f9fa;
+        }
+        
+        .tree-node:last-child {
+            border-bottom: none;
+        }
+        
+        .tree-node.level-0 { margin-left: 0; }
+        .tree-node.level-1 { margin-left: 2rem; }
+        .tree-node.level-2 { margin-left: 4rem; }
+        .tree-node.level-3 { margin-left: 6rem; }
+        
+        .tree-toggle {
+            cursor: pointer;
+            user-select: none;
+            color: #6c757d;
+            display: inline-flex !important;
+            align-items: center;
+            justify-content: center;
+            min-width: 20px;
+            height: 20px;
+            margin-right: 0.5rem;
+        }
+        
+        .tree-toggle:hover {
+            color: #495057;
+            background-color: #e9ecef;
+            border-radius: 4px;
+        }
+        
+        .tree-toggle i {
+            font-size: 14px !important;
+            line-height: 1;
+        }
+        
+        .tree-item-content {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        
+        .item-info {
+            flex: 1;
+            min-width: 200px;
+        }
+        
+        .item-name {
+            font-weight: 500;
+            color: #212529;
+        }
+        
+        .item-details {
+            font-size: 0.875rem;
+            color: #6c757d;
+        }
+        
+        .status-controls {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .status-select {
+            min-width: 120px;
+        }
+        
+        .bulk-select {
+            margin-right: 0.5rem;
+        }
+        
+        .status-badge {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+        }
+        
+        .status-pending { background-color: #f8f9fa; color: #6c757d; }
+        .status-cut { background-color: #cff4fc; color: #055160; }
+        .status-sorted { background-color: #d1ecf1; color: #0c5460; }
+        .status-assembled { background-color: #d4edda; color: #155724; }
+        .status-shipped { background-color: #d1e7dd; color: #0a3622; }
+        
+        .product-header {
+            background-color: #f8f9fa;
+            border-radius: 0.375rem;
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .product-status-summary {
+            font-size: 0.875rem;
+            color: #495057;
+        }
+        
+        .bulk-actions {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .search-container {
+            background-color: #ffffff;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .cascade-option {
+            margin-left: 0.5rem;
+        }
+        
+        .item-type-icon {
+            width: 16px;
+            text-align: center;
+            margin-right: 0.5rem;
+        }
+        
+        .loading-spinner {
+            display: none;
+        }
+        
+        .tree-node.product-node {
+            background-color: #f8f9fa;
+            border-radius: 0.375rem;
+            margin-bottom: 0.5rem;
+            border: 1px solid #e9ecef;
+        }
+        
+        .tree-node.part-node:hover {
+            background-color: #f8f9fa;
+        }
+    </style>
+}
+
+<div class="status-management-container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2>Modify Work Order</h2>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a asp-action="Index">Work Orders</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">@Model.WorkOrder.Name</li>
+                </ol>
+            </nav>
+        </div>
+        <div>
+            <a asp-action="Index" class="btn btn-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Back to Work Orders
+            </a>
+        </div>
+    </div>
+
+    <!-- Work Order Information Section -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-info-circle me-2"></i>Work Order Information
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <strong>Work Order ID:</strong><br>
+                            <span class="text-muted">@Model.WorkOrder.Id</span>
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Work Order Name:</strong><br>
+                            <span class="text-muted">@Model.WorkOrder.Name</span>
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Imported Date:</strong><br>
+                            <span class="text-muted">@Model.WorkOrder.ImportedDate.ToString("yyyy-MM-dd HH:mm")</span>
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Total Items:</strong><br>
+                            <span class="text-muted">@(Model.WorkOrder.Products.Sum(p => p.Parts.Count + p.Subassemblies.Count) + Model.WorkOrder.Hardware.Count + Model.WorkOrder.DetachedProducts.Count) items</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Entity Count Statistics -->
+    <div class="row mb-4">
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card border-primary h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-boxes fa-2x text-primary mb-2"></i>
+                    <h4 class="mb-1">@Model.WorkOrder.Products.Count</h4>
+                    <small class="text-muted">Products</small>
+                    <div class="mt-2">
+                        <small class="text-info">
+                            @Model.WorkOrder.Products.Sum(p => p.Parts.Count) Parts • 
+                            @Model.WorkOrder.Products.Sum(p => p.Subassemblies.Count) Subassemblies
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card border-warning h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-tools fa-2x text-warning mb-2"></i>
+                    <h4 class="mb-1">@Model.WorkOrder.Hardware.Count</h4>
+                    <small class="text-muted">Hardware Items</small>
+                    <div class="mt-2">
+                        <small class="text-info">
+                            Total Qty: @Model.WorkOrder.Hardware.Sum(h => h.Qty)
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card border-info h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-puzzle-piece fa-2x text-info mb-2"></i>
+                    <h4 class="mb-1">@Model.WorkOrder.DetachedProducts.Count</h4>
+                    <small class="text-muted">Detached Products</small>
+                    <div class="mt-2">
+                        <small class="text-info">
+                            Total Qty: @Model.WorkOrder.DetachedProducts.Sum(d => d.Qty)
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card border-secondary h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-cut fa-2x text-secondary mb-2"></i>
+                    <h4 class="mb-1">@Model.WorkOrder.NestSheets.Count</h4>
+                    <small class="text-muted">Nest Sheets</small>
+                    <div class="mt-2">
+                        <small class="text-info">
+                            @Model.WorkOrder.NestSheets.Sum(n => n.Parts.Count) Parts Total
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search and Filter -->
+    <div class="search-container">
+        <div class="row g-3">
+            <div class="col-md-8">
+                <div class="input-group">
+                    <span class="input-group-text">
+                        <i class="fas fa-search"></i>
+                    </span>
+                    <input type="text" id="searchInput" class="form-control" 
+                           placeholder="Search by product name, part name, or item ID...">
+                    <button type="button" id="clearSearchBtn" class="btn btn-outline-secondary">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <button type="button" id="expandAllBtn" class="btn btn-outline-primary me-2">
+                    <i class="fas fa-expand-alt me-1"></i>Expand All
+                </button>
+                <button type="button" id="collapseAllBtn" class="btn btn-outline-secondary">
+                    <i class="fas fa-compress-alt me-1"></i>Collapse All
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bulk Actions -->
+    <div class="bulk-actions">
+        <div class="row g-3 align-items-center">
+            <div class="col-md-3">
+                <label class="form-label mb-0">Bulk Actions:</label>
+                <div class="form-check mt-1">
+                    <input type="checkbox" id="selectAllItems" class="form-check-input">
+                    <label for="selectAllItems" class="form-check-label">Select All</label>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <label for="bulkStatusSelect" class="form-label">New Status:</label>
+                <select id="bulkStatusSelect" class="form-select">
+                    <option value="">Select Status</option>
+                    @foreach (var status in Model.AvailableStatuses)
+                    {
+                        <option value="@status">@status</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">&nbsp;</label>
+                <div class="form-check">
+                    <input type="checkbox" id="bulkCascadeOption" class="form-check-input">
+                    <label for="bulkCascadeOption" class="form-check-label">Cascade to Parts</label>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">&nbsp;</label>
+                <div class="d-grid">
+                    <button type="button" id="applyBulkChangesBtn" class="btn btn-warning" disabled>
+                        <i class="fas fa-edit me-1"></i>Apply Changes
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="mt-2">
+            <small class="text-muted">
+                <span id="selectedCount">0</span> items selected
+            </small>
+        </div>
+    </div>
+
+    <!-- Status Tree View -->
+    <div class="tree-view" id="statusTreeView">
+        @foreach (var productNode in Model.ProductNodes)
+        {
+            <!-- Product Node -->
+            <div class="tree-node level-0 product-node" data-item-type="product" data-item-id="@productNode.Product.Id">
+                <div class="tree-item-content">
+                    <span class="tree-toggle" data-target="product-@productNode.Product.Id">
+                        <i class="fas fa-chevron-down"></i>
+                    </span>
+                    <input type="checkbox" class="bulk-select form-check-input" value="@productNode.Product.Id" data-item-type="product">
+                    <i class="fas fa-cube item-type-icon text-primary"></i>
+                    <div class="item-info">
+                        <div class="item-name">@productNode.Product.Name</div>
+                        <div class="item-details">
+                            Product #@productNode.Product.ProductNumber | 
+                            @productNode.Parts.Count parts | 
+                            @productNode.Subassemblies.Count subassemblies
+                        </div>
+                        <div class="product-status-summary">
+                            Effective Status: <span class="badge status-@productNode.EffectiveStatus.ToString().ToLower()">@productNode.EffectiveStatus</span>
+                        </div>
+                    </div>
+                    <div class="status-controls">
+                        <select class="form-select status-select" data-item-id="@productNode.Product.Id" data-item-type="product">
+                            @foreach (var status in Model.AvailableStatuses)
+                            {
+                                <option value="@status" selected="@(status == productNode.EffectiveStatus)">@status</option>
+                            }
+                        </select>
+                        <div class="form-check cascade-option">
+                            <input type="checkbox" class="form-check-input cascade-checkbox" id="cascade-@productNode.Product.Id" checked>
+                            <label class="form-check-label" for="cascade-@productNode.Product.Id">
+                                <small>Cascade</small>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Product Parts and Subassemblies -->
+                <div id="product-@productNode.Product.Id" class="tree-children">
+                    <!-- Direct Parts -->
+                    @foreach (var part in productNode.Parts)
+                    {
+                        <div class="tree-node level-1 part-node" data-item-type="part" data-item-id="@part.Id">
+                            <div class="tree-item-content">
+                                <span class="tree-toggle"></span>
+                                <input type="checkbox" class="bulk-select form-check-input" value="@part.Id" data-item-type="part">
+                                <i class="fas fa-puzzle-piece item-type-icon text-success"></i>
+                                <div class="item-info">
+                                    <div class="item-name">@part.Name</div>
+                                    <div class="item-details">
+                                        Qty: @part.Qty | @(part.Length)mm × @(part.Width)mm × @(part.Thickness)mm | @part.Material
+                                    </div>
+                                </div>
+                                <div class="status-controls">
+                                    <span class="badge status-@part.Status.ToString().ToLower() me-2">@part.Status</span>
+                                    <select class="form-select status-select" data-item-id="@part.Id" data-item-type="part">
+                                        @foreach (var status in Model.AvailableStatuses)
+                                        {
+                                            <option value="@status" selected="@(status == part.Status)">@status</option>
+                                        }
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    }
+
+                    <!-- Subassemblies -->
+                    @foreach (var subassembly in productNode.Subassemblies)
+                    {
+                        <div class="tree-node level-1" data-item-type="subassembly" data-item-id="@subassembly.Id">
+                            <div class="tree-item-content">
+                                <span class="tree-toggle" data-target="sub-@subassembly.Id">
+                                    <i class="fas fa-chevron-down"></i>
+                                </span>
+                                <input type="checkbox" class="bulk-select form-check-input" value="@subassembly.Id" data-item-type="subassembly">
+                                <i class="fas fa-layer-group item-type-icon text-info"></i>
+                                <div class="item-info">
+                                    <div class="item-name">@subassembly.Name</div>
+                                    <div class="item-details">
+                                        Subassembly | Qty: @subassembly.Qty | @subassembly.Parts.Count parts
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Subassembly Parts -->
+                            <div id="sub-@subassembly.Id" class="tree-children">
+                                @foreach (var part in subassembly.Parts)
+                                {
+                                    <div class="tree-node level-2 part-node" data-item-type="part" data-item-id="@part.Id">
+                                        <div class="tree-item-content">
+                                            <span class="tree-toggle"></span>
+                                            <input type="checkbox" class="bulk-select form-check-input" value="@part.Id" data-item-type="part">
+                                            <i class="fas fa-puzzle-piece item-type-icon text-success"></i>
+                                            <div class="item-info">
+                                                <div class="item-name">@part.Name</div>
+                                                <div class="item-details">
+                                                    Qty: @part.Qty | @(part.Length)mm × @(part.Width)mm × @(part.Thickness)mm | @part.Material
+                                                </div>
+                                            </div>
+                                            <div class="status-controls">
+                                                <span class="badge status-@part.Status.ToString().ToLower() me-2">@part.Status</span>
+                                                <select class="form-select status-select" data-item-id="@part.Id" data-item-type="part">
+                                                    @foreach (var status in Model.AvailableStatuses)
+                                                    {
+                                                        <option value="@status" selected="@(status == part.Status)">@status</option>
+                                                    }
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        <!-- Hardware Section -->
+        @if (Model.WorkOrder.Hardware.Any())
+        {
+            <div class="tree-node level-0 product-node mt-3">
+                <div class="tree-item-content">
+                    <span class="tree-toggle" data-target="hardware-section">
+                        <i class="fas fa-chevron-down"></i>
+                    </span>
+                    <i class="fas fa-tools item-type-icon text-warning"></i>
+                    <div class="item-info">
+                        <div class="item-name">Hardware Items</div>
+                        <div class="item-details">@Model.WorkOrder.Hardware.Count hardware items</div>
+                    </div>
+                </div>
+
+                <div id="hardware-section" class="tree-children">
+                    @foreach (var hardware in Model.WorkOrder.Hardware)
+                    {
+                        <div class="tree-node level-1 part-node" data-item-type="hardware" data-item-id="@hardware.Id">
+                            <div class="tree-item-content">
+                                <span class="tree-toggle"></span>
+                                <input type="checkbox" class="bulk-select form-check-input" value="@hardware.Id" data-item-type="hardware">
+                                <i class="fas fa-cog item-type-icon text-warning"></i>
+                                <div class="item-info">
+                                    <div class="item-name">@hardware.Name</div>
+                                    <div class="item-details">Qty: @hardware.Qty</div>
+                                </div>
+                                <div class="status-controls">
+                                    <span class="badge @(hardware.IsShipped ? "status-shipped" : "status-pending") me-2">
+                                        @(hardware.IsShipped ? "Shipped" : "Pending")
+                                    </span>
+                                    <select class="form-select status-select" data-item-id="@hardware.Id" data-item-type="hardware">
+                                        <option value="Pending" selected="@(!hardware.IsShipped)">Pending</option>
+                                        <option value="Shipped" selected="@hardware.IsShipped">Shipped</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        <!-- Detached Products Section -->
+        @if (Model.WorkOrder.DetachedProducts.Any())
+        {
+            <div class="tree-node level-0 product-node mt-3">
+                <div class="tree-item-content">
+                    <span class="tree-toggle" data-target="detached-section">
+                        <i class="fas fa-chevron-down"></i>
+                    </span>
+                    <i class="fas fa-box item-type-icon text-secondary"></i>
+                    <div class="item-info">
+                        <div class="item-name">Detached Products</div>
+                        <div class="item-details">@Model.WorkOrder.DetachedProducts.Count detached products</div>
+                    </div>
+                </div>
+
+                <div id="detached-section" class="tree-children">
+                    @foreach (var detached in Model.WorkOrder.DetachedProducts)
+                    {
+                        <div class="tree-node level-1 part-node" data-item-type="detachedproduct" data-item-id="@detached.Id">
+                            <div class="tree-item-content">
+                                <span class="tree-toggle"></span>
+                                <input type="checkbox" class="bulk-select form-check-input" value="@detached.Id" data-item-type="detachedproduct">
+                                <i class="fas fa-box-open item-type-icon text-secondary"></i>
+                                <div class="item-info">
+                                    <div class="item-name">@detached.Name</div>
+                                    <div class="item-details">
+                                        Product #@detached.ProductNumber | Qty: @detached.Qty | 
+                                        @(detached.Length)mm × @(detached.Width)mm × @(detached.Thickness)mm
+                                    </div>
+                                </div>
+                                <div class="status-controls">
+                                    <span class="badge @(detached.IsShipped ? "status-shipped" : "status-pending") me-2">
+                                        @(detached.IsShipped ? "Shipped" : "Pending")
+                                    </span>
+                                    <select class="form-select status-select" data-item-id="@detached.Id" data-item-type="detachedproduct">
+                                        <option value="Pending" selected="@(!detached.IsShipped)">Pending</option>
+                                        <option value="Shipped" selected="@detached.IsShipped">Shipped</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+
+    <!-- Loading indicator -->
+    <div class="text-center loading-spinner" id="loadingSpinner">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <div class="mt-2">Processing status changes...</div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function() {
+            initializeStatusManagement();
+        });
+
+        function initializeStatusManagement() {
+            setupTreeToggles();
+            setupBulkSelection();
+            setupStatusChanges();
+            setupSearch();
+            setupBulkActions();
+        }
+
+        function setupTreeToggles() {
+            $('.tree-toggle').click(function() {
+                const target = $(this).data('target');
+                if (target) {
+                    const $children = $('#' + target);
+                    const $icon = $(this).find('i');
+                    
+                    if ($children.is(':visible')) {
+                        $children.hide();
+                        $icon.removeClass('fa-chevron-down').addClass('fa-chevron-right');
+                    } else {
+                        $children.show();
+                        $icon.removeClass('fa-chevron-right').addClass('fa-chevron-down');
+                    }
+                }
+            });
+
+            $('#expandAllBtn').click(function() {
+                $('.tree-children').show();
+                $('.tree-toggle i').removeClass('fa-chevron-right').addClass('fa-chevron-down');
+            });
+
+            $('#collapseAllBtn').click(function() {
+                $('.tree-children').hide();
+                $('.tree-toggle i').removeClass('fa-chevron-down').addClass('fa-chevron-right');
+            });
+        }
+
+        function setupBulkSelection() {
+            $('#selectAllItems').change(function() {
+                const isChecked = $(this).is(':checked');
+                $('.bulk-select:visible').prop('checked', isChecked);
+                updateBulkActionsState();
+            });
+
+            $(document).on('change', '.bulk-select', function() {
+                updateBulkActionsState();
+            });
+        }
+
+        function setupStatusChanges() {
+            $(document).on('change', '.status-select', function() {
+                const $select = $(this);
+                const itemId = $select.data('item-id');
+                const itemType = $select.data('item-type');
+                const newStatus = $select.val();
+                const cascadeToChildren = itemType === 'product' && 
+                    $select.closest('.tree-node').find('.cascade-checkbox').is(':checked');
+
+                updateSingleStatus(itemId, itemType, newStatus, cascadeToChildren);
+            });
+        }
+
+        function setupSearch() {
+            $('#searchInput').on('input', function() {
+                const searchTerm = $(this).val().toLowerCase();
+                filterTreeView(searchTerm);
+            });
+
+            $('#clearSearchBtn').click(function() {
+                $('#searchInput').val('');
+                filterTreeView('');
+            });
+        }
+
+        function setupBulkActions() {
+            $('#applyBulkChangesBtn').click(function() {
+                applyBulkStatusChanges();
+            });
+
+            $('#bulkStatusSelect').change(function() {
+                updateBulkActionsState();
+            });
+        }
+
+        function updateSingleStatus(itemId, itemType, newStatus, cascadeToChildren = false) {
+            showLoading(true);
+
+            $.post('@Url.Action("UpdateStatus", "Admin")', {
+                itemId: itemId,
+                itemType: itemType,
+                newStatus: newStatus,
+                cascadeToChildren: cascadeToChildren,
+                workOrderId: '@Model.WorkOrder.Id'
+            })
+            .done(function(response) {
+                if (response.success) {
+                    showSuccessMessage(response.message);
+                    // Update UI to reflect changes
+                    updateStatusBadges(itemId, itemType, newStatus);
+                    if (cascadeToChildren && itemType === 'product') {
+                        updateChildStatusBadges(itemId, newStatus);
+                    }
+                } else {
+                    showErrorMessage(response.message);
+                    // Revert the select to previous value
+                    revertStatusSelect(itemId, itemType);
+                }
+            })
+            .fail(function() {
+                showErrorMessage('Failed to update status. Please try again.');
+                revertStatusSelect(itemId, itemType);
+            })
+            .always(function() {
+                showLoading(false);
+            });
+        }
+
+        function applyBulkStatusChanges() {
+            const selectedItems = $('.bulk-select:checked');
+            const newStatus = $('#bulkStatusSelect').val();
+            const cascadeToChildren = $('#bulkCascadeOption').is(':checked');
+
+            if (selectedItems.length === 0) {
+                showErrorMessage('Please select items to update.');
+                return;
+            }
+
+            if (!newStatus) {
+                showErrorMessage('Please select a status to apply.');
+                return;
+            }
+
+            const updates = [];
+            selectedItems.each(function() {
+                updates.push({
+                    ItemId: $(this).val(),
+                    ItemType: $(this).data('item-type'),
+                    NewStatus: newStatus,
+                    CascadeToChildren: cascadeToChildren
+                });
+            });
+
+            if (confirm(`Apply status "${newStatus}" to ${updates.length} selected items?`)) {
+                showLoading(true);
+
+                $.post('@Url.Action("BulkUpdateStatus", "Admin")', {
+                    updates: updates,
+                    workOrderId: '@Model.WorkOrder.Id'
+                })
+                .done(function(response) {
+                    if (response.success) {
+                        showSuccessMessage(response.message);
+                        // Refresh the page to show updated statuses
+                        setTimeout(function() {
+                            window.location.reload();
+                        }, 1500);
+                    } else {
+                        showErrorMessage(response.message);
+                    }
+                })
+                .fail(function() {
+                    showErrorMessage('Failed to apply bulk changes. Please try again.');
+                })
+                .always(function() {
+                    showLoading(false);
+                });
+            }
+        }
+
+        function updateBulkActionsState() {
+            const selectedCount = $('.bulk-select:checked').length;
+            const hasStatus = $('#bulkStatusSelect').val() !== '';
+            
+            $('#selectedCount').text(selectedCount);
+            $('#applyBulkChangesBtn').prop('disabled', selectedCount === 0 || !hasStatus);
+
+            // Update select all checkbox state
+            const totalVisible = $('.bulk-select:visible').length;
+            const selectedVisible = $('.bulk-select:visible:checked').length;
+            
+            if (selectedVisible === 0) {
+                $('#selectAllItems').prop('indeterminate', false).prop('checked', false);
+            } else if (selectedVisible === totalVisible) {
+                $('#selectAllItems').prop('indeterminate', false).prop('checked', true);
+            } else {
+                $('#selectAllItems').prop('indeterminate', true).prop('checked', false);
+            }
+        }
+
+        function filterTreeView(searchTerm) {
+            if (searchTerm === '') {
+                $('.tree-node').show();
+                return;
+            }
+
+            $('.tree-node').each(function() {
+                const $node = $(this);
+                const text = $node.find('.item-name, .item-details').text().toLowerCase();
+                const matches = text.includes(searchTerm);
+                
+                if (matches || $node.hasClass('level-0')) {
+                    $node.show();
+                } else {
+                    $node.hide();
+                }
+            });
+
+            // Show parent nodes if children match
+            $('.tree-node:visible').each(function() {
+                $(this).parents('.tree-node').show();
+            });
+        }
+
+        function updateStatusBadges(itemId, itemType, newStatus) {
+            const $node = $(`.tree-node[data-item-id="${itemId}"][data-item-type="${itemType}"]`);
+            const $badge = $node.find('.badge');
+            
+            // Update badge class and text
+            $badge.removeClass(function(index, className) {
+                return (className.match(/(^|\s)status-\S+/g) || []).join(' ');
+            });
+            $badge.addClass('status-' + newStatus.toLowerCase());
+            $badge.text(newStatus);
+        }
+
+        function updateChildStatusBadges(productId, newStatus) {
+            const $productNode = $(`.tree-node[data-item-id="${productId}"][data-item-type="product"]`);
+            $productNode.find('.tree-children .badge').each(function() {
+                const $badge = $(this);
+                $badge.removeClass(function(index, className) {
+                    return (className.match(/(^|\s)status-\S+/g) || []).join(' ');
+                });
+                $badge.addClass('status-' + newStatus.toLowerCase());
+                $badge.text(newStatus);
+            });
+        }
+
+        function revertStatusSelect(itemId, itemType) {
+            const $select = $(`.status-select[data-item-id="${itemId}"][data-item-type="${itemType}"]`);
+            const $badge = $select.closest('.tree-node').find('.badge');
+            const currentStatus = $badge.text();
+            $select.val(currentStatus);
+        }
+
+        function showLoading(show) {
+            if (show) {
+                $('#loadingSpinner').show();
+                $('#statusTreeView').addClass('opacity-50');
+            } else {
+                $('#loadingSpinner').hide();
+                $('#statusTreeView').removeClass('opacity-50');
+            }
+        }
+
+        function showSuccessMessage(message) {
+            // You can implement toast notifications here
+            alert('Success: ' + message);
+        }
+
+        function showErrorMessage(message) {
+            // You can implement toast notifications here
+            alert('Error: ' + message);
+        }
+    </script>
+}

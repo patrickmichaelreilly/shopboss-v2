@@ -342,6 +342,127 @@ This phase completes the sorting station's intelligent routing capabilities, ens
 - [ ] Configuration backup/restore
 - [ ] Cross-station configuration testing
 
+### Phase 9C: Manual Status Management Interface (2 hours)
+**Prompt for Claude Code:**
+> Create a comprehensive manual status management view that displays all data for the active work order in a hierarchical table format (inspired by the import tree view) with the ability to manually adjust part, product, hardware, and detached product statuses. This administrative interface should provide fine-grained control over the manufacturing workflow when barcode scanning is not available or corrections are needed. **IMPORTANT**: Extend existing services rather than creating new ones to maintain architectural consistency and reduce code duplication.
+
+**Revised Architecture Approach:**
+- **Extend ShippingService**: Add general-purpose status management methods that work across all stations
+- **Leverage AuditTrailService**: Use existing audit logging patterns with "Manual" station designation
+- **Reuse SignalR patterns**: Follow established StatusHub notification patterns from other controllers
+- **Extend AdminController**: Add new action methods following existing patterns (similar to Modify/WorkOrder actions)
+
+**Key Features:**
+- **Hierarchical Data Display**: Products as top-level nodes with Parts/Hardware/Subassemblies nested underneath (reuse import tree view patterns)
+- **Unrestricted Status Changes**: Allow any status transition including backward moves for testing purposes
+- **Cascading Product Updates**: When changing product status, automatically update all associated parts
+- **Bulk Operations**: Multi-select functionality for bulk status changes with transaction rollback
+- **Search/Filter Integration**: Real-time filtering by item name, status, or type for large work orders
+- **Admin-Only Access**: New tab in Admin station interface with appropriate access controls
+
+**Technical Implementation Strategy:**
+
+**1. Service Layer Extensions:**
+```csharp
+// Extend ShippingService.cs (rename to WorkOrderStatusService.cs)
+public async Task<bool> UpdatePartStatusAsync(string partId, PartStatus newStatus, string changedBy = "Manual")
+public async Task<bool> UpdateProductStatusAsync(string productId, PartStatus newStatus, bool cascadeToparts = true)
+public async Task<BulkUpdateResult> UpdateMultipleStatusesAsync(List<StatusUpdateRequest> updates)
+public async Task<StatusManagementData> GetStatusManagementDataAsync(string workOrderId)
+```
+
+**2. Controller Extensions:**
+```csharp
+// Add to AdminController.cs
+public async Task<IActionResult> StatusManagement() // Main view
+[HttpPost] public async Task<IActionResult> UpdateStatus(string itemId, string itemType, PartStatus newStatus)
+[HttpPost] public async Task<IActionResult> BulkUpdateStatus(List<StatusUpdateRequest> updates)
+```
+
+**3. View Implementation:**
+- **File**: `Views/Admin/StatusManagement.cshtml`
+- **Pattern**: Reuse tree view CSS/JS from `Import.cshtml` but adapt for status management
+- **Structure**: Hierarchical table with Products → Parts/Subassemblies/Hardware
+- **Interaction**: Inline status dropdowns, bulk select checkboxes, search/filter controls
+
+**4. Data Models:**
+```csharp
+public class StatusManagementData
+{
+    public WorkOrder WorkOrder { get; set; }
+    public List<ProductStatusNode> ProductNodes { get; set; }
+    public List<PartStatus> AvailableStatuses { get; set; }
+}
+
+public class ProductStatusNode
+{
+    public Product Product { get; set; }
+    public List<Part> Parts { get; set; }
+    public List<Subassembly> Subassemblies { get; set; }
+    public List<Hardware> Hardware { get; set; }
+    public PartStatus EffectiveStatus { get; set; } // Calculated from parts
+}
+
+public class StatusUpdateRequest
+{
+    public string ItemId { get; set; }
+    public string ItemType { get; set; } // "Part", "Product", "Hardware", "DetachedProduct"
+    public PartStatus NewStatus { get; set; }
+    public bool CascadeToChildren { get; set; } = false;
+}
+```
+
+**5. Integration Points:**
+- **AuditTrailService**: Log manual changes with station="Manual" and details="Manual status change via Admin interface"
+- **StatusHub SignalR**: Broadcast status changes using existing patterns from other controllers
+- **Navigation**: Add "Status Management" tab to Admin/Index.cshtml alongside existing Import/Modify buttons
+- **Permissions**: Ensure admin-only access using existing session-based patterns
+
+**Design Patterns to Reuse:**
+1. **Tree View Structure**: Copy hierarchical display patterns from `Import.cshtml` (lines 13-104 for CSS, 659-918 for JS tree building)
+2. **Status Management**: Follow patterns from `ShippingController.cs` status update methods
+3. **Bulk Operations**: Adapt bulk delete patterns from `AdminController.cs` BulkDeleteWorkOrders method
+4. **SignalR Integration**: Copy notification patterns from `AssemblyController.cs` or `ShippingController.cs`
+5. **Admin Navigation**: Follow existing tab patterns in `Admin/Index.cshtml`
+
+**Business Rules:**
+- **Unrestricted Transitions**: Allow any status change (Shipped → Pending, etc.) for testing flexibility
+- **Product-Level Cascading**: When product status changes, automatically update all associated parts to same status
+- **Audit Trail**: All manual changes logged with clear "Manual" designation vs barcode scans
+- **Active Work Order Only**: Display data only for currently selected active work order
+- **Confirmation Required**: Modal dialogs for potentially disruptive changes
+
+**File Modification Plan:**
+1. **Extend**: `Services/ShippingService.cs` → Add status management methods
+2. **Extend**: `Controllers/AdminController.cs` → Add StatusManagement, UpdateStatus, BulkUpdateStatus actions
+3. **Create**: `Views/Admin/StatusManagement.cshtml` → Main interface (reuse Import.cshtml patterns)
+4. **Modify**: `Views/Admin/Index.cshtml` → Add "Status Management" navigation tab
+5. **Register**: `Program.cs` → No changes needed (ShippingService already registered)
+
+**Success Criteria:**
+- [ ] Hierarchical table displaying Products → Parts/Hardware/Subassemblies structure
+- [ ] Individual status dropdowns with immediate update capability
+- [ ] Product-level status changes cascade to all associated parts automatically
+- [ ] Bulk selection and status change with confirmation dialogs
+- [ ] Search/filter functionality for large work orders (1000+ items)
+- [ ] All manual changes properly logged in audit trail as "Manual" station
+- [ ] Real-time SignalR notifications to other stations when statuses change
+- [ ] Admin-only access with proper session validation
+- [ ] Unrestricted status transitions including backward moves (Shipped → Pending)
+- [ ] Responsive design working on both tablet and desktop
+- [ ] Potential replacement candidate for import tree view if user approves outcome
+
+**Testing Requirements:**
+1. **Single Updates**: Verify individual part/product status changes work correctly
+2. **Cascading Logic**: Test product status changes properly update all associated parts
+3. **Bulk Operations**: Test multi-select operations with proper transaction rollback on errors
+4. **Cross-Station Sync**: Verify other stations receive real-time status updates via SignalR
+5. **Audit Trail**: Confirm all changes logged with "Manual" designation vs "CNC"/"Sorting" etc.
+6. **Large Dataset Performance**: Test with 500+ parts to ensure responsive interface
+7. **Permission Validation**: Verify admin-only access and active work order requirements
+
+This implementation leverages existing architectural patterns while providing powerful manual status management capabilities, maintaining system consistency and reducing maintenance overhead.
+
 ---
 
 ## Phase 10: Integration & Polish (2-3 hours)
@@ -401,9 +522,9 @@ This phase completes the sorting station's intelligent routing capabilities, ens
 - **Phase 6 (Sorting Station):** 4-5 hours
 - **Phase 7 (Assembly Station):** 3-4 hours
 - **Phase 8 (Shipping Station):** 2-3 hours
-- **Phase 9 (Configuration):** 2-3 hours
+- **Phase 9 (Configuration):** 4-5 hours
 - **Phase 10 (Integration & Polish):** 2-3 hours
 
-**Total Estimated Time:** 20-28 hours of focused development
+**Total Estimated Time:** 22-30 hours of focused development
 
 This roadmap provides manageable 1-2 hour chunks that build systematically on your solid foundation toward a complete production-ready system.

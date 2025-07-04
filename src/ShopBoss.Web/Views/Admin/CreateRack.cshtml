@@ -1,0 +1,242 @@
+@model StorageRack
+@{
+    ViewData["Title"] = "Create New Rack";
+}
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-plus me-2"></i>Create New Rack</h2>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a asp-action="Index">Dashboard</a></li>
+                    <li class="breadcrumb-item"><a asp-action="RackConfiguration">Rack Configuration</a></li>
+                    <li class="breadcrumb-item active">Create New Rack</li>
+                </ol>
+            </nav>
+        </div>
+        <div>
+            <a asp-action="RackConfiguration" class="btn btn-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Back to Configuration
+            </a>
+        </div>
+    </div>
+
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="fas fa-exclamation-circle me-2"></i>@TempData["ErrorMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-layer-group me-2"></i>Rack Details</h5>
+                </div>
+                <div class="card-body">
+                    <form asp-action="CreateRack" method="post">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label asp-for="Name" class="form-label">Rack Name <span class="text-danger">*</span></label>
+                                    <input asp-for="Name" class="form-control" placeholder="e.g., Standard Rack C" required>
+                                    <span asp-validation-for="Name" class="text-danger"></span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label asp-for="Type" class="form-label">Rack Type <span class="text-danger">*</span></label>
+                                    <select asp-for="Type" class="form-select" required>
+                                        <option value="">Select rack type...</option>
+                                        <option value="Standard">Standard (Carcass Parts)</option>
+                                        <option value="DoorsAndDrawerFronts">Doors & Drawer Fronts</option>
+                                        <option value="AdjustableShelves">Adjustable Shelves</option>
+                                        <option value="Hardware">Hardware</option>
+                                        <option value="Cart">Mobile Cart</option>
+                                    </select>
+                                    <span asp-validation-for="Type" class="text-danger"></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="Description" class="form-label">Description</label>
+                            <textarea asp-for="Description" class="form-control" rows="2" placeholder="Optional description of the rack's purpose or contents"></textarea>
+                            <span asp-validation-for="Description" class="text-danger"></span>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label asp-for="Location" class="form-label">Location</label>
+                                    <input asp-for="Location" class="form-control" placeholder="e.g., East Wall, Section A">
+                                    <span asp-validation-for="Location" class="text-danger"></span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check mt-4">
+                                    <input asp-for="IsPortable" class="form-check-input" type="checkbox">
+                                    <label asp-for="IsPortable" class="form-check-label">
+                                        <i class="fas fa-dolly me-1"></i>Mobile/Portable Rack
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <h6 class="mb-3"><i class="fas fa-th me-2"></i>Bin Configuration</h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label asp-for="Rows" class="form-label">Number of Rows <span class="text-danger">*</span></label>
+                                    <input asp-for="Rows" type="number" class="form-control" min="1" max="50" value="4" required>
+                                    <div class="form-text">Horizontal levels (1-50)</div>
+                                    <span asp-validation-for="Rows" class="text-danger"></span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label asp-for="Columns" class="form-label">Number of Columns <span class="text-danger">*</span></label>
+                                    <input asp-for="Columns" type="number" class="form-control" min="1" max="50" value="8" required>
+                                    <div class="form-text">Vertical positions (1-50)</div>
+                                    <span asp-validation-for="Columns" class="text-danger"></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Total Bins:</strong> <span id="totalBins">32</span> bins will be created automatically.
+                            <br><strong>Default Capacity:</strong> Doors & Drawer Fronts racks default to 20 parts per bin, all others default to 50 parts per bin.
+                        </div>
+
+                        <hr>
+
+                        <h6 class="mb-3"><i class="fas fa-ruler me-2"></i>Physical Dimensions (Optional)</h6>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label asp-for="Length" class="form-label">Length (mm)</label>
+                                    <input asp-for="Length" type="number" class="form-control" min="1" placeholder="e.g., 2400">
+                                    <span asp-validation-for="Length" class="text-danger"></span>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label asp-for="Width" class="form-label">Width (mm)</label>
+                                    <input asp-for="Width" type="number" class="form-control" min="1" placeholder="e.g., 600">
+                                    <span asp-validation-for="Width" class="text-danger"></span>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label asp-for="Height" class="form-label">Height (mm)</label>
+                                    <input asp-for="Height" type="number" class="form-control" min="1" placeholder="e.g., 2000">
+                                    <span asp-validation-for="Height" class="text-danger"></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input asp-for="IsActive" class="form-check-input" type="checkbox" checked>
+                                    <label asp-for="IsActive" class="form-check-label">
+                                        <i class="fas fa-check-circle me-1"></i>Active (available for use)
+                                    </label>
+                                    <div class="form-text">Inactive racks will not be used for new part assignments</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <div class="d-flex justify-content-between">
+                            <a asp-action="RackConfiguration" class="btn btn-secondary">
+                                <i class="fas fa-times me-2"></i>Cancel
+                            </a>
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-save me-2"></i>Create Rack
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-info-circle me-2"></i>Rack Type Guide</h6>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <strong class="text-primary">Standard</strong>
+                        <p class="small mb-2">For general carcass parts (sides, backs, tops, bottoms). Most common rack type.</p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <strong class="text-success">Doors & Drawer Fronts</strong>
+                        <p class="small mb-2">Specialized for doors and drawer front panels. Lower default capacity (20 parts/bin).</p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <strong class="text-info">Adjustable Shelves</strong>
+                        <p class="small mb-2">For adjustable shelf components that require separate handling.</p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <strong class="text-warning">Hardware</strong>
+                        <p class="small mb-2">For hardware items like hinges, handles, screws, and brackets.</p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <strong class="text-secondary">Mobile Cart</strong>
+                        <p class="small mb-2">Portable racks that can be moved around the shop floor.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-lightbulb me-2"></i>Tips</h6>
+                </div>
+                <div class="card-body">
+                    <ul class="small mb-0">
+                        <li>Use descriptive names that include rack type and location</li>
+                        <li>Consider workflow when determining rack placement</li>
+                        <li>Doors & drawer fronts racks automatically get lower capacity per bin</li>
+                        <li>Mobile carts are useful for work-in-progress storage</li>
+                        <li>You can modify dimensions later, but existing bin assignments will be lost</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    
+    <script>
+        function updateTotalBins() {
+            const rows = parseInt(document.querySelector('input[name="Rows"]').value) || 0;
+            const columns = parseInt(document.querySelector('input[name="Columns"]').value) || 0;
+            document.getElementById('totalBins').textContent = rows * columns;
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const rowsInput = document.querySelector('input[name="Rows"]');
+            const columnsInput = document.querySelector('input[name="Columns"]');
+            
+            rowsInput.addEventListener('input', updateTotalBins);
+            columnsInput.addEventListener('input', updateTotalBins);
+            
+            updateTotalBins();
+        });
+    </script>
+}

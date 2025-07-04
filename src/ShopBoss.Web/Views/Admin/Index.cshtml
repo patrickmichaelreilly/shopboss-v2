@@ -100,7 +100,7 @@ else
                                 {
                                     <i class="fas fa-star text-warning me-2" title="Active Work Order"></i>
                                 }
-                                <a asp-action="WorkOrder" asp-route-id="@workOrder.Id" class="text-decoration-none">
+                                <a asp-action="ModifyWorkOrder" asp-route-id="@workOrder.Id" class="text-decoration-none">
                                     @workOrder.Name
                                 </a>
                             </div>
@@ -127,12 +127,8 @@ else
                                         <i class="fas fa-star"></i>
                                     </button>
                                 }
-                                <a asp-action="WorkOrder" asp-route-id="@workOrder.Id" 
-                                   class="btn btn-sm btn-outline-primary" title="View Details">
-                                    <i class="fas fa-eye"></i>
-                                </a>
-                                <a asp-action="Modify" asp-route-id="@workOrder.Id" 
-                                   class="btn btn-sm btn-outline-warning" title="Modify">
+                                <a asp-action="ModifyWorkOrder" asp-route-id="@workOrder.Id" 
+                                   class="btn btn-sm btn-outline-warning" title="Modify Work Order">
                                     <i class="fas fa-edit"></i>
                                 </a>
                                 <button type="button" class="btn btn-sm btn-outline-danger" 
