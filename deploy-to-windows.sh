@@ -129,6 +129,7 @@ if [ -d "test-data" ]; then
   cp -r test-data "$WINDOWS_TEST_PATH/"
 fi
 
+
 # Restore backed up data
 if [ "$PRESERVE_DATA" = true ] && [ -d "$BACKUP_PATH" ]; then
     echo "🔄 Restoring preserved data..."
@@ -173,9 +174,10 @@ echo "🖥️  Windows Testing Instructions:"
 echo "   1. Open Command Prompt as Administrator"
 echo "   2. cd C:\\ShopBoss-Testing"
 echo "   3. ShopBoss.Web.exe"
-echo "   4. Open browser to: http://localhost:5000"
+echo "   4. Access from any device at: http://[WindowsIP]:5000"
 echo ""
 echo "📁 Files deployed to: C:\\ShopBoss-Testing"
+echo "💡 The application automatically binds to all network interfaces"
 echo ""
 echo "💡 Next time you can use:"
 echo "   ./deploy-to-windows.sh              # Preserve data (default)"

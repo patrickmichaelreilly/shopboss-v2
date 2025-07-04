@@ -17,7 +17,7 @@
         }
         
         .shipping-section.products {
-            border-color: #0d6efd;
+            border-color: #004F00;
         }
         
         .shipping-section.hardware {
@@ -37,7 +37,7 @@
         
         .shipping-section.products .shipping-section-header {
             background: #cfe2ff;
-            border-color: #0d6efd;
+            border-color: #004F00;
         }
         
         .shipping-section.hardware .shipping-section-header {
@@ -110,14 +110,14 @@
         }
         
         .scan-card {
-            border: 2px solid #0d6efd;
+            border: 2px solid #004F00;
             border-radius: 8px;
             background: white;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
         
         .scan-input {
-            border: 2px solid #0d6efd;
+            border: 2px solid #004F00;
             border-radius: 6px;
             padding: 12px;
             font-size: 1.1rem;
@@ -132,7 +132,7 @@
             width: 60px;
             height: 60px;
             border: 4px solid #e9ecef;
-            border-top: 4px solid #0d6efd;
+            border-top: 4px solid #004F00;
             border-radius: 50%;
             margin: 0 auto 10px;
         }
@@ -252,6 +252,12 @@
                                     <div class="me-3">
                                         <small class="text-muted">Parts: @product.ShippedPartsCount/@product.TotalPartsCount</small>
                                     </div>
+                                    @if (!product.IsShipped && product.IsReadyForShipping)
+                                    {
+                                        <button class="btn btn-success btn-sm me-2" onclick="shipProduct('@product.Product.Id')">
+                                            <i class="fas fa-shipping-fast me-1"></i>Ship
+                                        </button>
+                                    }
                                     <span class="status-badge @(product.IsShipped ? "shipped" : product.IsReadyForShipping ? "ready" : "not-ready")">
                                         @if (product.IsShipped)
                                         {
@@ -301,6 +307,12 @@
                                     <div class="me-3">
                                         <small class="text-muted">Qty: @hardware.Hardware.Qty</small>
                                     </div>
+                                    @if (!hardware.IsShipped)
+                                    {
+                                        <button class="btn btn-success btn-sm me-2" onclick="shipHardware('@hardware.Hardware.Id')">
+                                            <i class="fas fa-shipping-fast me-1"></i>Ship
+                                        </button>
+                                    }
                                     <span class="status-badge @(hardware.IsShipped ? "shipped" : "ready")">
                                         @if (hardware.IsShipped)
                                         {
@@ -350,6 +362,12 @@
                                     <div class="me-3">
                                         <small class="text-muted">Qty: @detached.DetachedProduct.Qty</small>
                                     </div>
+                                    @if (!detached.IsShipped)
+                                    {
+                                        <button class="btn btn-success btn-sm me-2" onclick="shipDetachedProduct('@detached.DetachedProduct.Id')">
+                                            <i class="fas fa-shipping-fast me-1"></i>Ship
+                                        </button>
+                                    }
                                     <span class="status-badge @(detached.IsShipped ? "shipped" : "ready")">
                                         @if (detached.IsShipped)
                                         {
@@ -423,7 +441,8 @@
 </div>
 
 @section Scripts {
-    <script src="~/lib/signalr/dist/browser/signalr.min.js"></script>
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/signalr/dist/browser/signalr.js"></script>
     <script>
         $(document).ready(function() {
             // Initialize SignalR connection
@@ -443,21 +462,21 @@
             // Listen for assembly completions
             connection.on("ProductReadyForShipping", function (data) {
                 console.log("Product ready for shipping:", data);
-                // Refresh the page to show updated status
-                location.reload();
+                // Update the UI without full page reload
+                updateOverallProgress();
             });
 
             // Listen for general status updates
             connection.on("StatusUpdate", function (data) {
                 if (data.type === "product-assembled") {
                     console.log("Product assembled:", data);
-                    // Refresh the page to show updated status
-                    location.reload();
+                    // Update the UI without full page reload
+                    updateOverallProgress();
                 }
             });
 
             // Initialize page
-            updateOverallProgress();
+            setTimeout(updateOverallProgress, 500); // Delay to ensure page is fully loaded
             
             // Barcode scanning functionality
             $('#barcodeInput').on('keypress', function(e) {
@@ -475,6 +494,7 @@
 
             function processScan() {
                 const barcode = $('#barcodeInput').val().trim();
+                console.log('Processing scan for barcode:', barcode);
                 
                 if (!barcode) {
                     showAlert('Please enter a barcode', 'warning');
@@ -485,27 +505,49 @@
                 $('#barcodeInput').prop('disabled', true);
                 $('#scanButton').prop('disabled', true);
 
-                // Try scanning as product first
-                scanProduct(barcode)
+                // Try scanning as part first (most common case)
+                scanPart(barcode)
                     .then(result => {
+                        console.log('Part scan result:', result);
+                        if (result.success) {
+                            handleScanSuccess(result, 'Part');
+                            return { success: true, processed: true };
+                        } else {
+                            // Try as product
+                            return scanProduct(barcode);
+                        }
+                    })
+                    .then(result => {
+                        if (result.processed) return result; // Already handled
+                        
+                        console.log('Product scan result:', result);
                         if (result.success) {
                             handleScanSuccess(result, 'Product');
+                            return { success: true, processed: true };
                         } else {
                             // Try as hardware
                             return scanHardware(barcode);
                         }
                     })
                     .then(result => {
-                        if (result && !result.success) {
+                        if (result.processed) return result; // Already handled
+                        
+                        console.log('Hardware scan result:', result);
+                        if (result.success) {
+                            handleScanSuccess(result, 'Hardware');
+                            return { success: true, processed: true };
+                        } else {
                             // Try as detached product
                             return scanDetachedProduct(barcode);
                         }
-                        return result;
                     })
                     .then(result => {
-                        if (result && result.success) {
-                            handleScanSuccess(result, 'Hardware/Detached');
-                        } else if (result) {
+                        if (result.processed) return result; // Already handled
+                        
+                        console.log('Detached product scan result:', result);
+                        if (result.success) {
+                            handleScanSuccess(result, 'Detached Product');
+                        } else {
                             // If we tried all types and none worked
                             handleScanError(result.message || 'Item not found');
                         }
@@ -514,7 +556,7 @@
                         handleScanError('Error processing scan');
                         console.error('Scan error:', error);
                     })
-                    .finally(() => {
+                    .always(() => {
                         // Re-enable input
                         $('#barcodeInput').prop('disabled', false);
                         $('#scanButton').prop('disabled', false);
@@ -525,6 +567,15 @@
             function scanProduct(barcode) {
                 return $.ajax({
                     url: '/Shipping/ScanProduct',
+                    method: 'POST',
+                    data: { barcode: barcode },
+                    dataType: 'json'
+                });
+            }
+
+            function scanPart(barcode) {
+                return $.ajax({
+                    url: '/Shipping/ScanPart',
                     method: 'POST',
                     data: { barcode: barcode },
                     dataType: 'json'
@@ -556,10 +607,16 @@
                 // Update progress
                 updateOverallProgress();
                 
-                // Refresh page after short delay to show updates
-                setTimeout(() => {
-                    location.reload();
-                }, 1000);
+                // Update UI based on what was shipped
+                if (result.productId) {
+                    updateProductShippedUI(result.productId);
+                } else if (result.hardwareId) {
+                    updateHardwareShippedUI(result.hardwareId);
+                } else if (result.detachedProductId) {
+                    updateDetachedProductShippedUI(result.detachedProductId);
+                }
+                
+                // No page reload - keep Recent Scans intact
             }
 
             function handleScanError(message) {
@@ -594,15 +651,23 @@
             }
 
             function updateOverallProgress() {
+                console.log('Updating overall progress...');
                 $.get('/Shipping/GetShippingProgress')
                     .done(function(response) {
-                        if (response.success) {
+                        console.log('Progress response:', response);
+                        if (response.success && response.data) {
                             const data = response.data;
-                            const totalItems = data.Products.Total + data.Hardware.Total + data.DetachedProducts.Total;
-                            const shippedItems = data.Products.Shipped + data.Hardware.Shipped + data.DetachedProducts.Shipped;
+                            // Handle both camelCase (from JSON serialization) and PascalCase
+                            const totalItems = (data.products?.total || data.Products?.Total || 0) + 
+                                             (data.hardware?.total || data.Hardware?.Total || 0) + 
+                                             (data.detachedProducts?.total || data.DetachedProducts?.Total || 0);
+                            const shippedItems = (data.products?.shipped || data.Products?.Shipped || 0) + 
+                                               (data.hardware?.shipped || data.Hardware?.Shipped || 0) + 
+                                               (data.detachedProducts?.shipped || data.DetachedProducts?.Shipped || 0);
                             
                             const percentage = totalItems > 0 ? Math.round((shippedItems / totalItems) * 100) : 0;
                             
+                            console.log(`Progress: ${shippedItems}/${totalItems} (${percentage}%)`);
                             $('#overallProgressText').text(`${shippedItems}/${totalItems} (${percentage}%)`);
                             
                             const progressRing = $('#overallProgressRing');
@@ -613,9 +678,13 @@
                                 progressRing.removeClass('completed');
                                 $('#shippingCompleteAlert').addClass('d-none');
                             }
+                        } else {
+                            console.error('Progress response not successful:', response);
+                            $('#overallProgressText').text('Error: ' + (response.message || 'Unknown error'));
                         }
                     })
-                    .fail(function() {
+                    .fail(function(xhr, status, error) {
+                        console.error('Progress request failed:', status, error);
                         $('#overallProgressText').text('Error loading progress');
                     });
             }
@@ -638,6 +707,137 @@
                 setTimeout(() => {
                     $('.alert').fadeOut();
                 }, 5000);
+            }
+
+            // Make functions global by attaching to window object
+            window.shipProduct = function(productId) {
+                if (!confirm('Are you sure you want to ship this product?')) {
+                    return;
+                }
+                
+                $.ajax({
+                    url: '/Shipping/ScanProduct',
+                    method: 'POST',
+                    data: { barcode: productId },
+                    dataType: 'json'
+                })
+                .done(function(response) {
+                    if (response.success) {
+                        handleScanSuccess(response, 'Product (Manual)');
+                        updateOverallProgress();
+                        // Hide the ship button and update UI for this product
+                        updateProductShippedUI(productId);
+                    } else {
+                        showAlert(response.message || 'Error shipping product', 'danger');
+                    }
+                })
+                .fail(function() {
+                    showAlert('Error shipping product', 'danger');
+                });
+            };
+
+            window.shipHardware = function(hardwareId) {
+                if (!confirm('Are you sure you want to ship this hardware item?')) {
+                    return;
+                }
+                
+                $.ajax({
+                    url: '/Shipping/ScanHardware',
+                    method: 'POST',
+                    data: { barcode: hardwareId },
+                    dataType: 'json'
+                })
+                .done(function(response) {
+                    if (response.success) {
+                        handleScanSuccess(response, 'Hardware (Manual)');
+                        updateOverallProgress();
+                        // Hide the ship button and update UI for this hardware
+                        updateHardwareShippedUI(hardwareId);
+                    } else {
+                        showAlert(response.message || 'Error shipping hardware', 'danger');
+                    }
+                })
+                .fail(function() {
+                    showAlert('Error shipping hardware', 'danger');
+                });
+            };
+
+            window.shipDetachedProduct = function(detachedProductId) {
+                if (!confirm('Are you sure you want to ship this detached product?')) {
+                    return;
+                }
+                
+                $.ajax({
+                    url: '/Shipping/ScanDetachedProduct',
+                    method: 'POST',
+                    data: { barcode: detachedProductId },
+                    dataType: 'json'
+                })
+                .done(function(response) {
+                    if (response.success) {
+                        handleScanSuccess(response, 'Detached Product (Manual)');
+                        updateOverallProgress();
+                        // Hide the ship button and update UI for this detached product
+                        updateDetachedProductShippedUI(detachedProductId);
+                    } else {
+                        showAlert(response.message || 'Error shipping detached product', 'danger');
+                    }
+                })
+                .fail(function() {
+                    showAlert('Error shipping detached product', 'danger');
+                });
+            };
+
+            // UI update functions to change styling when items are shipped
+            function updateProductShippedUI(productId) {
+                // Find the product container
+                const productButton = $(`button[onclick="shipProduct('${productId}')"]`);
+                const productContainer = productButton.closest('.shipping-item');
+                
+                // Hide the ship button
+                productButton.hide();
+                
+                // Update container styling
+                productContainer.removeClass('ready not-ready').addClass('shipped');
+                
+                // Update status badge
+                const statusBadge = productContainer.find('.status-badge');
+                statusBadge.removeClass('ready not-ready').addClass('shipped');
+                statusBadge.html('<i class="fas fa-check me-1"></i>Shipped');
+            }
+
+            function updateHardwareShippedUI(hardwareId) {
+                // Find the hardware container
+                const hardwareButton = $(`button[onclick="shipHardware('${hardwareId}')"]`);
+                const hardwareContainer = hardwareButton.closest('.shipping-item');
+                
+                // Hide the ship button
+                hardwareButton.hide();
+                
+                // Update container styling
+                hardwareContainer.removeClass('ready').addClass('shipped');
+                
+                // Update status badge
+                const statusBadge = hardwareContainer.find('.status-badge');
+                statusBadge.removeClass('ready').addClass('shipped');
+                statusBadge.html('<i class="fas fa-check me-1"></i>Shipped');
+            }
+
+            function updateDetachedProductShippedUI(detachedProductId) {
+                // Find the detached product container
+                const detachedButton = $(`button[onclick="shipDetachedProduct('${detachedProductId}')"]`);
+                const detachedContainer = detachedButton.closest('.shipping-item');
+                
+                // Hide the ship button
+                detachedButton.hide();
+                
+                // Update container styling
+                detachedContainer.removeClass('ready').addClass('shipped');
+                
+                // Update status badge
+                const statusBadge = detachedContainer.find('.status-badge');
+                statusBadge.removeClass('ready').addClass('shipped');
+                statusBadge.html('<i class="fas fa-check me-1"></i>Shipped');
             }
         });
     </script>

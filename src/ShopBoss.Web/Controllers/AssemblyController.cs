@@ -302,6 +302,19 @@ public class AssemblyController : Controller
                 }
             }
 
+            // Get filtered parts locations for guidance BEFORE marking them as assembled
+            var filteredPartsForGuidance = _partFilteringService.GetFilteredParts(product.Parts);
+            var filteredPartsGuidance = filteredPartsForGuidance
+                .Where(fp => fp.Status == PartStatus.Sorted)
+                .Select(fp => new
+                {
+                    Name = fp.Name,
+                    Category = _partFilteringService.ClassifyPart(fp).ToString(),
+                    Location = fp.Location ?? "Unknown Location",
+                    Quantity = fp.Qty
+                })
+                .ToList();
+
             // Mark filtered parts as assembled and track their bins for emptying
             var filteredParts = _partFilteringService.GetFilteredParts(product.Parts);
             foreach (var filteredPart in filteredParts)
@@ -393,19 +406,6 @@ public class AssemblyController : Controller
             // Check if work order is now ready for shipping
             var isWorkOrderReadyForShipping = await _shippingService.IsWorkOrderReadyForShippingAsync(activeWorkOrderId);
             var readyForShippingProducts = await _shippingService.GetProductsReadyForShippingAsync(activeWorkOrderId);
-
-            // Get filtered parts locations for guidance
-            var filteredPartsForGuidance = _partFilteringService.GetFilteredParts(product.Parts);
-            var filteredPartsGuidance = filteredPartsForGuidance
-                .Where(fp => fp.Status == PartStatus.Sorted)
-                .Select(fp => new
-                {
-                    Name = fp.Name,
-                    Category = _partFilteringService.ClassifyPart(fp).ToString(),
-                    Location = fp.Location ?? "Unknown Location",
-                    Quantity = fp.Qty
-                })
-                .ToList();
 
             // Send single consolidated SignalR notification to avoid duplicates
             var assemblyCompletionData = new

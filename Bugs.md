@@ -5,10 +5,13 @@
     Group multiple related work orders (project phases)
     Workflow for re-cuts, supplementary Nest Sheets
     Multiple quantities of products and parts breaks everything
+    Active Work Order selection at top banner
 
 # Import Process
-    Do part filtering now, add field to part data indicating Part Type (which drives storage rack and readiness calc.)
-    Breaks for workorders with different file name
+    Do part filtering now, add field to part data indicating Part Type (which drives storage rack and readiness calc.)??
+    Not handling multiple quantities correctly. Especially hardware.
+    Handle repeat work order names
+
 
 # Dashboard
     Eliminate. Open direct to work order view
@@ -21,11 +24,12 @@
 
 # CNC Station
     Improve display
-    Group items from 
     Eliminate popup Success confirmation
     Double processing on scan barcode action? ("Already...")
     Recent Scan History modal glitches out
     Nest sheet detail view with sticker printing (recuts as well)
+    Nest cut status does not correctly update if all the parts from the nest are marked cut by other means
+
 
 # Sorting Station
     The storage rack fill counts next to their names does not update when i empty a bin.
@@ -33,12 +37,27 @@
     Filtering doors, adjustable shelves, drawer fronts
     In Bin Details modal, the Status stat never changes from "Partial"
     When final part for a Product is scanned, the red triangle indicating ready appears in real time, but the Ready For Assembly button does not. The button however does appear if I refresh the view.
+    Open to a default rack
+
+    Getting notification for every completed product (repeatedly) after completing a new product
+    Getting notification for complete product when carcass is complete but door has not been sorted
+
+    Cut Parts list modal -- "Sort" buttons not working
+
 
 # Assembly Station
     "Drop Product" off line.
     Scan opens Product details modal, manual button for operator to indicate doors have been installed and cabinet dropped.
     "Locations" info uses Rack LinkID rather than human readable name. Also repeated for every part, only need it once.
     In Assembly Queue, completed Products show 0 Progress.
+
+
 # Collab Process
     Explicitly tell me how to test every time
     Different types of task: Phase, fix, feature, root cause analysis, 
+    MCP Servers
+    CLAUDE.md
+
+# Rack Configuration
+    Deleting a rack must deal with parts if it is not empty
+    

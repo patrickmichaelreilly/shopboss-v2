@@ -233,6 +233,104 @@ public class ShippingController : Controller
     }
 
     [HttpPost]
+    public async Task<IActionResult> ScanPart(string barcode)
+    {
+        try
+        {
+            var activeWorkOrderId = HttpContext.Session.GetString("ActiveWorkOrderId");
+            if (string.IsNullOrEmpty(activeWorkOrderId))
+            {
+                return Json(new { success = false, message = "No active work order selected" });
+            }
+
+            // Validate barcode input
+            if (string.IsNullOrWhiteSpace(barcode))
+            {
+                return Json(new { success = false, message = "Please enter a valid barcode" });
+            }
+
+            barcode = barcode.Trim();
+
+            // Log the scan attempt
+            await _auditTrailService.LogScanAsync(
+                barcode: barcode,
+                station: "Shipping",
+                isSuccessful: false, // Will be updated to true if successful
+                workOrderId: activeWorkOrderId,
+                sessionId: HttpContext.Session.Id,
+                details: "Shipping station part barcode scan attempt"
+            );
+
+            // Find the part by barcode (ID or name)
+            var part = await _context.Parts
+                .Include(p => p.Product)
+                .FirstOrDefaultAsync(p => p.Product.WorkOrderId == activeWorkOrderId &&
+                                        (p.Id == barcode || p.Name == barcode));
+
+            if (part == null)
+            {
+                return Json(new { success = false, message = $"Part with barcode '{barcode}' not found in active work order" });
+            }
+
+            // Check if part is assembled (prerequisite for shipping)
+            if (part.Status != PartStatus.Assembled)
+            {
+                return Json(new { success = false, message = $"Part '{part.Name}' must be assembled before shipping. Current status: {part.Status}" });
+            }
+
+            // Business logic: Scanning any part from a product marks the entire product as shipped
+            var product = part.Product;
+            
+            // Mark ALL parts in the product as shipped
+            var allPartsInProduct = await _context.Parts
+                .Where(p => p.ProductId == product.Id)
+                .ToListAsync();
+
+            var shippedPartsCount = 0;
+            foreach (var productPart in allPartsInProduct)
+            {
+                if (productPart.Status != PartStatus.Shipped)
+                {
+                    productPart.Status = PartStatus.Shipped;
+                    productPart.StatusUpdatedDate = DateTime.UtcNow;
+                    shippedPartsCount++;
+                }
+            }
+
+            await _context.SaveChangesAsync();
+
+            // Log successful scan
+            await _auditTrailService.LogScanAsync(
+                barcode: barcode,
+                station: "Shipping",
+                isSuccessful: true,
+                workOrderId: activeWorkOrderId,
+                partsProcessed: shippedPartsCount,
+                sessionId: HttpContext.Session.Id,
+                details: $"Product '{product.Name}' shipped via part scan '{part.Name}' - {shippedPartsCount} parts marked as Shipped"
+            );
+
+            _logger.LogInformation("Product {ProductId} ({ProductName}) shipped via part barcode scan '{Barcode}' - {ShippedParts} parts marked as Shipped",
+                product.Id, product.Name, barcode, shippedPartsCount);
+
+            return Json(new { 
+                success = true, 
+                message = $"✅ Product '{product.Name}' shipped successfully! ({shippedPartsCount} parts shipped)",
+                partId = part.Id,
+                partName = part.Name,
+                productName = product.Name,
+                productFullyShipped = true,
+                shippedPartsCount = shippedPartsCount
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error processing part barcode scan for shipping: {Barcode}", barcode);
+            return Json(new { success = false, message = "An error occurred while processing the scan" });
+        }
+    }
+
+    [HttpPost]
     public async Task<IActionResult> ScanHardware(string barcode)
     {
         try

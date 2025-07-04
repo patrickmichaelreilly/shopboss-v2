@@ -153,6 +153,252 @@ public class ShippingService
             return false;
         }
     }
+
+    // Manual Status Management Methods
+    public async Task<StatusManagementData> GetStatusManagementDataAsync(string workOrderId)
+    {
+        try
+        {
+            var workOrder = await _context.WorkOrders
+                .Include(w => w.Products)
+                    .ThenInclude(p => p.Parts)
+                .Include(w => w.Products)
+                    .ThenInclude(p => p.Subassemblies)
+                        .ThenInclude(s => s.Parts)
+                .Include(w => w.Hardware)
+                .Include(w => w.DetachedProducts)
+                .FirstOrDefaultAsync(w => w.Id == workOrderId);
+
+            if (workOrder == null)
+            {
+                return new StatusManagementData();
+            }
+
+            var productNodes = workOrder.Products.Select(product => new ProductStatusNode
+            {
+                Product = product,
+                Parts = product.Parts.ToList(),
+                Subassemblies = product.Subassemblies.ToList(),
+                Hardware = new List<Hardware>(), // Product-level hardware handled separately
+                EffectiveStatus = CalculateEffectiveStatus(product.Parts)
+            }).ToList();
+
+            return new StatusManagementData
+            {
+                WorkOrder = workOrder,
+                ProductNodes = productNodes,
+                AvailableStatuses = Enum.GetValues<PartStatus>().ToList()
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting status management data for work order {WorkOrderId}", workOrderId);
+            return new StatusManagementData();
+        }
+    }
+
+    public async Task<bool> UpdatePartStatusAsync(string partId, PartStatus newStatus, string changedBy = "Manual")
+    {
+        try
+        {
+            var part = await _context.Parts.FirstOrDefaultAsync(p => p.Id == partId);
+            if (part == null)
+            {
+                return false;
+            }
+
+            var oldStatus = part.Status;
+            part.Status = newStatus;
+            part.StatusUpdatedDate = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Part {PartId} status updated from {OldStatus} to {NewStatus} by {ChangedBy}", 
+                partId, oldStatus, newStatus, changedBy);
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating part {PartId} status to {NewStatus}", partId, newStatus);
+            return false;
+        }
+    }
+
+    public async Task<bool> UpdateProductStatusAsync(string productId, PartStatus newStatus, bool cascadeToParts = true)
+    {
+        try
+        {
+            var product = await _context.Products
+                .Include(p => p.Parts)
+                .Include(p => p.Subassemblies)
+                    .ThenInclude(s => s.Parts)
+                .FirstOrDefaultAsync(p => p.Id == productId);
+
+            if (product == null)
+            {
+                return false;
+            }
+
+            if (cascadeToParts)
+            {
+                // Update all direct parts
+                foreach (var part in product.Parts)
+                {
+                    part.Status = newStatus;
+                    part.StatusUpdatedDate = DateTime.UtcNow;
+                }
+
+                // Update all subassembly parts
+                foreach (var subassembly in product.Subassemblies)
+                {
+                    foreach (var part in subassembly.Parts)
+                    {
+                        part.Status = newStatus;
+                        part.StatusUpdatedDate = DateTime.UtcNow;
+                    }
+                }
+            }
+
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Product {ProductId} status updated to {NewStatus} with cascade={CascadeToParts}", 
+                productId, newStatus, cascadeToParts);
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating product {ProductId} status to {NewStatus}", productId, newStatus);
+            return false;
+        }
+    }
+
+    public async Task<bool> UpdateHardwareStatusAsync(string hardwareId, bool isShipped)
+    {
+        try
+        {
+            var hardware = await _context.Hardware.FirstOrDefaultAsync(h => h.Id == hardwareId);
+            if (hardware == null)
+            {
+                return false;
+            }
+
+            hardware.IsShipped = isShipped;
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Hardware {HardwareId} shipped status updated to {IsShipped}", 
+                hardwareId, isShipped);
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating hardware {HardwareId} shipped status", hardwareId);
+            return false;
+        }
+    }
+
+    public async Task<bool> UpdateDetachedProductStatusAsync(string detachedProductId, bool isShipped)
+    {
+        try
+        {
+            var detachedProduct = await _context.DetachedProducts.FirstOrDefaultAsync(d => d.Id == detachedProductId);
+            if (detachedProduct == null)
+            {
+                return false;
+            }
+
+            detachedProduct.IsShipped = isShipped;
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Detached product {DetachedProductId} shipped status updated to {IsShipped}", 
+                detachedProductId, isShipped);
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating detached product {DetachedProductId} shipped status", detachedProductId);
+            return false;
+        }
+    }
+
+    public async Task<BulkUpdateResult> UpdateMultipleStatusesAsync(List<StatusUpdateRequest> updates)
+    {
+        var result = new BulkUpdateResult();
+        
+        using var transaction = await _context.Database.BeginTransactionAsync();
+        
+        try
+        {
+            foreach (var update in updates)
+            {
+                bool success = false;
+                
+                switch (update.ItemType.ToLower())
+                {
+                    case "part":
+                        success = await UpdatePartStatusAsync(update.ItemId, update.NewStatus, "Manual Bulk");
+                        break;
+                    case "product":
+                        success = await UpdateProductStatusAsync(update.ItemId, update.NewStatus, update.CascadeToChildren);
+                        break;
+                    case "hardware":
+                        success = await UpdateHardwareStatusAsync(update.ItemId, update.NewStatus == PartStatus.Shipped);
+                        break;
+                    case "detachedproduct":
+                        success = await UpdateDetachedProductStatusAsync(update.ItemId, update.NewStatus == PartStatus.Shipped);
+                        break;
+                }
+                
+                if (success)
+                {
+                    result.SuccessCount++;
+                }
+                else
+                {
+                    result.FailureCount++;
+                    result.FailedItems.Add(update.ItemId);
+                }
+            }
+
+            await transaction.CommitAsync();
+            result.Success = true;
+            
+            _logger.LogInformation("Bulk update completed: {SuccessCount} successful, {FailureCount} failed", 
+                result.SuccessCount, result.FailureCount);
+                
+            return result;
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync();
+            _logger.LogError(ex, "Error during bulk status update");
+            result.Success = false;
+            result.ErrorMessage = ex.Message;
+            return result;
+        }
+    }
+
+    private PartStatus CalculateEffectiveStatus(List<Part> parts)
+    {
+        if (!parts.Any()) return PartStatus.Pending;
+
+        // If all parts have the same status, return that status
+        var distinctStatuses = parts.Select(p => p.Status).Distinct().ToList();
+        if (distinctStatuses.Count == 1)
+        {
+            return distinctStatuses.First();
+        }
+
+        // Return the "lowest" status if mixed
+        if (parts.Any(p => p.Status == PartStatus.Pending)) return PartStatus.Pending;
+        if (parts.Any(p => p.Status == PartStatus.Cut)) return PartStatus.Cut;
+        if (parts.Any(p => p.Status == PartStatus.Sorted)) return PartStatus.Sorted;
+        if (parts.Any(p => p.Status == PartStatus.Assembled)) return PartStatus.Assembled;
+        return PartStatus.Shipped;
+    }
 }
 
 // Data models for shipping dashboard
@@ -185,4 +431,38 @@ public class DetachedProductShippingStatus
 {
     public DetachedProduct DetachedProduct { get; set; } = null!;
     public bool IsShipped { get; set; }
+}
+
+// Data models for status management
+public class StatusManagementData
+{
+    public WorkOrder WorkOrder { get; set; } = null!;
+    public List<ProductStatusNode> ProductNodes { get; set; } = new();
+    public List<PartStatus> AvailableStatuses { get; set; } = new();
+}
+
+public class ProductStatusNode
+{
+    public Product Product { get; set; } = null!;
+    public List<Part> Parts { get; set; } = new();
+    public List<Subassembly> Subassemblies { get; set; } = new();
+    public List<Hardware> Hardware { get; set; } = new();
+    public PartStatus EffectiveStatus { get; set; }
+}
+
+public class StatusUpdateRequest
+{
+    public string ItemId { get; set; } = string.Empty;
+    public string ItemType { get; set; } = string.Empty; // "Part", "Product", "Hardware", "DetachedProduct"
+    public PartStatus NewStatus { get; set; }
+    public bool CascadeToChildren { get; set; } = false;
+}
+
+public class BulkUpdateResult
+{
+    public bool Success { get; set; }
+    public int SuccessCount { get; set; }
+    public int FailureCount { get; set; }
+    public List<string> FailedItems { get; set; } = new();
+    public string ErrorMessage { get; set; } = string.Empty;
 }

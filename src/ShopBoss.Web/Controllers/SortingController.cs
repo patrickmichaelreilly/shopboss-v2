@@ -537,6 +537,10 @@ public class SortingController : Controller
             // Get parts that are currently assigned to this specific bin location
             // Location format matches what's stored: "{RackName}:{BinLabel}" (e.g., "Standard Rack A:A01")
             var rack = await _context.StorageRacks.FindAsync(rackId);
+            if (rack == null)
+            {
+                return Json(new { success = false, message = "Rack not found." });
+            }
             var binLocation = $"{rack.Name}:{bin.BinLabel}";
             var activeWorkOrderId = HttpContext.Session.GetString("ActiveWorkOrderId");
             var binParts = new List<object>();
@@ -726,7 +730,13 @@ public class SortingController : Controller
             }
 
             // Find all parts that are currently sorted to this specific bin location
-            var binLocation = $"{rackId}-{bin.BinLabel}";
+            // Location format matches what's stored: "{RackName}:{BinLabel}" (e.g., "Standard Rack A:A01")
+            var rack = await _context.StorageRacks.FindAsync(rackId);
+            if (rack == null)
+            {
+                return Json(new { success = false, message = "Rack not found." });
+            }
+            var binLocation = $"{rack.Name}:{bin.BinLabel}";
             var partsToRemove = await _context.Parts
                 .Include(p => p.Product)
                 .Include(p => p.NestSheet)
@@ -915,22 +925,14 @@ public class SortingController : Controller
                     .Distinct()
                     .ToListAsync();
 
-                // Extract rack names from locations (format: "rackId-binLabel")
+                // Extract rack names from locations (format: "RackName:BinLabel")
                 var rackNames = rackLocations
-                    .Where(l => l != null && l.Contains('-'))
-                    .Select(l => l!.Split('-')[0])
+                    .Where(l => l != null && l.Contains(':'))
+                    .Select(l => l!.Split(':')[0])
                     .Distinct()
                     .ToList();
 
-                var rackDisplayNames = new List<string>();
-                foreach (var rackId in rackNames)
-                {
-                    var rack = await _context.StorageRacks.FindAsync(rackId);
-                    if (rack != null)
-                    {
-                        rackDisplayNames.Add(rack.Name);
-                    }
-                }
+                var rackDisplayNames = rackNames.ToList(); // Rack names are already in display format
 
                 readyProducts.Add(new
                 {

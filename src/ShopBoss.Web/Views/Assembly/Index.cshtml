@@ -16,7 +16,7 @@
         }
         
         .assembly-card.completed {
-            border-left-color: #0d6efd;
+            border-left-color: #004F00;
             background-color: #f8f9ff;
         }
         
@@ -45,7 +45,7 @@
         .progress-26-50 { background-color: #fd7e14; }
         .progress-51-75 { background-color: #ffc107; color: #000; }
         .progress-76-99 { background-color: #198754; }
-        .progress-100 { background-color: #0d6efd; }
+        .progress-100 { background-color: #004F00; }
         
         .rack-indicator {
             display: inline-block;
@@ -55,7 +55,7 @@
             margin-right: 8px;
         }
         
-        .rack-standard { background-color: #0d6efd; }
+        .rack-standard { background-color: #004F00; }
         .rack-doors { background-color: #198754; }
         .rack-shelves { background-color: #fd7e14; }
         .rack-hardware { background-color: #6f42c1; }
@@ -938,6 +938,16 @@
             `;
 
             content.innerHTML = html;
+            
+            // Add event listener for when modal is dismissed to refresh the UI
+            const modalElement = document.getElementById('filteredPartsModal');
+            modalElement.addEventListener('hidden.bs.modal', function handleModalDismiss() {
+                // Remove the event listener to prevent multiple listeners
+                modalElement.removeEventListener('hidden.bs.modal', handleModalDismiss);
+                // Reload the page to show updated product status
+                location.reload();
+            });
+            
             modal.show();
         }
     </script>
