@@ -9,7 +9,7 @@ html {
 }
 
 .btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
-  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
+  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #004F00;
 }
 
 html {
@@ -19,4 +19,192 @@ html {
 
 body {
   margin-bottom: 60px;
+}
+
+/* ShopBoss Primary Color Overrides */
+:root {
+  --bs-primary: #004F00;
+  --bs-primary-rgb: 0, 79, 0;
+}
+
+.bg-primary {
+  background-color: #004F00 !important;
+}
+
+.text-primary {
+  color: #004F00 !important;
+}
+
+.btn-primary {
+  color: #fff;
+  background-color: #004F00;
+  border-color: #003D00;
+}
+
+.btn-primary:hover {
+  color: #fff;
+  background-color: #003D00;
+  border-color: #002800;
+}
+
+.btn-primary:focus, .btn-primary.focus {
+  color: #fff;
+  background-color: #003D00;
+  border-color: #002800;
+  box-shadow: 0 0 0 0.2rem rgba(0, 79, 0, 0.5);
+}
+
+.btn-primary.disabled, .btn-primary:disabled {
+  color: #fff;
+  background-color: #004F00;
+  border-color: #003D00;
+}
+
+.btn-primary:not(:disabled):not(.disabled):active, .btn-primary:not(:disabled):not(.disabled).active, .show > .btn-primary.dropdown-toggle {
+  color: #fff;
+  background-color: #002800;
+  border-color: #001A00;
+}
+
+.btn-primary:not(:disabled):not(.disabled):active:focus, .btn-primary:not(:disabled):not(.disabled).active:focus, .show > .btn-primary.dropdown-toggle:focus {
+  box-shadow: 0 0 0 0.2rem rgba(0, 79, 0, 0.5);
+}
+
+.btn-outline-primary {
+  color: #004F00;
+  border-color: #004F00;
+}
+
+.btn-outline-primary:hover {
+  color: #fff;
+  background-color: #004F00;
+  border-color: #004F00;
+}
+
+.btn-outline-primary:focus, .btn-outline-primary.focus {
+  box-shadow: 0 0 0 0.2rem rgba(0, 79, 0, 0.5);
+}
+
+.btn-outline-primary.disabled, .btn-outline-primary:disabled {
+  color: #004F00;
+  background-color: transparent;
+}
+
+.btn-outline-primary:not(:disabled):not(.disabled):active, .btn-outline-primary:not(:disabled):not(.disabled).active, .show > .btn-outline-primary.dropdown-toggle {
+  color: #fff;
+  background-color: #004F00;
+  border-color: #004F00;
+}
+
+.btn-outline-primary:not(:disabled):not(.disabled):active:focus, .btn-outline-primary:not(:disabled):not(.disabled).active:focus, .show > .btn-outline-primary.dropdown-toggle:focus {
+  box-shadow: 0 0 0 0.2rem rgba(0, 79, 0, 0.5);
+}
+
+.border-primary {
+  border-color: #004F00 !important;
+}
+
+.alert-primary {
+  color: #002800;
+  background-color: #ccffcc;
+  border-color: #b3ffb3;
+}
+
+.alert-primary hr {
+  border-top-color: #99ff99;
+}
+
+.alert-primary .alert-link {
+  color: #001A00;
+}
+
+.badge-primary {
+  color: #fff;
+  background-color: #004F00;
+}
+
+.badge-primary[href]:hover, .badge-primary[href]:focus {
+  color: #fff;
+  background-color: #003D00;
+}
+
+.progress-bar {
+  background-color: #004F00;
+}
+
+.navbar-dark .navbar-brand {
+  color: #fff;
+}
+
+.navbar-dark .navbar-brand:hover, .navbar-dark .navbar-brand:focus {
+  color: #fff;
+}
+
+/* Work Order Dropdown Styles */
+.work-order-nav-link {
+  display: flex !important;
+  align-items: center;
+  white-space: nowrap;
+  width: 280px;
+  min-width: 280px;
+  justify-content: space-between;
+}
+
+.work-order-content {
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  flex: 1;
+  min-width: 0;
+}
+
+.work-order-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 180px;
+  display: inline-block;
+}
+
+#workOrderDropdownMenu {
+  width: 280px;
+  min-width: 280px;
+  max-width: 280px;
+}
+
+#workOrderDropdownMenu .dropdown-item {
+  padding: 0.75rem 1rem;
+  white-space: normal;
+}
+
+#workOrderDropdownMenu .dropdown-item:hover {
+  background-color: #f8f9fa;
+}
+
+#workOrderDropdownMenu .dropdown-item.active {
+  background-color: #004F00;
+  color: white;
+}
+
+#workOrderDropdownMenu .dropdown-item.active:hover {
+  background-color: #003D00;
+}
+
+#workOrderDropdownMenu .dropdown-item.active .text-muted {
+  color: #cccccc !important;
+}
+
+/* Ensure proper alignment for the dropdown toggle */
+#activeWorkOrderDropdown.text-muted .work-order-name {
+  color: #6c757d !important;
+}
+
+#activeWorkOrderDropdown:not(.text-muted) .work-order-name {
+  color: #ffc107 !important;
+}
+
+/* Ensure the dropdown caret appears at the far right */
+.work-order-nav-link::after {
+  margin-left: 0;
+  flex-shrink: 0;
 }

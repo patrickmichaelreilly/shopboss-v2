@@ -2,6 +2,11 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ShopBoss.Web.Data;
 using ShopBoss.Web.Models;
+using ShopBoss.Web.Services;
+using ShopBoss.Web.Hubs;
+using Microsoft.AspNetCore.SignalR;
+using System.Text.Json;
+using System.Diagnostics;
 
 namespace ShopBoss.Web.Controllers;
 
@@ -9,11 +14,22 @@ public class AdminController : Controller
 {
     private readonly ShopBossDbContext _context;
     private readonly ILogger<AdminController> _logger;
+    private readonly ShippingService _shippingService;
+    private readonly AuditTrailService _auditTrailService;
+    private readonly IHubContext<StatusHub> _hubContext;
 
-    public AdminController(ShopBossDbContext context, ILogger<AdminController> logger)
+    public AdminController(
+        ShopBossDbContext context, 
+        ILogger<AdminController> logger,
+        ShippingService shippingService,
+        AuditTrailService auditTrailService,
+        IHubContext<StatusHub> hubContext)
     {
         _context = context;
         _logger = logger;
+        _shippingService = shippingService;
+        _auditTrailService = auditTrailService;
+        _hubContext = hubContext;
     }
 
     public async Task<IActionResult> Index(string search = "")
@@ -50,43 +66,6 @@ public class AdminController : Controller
         }
     }
 
-    public async Task<IActionResult> WorkOrder(string id)
-    {
-        if (string.IsNullOrEmpty(id))
-        {
-            return NotFound();
-        }
-
-        try
-        {
-            var workOrder = await _context.WorkOrders
-                .Include(w => w.Products)
-                    .ThenInclude(p => p.Parts)
-                .Include(w => w.Products)
-                    .ThenInclude(p => p.Subassemblies)
-                        .ThenInclude(s => s.Parts)
-                .Include(w => w.Products)
-                    .ThenInclude(p => p.Subassemblies)
-                        .ThenInclude(s => s.ChildSubassemblies)
-                            .ThenInclude(cs => cs.Parts)
-                .Include(w => w.Hardware)
-                .Include(w => w.DetachedProducts)
-                .FirstOrDefaultAsync(w => w.Id == id);
-
-            if (workOrder == null)
-            {
-                return NotFound();
-            }
-
-            return View(workOrder);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving work order {WorkOrderId}", id);
-            TempData["ErrorMessage"] = "An error occurred while loading the work order.";
-            return RedirectToAction(nameof(Index));
-        }
-    }
 
     [HttpPost]
     public async Task<IActionResult> DeleteWorkOrder(string id)
@@ -175,123 +154,6 @@ public class AdminController : Controller
         }
     }
 
-    public async Task<IActionResult> Modify(string id)
-    {
-        if (string.IsNullOrEmpty(id))
-        {
-            return NotFound();
-        }
-
-        try
-        {
-            var workOrder = await _context.WorkOrders
-                .Include(w => w.Products)
-                    .ThenInclude(p => p.Parts)
-                .Include(w => w.Products)
-                    .ThenInclude(p => p.Subassemblies)
-                        .ThenInclude(s => s.Parts)
-                .Include(w => w.Products)
-                    .ThenInclude(p => p.Subassemblies)
-                        .ThenInclude(s => s.ChildSubassemblies)
-                            .ThenInclude(cs => cs.Parts)
-                .Include(w => w.Hardware)
-                .Include(w => w.DetachedProducts)
-                .FirstOrDefaultAsync(w => w.Id == id);
-
-            if (workOrder == null)
-            {
-                return NotFound();
-            }
-
-            ViewBag.Mode = "modify";
-            // Create clean data structure for JavaScript serialization
-            ViewBag.WorkOrderData = new
-            {
-                id = workOrder.Id,
-                name = workOrder.Name,
-                importedDate = workOrder.ImportedDate,
-                products = workOrder.Products.Select(p => new
-                {
-                    id = p.Id,
-                    productNumber = p.ProductNumber,
-                    name = p.Name,
-                    qty = p.Qty,
-                    length = p.Length,
-                    width = p.Width,
-                    parts = p.Parts.Select(part => new
-                    {
-                        id = part.Id,
-                        name = part.Name,
-                        qty = part.Qty,
-                        length = part.Length,
-                        width = part.Width,
-                        thickness = part.Thickness,
-                        material = part.Material
-                    }),
-                    subassemblies = p.Subassemblies.Select(sub => new
-                    {
-                        id = sub.Id,
-                        name = sub.Name,
-                        qty = sub.Qty,
-                        parts = sub.Parts.Select(part => new
-                        {
-                            id = part.Id,
-                            name = part.Name,
-                            qty = part.Qty,
-                            length = part.Length,
-                            width = part.Width,
-                            thickness = part.Thickness,
-                            material = part.Material
-                        }),
-                        childSubassemblies = sub.ChildSubassemblies.Select(child => new
-                        {
-                            id = child.Id,
-                            name = child.Name,
-                            qty = child.Qty,
-                            parts = child.Parts.Select(part => new
-                            {
-                                id = part.Id,
-                                name = part.Name,
-                                qty = part.Qty,
-                                length = part.Length,
-                                width = part.Width,
-                                thickness = part.Thickness,
-                                material = part.Material
-                            })
-                        })
-                    })
-                }),
-                hardware = workOrder.Hardware.Select(h => new
-                {
-                    id = h.Id,
-                    name = h.Name,
-                    qty = h.Qty
-                }),
-                detachedProducts = workOrder.DetachedProducts.Select(d => new
-                {
-                    id = d.Id,
-                    productNumber = d.ProductNumber,
-                    name = d.Name,
-                    qty = d.Qty,
-                    length = d.Length,
-                    width = d.Width,
-                    thickness = d.Thickness,
-                    material = d.Material
-                })
-            };
-            
-            // Pre-serialize the data for JavaScript to avoid circular reference issues
-            ViewBag.WorkOrderDataJson = System.Text.Json.JsonSerializer.Serialize(ViewBag.WorkOrderData);
-            
-            return View(workOrder);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving work order for modification {WorkOrderId}", id);
-            TempData["ErrorMessage"] = "An error occurred while loading the work order for modification.";
-            return RedirectToAction(nameof(Index));
-        }
-    }
 
     [HttpPost]
     public async Task<IActionResult> SetActiveWorkOrder(string id)
@@ -323,6 +185,40 @@ public class AdminController : Controller
             _logger.LogError(ex, "Error setting active work order {WorkOrderId}", id);
             TempData["ErrorMessage"] = "An error occurred while setting the active work order.";
             return RedirectToAction(nameof(Index));
+        }
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> SetActiveWorkOrderJson(string id)
+    {
+        if (string.IsNullOrEmpty(id))
+        {
+            return Json(new { success = false, message = "Invalid work order ID." });
+        }
+
+        try
+        {
+            // Verify the work order exists
+            var workOrder = await _context.WorkOrders.FindAsync(id);
+            if (workOrder == null)
+            {
+                return Json(new { success = false, message = "Work order not found." });
+            }
+
+            // Set as active work order in session
+            HttpContext.Session.SetString("ActiveWorkOrderId", id);
+            
+            return Json(new { 
+                success = true, 
+                message = $"'{workOrder.Name}' is now the active work order.",
+                workOrderId = id,
+                workOrderName = workOrder.Name
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error setting active work order {WorkOrderId}", id);
+            return Json(new { success = false, message = "An error occurred while setting the active work order." });
         }
     }
 
@@ -399,40 +295,36 @@ public class AdminController : Controller
         }
     }
 
-    [HttpPost]
-    public async Task<IActionResult> SaveModifications(string id, string workOrderName)
+    public async Task<IActionResult> GetAllWorkOrders()
     {
-        if (string.IsNullOrEmpty(id))
-        {
-            return NotFound();
-        }
-
         try
         {
-            var workOrder = await _context.WorkOrders.FindAsync(id);
-            if (workOrder == null)
-            {
-                return NotFound();
-            }
-
-            // Update work order metadata
-            if (!string.IsNullOrEmpty(workOrderName))
-            {
-                workOrder.Name = workOrderName.Trim();
-            }
-
-            await _context.SaveChangesAsync();
-            TempData["SuccessMessage"] = "Work order updated successfully.";
+            var activeWorkOrderId = HttpContext.Session.GetString("ActiveWorkOrderId");
             
-            return RedirectToAction(nameof(WorkOrder), new { id = id });
+            var workOrders = await _context.WorkOrders
+                .OrderByDescending(w => w.ImportedDate)
+                .Select(w => new 
+                {
+                    Id = w.Id,
+                    Name = w.Name,
+                    ImportedDate = w.ImportedDate,
+                    IsActive = w.Id == activeWorkOrderId
+                })
+                .ToListAsync();
+
+            return Json(new { 
+                success = true, 
+                workOrders = workOrders,
+                activeWorkOrderId = activeWorkOrderId
+            });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error saving work order modifications {WorkOrderId}", id);
-            TempData["ErrorMessage"] = "An error occurred while saving the work order modifications.";
-            return RedirectToAction(nameof(Modify), new { id = id });
+            _logger.LogError(ex, "Error retrieving all work orders for dropdown");
+            return Json(new { success = false, message = "Error retrieving work orders." });
         }
     }
+
 
     public async Task<IActionResult> Statistics()
     {
@@ -456,5 +348,493 @@ public class AdminController : Controller
             TempData["ErrorMessage"] = "An error occurred while loading statistics.";
             return View();
         }
+    }
+
+    // Modify Work Order Methods
+    public async Task<IActionResult> ModifyWorkOrder(string id)
+    {
+        if (string.IsNullOrEmpty(id))
+        {
+            TempData["ErrorMessage"] = "Work order ID is required to modify work order.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        try
+        {
+            var statusData = await _shippingService.GetStatusManagementDataAsync(id);
+            
+            if (statusData.WorkOrder == null)
+            {
+                TempData["ErrorMessage"] = "Work order not found.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            return View(statusData);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error loading modify work order interface for work order {WorkOrderId}", id);
+            TempData["ErrorMessage"] = "An error occurred while loading the modify work order interface.";
+            return RedirectToAction(nameof(Index));
+        }
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> UpdateStatus(string itemId, string itemType, PartStatus newStatus, bool cascadeToChildren = false, string workOrderId = "")
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(workOrderId))
+            {
+                return Json(new { success = false, message = "Work order ID is required" });
+            }
+
+            bool success = false;
+            string entityType = itemType;
+            var oldValue = "";
+            var newValue = newStatus.ToString();
+
+            switch (itemType.ToLower())
+            {
+                case "part":
+                    var part = await _context.Parts.FirstOrDefaultAsync(p => p.Id == itemId);
+                    if (part != null)
+                    {
+                        oldValue = part.Status.ToString();
+                        success = await _shippingService.UpdatePartStatusAsync(itemId, newStatus, "Manual");
+                    }
+                    break;
+                    
+                case "product":
+                    var product = await _context.Products.FirstOrDefaultAsync(p => p.Id == itemId);
+                    if (product != null)
+                    {
+                        // For products, the old value is the effective status of their parts
+                        oldValue = "Mixed"; // Simplified for now
+                        success = await _shippingService.UpdateProductStatusAsync(itemId, newStatus, cascadeToChildren);
+                    }
+                    break;
+                    
+                case "hardware":
+                    var hardware = await _context.Hardware.FirstOrDefaultAsync(h => h.Id == itemId);
+                    if (hardware != null)
+                    {
+                        oldValue = hardware.IsShipped ? "Shipped" : "Pending";
+                        success = await _shippingService.UpdateHardwareStatusAsync(itemId, newStatus == PartStatus.Shipped);
+                        newValue = newStatus == PartStatus.Shipped ? "Shipped" : "Pending";
+                    }
+                    break;
+                    
+                case "detachedproduct":
+                    var detachedProduct = await _context.DetachedProducts.FirstOrDefaultAsync(d => d.Id == itemId);
+                    if (detachedProduct != null)
+                    {
+                        oldValue = detachedProduct.IsShipped ? "Shipped" : "Pending";
+                        success = await _shippingService.UpdateDetachedProductStatusAsync(itemId, newStatus == PartStatus.Shipped);
+                        newValue = newStatus == PartStatus.Shipped ? "Shipped" : "Pending";
+                    }
+                    break;
+            }
+
+            if (success)
+            {
+                // Log the manual status change
+                await _auditTrailService.LogAsync(
+                    action: "ManualStatusChange",
+                    entityType: entityType,
+                    entityId: itemId,
+                    oldValue: oldValue,
+                    newValue: newValue,
+                    station: "Manual",
+                    workOrderId: workOrderId,
+                    details: $"Manual status change via Admin interface. Cascade: {cascadeToChildren}",
+                    sessionId: HttpContext.Session.Id
+                );
+
+                // Send SignalR notification to other stations
+                await _hubContext.Clients.Group("all-stations")
+                    .SendAsync("StatusManuallyChanged", new
+                    {
+                        ItemId = itemId,
+                        ItemType = itemType,
+                        NewStatus = newStatus.ToString(),
+                        WorkOrderId = workOrderId,
+                        Timestamp = DateTime.UtcNow,
+                        Station = "Manual",
+                        ChangedBy = "Admin"
+                    });
+
+                return Json(new { success = true, message = $"{itemType} status updated successfully" });
+            }
+            else
+            {
+                return Json(new { success = false, message = $"Failed to update {itemType} status" });
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating status for {ItemType} {ItemId}", itemType, itemId);
+            return Json(new { success = false, message = "An error occurred while updating the status" });
+        }
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> BulkUpdateStatus(List<StatusUpdateRequest> updates, string workOrderId = "")
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(workOrderId))
+            {
+                return Json(new { success = false, message = "Work order ID is required" });
+            }
+
+            if (updates == null || !updates.Any())
+            {
+                return Json(new { success = false, message = "No updates provided" });
+            }
+
+            var result = await _shippingService.UpdateMultipleStatusesAsync(updates);
+
+            if (result.Success)
+            {
+                // Log bulk operation
+                await _auditTrailService.LogAsync(
+                    action: "BulkStatusChange",
+                    entityType: "Multiple",
+                    entityId: "Bulk",
+                    oldValue: JsonSerializer.Serialize(updates.Select(u => new { u.ItemId, u.ItemType })),
+                    newValue: JsonSerializer.Serialize(updates.Select(u => new { u.ItemId, u.NewStatus })),
+                    station: "Manual",
+                    workOrderId: workOrderId,
+                    details: $"Bulk status change: {result.SuccessCount} successful, {result.FailureCount} failed",
+                    sessionId: HttpContext.Session.Id
+                );
+
+                // Send SignalR notification
+                await _hubContext.Clients.Group("all-stations")
+                    .SendAsync("BulkStatusChanged", new
+                    {
+                        UpdateCount = result.SuccessCount,
+                        WorkOrderId = workOrderId,
+                        Timestamp = DateTime.UtcNow,
+                        Station = "Manual"
+                    });
+
+                return Json(new 
+                { 
+                    success = true, 
+                    message = $"Bulk update completed: {result.SuccessCount} successful, {result.FailureCount} failed",
+                    successCount = result.SuccessCount,
+                    failureCount = result.FailureCount,
+                    failedItems = result.FailedItems
+                });
+            }
+            else
+            {
+                return Json(new { success = false, message = result.ErrorMessage ?? "Bulk update failed" });
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error performing bulk status update");
+            return Json(new { success = false, message = "An error occurred during bulk update" });
+        }
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> GetStatusData(string workOrderId = "", string search = "")
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(workOrderId))
+            {
+                return Json(new { success = false, message = "Work order ID is required" });
+            }
+
+            var statusData = await _shippingService.GetStatusManagementDataAsync(workOrderId);
+
+            // Apply search filter if provided
+            if (!string.IsNullOrEmpty(search))
+            {
+                search = search.ToLower();
+                statusData.ProductNodes = statusData.ProductNodes
+                    .Where(p => p.Product.Name.ToLower().Contains(search) ||
+                               p.Parts.Any(part => part.Name.ToLower().Contains(search)) ||
+                               p.Subassemblies.Any(sub => sub.Name.ToLower().Contains(search)))
+                    .ToList();
+
+                // Filter parts within products
+                foreach (var productNode in statusData.ProductNodes)
+                {
+                    productNode.Parts = productNode.Parts
+                        .Where(part => part.Name.ToLower().Contains(search))
+                        .ToList();
+                }
+            }
+
+            return Json(new { success = true, data = statusData });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting filtered status data");
+            return Json(new { success = false, message = "Error loading status data" });
+        }
+    }
+
+    // Rack Configuration Methods
+    public async Task<IActionResult> RackConfiguration()
+    {
+        try
+        {
+            var racks = await _context.StorageRacks
+                .Include(r => r.Bins)
+                .OrderBy(r => r.Name)
+                .ToListAsync();
+
+            return View(racks);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error loading rack configuration");
+            TempData["ErrorMessage"] = "An error occurred while loading rack configuration.";
+            return View(new List<StorageRack>());
+        }
+    }
+
+    [HttpGet]
+    public IActionResult CreateRack()
+    {
+        return View(new StorageRack());
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> CreateRack(StorageRack rack)
+    {
+        try
+        {
+            if (ModelState.IsValid)
+            {
+                rack.Id = Guid.NewGuid().ToString();
+                rack.CreatedDate = DateTime.UtcNow;
+                rack.LastModifiedDate = DateTime.UtcNow;
+
+                _context.StorageRacks.Add(rack);
+                await _context.SaveChangesAsync();
+
+                // Create bins for the new rack
+                await CreateBinsForRack(rack);
+
+                TempData["SuccessMessage"] = $"Rack '{rack.Name}' created successfully with {rack.TotalBins} bins.";
+                return RedirectToAction(nameof(RackConfiguration));
+            }
+
+            return View(rack);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating rack");
+            TempData["ErrorMessage"] = "An error occurred while creating the rack.";
+            return View(rack);
+        }
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> EditRack(string id)
+    {
+        if (string.IsNullOrEmpty(id))
+        {
+            return NotFound();
+        }
+
+        try
+        {
+            var rack = await _context.StorageRacks
+                .Include(r => r.Bins)
+                .FirstOrDefaultAsync(r => r.Id == id);
+
+            if (rack == null)
+            {
+                return NotFound();
+            }
+
+            return View(rack);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error loading rack for editing: {RackId}", id);
+            TempData["ErrorMessage"] = "An error occurred while loading the rack.";
+            return RedirectToAction(nameof(RackConfiguration));
+        }
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> EditRack(StorageRack rack)
+    {
+        try
+        {
+            if (ModelState.IsValid)
+            {
+                var existingRack = await _context.StorageRacks
+                    .Include(r => r.Bins)
+                    .FirstOrDefaultAsync(r => r.Id == rack.Id);
+
+                if (existingRack == null)
+                {
+                    return NotFound();
+                }
+
+                // Store original dimensions
+                var originalRows = existingRack.Rows;
+                var originalColumns = existingRack.Columns;
+
+                // Update rack properties
+                existingRack.Name = rack.Name;
+                existingRack.Type = rack.Type;
+                existingRack.Description = rack.Description;
+                existingRack.Rows = rack.Rows;
+                existingRack.Columns = rack.Columns;
+                existingRack.Length = rack.Length;
+                existingRack.Width = rack.Width;
+                existingRack.Height = rack.Height;
+                existingRack.Location = rack.Location;
+                existingRack.IsActive = rack.IsActive;
+                existingRack.IsPortable = rack.IsPortable;
+                existingRack.LastModifiedDate = DateTime.UtcNow;
+
+                // If dimensions changed, recreate bins
+                if (originalRows != rack.Rows || originalColumns != rack.Columns)
+                {
+                    // Remove existing bins
+                    _context.Bins.RemoveRange(existingRack.Bins);
+                    
+                    // Create new bins
+                    await CreateBinsForRack(existingRack);
+                }
+
+                await _context.SaveChangesAsync();
+
+                TempData["SuccessMessage"] = $"Rack '{rack.Name}' updated successfully.";
+                return RedirectToAction(nameof(RackConfiguration));
+            }
+
+            return View(rack);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating rack: {RackId}", rack.Id);
+            TempData["ErrorMessage"] = "An error occurred while updating the rack.";
+            return View(rack);
+        }
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> DeleteRack(string id)
+    {
+        if (string.IsNullOrEmpty(id))
+        {
+            return NotFound();
+        }
+
+        try
+        {
+            var rack = await _context.StorageRacks
+                .Include(r => r.Bins)
+                .FirstOrDefaultAsync(r => r.Id == id);
+
+            if (rack == null)
+            {
+                return NotFound();
+            }
+
+            // Check if rack has any parts assigned
+            var hasAssignedParts = rack.Bins.Any(b => !string.IsNullOrEmpty(b.PartId));
+
+            if (hasAssignedParts)
+            {
+                TempData["ErrorMessage"] = $"Cannot delete rack '{rack.Name}' - it contains assigned parts. Please move all parts before deleting.";
+                return RedirectToAction(nameof(RackConfiguration));
+            }
+
+            _context.StorageRacks.Remove(rack);
+            await _context.SaveChangesAsync();
+
+            TempData["SuccessMessage"] = $"Rack '{rack.Name}' deleted successfully.";
+            return RedirectToAction(nameof(RackConfiguration));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting rack: {RackId}", id);
+            TempData["ErrorMessage"] = "An error occurred while deleting the rack.";
+            return RedirectToAction(nameof(RackConfiguration));
+        }
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> ToggleRackStatus(string id)
+    {
+        if (string.IsNullOrEmpty(id))
+        {
+            return Json(new { success = false, message = "Invalid rack ID" });
+        }
+
+        try
+        {
+            var rack = await _context.StorageRacks.FindAsync(id);
+            if (rack == null)
+            {
+                return Json(new { success = false, message = "Rack not found" });
+            }
+
+            rack.IsActive = !rack.IsActive;
+            rack.LastModifiedDate = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            return Json(new { 
+                success = true, 
+                message = $"Rack '{rack.Name}' is now {(rack.IsActive ? "active" : "inactive")}",
+                isActive = rack.IsActive
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error toggling rack status: {RackId}", id);
+            return Json(new { success = false, message = "An error occurred while updating the rack status" });
+        }
+    }
+
+    private async Task CreateBinsForRack(StorageRack rack)
+    {
+        var bins = new List<Bin>();
+
+        for (int row = 1; row <= rack.Rows; row++)
+        {
+            for (int col = 1; col <= rack.Columns; col++)
+            {
+                var bin = new Bin
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    StorageRackId = rack.Id,
+                    Row = row,
+                    Column = col,
+                    Status = BinStatus.Empty,
+                    MaxCapacity = rack.Type == RackType.DoorsAndDrawerFronts ? 20 : 50,
+                    PartsCount = 0,
+                    AssignedDate = DateTime.UtcNow,
+                    LastUpdatedDate = DateTime.UtcNow
+                };
+
+                bins.Add(bin);
+            }
+        }
+
+        _context.Bins.AddRange(bins);
+        await _context.SaveChangesAsync();
+    }
+
+    [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
+    public IActionResult Error()
+    {
+        return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
     }
 }
