@@ -125,7 +125,7 @@ public class ShopBossDbContext : DbContext
                 .HasForeignKey(e => e.WorkOrderId)
                 .OnDelete(DeleteBehavior.Cascade);
                 
-            entity.HasIndex(e => e.Barcode).IsUnique();
+            entity.HasIndex(e => new { e.WorkOrderId, e.Barcode }).IsUnique();
         });
 
         modelBuilder.Entity<AuditLog>(entity =>

@@ -6,7 +6,9 @@ namespace ShopBoss.Web.Models;
 public class Hardware
 {
     [Key]
-    public string Id { get; set; } = string.Empty;
+    public string Id { get; set; } = Guid.NewGuid().ToString();
+    
+    public string MicrovellumId { get; set; } = string.Empty;
     
     [ForeignKey("WorkOrder")]
     public string WorkOrderId { get; set; } = string.Empty;

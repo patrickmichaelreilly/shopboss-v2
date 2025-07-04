@@ -55,7 +55,6 @@ public class ImportSelectionService
             
             // Process selected items
             ProcessSelectedProducts(importData, selection, workOrder, processedHardwareIds, result);
-            ProcessSelectedHardware(importData, selection, workOrder, processedHardwareIds, result);
             ProcessSelectedDetachedProducts(importData, selection, workOrder, result);
             
             // Identify products with only 1 part as detached products
@@ -226,19 +225,46 @@ public class ImportSelectionService
 
         foreach (var importProduct in importData.Products.Where(p => selectedProductIds.Contains(p.Id)))
         {
-            var product = ConvertToProductEntity(importProduct, workOrder.Id);
-            workOrder.Products.Add(product);
-
-            // Process selected parts for this product
-            ProcessSelectedPartsForProduct(importProduct, selection, product, workOrder, result);
+            // Handle multiple product quantities by creating individual product instances
+            // Business Rule: Products with Qty > 1 are normalized to multiple Qty = 1 products
+            // This simplifies assembly/shipping tracking (each product tracked individually)
+            var productQuantity = importProduct.Quantity;
             
-            // Process selected subassemblies for this product
-            ProcessSelectedSubassembliesForProduct(importProduct, selection, product, workOrder, result);
+            if (productQuantity > 1)
+            {
+                _logger.LogInformation("Converting product '{ProductName}' (ID: {ProductId}) with quantity {Quantity} to {Quantity} individual product instances",
+                    importProduct.Name, importProduct.Id, productQuantity, productQuantity);
+            }
             
-            // Process selected hardware for this product
-            ProcessSelectedHardwareForProduct(importProduct, selection, product, workOrder, processedHardwareIds, result);
+            for (int i = 1; i <= productQuantity; i++)
+            {
+                // Create individual product instance with Qty = 1
+                var product = ConvertToProductEntity(importProduct, workOrder.Id);
+                
+                // Make each product instance unique if quantity > 1
+                if (productQuantity > 1)
+                {
+                    product.Id = $"{importProduct.Id}_{i}";
+                    product.Name = $"{importProduct.Name} (Instance {i})";
+                }
+                product.Qty = 1; // Each instance is quantity 1
+                
+                workOrder.Products.Add(product);
 
-            result.Statistics.ConvertedProducts++;
+                // Only pass product instance ID for uniqueness if quantity > 1
+                var productInstanceIdForUniqueness = productQuantity > 1 ? product.Id : null;
+                
+                // Process selected parts for this product instance
+                ProcessSelectedPartsForProduct(importProduct, selection, product, workOrder, result, productInstanceIdForUniqueness);
+                
+                // Process selected subassemblies for this product instance
+                ProcessSelectedSubassembliesForProduct(importProduct, selection, product, workOrder, result, productInstanceIdForUniqueness);
+                
+                // Process selected hardware for this product instance (now correctly 1× per instance)
+                ProcessSelectedHardwareForProduct(importProduct, selection, product, workOrder, processedHardwareIds, result);
+
+                result.Statistics.ConvertedProducts++;
+            }
         }
     }
 
@@ -247,7 +273,8 @@ public class ImportSelectionService
         SelectionRequest selection,
         Product product,
         WorkOrder workOrder,
-        ImportConversionResult result)
+        ImportConversionResult result,
+        string? productInstanceIdForUniqueness = null)
     {
         var selectedPartIds = selection.SelectedItemIds
             .Where(id => selection.SelectionDetails.ContainsKey(id) && 
@@ -256,7 +283,7 @@ public class ImportSelectionService
 
         foreach (var importPart in importProduct.Parts.Where(p => selectedPartIds.Contains(p.Id)))
         {
-            var part = ConvertToPartEntity(importPart, product.Id, null, workOrder);
+            var part = ConvertToPartEntity(importPart, product.Id, null, workOrder, productInstanceIdForUniqueness);
             product.Parts.Add(part);
             result.Statistics.ConvertedParts++;
         }
@@ -267,7 +294,8 @@ public class ImportSelectionService
         SelectionRequest selection,
         Product product,
         WorkOrder workOrder,
-        ImportConversionResult result)
+        ImportConversionResult result,
+        string? productInstanceIdForUniqueness = null)
     {
         var selectedSubassemblyIds = selection.SelectedItemIds
             .Where(id => selection.SelectionDetails.ContainsKey(id) && 
@@ -276,11 +304,11 @@ public class ImportSelectionService
 
         foreach (var importSubassembly in importProduct.Subassemblies.Where(s => selectedSubassemblyIds.Contains(s.Id)))
         {
-            var subassembly = ConvertToSubassemblyEntity(importSubassembly, product.Id, null);
+            var subassembly = ConvertToSubassemblyEntity(importSubassembly, product.Id, null, productInstanceIdForUniqueness);
             product.Subassemblies.Add(subassembly);
 
             // Recursively process selected items within this subassembly
-            ProcessSelectedItemsInSubassembly(importSubassembly, selection, subassembly, workOrder, result);
+            ProcessSelectedItemsInSubassembly(importSubassembly, selection, subassembly, workOrder, result, productInstanceIdForUniqueness);
 
             result.Statistics.ConvertedSubassemblies++;
         }
@@ -299,21 +327,37 @@ public class ImportSelectionService
                         selection.SelectionDetails[id].ItemType == "hardware")
             .ToHashSet();
 
-        foreach (var importHardware in importProduct.Hardware.Where(h => selectedHardwareIds.Contains(h.Id)))
+        // Group hardware by MicrovellumId and Name to handle duplicates
+        var hardwareGroups = importProduct.Hardware
+            .Where(h => selectedHardwareIds.Contains(h.Id))
+            .GroupBy(h => new { h.Id, h.Name })
+            .ToList();
+
+        foreach (var hardwareGroup in hardwareGroups)
         {
             // Skip if this hardware has already been processed
-            if (processedHardwareIds.Contains(importHardware.Id))
+            if (processedHardwareIds.Contains(hardwareGroup.Key.Id))
             {
                 continue;
             }
             
-            // Hardware can be associated with either work order or product
-            // For product-level hardware, we'll create it as work order hardware with reference
-            var hardware = ConvertToHardwareEntity(importHardware, product.WorkOrderId);
+            // Sum quantities for identical hardware items
+            var totalQuantity = hardwareGroup.Sum(h => h.Quantity);
+            var firstHardware = hardwareGroup.First();
+            
+            // Create single hardware entity with summed quantity
+            var hardware = new Hardware
+            {
+                Id = Guid.NewGuid().ToString(),
+                MicrovellumId = firstHardware.Id,
+                Name = firstHardware.Name,
+                Qty = totalQuantity,
+                WorkOrderId = product.WorkOrderId
+            };
             
             // Add to work order's hardware collection
             workOrder.Hardware.Add(hardware);
-            processedHardwareIds.Add(importHardware.Id);
+            processedHardwareIds.Add(hardwareGroup.Key.Id);
             result.Statistics.ConvertedHardware++;
         }
     }
@@ -323,7 +367,8 @@ public class ImportSelectionService
         SelectionRequest selection,
         Subassembly subassembly,
         WorkOrder workOrder,
-        ImportConversionResult result)
+        ImportConversionResult result,
+        string? productInstanceId = null)
     {
         var selectedPartIds = selection.SelectedItemIds
             .Where(id => selection.SelectionDetails.ContainsKey(id) && 
@@ -338,7 +383,7 @@ public class ImportSelectionService
         // Process parts in this subassembly
         foreach (var importPart in importSubassembly.Parts.Where(p => selectedPartIds.Contains(p.Id)))
         {
-            var part = ConvertToPartEntity(importPart, subassembly.ProductId, subassembly.Id, workOrder);
+            var part = ConvertToPartEntity(importPart, subassembly.ProductId, subassembly.Id, workOrder, productInstanceId);
             subassembly.Parts.Add(part);
             result.Statistics.ConvertedParts++;
         }
@@ -346,42 +391,16 @@ public class ImportSelectionService
         // Process nested subassemblies
         foreach (var importNested in importSubassembly.NestedSubassemblies.Where(s => selectedSubassemblyIds.Contains(s.Id)))
         {
-            var nested = ConvertToSubassemblyEntity(importNested, subassembly.ProductId, subassembly.Id);
+            var nested = ConvertToSubassemblyEntity(importNested, subassembly.ProductId, subassembly.Id, productInstanceId);
             subassembly.ChildSubassemblies.Add(nested);
 
             // Recursively process items in nested subassembly
-            ProcessSelectedItemsInSubassembly(importNested, selection, nested, workOrder, result);
+            ProcessSelectedItemsInSubassembly(importNested, selection, nested, workOrder, result, productInstanceId);
 
             result.Statistics.ConvertedSubassemblies++;
         }
     }
 
-    private void ProcessSelectedHardware(
-        ImportWorkOrder importData,
-        SelectionRequest selection,
-        WorkOrder workOrder,
-        HashSet<string> processedHardwareIds,
-        ImportConversionResult result)
-    {
-        var selectedHardwareIds = selection.SelectedItemIds
-            .Where(id => selection.SelectionDetails.ContainsKey(id) && 
-                        selection.SelectionDetails[id].ItemType == "hardware")
-            .ToHashSet();
-
-        foreach (var importHardware in importData.Hardware.Where(h => selectedHardwareIds.Contains(h.Id)))
-        {
-            // Skip if this hardware has already been processed
-            if (processedHardwareIds.Contains(importHardware.Id))
-            {
-                continue;
-            }
-            
-            var hardware = ConvertToHardwareEntity(importHardware, workOrder.Id);
-            workOrder.Hardware.Add(hardware);
-            processedHardwareIds.Add(importHardware.Id);
-            result.Statistics.ConvertedHardware++;
-        }
-    }
 
     private void ProcessSelectedDetachedProducts(
         ImportWorkOrder importData,
@@ -416,14 +435,25 @@ public class ImportSelectionService
         };
     }
 
-    private Part ConvertToPartEntity(ImportPart importPart, string? productId, string? subassemblyId, WorkOrder workOrder)
+    private Part ConvertToPartEntity(ImportPart importPart, string? productId, string? subassemblyId, WorkOrder workOrder, string? productInstanceId = null)
     {
         // Find the nest sheet for this part
         var nestSheet = FindNestSheetForPart(importPart, workOrder);
         
+        // Create unique part ID for product instances
+        var partId = importPart.Id;
+        
+        // Check if we need to make IDs unique (product instance has "_" suffix)
+        if (!string.IsNullOrEmpty(productInstanceId) && productInstanceId.Contains("_"))
+        {
+            // Extract instance suffix from product ID (e.g., "PROD_1" -> "_1")
+            var instanceSuffix = productInstanceId.Substring(productInstanceId.LastIndexOf('_'));
+            partId = $"{importPart.Id}{instanceSuffix}";
+        }
+        
         return new Part
         {
-            Id = importPart.Id, // Preserve Microvellum ID
+            Id = partId, // Use unique part ID for product instances
             Name = importPart.Name,
             Qty = importPart.Quantity,
             Length = importPart.Height, // Height maps to Length
@@ -441,17 +471,35 @@ public class ImportSelectionService
         };
     }
 
-    private Subassembly ConvertToSubassemblyEntity(ImportSubassembly importSubassembly, string? productId, string? parentSubassemblyId)
+    private Subassembly ConvertToSubassemblyEntity(ImportSubassembly importSubassembly, string? productId, string? parentSubassemblyId, string? productInstanceId = null)
     {
+        // Create unique subassembly ID for product instances
+        var subassemblyId = importSubassembly.Id;
+        var updatedParentSubassemblyId = parentSubassemblyId;
+        
+        // Check if we need to make IDs unique (product instance has "_" suffix)
+        if (!string.IsNullOrEmpty(productInstanceId) && productInstanceId.Contains("_"))
+        {
+            // Extract instance suffix from product ID (e.g., "PROD_1" -> "_1")
+            var instanceSuffix = productInstanceId.Substring(productInstanceId.LastIndexOf('_'));
+            subassemblyId = $"{importSubassembly.Id}{instanceSuffix}";
+            
+            // Also update parent subassembly ID if it exists
+            if (!string.IsNullOrEmpty(parentSubassemblyId))
+            {
+                updatedParentSubassemblyId = $"{parentSubassemblyId}{instanceSuffix}";
+            }
+        }
+        
         return new Subassembly
         {
-            Id = importSubassembly.Id, // Preserve Microvellum ID
+            Id = subassemblyId, // Use unique subassembly ID for product instances
             Name = importSubassembly.Name,
             Qty = importSubassembly.Quantity,
             Length = importSubassembly.Height, // Height maps to Length
             Width = importSubassembly.Width,
             ProductId = productId,
-            ParentSubassemblyId = parentSubassemblyId
+            ParentSubassemblyId = updatedParentSubassemblyId
         };
     }
 
@@ -459,7 +507,8 @@ public class ImportSelectionService
     {
         return new Hardware
         {
-            Id = importHardware.Id, // Preserve Microvellum ID
+            Id = Guid.NewGuid().ToString(), // Use auto-generated GUID
+            MicrovellumId = importHardware.Id, // Preserve Microvellum ID
             Name = importHardware.Name,
             Qty = importHardware.Quantity,
             WorkOrderId = workOrderId
@@ -567,7 +616,13 @@ public class ImportSelectionService
     private void ProcessSinglePartProductsAsDetached(WorkOrder workOrder, ImportConversionResult result)
     {
         // Find products with exactly 1 part and treat them as detached products
-        var singlePartProducts = workOrder.Products.Where(p => p.Parts.Count == 1).ToList();
+        // This applies to both original products and normalized product instances
+        var singlePartProducts = workOrder.Products
+            .Where(p => p.Parts.Count == 1)
+            .ToList();
+        
+        // Create list to track products to remove after conversion
+        var productsToRemove = new List<Product>();
         
         foreach (var product in singlePartProducts)
         {
@@ -592,7 +647,14 @@ public class ImportSelectionService
             };
             
             workOrder.DetachedProducts.Add(detachedProduct);
+            productsToRemove.Add(product);
             result.Statistics.ConvertedDetachedProducts++;
+        }
+        
+        // Remove the original single-part products to avoid Entity Framework tracking conflicts
+        foreach (var product in productsToRemove)
+        {
+            workOrder.Products.Remove(product);
         }
         
         if (singlePartProducts.Any())

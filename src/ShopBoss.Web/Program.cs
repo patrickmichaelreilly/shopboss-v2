@@ -20,7 +20,16 @@ builder.Services.AddSession(options =>
 
 // Add Entity Framework
 builder.Services.AddDbContext<ShopBossDbContext>(options =>
-    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection") ?? "Data Source=shopboss.db;Cache=Shared"));
+{
+    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection") ?? "Data Source=shopboss.db;Cache=Shared");
+    
+    // Enable sensitive data logging for debugging Entity Framework conflicts
+    if (builder.Environment.IsDevelopment())
+    {
+        options.EnableSensitiveDataLogging();
+        options.LogTo(Console.WriteLine, LogLevel.Warning);
+    }
+});
 
 // Add custom services
 builder.Services.AddScoped<ImporterService>();
