@@ -1,0 +1,341 @@
+/* Unified Tree View CSS - Shared styles for all tree components */
+
+.tree-content {
+    padding: 1rem;
+}
+
+.tree-node {
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #f8f9fa;
+    position: relative;
+}
+
+.tree-node:last-child {
+    border-bottom: none;
+}
+
+/* Hierarchical indentation */
+.tree-node.level-0 { margin-left: 0; }
+.tree-node.level-1 { margin-left: 1.5rem; }
+.tree-node.level-2 { margin-left: 3rem; }
+.tree-node.level-3 { margin-left: 4.5rem; }
+.tree-node.level-4 { margin-left: 6rem; }
+
+/* Tree toggle button */
+.tree-toggle {
+    cursor: pointer;
+    user-select: none;
+    color: #6c757d;
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    margin-right: 0.5rem;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.tree-toggle:hover {
+    color: #495057;
+    background-color: #e9ecef;
+}
+
+.tree-toggle i {
+    font-size: 12px !important;
+    line-height: 1;
+    transition: transform 0.2s ease;
+}
+
+/* Tree item content layout */
+.tree-item-content {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    transition: background-color 0.2s ease;
+}
+
+.tree-node:hover .tree-item-content {
+    background-color: #f8f9fa;
+    border-radius: 4px;
+    padding: 0.25rem 0.5rem;
+    margin: -0.25rem -0.5rem;
+}
+
+/* Item information */
+.item-info {
+    flex: 1;
+    min-width: 200px;
+}
+
+.item-name {
+    font-weight: 500;
+    color: #212529;
+    margin-bottom: 0.125rem;
+}
+
+.item-details {
+    font-size: 0.875rem;
+    color: #6c757d;
+    line-height: 1.3;
+}
+
+/* Item type icons */
+.item-type-icon {
+    width: 16px;
+    text-align: center;
+    font-size: 14px;
+}
+
+/* Node controls (checkboxes, status selects, etc.) */
+.node-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+.status-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.status-select {
+    min-width: 120px;
+    font-size: 0.875rem;
+    padding: 0.25rem 0.5rem;
+}
+
+.cascade-option {
+    margin-left: 0.5rem;
+}
+
+.cascade-option .form-check-label {
+    font-size: 0.75rem;
+    margin-bottom: 0;
+}
+
+/* Tree checkbox styling */
+.tree-checkbox {
+    margin-right: 0.5rem;
+    cursor: pointer;
+}
+
+/* Status badges */
+.status-badge,
+.badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+}
+
+/* Status-specific colors */
+.status-pending { 
+    background-color: #f8f9fa; 
+    color: #6c757d; 
+    border: 1px solid #dee2e6;
+}
+
+.status-cut { 
+    background-color: #cff4fc; 
+    color: #055160; 
+    border: 1px solid #b6effb;
+}
+
+.status-sorted { 
+    background-color: #d1ecf1; 
+    color: #0c5460; 
+    border: 1px solid #bee5eb;
+}
+
+.status-assembled { 
+    background-color: #d4edda; 
+    color: #155724; 
+    border: 1px solid #c3e6cb;
+}
+
+.status-shipped { 
+    background-color: #d1e7dd; 
+    color: #0a3622; 
+    border: 1px solid #badbcc;
+}
+
+/* Node type specific styling */
+.tree-node.work-order-node {
+    background-color: #f8f9fa;
+    border-radius: 0.375rem;
+    margin-bottom: 1rem;
+    border: 2px solid #e9ecef;
+    padding: 1rem;
+}
+
+.tree-node.section-header {
+    background-color: #f8f9fa;
+    border-radius: 0.375rem;
+    margin-bottom: 0.5rem;
+    border: 1px solid #e9ecef;
+    font-weight: 600;
+}
+
+.tree-node.product-node {
+    background-color: #f8f9fa;
+    border-radius: 0.375rem;
+    margin-bottom: 0.5rem;
+    border: 1px solid #e9ecef;
+}
+
+.tree-node.part-node:hover {
+    background-color: #f8f9fa;
+}
+
+/* Product status summary */
+.product-status-summary {
+    font-size: 0.875rem;
+    color: #495057;
+    margin-top: 0.25rem;
+}
+
+/* Tree children containers */
+.tree-children {
+    margin-left: 1rem;
+    border-left: 2px solid #f8f9fa;
+    padding-left: 1rem;
+    margin-top: 0.5rem;
+}
+
+.tree-children:empty {
+    display: none;
+}
+
+/* Loading states */
+.loading-spinner {
+    display: none;
+    text-align: center;
+    padding: 2rem;
+}
+
+.loading-spinner .spinner-border {
+    width: 3rem;
+    height: 3rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .tree-node.level-1 { margin-left: 1rem; }
+    .tree-node.level-2 { margin-left: 2rem; }
+    .tree-node.level-3 { margin-left: 3rem; }
+    .tree-node.level-4 { margin-left: 4rem; }
+    
+    .tree-item-content {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+    
+    .node-controls {
+        width: 100%;
+        justify-content: flex-start;
+    }
+    
+    .status-controls {
+        flex-wrap: wrap;
+    }
+}
+
+/* Accessibility improvements */
+.tree-toggle:focus {
+    outline: 2px solid #0d6efd;
+    outline-offset: 2px;
+}
+
+.tree-checkbox:focus {
+    outline: 2px solid #0d6efd;
+    outline-offset: 2px;
+}
+
+.status-select:focus {
+    border-color: #86b7fe;
+    outline: 0;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+/* Animation for expand/collapse */
+.tree-children {
+    transition: all 0.3s ease;
+    overflow: hidden;
+}
+
+.tree-toggle i {
+    transition: transform 0.2s ease;
+}
+
+/* Selection states */
+.tree-node.selected > .tree-item-content {
+    background-color: #e7f3ff;
+    border: 1px solid #b6e2ff;
+    border-radius: 4px;
+}
+
+.tree-node.partially-selected > .tree-item-content {
+    background-color: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 4px;
+}
+
+/* Error states */
+.tree-node.error > .tree-item-content {
+    background-color: #f8d7da;
+    border: 1px solid #f5c6cb;
+    border-radius: 4px;
+}
+
+/* Disabled states */
+.tree-node.disabled {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+/* Highlight search matches */
+.tree-node.search-match > .tree-item-content {
+    background-color: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 4px;
+}
+
+.search-highlight {
+    background-color: #ffeb3b;
+    padding: 0.125rem 0.25rem;
+    border-radius: 0.25rem;
+}
+
+/* Drag and drop states (for future enhancement) */
+.tree-node.drag-over {
+    background-color: #e7f3ff;
+    border: 2px dashed #0d6efd;
+    border-radius: 4px;
+}
+
+.tree-node.dragging {
+    opacity: 0.5;
+    transform: rotate(5deg);
+}
+
+/* Print styles */
+@media print {
+    .tree-toggle,
+    .tree-checkbox,
+    .status-select,
+    .node-controls {
+        display: none !important;
+    }
+    
+    .tree-children {
+        border-left: 1px solid #000;
+    }
+    
+    .tree-node {
+        break-inside: avoid;
+    }
+}

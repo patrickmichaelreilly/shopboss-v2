@@ -15,6 +15,7 @@ public class AdminController : Controller
     private readonly ShopBossDbContext _context;
     private readonly ILogger<AdminController> _logger;
     private readonly ShippingService _shippingService;
+    private readonly WorkOrderService _workOrderService;
     private readonly AuditTrailService _auditTrailService;
     private readonly IHubContext<StatusHub> _hubContext;
 
@@ -22,12 +23,14 @@ public class AdminController : Controller
         ShopBossDbContext context, 
         ILogger<AdminController> logger,
         ShippingService shippingService,
+        WorkOrderService workOrderService,
         AuditTrailService auditTrailService,
         IHubContext<StatusHub> hubContext)
     {
         _context = context;
         _logger = logger;
         _shippingService = shippingService;
+        _workOrderService = workOrderService;
         _auditTrailService = auditTrailService;
         _hubContext = hubContext;
     }
@@ -36,21 +39,7 @@ public class AdminController : Controller
     {
         try
         {
-            var query = _context.WorkOrders
-                .Include(w => w.Products)
-                .Include(w => w.Hardware)
-                .Include(w => w.DetachedProducts)
-                .AsQueryable();
-
-            // Apply search filter if provided
-            if (!string.IsNullOrEmpty(search))
-            {
-                query = query.Where(w => w.Name.Contains(search) || w.Id.Contains(search));
-            }
-
-            var workOrders = await query
-                .OrderByDescending(w => w.ImportedDate)
-                .ToListAsync();
+            var workOrders = await _workOrderService.GetWorkOrderSummariesAsync(search);
 
             // Get current active work order from session
             ViewBag.ActiveWorkOrderId = HttpContext.Session.GetString("ActiveWorkOrderId");
@@ -361,15 +350,17 @@ public class AdminController : Controller
 
         try
         {
-            var statusData = await _shippingService.GetStatusManagementDataAsync(id);
+            // Verify work order exists using lightweight query
+            var workOrder = await _workOrderService.GetWorkOrderByIdAsync(id);
             
-            if (statusData.WorkOrder == null)
+            if (workOrder == null)
             {
                 TempData["ErrorMessage"] = "Work order not found.";
                 return RedirectToAction(nameof(Index));
             }
 
-            return View(statusData);
+            // Use new unified view with just the work order ID
+            return View("ModifyWorkOrderUnified", id);
         }
         catch (Exception ex)
         {
@@ -551,7 +542,7 @@ public class AdminController : Controller
                 return Json(new { success = false, message = "Work order ID is required" });
             }
 
-            var statusData = await _shippingService.GetStatusManagementDataAsync(workOrderId);
+            var statusData = await _workOrderService.GetWorkOrderManagementDataAsync(workOrderId);
 
             // Apply search filter if provided
             if (!string.IsNullOrEmpty(search))

@@ -40,6 +40,7 @@ builder.Services.AddScoped<AuditTrailService>();
 builder.Services.AddScoped<SortingRuleService>();
 builder.Services.AddScoped<PartFilteringService>();
 builder.Services.AddScoped<ShippingService>();
+builder.Services.AddScoped<WorkOrderService>();
 
 var app = builder.Build();
 

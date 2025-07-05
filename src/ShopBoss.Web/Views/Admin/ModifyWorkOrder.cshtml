@@ -1,4 +1,4 @@
-@model ShopBoss.Web.Services.StatusManagementData
+@model ShopBoss.Web.Services.WorkOrderManagementData
 
 @{
     ViewData["Title"] = "Modify Work Order";
@@ -258,12 +258,12 @@
             <div class="card border-secondary h-100">
                 <div class="card-body text-center">
                     <i class="fas fa-cut fa-2x text-secondary mb-2"></i>
-                    <h4 class="mb-1">@Model.WorkOrder.NestSheets.Count</h4>
+                    <h4 class="mb-1">@Model.NestSheetSummary.TotalNestSheets</h4>
                     <small class="text-muted">Nest Sheets</small>
                     <div class="mt-2">
-                        <small class="text-info">
-                            @Model.WorkOrder.NestSheets.Sum(n => n.Parts.Count) Parts Total
-                        </small>
+                        <small class="text-success">@Model.NestSheetSummary.ProcessedNestSheets Processed</small><br/>
+                        <small class="text-warning">@Model.NestSheetSummary.PendingNestSheets Pending</small><br/>
+                        <small class="text-info">@Model.NestSheetSummary.TotalPartsOnNestSheets Parts Total</small>
                     </div>
                 </div>
             </div>

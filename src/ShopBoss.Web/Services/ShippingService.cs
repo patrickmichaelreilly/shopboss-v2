@@ -154,48 +154,6 @@ public class ShippingService
         }
     }
 
-    // Manual Status Management Methods
-    public async Task<StatusManagementData> GetStatusManagementDataAsync(string workOrderId)
-    {
-        try
-        {
-            var workOrder = await _context.WorkOrders
-                .Include(w => w.Products)
-                    .ThenInclude(p => p.Parts)
-                .Include(w => w.Products)
-                    .ThenInclude(p => p.Subassemblies)
-                        .ThenInclude(s => s.Parts)
-                .Include(w => w.Hardware)
-                .Include(w => w.DetachedProducts)
-                .FirstOrDefaultAsync(w => w.Id == workOrderId);
-
-            if (workOrder == null)
-            {
-                return new StatusManagementData();
-            }
-
-            var productNodes = workOrder.Products.Select(product => new ProductStatusNode
-            {
-                Product = product,
-                Parts = product.Parts.ToList(),
-                Subassemblies = product.Subassemblies.ToList(),
-                Hardware = new List<Hardware>(), // Product-level hardware handled separately
-                EffectiveStatus = CalculateEffectiveStatus(product.Parts)
-            }).ToList();
-
-            return new StatusManagementData
-            {
-                WorkOrder = workOrder,
-                ProductNodes = productNodes,
-                AvailableStatuses = Enum.GetValues<PartStatus>().ToList()
-            };
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting status management data for work order {WorkOrderId}", workOrderId);
-            return new StatusManagementData();
-        }
-    }
 
     public async Task<bool> UpdatePartStatusAsync(string partId, PartStatus newStatus, string changedBy = "Manual")
     {
@@ -381,24 +339,6 @@ public class ShippingService
         }
     }
 
-    private PartStatus CalculateEffectiveStatus(List<Part> parts)
-    {
-        if (!parts.Any()) return PartStatus.Pending;
-
-        // If all parts have the same status, return that status
-        var distinctStatuses = parts.Select(p => p.Status).Distinct().ToList();
-        if (distinctStatuses.Count == 1)
-        {
-            return distinctStatuses.First();
-        }
-
-        // Return the "lowest" status if mixed
-        if (parts.Any(p => p.Status == PartStatus.Pending)) return PartStatus.Pending;
-        if (parts.Any(p => p.Status == PartStatus.Cut)) return PartStatus.Cut;
-        if (parts.Any(p => p.Status == PartStatus.Sorted)) return PartStatus.Sorted;
-        if (parts.Any(p => p.Status == PartStatus.Assembled)) return PartStatus.Assembled;
-        return PartStatus.Shipped;
-    }
 }
 
 // Data models for shipping dashboard
@@ -433,22 +373,6 @@ public class DetachedProductShippingStatus
     public bool IsShipped { get; set; }
 }
 
-// Data models for status management
-public class StatusManagementData
-{
-    public WorkOrder WorkOrder { get; set; } = null!;
-    public List<ProductStatusNode> ProductNodes { get; set; } = new();
-    public List<PartStatus> AvailableStatuses { get; set; } = new();
-}
-
-public class ProductStatusNode
-{
-    public Product Product { get; set; } = null!;
-    public List<Part> Parts { get; set; } = new();
-    public List<Subassembly> Subassemblies { get; set; } = new();
-    public List<Hardware> Hardware { get; set; } = new();
-    public PartStatus EffectiveStatus { get; set; }
-}
 
 public class StatusUpdateRequest
 {
