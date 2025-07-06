@@ -462,3 +462,808 @@ public class WorkOrderApiController : ControllerBase
 - **Scalability**: Supports growth to larger manufacturing operations
 - **Performance**: Fast, responsive interface improves daily workflow efficiency
 - **Maintainability**: Single tree component reduces code duplication and bugs
+
+## **Phase 5: Hardware Quantity Multiplication Fix & Two-Phase Processing Architecture (Critical Bug)**
+**Status: IDENTIFIED - Implementation Required**
+**Priority: Critical - Blocking Unified Interface Development**
+
+### **PROBLEM STATEMENT**
+
+**Critical Bug Discovered**: Hardware items are not being properly multiplied when Products have multiple quantities. This was an unintended side effect of the successful Product quantity normalization implemented in previous phases.
+
+**Root Cause**: The current ImportSelectionService uses a single-pass approach that tries to normalize products AND process their contents simultaneously. This leads to:
+- Hardware being processed once per product type instead of once per product instance
+- Complex tracking with `processedHardwareIds` and `productInstanceIdForUniqueness` parameters
+- Mixed concerns making the code difficult to maintain and debug
+
+### **TECHNICAL ANALYSIS**
+
+#### **Current Problem in ImportSelectionService.cs**
+```csharp
+// Lines 228-268: Product normalization creates multiple product instances
+for (int i = 1; i <= productQuantity; i++)
+{
+    var product = ConvertToProductEntity(importProduct, workOrder.Id);
+    if (productQuantity > 1)
+    {
+        product.Id = $"{importProduct.Id}_{i}";
+        product.Name = $"{importProduct.Name} (Instance {i})";
+    }
+    
+    // Lines 264: Hardware processing called once per product instance
+    ProcessSelectedHardwareForProduct(importProduct, selection, product, workOrder, processedHardwareIds, result);
+}
+
+// Lines 317-363: Hardware processing uses global tracking
+private void ProcessSelectedHardwareForProduct(...)
+{
+    // PROBLEM: processedHardwareIds prevents hardware duplication across product instances
+    if (processedHardwareIds.Contains(hardwareGroup.Key.Id))
+    {
+        continue; // ❌ SKIPS hardware for subsequent product instances
+    }
+    
+    processedHardwareIds.Add(hardwareGroup.Key.Id); // ❌ BLOCKS future product instances
+}
+```
+
+#### **Example of Current Bug**
+```
+SDF Input:
+- Product "Cabinet A" (Qty: 3)
+  - Hardware "Hinge" (Qty: 2 per product)
+  - Hardware "Handle" (Qty: 1 per product)
+
+Expected Output:
+- Product "Cabinet A (Instance 1)" + Product "Cabinet A (Instance 2)" + Product "Cabinet A (Instance 3)"
+- Hardware "Hinge" (Total Qty: 6) - 2 × 3 products
+- Hardware "Handle" (Total Qty: 3) - 1 × 3 products
+
+Current Buggy Output:
+- Product "Cabinet A (Instance 1)" + Product "Cabinet A (Instance 2)" + Product "Cabinet A (Instance 3)" ✅
+- Hardware "Hinge" (Total Qty: 2) - Only processed for first instance ❌
+- Hardware "Handle" (Total Qty: 1) - Only processed for first instance ❌
+```
+
+### **SOLUTION ARCHITECTURE: TWO-PHASE PROCESSING**
+
+#### **Phase 1: Product Normalization (Clean Separation)**
+```csharp
+private List<Product> NormalizeProductQuantities(
+    ImportWorkOrder importData, 
+    SelectionRequest selection, 
+    WorkOrder workOrder)
+{
+    var normalizedProducts = new List<Product>();
+    
+    foreach (var importProduct in selectedImportProducts)
+    {
+        var productQuantity = importProduct.Quantity;
+        
+        for (int i = 1; i <= productQuantity; i++)
+        {
+            var product = ConvertToProductEntity(importProduct, workOrder.Id);
+            
+            if (productQuantity > 1)
+            {
+                product.Id = $"{importProduct.Id}_{i}";
+                product.Name = $"{importProduct.Name} (Instance {i})";
+            }
+            product.Qty = 1; // Each instance is quantity 1
+            
+            normalizedProducts.Add(product);
+        }
+    }
+    
+    return normalizedProducts;
+}
+```
+
+#### **Phase 2: Content Processing (Per Individual Product)**
+```csharp
+private void ProcessProductContent(
+    ImportProduct importProduct,
+    SelectionRequest selection,
+    Product normalizedProduct,
+    WorkOrder workOrder,
+    ImportConversionResult result)
+{
+    // Process parts for this individual product
+    ProcessSelectedPartsForProduct(importProduct, selection, normalizedProduct, workOrder, result);
+    
+    // Process subassemblies for this individual product
+    ProcessSelectedSubassembliesForProduct(importProduct, selection, normalizedProduct, workOrder, result);
+    
+    // Process hardware for this individual product (NO GLOBAL TRACKING)
+    ProcessSelectedHardwareForProduct(importProduct, selection, normalizedProduct, workOrder, result);
+}
+```
+
+#### **Hardware Processing Simplification**
+```csharp
+private void ProcessSelectedHardwareForProduct(
+    ImportProduct importProduct,
+    SelectionRequest selection,
+    Product product,
+    WorkOrder workOrder,
+    ImportConversionResult result)
+{
+    // NO MORE processedHardwareIds tracking - each product instance gets its own hardware
+    var selectedHardwareIds = GetSelectedHardwareIds(selection);
+    
+    foreach (var importHardware in importProduct.Hardware.Where(h => selectedHardwareIds.Contains(h.Id)))
+    {
+        var hardware = new Hardware
+        {
+            Id = Guid.NewGuid().ToString(),
+            MicrovellumId = importHardware.Id,
+            Name = importHardware.Name,
+            Qty = importHardware.Quantity, // Original quantity per product
+            WorkOrderId = product.WorkOrderId
+        };
+        
+        workOrder.Hardware.Add(hardware);
+        result.Statistics.ConvertedHardware++;
+    }
+}
+```
+
+### **INTERFACE CONSIDERATIONS**
+
+#### **Import Preview Interface**
+- **Current**: Shows original products with their quantities
+- **After Fix**: Must show normalized products (individual instances) in preview
+- **UI Enhancement**: "Product A (Qty: 3)" → "Product A (Instance 1)", "Product A (Instance 2)", "Product A (Instance 3)"
+- **Hardware Display**: Show multiplied hardware quantities in preview
+
+#### **Modify Work Order Interface**
+- **Current**: Already works with normalized products
+- **After Fix**: Hardware quantities will be correctly displayed
+- **Consistency**: Both interfaces will show identical data structure
+
+#### **Unified Interface Benefits**
+- **Data Consistency**: Both interfaces process data identically
+- **Predictable Behavior**: Users see the same normalization in both contexts
+- **Simplified Logic**: Single processing path for both import and modification
+
+### **IMPLEMENTATION PLAN**
+
+#### **5A: Core Refactoring (High Priority)**
+1. **Extract Product Normalization**: Create separate `NormalizeProductQuantities` method
+2. **Simplify Hardware Processing**: Remove global tracking, process per individual product
+3. **Update Main Processing Loop**: Use two-phase approach
+4. **Preserve Part Quantity Logic**: Ensure part quantities within products are handled correctly
+5. **Test Hardware Multiplication**: Verify hardware quantities are correctly multiplied
+
+#### **5B: Interface Updates (Medium Priority)**
+1. **Update Import Preview**: Show normalized products in preview tree
+2. **Verify Modify Work Order**: Ensure hardware quantities display correctly
+3. **UI Consistency**: Ensure both interfaces show identical data structure
+4. **Update Statistics**: Hardware counts should reflect multiplied quantities
+
+#### **5C: Testing & Validation (High Priority)**
+1. **Multi-Quantity Product Tests**: Test products with various quantities (1, 2, 5, 10)
+2. **Hardware Multiplication Tests**: Verify hardware quantities are correctly multiplied
+3. **Part Quantity Tests**: Ensure parts with individual quantities are handled correctly
+4. **Interface Consistency Tests**: Verify both interfaces show identical data
+5. **End-to-End Workflow Tests**: Test complete import → assembly → shipping workflow
+
+### **DETAILED IMPLEMENTATION**
+
+#### **Modified ProcessSelectedProducts Method**
+```csharp
+private void ProcessSelectedProducts(
+    ImportWorkOrder importData, 
+    SelectionRequest selection, 
+    WorkOrder workOrder, 
+    ImportConversionResult result)
+{
+    // Phase 1: Normalize products into individual instances
+    var normalizedProducts = NormalizeProductQuantities(importData, selection, workOrder);
+    
+    // Phase 2: Process content for each individual product
+    foreach (var product in normalizedProducts)
+    {
+        workOrder.Products.Add(product);
+        
+        // Find the original import product for this normalized product
+        var originalProductId = product.Id.Contains("_") ? 
+            product.Id.Substring(0, product.Id.LastIndexOf('_')) : 
+            product.Id;
+        
+        var importProduct = importData.Products.First(p => p.Id == originalProductId);
+        
+        // Process content for this individual product (no global tracking)
+        ProcessProductContent(importProduct, selection, product, workOrder, result);
+        
+        result.Statistics.ConvertedProducts++;
+    }
+}
+```
+
+#### **Simplified Hardware Processing**
+```csharp
+private void ProcessSelectedHardwareForProduct(
+    ImportProduct importProduct,
+    SelectionRequest selection,
+    Product product,
+    WorkOrder workOrder,
+    ImportConversionResult result)
+{
+    var selectedHardwareIds = selection.SelectedItemIds
+        .Where(id => selection.SelectionDetails.ContainsKey(id) && 
+                    selection.SelectionDetails[id].ItemType == "hardware")
+        .ToHashSet();
+
+    foreach (var importHardware in importProduct.Hardware.Where(h => selectedHardwareIds.Contains(h.Id)))
+    {
+        var hardware = new Hardware
+        {
+            Id = Guid.NewGuid().ToString(),
+            MicrovellumId = importHardware.Id,
+            Name = importHardware.Name,
+            Qty = importHardware.Quantity, // Original quantity per product
+            WorkOrderId = product.WorkOrderId
+        };
+        
+        workOrder.Hardware.Add(hardware);
+        result.Statistics.ConvertedHardware++;
+    }
+}
+```
+
+### **FILES TO MODIFY**
+
+1. **Services/ImportSelectionService.cs** - Main refactoring
+   - Add `NormalizeProductQuantities` method
+   - Add `ProcessProductContent` method
+   - Modify `ProcessSelectedProducts` method
+   - Simplify `ProcessSelectedHardwareForProduct` method
+   - Remove `processedHardwareIds` parameter threading
+
+2. **Views/Admin/Import.cshtml** - Update preview display
+   - Show normalized products in preview
+   - Display multiplied hardware quantities
+   - Update statistics calculations
+
+3. **Views/Admin/ModifyWorkOrder.cshtml** - Verify hardware display
+   - Ensure hardware quantities show correctly
+   - Verify consistency with import preview
+
+### **SUCCESS CRITERIA**
+
+#### **Functional Requirements**
+- ✅ Product with Qty=3 creates 3 individual product instances
+- ✅ Hardware with Qty=2 per product creates 6 total hardware items (2×3)
+- ✅ Part with Qty=4 per product creates 4 parts per product instance
+- ✅ Import Preview shows normalized products and multiplied hardware
+- ✅ Modify Work Order shows identical data structure
+
+#### **Technical Requirements**
+- ✅ No global tracking variables needed
+- ✅ Clean separation between normalization and content processing
+- ✅ Code is maintainable and easy to debug
+- ✅ Both interfaces use identical processing logic
+
+#### **Business Requirements**
+- ✅ Accurate hardware quantities for manufacturing planning
+- ✅ Correct part counts for production scheduling
+- ✅ Consistent user experience across interfaces
+- ✅ Reliable data for assembly and shipping workflows
+
+### **TESTING REQUIREMENTS**
+
+#### **Unit Tests**
+1. **Product Normalization Tests**
+   - Single quantity products (Qty=1)
+   - Multiple quantity products (Qty=2, 3, 5, 10)
+   - Edge cases (Qty=0, negative quantities)
+
+2. **Hardware Multiplication Tests**
+   - Single hardware item per product
+   - Multiple hardware items per product
+   - Hardware with various quantities
+   - Hardware in subassemblies
+
+3. **Part Quantity Tests**
+   - Parts with Qty=1 in multi-quantity products
+   - Parts with Qty>1 in single-quantity products
+   - Parts with Qty>1 in multi-quantity products
+   - Parts in subassemblies
+
+#### **Integration Tests**
+4. **Import Preview Integration**
+   - Verify normalized products appear in preview
+   - Verify hardware quantities are multiplied
+   - Verify statistics are calculated correctly
+
+5. **Modify Work Order Integration**
+   - Load work order with normalized products
+   - Verify hardware quantities display correctly
+   - Verify data consistency between interfaces
+
+6. **End-to-End Workflow Tests**
+   - Import → Assembly → Shipping workflow
+   - Verify all quantities are handled correctly
+   - Verify completion logic works with normalized products
+
+### **RISK ASSESSMENT: MEDIUM**
+- **Data Integrity**: Changes to core import logic require careful testing
+- **Interface Consistency**: Both interfaces must show identical data
+- **Performance**: Two-phase processing may impact import performance
+- **Backward Compatibility**: Existing work orders must continue to work
+
+### **BUSINESS VALUE: HIGH**
+- **Accurate Manufacturing Data**: Correct hardware quantities for production planning
+- **Unified Interface Foundation**: Clean architecture supports interface consolidation
+- **Improved User Experience**: Consistent data across all interfaces
+- **Maintainable Code**: Separated concerns make future enhancements easier
+
+### **DEPENDENCIES**
+- **Prerequisite**: Phase 4 (Unified Interface Architecture) benefits from this fix
+- **Blocker**: Must be completed before final interface consolidation
+- **Foundation**: Provides clean architecture for future enhancements
+
+## **Phase 6: Unified Interface Foundation & Modify Work Order Rebuild (Critical Architecture)**
+**Status: PLANNED - Ready for Implementation**
+**Priority: High - Consolidating Interface Architecture**
+
+### **STRATEGIC VISION**
+
+**Core Principle**: The Import Preview interface represents the target unified design. The Modify Work Order interface must be rebuilt to use the same foundation, data sources, and visual structure.
+
+**Key Insight**: Import Preview is semantically just a specialized view of the unified interface. Both interfaces must:
+- Use identical data loading patterns
+- Share the same tree rendering logic  
+- Display the same statistics and structure
+- Differ only in their interaction capabilities (selection vs status management)
+
+### **CURRENT STATE ANALYSIS**
+
+#### **Import Preview Interface (Target Design - ✅ Good Foundation)**
+**Strengths to Preserve:**
+- ✅ **Clean Visual Layout**: Bordered content areas with logical organization
+- ✅ **Statistics Bar**: Icon-based counts for Products, Parts, Subassemblies, Hardware, Nest Sheets
+- ✅ **Tree Structure**: Hierarchical data display with expand/collapse functionality
+- ✅ **Action Controls**: Select All, Clear All, Expand/Collapse, Export capabilities
+- ✅ **Responsive Design**: Works well on tablets and desktop
+
+**Issues to Fix:**
+- ❌ **Hardware Statistics**: Shows incorrect counts (7 selected vs actual multiplied quantities)
+- ❌ **Nest Sheets Missing from Tree**: Should appear as top-level category alongside Products, Hardware, Detached Products
+
+#### **Modify Work Order Interface (Needs Complete Rebuild - ❌ Wrong Foundation)**
+**Current Problems:**
+- ❌ **Different Data Loading**: Uses WorkOrderService with complex EF queries vs Import's efficient JSON approach
+- ❌ **Server-Side Rendering**: Razor loops create massive HTML vs Import's client-side JavaScript tree
+- ❌ **Performance Issues**: Timeouts and memory leaks vs Import's smooth performance
+- ❌ **Inconsistent UI**: Different styling, layout, and interaction patterns
+- ❌ **Missing Features**: No statistics bar, export capabilities, or bulk operations
+
+**Current Capabilities to Preserve:**
+- ✅ **Status Management**: Line-by-line status dropdown modifications
+- ✅ **Real-time Updates**: SignalR integration for cross-station updates
+- ✅ **Audit Trail**: Tracks all status changes with timestamps
+
+### **UNIFIED ARCHITECTURE DESIGN**
+
+#### **Shared Foundation Components**
+
+**1. Unified Data API**
+```csharp
+[ApiController]
+[Route("api/workorder")]
+public class WorkOrderTreeApiController : ControllerBase
+{
+    [HttpGet("{workOrderId}/tree")]
+    public async Task<WorkOrderTreeData> GetTreeData(string workOrderId, bool includeStatus = false)
+    {
+        // Single API endpoint serves both Import Preview and Modify Work Order
+        // includeStatus flag determines if status information is included
+    }
+    
+    [HttpPost("{workOrderId}/status")]
+    public async Task<IActionResult> UpdateStatus(string workOrderId, StatusUpdateRequest request)
+    {
+        // Status updates for Modify interface (not used in Import)
+    }
+}
+```
+
+**2. Unified Tree Component**
+```typescript
+class UnifiedWorkOrderTree {
+    constructor(containerId, mode) {
+        this.mode = mode; // 'import-preview' | 'modify-workorder'
+        this.enableSelection = (mode === 'import-preview');
+        this.enableStatusManagement = (mode === 'modify-workorder');
+    }
+    
+    async loadData(workOrderId) {
+        const includeStatus = this.enableStatusManagement;
+        const response = await fetch(`/api/workorder/${workOrderId}/tree?includeStatus=${includeStatus}`);
+        return response.json();
+    }
+    
+    renderNode(nodeData, level = 0) {
+        // Unified rendering with mode-specific features:
+        // Import Preview: checkboxes, selection tracking
+        // Modify Work Order: status dropdowns, bulk actions
+    }
+}
+```
+
+#### **Tree Structure Design (Mode-Specific Layouts)**
+
+**CRITICAL DESIGN DECISION**: The two interfaces will have different hardware organization patterns to optimize for their specific use cases, with future toggle capability.
+
+#### **Import Preview Mode - Hardware Nested Under Products**
+**Philosophy**: During import selection, users need to see hardware grouped with their parent products to understand relationships and make informed selections.
+
+**Top-Level Categories:**
+1. **📋 Products** - Hierarchical structure including nested hardware items
+2. **📦 Detached Products** - Standalone items not part of main hierarchy  
+3. **📄 Nest Sheets** - Manufacturing sheets with associated parts
+
+**Example Structure:**
+```
+🏭 Kitchen Remodel Project (Work Order) - Import Preview Mode
+├── 📋 Products (42 total, 42 selected)
+│   ├── 📦 Cabinet A (Instance 1)
+│   │   ├── 🔧 Side Panel (Qty: 2) 
+│   │   ├── 🔧 Door (Qty: 1)
+│   │   ├── 📁 Subassembly X
+│   │   │   └── 🔧 Shelf (Qty: 3)
+│   │   └── 🛠️ Hardware for this Product
+│   │       ├── 🔩 Hinge (Qty: 2) ← Per-product quantity
+│   │       └── 🔗 Handle (Qty: 1) ← Per-product quantity
+│   ├── 📦 Cabinet A (Instance 2)
+│   │   ├── 🔧 Side Panel (Qty: 2)
+│   │   ├── 🔧 Door (Qty: 1)
+│   │   └── 🛠️ Hardware for this Product
+│   │       ├── 🔩 Hinge (Qty: 2) ← Per-product quantity
+│   │       └── 🔗 Handle (Qty: 1) ← Per-product quantity
+├── 📦 Detached Products (12 total, 12 selected)
+│   └── 🪵 Crown Molding (Qty: 1)
+└── 📄 Nest Sheets (50 total, 50 selected)
+    ├── 📑 Sheet_001.dwg (15 parts) [Status: Processed]
+    └── 📑 Sheet_002.dwg (8 parts) [Status: Pending]
+
+Statistics Bar: Hardware (6 total) ← Shows multiplied totals: Hinges(4) + Handles(2)
+```
+
+#### **Modify Work Order Mode - Hardware as Separate Category**
+**Philosophy**: During work order management, hardware is managed independently from products for inventory, ordering, and assembly planning purposes.
+
+**Top-Level Categories:**
+1. **📋 Products** - Hierarchical product/part/subassembly structure (no hardware)
+2. **🛠️ Hardware** - All hardware items as separate category (correctly multiplied quantities)
+3. **📦 Detached Products** - Standalone items not part of main hierarchy  
+4. **📄 Nest Sheets** - Manufacturing sheets with associated parts
+
+**Example Structure:**
+```
+🏭 Kitchen Remodel Project (Work Order) - Modify Work Order Mode
+├── 📋 Products (42 total, 42 selected)
+│   ├── 📦 Cabinet A (Instance 1)
+│   │   ├── 🔧 Side Panel (Qty: 2) [Status: Cut] 
+│   │   ├── 🔧 Door (Qty: 1) [Status: Pending]
+│   │   └── 📁 Subassembly X
+│   │       └── 🔧 Shelf (Qty: 3) [Status: Sorted]
+│   └── 📦 Cabinet A (Instance 2)
+│       ├── 🔧 Side Panel (Qty: 2) [Status: Pending]
+│       └── 🔧 Door (Qty: 1) [Status: Pending]
+├── 🛠️ Hardware (6 total) ← Separate category for management
+│   ├── 🔩 Hinge (Qty: 4) [Status: N/A] ← Multiplied total: 2×2 instances
+│   └── 🔗 Handle (Qty: 2) [Status: N/A] ← Multiplied total: 1×2 instances
+├── 📦 Detached Products (12 total, 12 selected)
+│   └── 🪵 Crown Molding (Qty: 1) [Status: Cut]
+└── 📄 Nest Sheets (50 total, 50 selected)
+    ├── 📑 Sheet_001.dwg (15 parts) [Status: Processed]
+    └── 📑 Sheet_002.dwg (8 parts) [Status: Pending]
+
+Statistics Bar: Hardware (6 total) ← Same multiplied totals, different organization
+```
+
+#### **Future Toggle Capability**
+```typescript
+class UnifiedWorkOrderTree {
+    constructor(containerId, mode, options = {}) {
+        this.mode = mode;
+        this.hardwareDisplayMode = options.hardwareDisplayMode || this.getDefaultHardwareMode();
+        // 'nested-in-products' | 'separate-category'
+    }
+    
+    getDefaultHardwareMode() {
+        return this.mode === 'import-preview' ? 'nested-in-products' : 'separate-category';
+    }
+    
+    toggleHardwareDisplay() {
+        this.hardwareDisplayMode = this.hardwareDisplayMode === 'nested-in-products' 
+            ? 'separate-category' 
+            : 'nested-in-products';
+        this.refresh();
+    }
+}
+```
+
+### **IMPLEMENTATION STRATEGY**
+
+#### **6A: Create Unified Data Foundation (High Priority)**
+
+**1. Build WorkOrderTreeApiController**
+- Single API endpoint serving both interfaces
+- Efficient data loading using Phase 5's normalized product structure
+- Proper hardware quantity calculations (fix the "7 selected" issue)
+- Include Nest Sheets as top-level category
+
+**2. Create Unified Data Models**
+```csharp
+public class WorkOrderTreeData
+{
+    public WorkOrderInfo WorkOrder { get; set; }
+    public TreeStatistics Statistics { get; set; }
+    public List<TreeCategoryNode> Categories { get; set; } // Products, Hardware, Detached, NestSheets
+}
+
+public class TreeCategoryNode
+{
+    public string Type { get; set; } // "products", "hardware", "detached", "nestsheets"
+    public string Name { get; set; } // "Products", "Hardware", etc.
+    public string Icon { get; set; } // CSS class for icon
+    public int TotalCount { get; set; }
+    public int SelectedCount { get; set; } // For import mode
+    public List<TreeItemNode> Items { get; set; }
+}
+
+public class TreeItemNode
+{
+    public string Id { get; set; }
+    public string Name { get; set; }
+    public string Type { get; set; } // "product", "part", "subassembly", "hardware", "detached", "nestsheet"
+    public int Quantity { get; set; }
+    public string Status { get; set; } // For modify mode
+    public bool IsSelected { get; set; } // For import mode
+    public List<TreeItemNode> Children { get; set; }
+    public Dictionary<string, object> Metadata { get; set; } // Dimensions, material, etc.
+}
+```
+
+#### **6B: Create Unified JavaScript Tree Component (High Priority)**
+
+**1. Build UnifiedWorkOrderTree Class**
+- Mode-aware rendering (import-preview vs modify-workorder)
+- Shared tree visualization logic
+- Togglable features based on mode
+- Performance optimizations (virtual scrolling for large datasets)
+
+**2. Feature Implementation**
+```typescript
+// Mode-specific rendering with hardware display logic
+renderItemNode(node) {
+    const html = `<div class="tree-item" data-id="${node.id}">`;
+    
+    if (this.enableSelection) {
+        // Import Preview mode: checkboxes
+        html += `<input type="checkbox" ${node.isSelected ? 'checked' : ''}>`;
+    }
+    
+    if (this.enableStatusManagement) {
+        // Modify Work Order mode: status dropdowns
+        html += `<select class="status-dropdown" data-id="${node.id}">
+                   <option value="Pending" ${node.status === 'Pending' ? 'selected' : ''}>Pending</option>
+                   <option value="Cut" ${node.status === 'Cut' ? 'selected' : ''}>Cut</option>
+                   <option value="Sorted" ${node.status === 'Sorted' ? 'selected' : ''}>Sorted</option>
+                 </select>`;
+    }
+    
+    html += `<span class="item-name">${node.name}</span>`;
+    html += `<span class="item-quantity">Qty: ${node.quantity}</span>`;
+    return html;
+}
+
+// Hardware organization logic
+organizeTreeData(rawData) {
+    if (this.hardwareDisplayMode === 'nested-in-products') {
+        // Import Preview default: Hardware nested under each product
+        return this.nestHardwareUnderProducts(rawData);
+    } else {
+        // Modify Work Order default: Hardware as separate top-level category
+        return this.separateHardwareCategory(rawData);
+    }
+}
+
+nestHardwareUnderProducts(data) {
+    // Group hardware items under their respective product instances
+    // Statistics still show multiplied totals across all products
+}
+
+separateHardwareCategory(data) {
+    // Extract all hardware into top-level category with multiplied quantities
+    // Products show only parts and subassemblies
+}
+```
+
+#### **6C: Rebuild Modify Work Order Interface (Medium Priority)**
+
+**1. Replace ModifyWorkOrder.cshtml**
+- Remove server-side Razor tree rendering
+- Use unified JavaScript tree component in 'modify-workorder' mode
+- Preserve existing functionality (status updates, bulk operations)
+- Add missing features from Import Preview (statistics bar, export)
+
+**2. Update AdminController**
+```csharp
+public async Task<IActionResult> ModifyWorkOrder(string id)
+{
+    // Lightweight data loading - tree data comes from API
+    var workOrder = await _workOrderService.GetWorkOrderBasicInfoAsync(id);
+    
+    return View(new ModifyWorkOrderViewModel 
+    { 
+        WorkOrder = workOrder,
+        Mode = "modify-workorder" // Configure tree component mode
+    });
+}
+```
+
+#### **6D: Enhanced Import Preview Interface (Low Priority)**
+
+**1. Fix Hardware Statistics**
+- Use corrected hardware quantities from Phase 5 normalization
+- Update statistics calculation to reflect multiplied quantities
+
+**2. Add Nest Sheets to Tree**
+- Include Nest Sheets as top-level category
+- Show associated parts count and processing status
+- Enable selection/deselection of nest sheets
+
+**3. Optional Status Preview**
+- Add toggle to preview what statuses items will have after import
+- Show "Will be imported as: Pending" for better user understanding
+
+### **VISUAL DESIGN SPECIFICATIONS**
+
+#### **Statistics Bar Layout (Preserve Import Preview Design)**
+```
+[🏭] [📋] [🔧] [📁] [🛠️] [📄]
+ 42   495   73   335   50
+Products Parts Subassemblies Hardware NestSheets
+Selected: 42 Selected: 495 Selected: 73 Selected: 335 Selected: 50
+```
+
+#### **Action Controls (Preserve Import Preview Design)**
+```
+[✓ Select All Products] [✓ Select All Nest Sheets] [✗ Clear All] 
+[⬇ Expand All] [⬆ Collapse All] [📊 Export Data CSV]
+
+// Additional for Modify mode:
+[🔄 Bulk Status Update] [📊 Export Status Report] [🔔 Real-time Updates: ON]
+```
+
+#### **Tree Node Design (Mode-Aware)**
+```
+// Import Preview Mode
+☐ 📦 Cabinet A (Instance 1) - Qty: 1
+  ☐ 🔧 Side Panel - Qty: 2 | Material: Plywood | 24"×16"×0.75"
+  ☐ 🔧 Door - Qty: 1 | Material: MDF | 18"×22"×0.75"
+
+// Modify Work Order Mode  
+📦 Cabinet A (Instance 1) - Qty: 1
+├─ 🔧 Side Panel - Qty: 2 [Status: Cut ▼] | Material: Plywood
+├─ 🔧 Door - Qty: 1 [Status: Pending ▼] | Material: MDF
+└─ [Bulk Update Selected: Cut ▼] [Apply to 12 items]
+```
+
+### **IMPLEMENTATION PLAN**
+
+#### **Phase 6A: API Foundation (Week 1)**
+1. Create WorkOrderTreeApiController with unified data endpoint
+2. Build TreeData models for unified structure
+3. Fix hardware quantity calculations (resolve "7 selected" issue)
+4. Add Nest Sheets as top-level category
+5. Test API performance with large work orders
+
+#### **Phase 6B: JavaScript Component (Week 2)**  
+1. Extract Import Preview tree logic into UnifiedWorkOrderTree class
+2. Add mode-aware rendering (selection vs status management)
+3. Implement status update functionality for Modify mode
+4. Add bulk operations and export capabilities
+5. Test component with both modes
+
+#### **Phase 6C: Interface Rebuild (Week 3)**
+1. Create new ModifyWorkOrder.cshtml using unified component
+2. Update AdminController to use lightweight data loading
+3. Preserve all existing Modify functionality
+4. Add missing Import Preview features (statistics, export)
+5. Test status updates and real-time functionality
+
+#### **Phase 6D: Final Integration (Week 4)**
+1. Update Import Preview to fix hardware statistics
+2. Add Nest Sheets to Import tree structure
+3. Unified styling and responsive design
+4. Performance optimization and testing
+5. User acceptance testing
+
+### **FILES TO MODIFY**
+
+#### **New Files:**
+1. `Controllers/Api/WorkOrderTreeApiController.cs` - Unified data API
+2. `Models/Api/TreeData.cs` - Unified data models  
+3. `wwwroot/js/UnifiedWorkOrderTree.js` - Shared tree component
+4. `wwwroot/css/unified-tree.css` - Shared styling
+
+#### **Major Modifications:**
+5. `Views/Admin/ModifyWorkOrder.cshtml` - Complete rebuild
+6. `Views/Admin/Import.cshtml` - Enhanced with fixes
+7. `Controllers/AdminController.cs` - Updated data loading
+8. `Services/WorkOrderService.cs` - Optimized for API usage
+
+#### **Minor Updates:**
+9. `Program.cs` - Register new API controller
+10. Various CSS files - Unified styling implementation
+
+### **SUCCESS CRITERIA**
+
+#### **Functional Unification**
+- ✅ Both interfaces use identical data loading patterns
+- ✅ Both interfaces display identical tree structure and statistics
+- ✅ Modify Work Order includes all Import Preview features (statistics, export, bulk operations)
+- ✅ Import Preview includes Nest Sheets and corrected hardware statistics
+- ✅ Status management can be toggled on/off in unified component
+
+#### **Performance Standards**
+- ✅ Large work orders (1000+ items) load in <5 seconds in both interfaces
+- ✅ Tree operations (expand/collapse/select) respond instantly
+- ✅ Memory usage remains stable during extended usage
+- ✅ Real-time updates continue working in Modify interface
+
+#### **User Experience**
+- ✅ Consistent visual design and interaction patterns
+- ✅ Smooth transitions between Import and Modify workflows
+- ✅ All existing functionality preserved in both interfaces
+- ✅ Enhanced capabilities available in both contexts
+
+#### **Technical Architecture**
+- ✅ Single codebase for tree rendering logic
+- ✅ Shared data models and API endpoints
+- ✅ Mode-aware component configuration
+- ✅ Maintainable and extensible architecture
+
+### **TESTING REQUIREMENTS**
+
+#### **Integration Testing**
+1. **Import to Modify Flow**: Import work order → navigate to Modify → verify identical data display
+2. **Status Management**: Update statuses in Modify interface → verify real-time updates
+3. **Bulk Operations**: Test bulk status updates on large selections
+4. **Export Functionality**: Verify CSV export works in both modes
+
+#### **Performance Testing**
+5. **Large Dataset Handling**: Test with 500+ products, 2000+ parts
+6. **Concurrent Users**: Multiple users accessing same work order
+7. **Memory Monitoring**: Extended usage without memory leaks
+8. **Network Efficiency**: API calls optimized for minimal bandwidth
+
+#### **User Acceptance Testing**
+9. **Workflow Validation**: Complete import → modify → assembly workflow
+10. **Feature Parity**: All existing capabilities preserved and enhanced
+11. **Responsive Design**: Tablet and desktop usage scenarios
+12. **Error Handling**: Graceful degradation for network issues
+
+### **RISK ASSESSMENT: MEDIUM**
+- **Interface Consistency**: Must maintain exact feature parity during rebuild
+- **Performance Critical**: Unified component must handle large datasets efficiently  
+- **User Impact**: Major UI changes require careful transition planning
+- **Technical Complexity**: Mode-aware component requires sophisticated design
+
+### **BUSINESS VALUE: CRITICAL**
+- **Unified User Experience**: Single interface reduces training and confusion
+- **Enhanced Productivity**: Import Preview features available in daily Modify workflow
+- **Scalable Architecture**: Foundation supports future enhancements and growth
+- **Reduced Maintenance**: Single codebase eliminates duplicate bugs and inconsistencies
+- **Performance Improvement**: Eliminates Modify interface timeout issues
+
+### **DEPENDENCIES**
+- **Prerequisite**: Phase 5 (Hardware Quantity Fix) provides clean normalized data structure
+- **Foundation**: Unified API and component architecture supports all future interface development
+- **Enabler**: Creates foundation for advanced features like real-time collaboration and mobile optimization
