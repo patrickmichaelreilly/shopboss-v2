@@ -352,7 +352,6 @@ public class CncController : Controller
         {
             var nestSheet = await _context.NestSheets
                 .Include(n => n.Parts)
-                .ThenInclude(p => p.Product)
                 .FirstOrDefaultAsync(n => n.Id == id);
 
             if (nestSheet == null)
@@ -377,18 +376,18 @@ public class CncController : Controller
                     createdDate = nestSheet.CreatedDate.ToString("yyyy-MM-dd HH:mm"),
                     partCount = nestSheet.Parts.Count,
                     cutPartCount = nestSheet.Parts.Count(p => p.Status >= PartStatus.Cut),
-                    parts = nestSheet.Parts.Select(p => new
+                    parts = await Task.WhenAll(nestSheet.Parts.Select(async p => new
                     {
                         id = p.Id,
                         name = p.Name,
                         qty = p.Qty,
                         status = p.Status.ToString(),
-                        productName = p.Product?.Name ?? "Unknown",
+                        productName = await GetProductNameForPart(p.ProductId),
                         material = p.Material,
                         length = p.Length,
                         width = p.Width,
                         thickness = p.Thickness
-                    })
+                    }))
                 }
             };
 
@@ -482,6 +481,35 @@ public class CncController : Controller
         {
             _logger.LogError(ex, "Error validating barcode {Barcode}", barcode);
             return Json(new { success = false, message = "Validation failed.", type = "system_error" });
+        }
+    }
+
+    /// <summary>
+    /// Gets the product name for a part, checking both Products and DetachedProducts tables
+    /// </summary>
+    private async Task<string> GetProductNameForPart(string? productId)
+    {
+        if (string.IsNullOrEmpty(productId))
+            return "Unknown";
+
+        try
+        {
+            // First try regular Products table
+            var product = await _context.Products.FindAsync(productId);
+            if (product != null)
+                return product.Name;
+
+            // If not found, try DetachedProducts table
+            var detachedProduct = await _context.DetachedProducts.FindAsync(productId);
+            if (detachedProduct != null)
+                return detachedProduct.Name;
+
+            return "Unknown";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error getting product name for ProductId {ProductId}", productId);
+            return "Unknown";
         }
     }
 }

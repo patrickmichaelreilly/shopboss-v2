@@ -50,15 +50,26 @@ public class SortingController : Controller
 
             // Get cut parts that need sorting
             var cutParts = await _context.Parts
-                .Include(p => p.Product)
                 .Include(p => p.NestSheet)
                 .Where(p => p.NestSheet!.WorkOrderId == activeWorkOrderId && p.Status == PartStatus.Cut)
-                .OrderBy(p => p.Product!.Name)
-                .ThenBy(p => p.Name)
                 .ToListAsync();
 
-            ViewBag.CutPartsCount = cutParts.Count;
-            ViewBag.CutParts = cutParts;
+            // Sort by product name (resolved from both Products and DetachedProducts)
+            var cutPartsWithProductNames = new List<(Part part, string productName)>();
+            foreach (var part in cutParts)
+            {
+                var productName = await GetProductNameForPart(part.ProductId);
+                cutPartsWithProductNames.Add((part, productName));
+            }
+            
+            var sortedCutParts = cutPartsWithProductNames
+                .OrderBy(x => x.productName)
+                .ThenBy(x => x.part.Name)
+                .Select(x => x.part)
+                .ToList();
+
+            ViewBag.CutPartsCount = sortedCutParts.Count;
+            ViewBag.CutParts = sortedCutParts;
 
             return View(racks);
         }
@@ -238,9 +249,18 @@ public class SortingController : Controller
 
             var cleanBarcode = barcode.Trim();
 
+            // Debug: Log all cut parts for this work order to help troubleshoot
+            var allCutParts = await _context.Parts
+                .Include(p => p.NestSheet)
+                .Where(p => p.NestSheet!.WorkOrderId == activeWorkOrderId && p.Status == PartStatus.Cut)
+                .Select(p => new { p.Id, p.Name, p.ProductId })
+                .ToListAsync();
+            
+            _logger.LogInformation("SCAN DEBUG: Looking for barcode '{Barcode}' among {Count} cut parts: {Parts}", 
+                cleanBarcode, allCutParts.Count, string.Join(", ", allCutParts.Select(p => $"{p.Id}/{p.Name}")));
+
             // Find the cut part by barcode (assuming part name or ID as barcode)
             var part = await _context.Parts
-                .Include(p => p.Product)
                 .Include(p => p.NestSheet)
                 .FirstOrDefaultAsync(p => p.NestSheet!.WorkOrderId == activeWorkOrderId && 
                                          (p.Id == cleanBarcode || p.Name == cleanBarcode) &&
@@ -330,12 +350,15 @@ public class SortingController : Controller
                 details: $"Part sorted via barcode scan '{cleanBarcode}' to {placementMessage}",
                 sessionId: sessionId, ipAddress: ipAddress);
 
+            // Get product name (could be regular Product or DetachedProduct)
+            var productName = await GetProductNameForPart(part.ProductId);
+
             // Send real-time updates via SignalR
             var updateData = new
             {
                 partId = part.Id,
                 partName = part.Name,
-                productName = part.Product?.Name,
+                productName = productName,
                 rackId = rackId,
                 binLabel = $"{(char)('A' + row.Value - 1)}{column.Value:D2}",
                 station = station,
@@ -450,7 +473,7 @@ public class SortingController : Controller
                 message = $"Part '{part.Name}' sorted successfully!",
                 partId = part.Id,
                 partName = part.Name,
-                productName = part.Product?.Name,
+                productName = productName,
                 rackId = rackId,
                 binLabel = updateData.binLabel,
                 placementMessage = placementMessage,
@@ -491,27 +514,36 @@ public class SortingController : Controller
             }
 
             var cutParts = await _context.Parts
-                .Include(p => p.Product)
                 .Include(p => p.NestSheet)
                 .Where(p => p.NestSheet!.WorkOrderId == activeWorkOrderId && p.Status == PartStatus.Cut)
-                .Select(p => new
-                {
-                    id = p.Id,
-                    name = p.Name,
-                    qty = p.Qty,
-                    productName = p.Product!.Name,
-                    productId = p.ProductId,
-                    material = p.Material,
-                    length = p.Length,
-                    width = p.Width,
-                    thickness = p.Thickness,
-                    nestSheetName = p.NestSheet!.Name
-                })
-                .OrderBy(p => p.productName)
-                .ThenBy(p => p.name)
                 .ToListAsync();
 
-            return Json(new { success = true, parts = cutParts });
+            // Create response with product names resolved from both Products and DetachedProducts
+            var cutPartsResponse = new List<object>();
+            foreach (var part in cutParts)
+            {
+                var productName = await GetProductNameForPart(part.ProductId);
+                cutPartsResponse.Add(new
+                {
+                    id = part.Id,
+                    name = part.Name,
+                    qty = part.Qty,
+                    productName = productName,
+                    productId = part.ProductId,
+                    material = part.Material,
+                    length = part.Length,
+                    width = part.Width,
+                    thickness = part.Thickness,
+                    nestSheetName = part.NestSheet!.Name
+                });
+            }
+
+            var sortedCutParts = cutPartsResponse
+                .OrderBy(p => ((dynamic)p).productName)
+                .ThenBy(p => ((dynamic)p).name)
+                .ToList();
+
+            return Json(new { success = true, parts = sortedCutParts });
         }
         catch (Exception ex)
         {
@@ -548,25 +580,28 @@ public class SortingController : Controller
             if (!string.IsNullOrEmpty(activeWorkOrderId))
             {
                 var sortedParts = await _context.Parts
-                    .Include(p => p.Product)
                     .Include(p => p.NestSheet)
                     .Where(p => p.Location == binLocation && 
                                p.Status == PartStatus.Sorted &&
                                p.NestSheet!.WorkOrderId == activeWorkOrderId)
                     .ToListAsync();
 
-                binParts = sortedParts.Select(p => new
+                foreach (var part in sortedParts)
                 {
-                    id = p.Id,
-                    name = p.Name,
-                    qty = p.Qty,
-                    productName = p.Product?.Name ?? "Unknown",
-                    material = p.Material,
-                    length = p.Length,
-                    width = p.Width,
-                    thickness = p.Thickness,
-                    sortedDate = p.StatusUpdatedDate?.ToString("yyyy-MM-dd HH:mm") ?? "Unknown"
-                }).Cast<object>().ToList();
+                    var productName = await GetProductNameForPart(part.ProductId);
+                    binParts.Add(new
+                    {
+                        id = part.Id,
+                        name = part.Name,
+                        qty = part.Qty,
+                        productName = productName,
+                        material = part.Material,
+                        length = part.Length,
+                        width = part.Width,
+                        thickness = part.Thickness,
+                        sortedDate = part.StatusUpdatedDate?.ToString("yyyy-MM-dd HH:mm") ?? "Unknown"
+                    });
+                }
             }
 
             // Calculate enhanced progress information for this bin
@@ -622,7 +657,6 @@ public class SortingController : Controller
             }
 
             var part = await _context.Parts
-                .Include(p => p.Product)
                 .FirstOrDefaultAsync(p => p.Id == partId && p.Status == PartStatus.Sorted);
 
             if (part == null)
@@ -658,7 +692,8 @@ public class SortingController : Controller
                     if (!string.IsNullOrEmpty(bin.Contents))
                     {
                         // This is a simplified content update - in a real system you'd track parts more precisely
-                        bin.Contents = $"{part.Product?.Name}: {bin.PartsCount} parts";
+                        var productName = await GetProductNameForPart(part.ProductId);
+                        bin.Contents = $"{productName}: {bin.PartsCount} parts";
                     }
                 }
                 
@@ -738,7 +773,6 @@ public class SortingController : Controller
             }
             var binLocation = $"{rack.Name}:{bin.BinLabel}";
             var partsToRemove = await _context.Parts
-                .Include(p => p.Product)
                 .Include(p => p.NestSheet)
                 .Where(p => p.Location == binLocation && 
                            p.Status == PartStatus.Sorted &&
@@ -960,7 +994,6 @@ public class SortingController : Controller
             // Check if part exists but in different status
             var partInDifferentStatus = await _context.Parts
                 .Include(p => p.NestSheet)
-                .Include(p => p.Product)
                 .FirstOrDefaultAsync(p => p.NestSheet!.WorkOrderId == workOrderId && 
                                          (p.Id == barcode || p.Name == barcode));
 
@@ -1018,6 +1051,35 @@ public class SortingController : Controller
         }
 
         return suggestions;
+    }
+
+    /// <summary>
+    /// Gets the product name for a part, checking both Products and DetachedProducts tables
+    /// </summary>
+    private async Task<string> GetProductNameForPart(string? productId)
+    {
+        if (string.IsNullOrEmpty(productId))
+            return "Unknown";
+
+        try
+        {
+            // First try regular Products table
+            var product = await _context.Products.FindAsync(productId);
+            if (product != null)
+                return product.Name;
+
+            // If not found, try DetachedProducts table
+            var detachedProduct = await _context.DetachedProducts.FindAsync(productId);
+            if (detachedProduct != null)
+                return detachedProduct.Name;
+
+            return "Unknown";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error getting product name for ProductId {ProductId}", productId);
+            return "Unknown";
+        }
     }
 
     /// <summary>

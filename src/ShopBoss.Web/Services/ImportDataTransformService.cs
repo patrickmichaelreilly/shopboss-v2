@@ -473,7 +473,7 @@ public class ImportDataTransformService
             // Create a detached product from this single-part product
             var detachedProduct = new ImportDetachedProduct
             {
-                Id = $"{product.Id}_detached", // Create unique ID to avoid conflicts
+                Id = $"{product.Id}_detached_{Guid.NewGuid().ToString()[..8]}", // Create unique ID to avoid conflicts
                 Name = product.Name,
                 Quantity = product.Quantity,
                 Height = singlePart.Height,
@@ -481,7 +481,12 @@ public class ImportDataTransformService
                 Thickness = singlePart.Thickness,
                 Material = singlePart.Material,
                 EdgeBanding = singlePart.EdgeBanding,
-                WorkOrderId = workOrder.Id
+                WorkOrderId = workOrder.Id,
+                // Copy NestSheet information from the original part
+                NestSheetName = singlePart.NestSheetName,
+                NestSheetId = singlePart.NestSheetId,
+                // Store original part ID for barcode scanning compatibility
+                OriginalPartId = singlePart.Id
             };
             
             workOrder.DetachedProducts.Add(detachedProduct);

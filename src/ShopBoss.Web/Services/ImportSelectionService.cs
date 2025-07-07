@@ -483,14 +483,24 @@ public class ImportSelectionService
 
         foreach (var importDetached in importData.DetachedProducts.Where(d => selectedDetachedIds.Contains(d.Id)))
         {
+            // Create DetachedProduct entity (existing functionality)
             var detached = ConvertToDetachedProductEntity(importDetached, workOrder.Id);
             workOrder.DetachedProducts.Add(detached);
             result.Statistics.ConvertedDetachedProducts++;
+            
+            // ALSO create Part entity for DetachedProduct so it can go through CNC → Sorting workflow
+            var detachedPart = CreateDetachedProductPart(importDetached, detached, workOrder);
+            _context.Parts.Add(detachedPart);
+            result.Statistics.ConvertedParts++;
+            
+            _logger.LogInformation("Created DetachedProduct '{DetachedProductId}' with associated Part '{PartId}'", 
+                detached.Id, detachedPart.Id);
         }
         
         if (selectedDetachedIds.Any())
         {
-            _logger.LogInformation("Imported {Count} selected detached products", selectedDetachedIds.Count);
+            _logger.LogInformation("Imported {Count} selected detached products with {Count} associated parts", 
+                selectedDetachedIds.Count, selectedDetachedIds.Count);
         }
     }
 
@@ -684,6 +694,71 @@ public class ImportSelectionService
 
         workOrder.NestSheets.Add(defaultNestSheet);
         return defaultNestSheet;
+    }
+
+    private Part CreateDetachedProductPart(ImportDetachedProduct importDetached, DetachedProduct detachedProduct, WorkOrder workOrder)
+    {
+        // Create a Part entity for the DetachedProduct so it can go through CNC → Sorting workflow
+        // Use the original part ID from the SDF data for barcode scanning compatibility
+        
+        // Use OriginalPartId which contains the correct Part LinkID (barcode) from SDF data
+        var partId = importDetached.OriginalPartId;
+        
+        // Find the nest sheet for this DetachedProduct part (same logic as regular parts)
+        var nestSheet = FindNestSheetForDetachedProduct(importDetached, workOrder);
+        
+        // Ensure we have a valid NestSheetId - use first available or create default
+        var nestSheetId = nestSheet?.Id;
+        if (string.IsNullOrEmpty(nestSheetId))
+        {
+            // Use first available nest sheet from work order, or create default
+            var existingNestSheet = workOrder.NestSheets.FirstOrDefault();
+            if (existingNestSheet != null)
+            {
+                nestSheetId = existingNestSheet.Id;
+            }
+            else
+            {
+                var defaultNestSheet = CreateDefaultNestSheet(workOrder);
+                nestSheetId = defaultNestSheet.Id;
+            }
+        }
+
+        return new Part
+        {
+            Id = partId,
+            Name = detachedProduct.Name,
+            Qty = detachedProduct.Qty,
+            Length = detachedProduct.Length,
+            Width = detachedProduct.Width,
+            Thickness = detachedProduct.Thickness,
+            Material = detachedProduct.Material,
+            EdgebandingTop = detachedProduct.EdgebandingTop,
+            EdgebandingBottom = detachedProduct.EdgebandingBottom,
+            EdgebandingLeft = detachedProduct.EdgebandingLeft,
+            EdgebandingRight = detachedProduct.EdgebandingRight,
+            ProductId = detachedProduct.Id, // Link Part to DetachedProduct via ProductId (no FK constraint)
+            SubassemblyId = null, // DetachedProducts don't have subassemblies
+            NestSheetId = nestSheetId,
+            Status = PartStatus.Pending // Set initial status
+        };
+    }
+
+    private NestSheet? FindNestSheetForDetachedProduct(ImportDetachedProduct importDetached, WorkOrder workOrder)
+    {
+        // Try to find by nest sheet name first
+        if (!string.IsNullOrEmpty(importDetached.NestSheetName))
+        {
+            return workOrder.NestSheets.FirstOrDefault(n => n.Name == importDetached.NestSheetName);
+        }
+
+        // If no specific nest sheet name, try to find by nest sheet ID
+        if (!string.IsNullOrEmpty(importDetached.NestSheetId))
+        {
+            return workOrder.NestSheets.FirstOrDefault(n => n.Id == importDetached.NestSheetId);
+        }
+
+        return null;
     }
 
 }

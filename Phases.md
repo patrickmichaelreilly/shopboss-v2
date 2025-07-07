@@ -296,6 +296,92 @@
 
 ---
 
+## Phase 7: Create Missing Parts for DetachedProducts
+**Risk:** LOW - Targeted fix to create missing Part entities for DetachedProducts
+
+**Root Cause Analysis:**
+DetachedProducts are created as separate `DetachedProduct` entities during import, but NO corresponding `Part` entities are created. The sorting station only queries the `Parts` table for scannable items, so DetachedProduct "parts" don't exist to be scanned.
+
+**Current Implementation:**
+- Regular Products: Create `Product` → Create `Part` entities → Assign to NestSheets → CNC → Sorting
+- DetachedProducts: Create `DetachedProduct` only → **NO Parts created** → Can't be processed through CNC/Sorting workflow
+
+**Solution:**
+Modify the import process so DetachedProducts ALSO get Part entities created for them, just like regular Products do. This creates the missing Parts infrastructure while preserving all existing DetachedProduct behavior.
+
+**Tasks:**
+
+### 7A: Import System Fix
+1. **Update `ProcessSelectedDetachedProducts()` method:**
+   - Keep all existing DetachedProduct entity creation unchanged
+   - ALSO create a Part entity for each DetachedProduct
+   - Part should have same properties as DetachedProduct (name, dimensions, material, etc.)
+   - Set Part.ProductId = DetachedProduct.Id (treating DetachedProduct as Product for Part linkage)
+   - Assign DetachedProduct Parts to appropriate NestSheet for CNC processing
+
+2. **Create `CreateDetachedProductPart()` helper method:**
+   - Convert DetachedProduct properties to Part entity
+   - Handle NestSheet assignment
+   - Ensure proper audit trail and logging
+
+### 7B: Verification and Testing
+1. **Test CNC Workflow:**
+   - Verify DetachedProduct Parts appear on NestSheets
+   - Confirm CNC processing marks DetachedProduct Parts as Cut
+
+2. **Test Sorting Station:**
+   - Should work automatically since Parts will now exist in Parts table
+   - Verify DetachedProduct Parts can be scanned and sorted
+   - Check if any minor adjustments needed for p.Product navigation
+
+3. **Test Assembly Station:**
+   - Ensure Assembly continues to skip DetachedProducts entirely
+   - DetachedProduct Parts should not appear in assembly workflows
+
+**Expected Behavior:**
+- Sorting station query should automatically find DetachedProduct Parts once they exist
+- CNC → Sorting → Shipping workflow will work normally for DetachedProducts
+- All existing DetachedProduct functionality preserved exactly as-is
+
+**Preservation Requirements:**
+- Tree API continues to show separate "DetachedProducts" category exactly as before
+- All statistics and counts remain identical
+- Admin interface shows DetachedProducts separately as before  
+- Shipping interface continues to handle DetachedProducts as separate entities
+- All existing queries and views remain unchanged
+- No changes to UI or user experience
+
+**Implementation Order:**
+1. Phase 7A: Update import to create Parts for DetachedProducts
+2. Phase 7B: Test and verify workflows, make minimal adjustments if needed
+
+**Success Criteria:**
+- DetachedProduct Parts can be scanned and sorted at Sorting Station
+- All existing functionality and UI remains exactly the same
+- Tree API still shows separate DetachedProducts category
+- Statistics and counts remain unchanged
+- CNC → Sorting → Shipping workflow works for DetachedProducts
+
+**Testing Instructions:**
+1. Import SDF file with DetachedProducts - verify DetachedProduct entities AND Parts are created
+2. Verify Tree API still shows separate DetachedProducts category (unchanged)
+3. Test CNC processing marks DetachedProduct Parts as Cut
+4. Test Sorting Station can scan and sort DetachedProduct Parts successfully
+5. Verify Assembly Station still skips DetachedProducts completely
+6. Test complete CNC → Sorting → Shipping workflow for DetachedProducts
+7. Verify all statistics and counts remain identical
+
+**Rollback Plan:**
+- Revert import logic to not create Parts for DetachedProducts
+- Remove any DetachedProduct Part handling code added
+
+**Post-Completion:**
+- Follow Collaboration_Guidelines.md for git commit and documentation
+- Update Worklog.md with Phase 7 completion notes
+- Verify sorting station issue is completely resolved
+
+---
+
 ## Rollback Procedures
 
 **Immediate Rollback:**

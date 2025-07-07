@@ -13,6 +13,13 @@ public class ImportDetachedProduct
     public string EdgeBanding { get; set; } = string.Empty;
     public string WorkOrderId { get; set; } = string.Empty;
     
+    // NestSheet assignment properties (same as ImportPart)
+    public string NestSheetName { get; set; } = string.Empty;
+    public string NestSheetId { get; set; } = string.Empty;
+    
+    // Original part ID for barcode scanning compatibility
+    public string OriginalPartId { get; set; } = string.Empty;
+    
     // Additional properties
     public string Category { get; set; } = string.Empty;
     public string Notes { get; set; } = string.Empty;

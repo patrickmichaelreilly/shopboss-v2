@@ -53,10 +53,9 @@ public class ShopBossDbContext : DbContext
             entity.Property(e => e.Qty).IsRequired();
             entity.Property(e => e.Status).IsRequired();
             
-            entity.HasOne(e => e.Product)
-                .WithMany(p => p.Parts)
-                .HasForeignKey(e => e.ProductId)
-                .OnDelete(DeleteBehavior.Cascade);
+            // Remove foreign key constraint for ProductId to allow DetachedProduct Parts
+            // ProductId can now point to either Product.Id or DetachedProduct.Id
+            entity.Property(e => e.ProductId).IsRequired(false);
                 
             entity.HasOne(e => e.Subassembly)
                 .WithMany(s => s.Parts)

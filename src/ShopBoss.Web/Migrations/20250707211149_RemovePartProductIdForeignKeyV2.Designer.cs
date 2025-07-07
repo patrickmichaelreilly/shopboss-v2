@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ShopBoss.Web.Data;
 
@@ -10,9 +11,11 @@ using ShopBoss.Web.Data;
 namespace ShopBoss.Web.Migrations
 {
     [DbContext(typeof(ShopBossDbContext))]
-    partial class ShopBossDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250707211149_RemovePartProductIdForeignKeyV2")]
+    partial class RemovePartProductIdForeignKeyV2
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.0");
