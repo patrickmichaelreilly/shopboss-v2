@@ -3,89 +3,13 @@
 }
 
 @section Styles {
+    <link rel="stylesheet" href="~/css/unified-tree.css" asp-append-version="true" />
     <style>
         .progress-container {
             background: #f8f9fa;
             border-radius: 0.5rem;
             padding: 1.5rem;
             border: 1px solid #dee2e6;
-        }
-        
-        .tree-view {
-            max-height: 400px;
-            overflow-y: auto;
-            border: 1px solid #dee2e6;
-            border-radius: 0.375rem;
-            padding: 1rem;
-            background-color: #ffffff;
-        }
-        
-        .tree-node {
-            padding: 0.25rem 0;
-        }
-        
-        .tree-node.level-0 { margin-left: 0; }
-        .tree-node.level-1 { margin-left: 1.5rem; }
-        .tree-node.level-2 { margin-left: 3rem; }
-        .tree-node.level-3 { margin-left: 4.5rem; }
-        .tree-node.level-4 { margin-left: 6rem; }
-        
-        .tree-toggle {
-            cursor: pointer;
-            user-select: none;
-            color: #6c757d;
-            display: inline-flex !important;
-            align-items: center;
-            justify-content: center;
-            min-width: 16px;
-            height: 16px;
-        }
-        
-        .tree-toggle:hover {
-            color: #495057;
-            background-color: #e9ecef;
-            border-radius: 2px;
-        }
-        
-        .tree-toggle i {
-            font-size: 12px !important;
-            line-height: 1;
-        }
-        
-        .tree-checkbox {
-            margin-right: 0.5rem;
-        }
-        
-        .tree-checkbox.indeterminate {
-            opacity: 0.6;
-        }
-        
-        .tree-node.selected {
-            background-color: #e3f2fd;
-            border-radius: 0.25rem;
-            padding: 0.125rem 0.25rem;
-        }
-        
-        .tree-node.partially-selected {
-            background-color: #fff3e0;
-            border-radius: 0.25rem;
-            padding: 0.125rem 0.25rem;
-        }
-        
-        .selection-summary {
-            background-color: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 0.375rem;
-            padding: 1rem;
-            margin-bottom: 1rem;
-        }
-        
-        .selection-warning {
-            background-color: #fff3cd;
-            border: 1px solid #ffeaa7;
-            border-radius: 0.375rem;
-            padding: 0.75rem;
-            margin-bottom: 1rem;
         }
         
         .stage-indicator {
@@ -100,6 +24,22 @@
             background-color: #d4edda;
             border-color: #c3e6cb;
             color: #155724;
+        }
+        
+        .import-actions {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .selection-warnings {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 0.375rem;
+            padding: 0.75rem;
+            margin-bottom: 1rem;
         }
     </style>
 }
@@ -189,7 +129,7 @@
                         <strong>Import Ready:</strong> Review the work order details below and make any necessary adjustments before importing.
                     </div>
                     
-                    <!-- Work Order Metadata Section (Unified Pattern) -->
+                    <!-- Work Order Metadata Section -->
                     <div class="mb-4">
                         <h5>Work Order Information</h5>
                         <div class="card">
@@ -215,106 +155,47 @@
                         </div>
                     </div>
 
-                    <div class="mb-4">
-                        <h5>Import Statistics</h5>
-                        <div class="row">
-                            <div class="col-lg col-md-4 col-6 mb-3">
-                                <div class="card border-primary h-100">
-                                    <div class="card-body text-center">
-                                        <i class="fas fa-boxes fa-2x text-primary mb-2"></i>
-                                        <h4 id="totalProducts" class="mb-1">0</h4>
-                                        <small class="text-muted">Products</small>
-                                        <div class="mt-1">
-                                            <small class="text-success fw-bold">Selected: <span id="selectedProducts">0</span></small>
-                                        </div>
-                                    </div>
+                    <!-- Import Actions -->
+                    <div class="import-actions">
+                        <div class="row g-3 align-items-center">
+                            <div class="col-md-4">
+                                <div class="d-flex gap-2 flex-wrap">
+                                    <button type="button" id="selectAllBtn" class="btn btn-outline-success btn-sm">
+                                        <i class="fas fa-check-double me-1"></i>Select All
+                                    </button>
+                                    <button type="button" id="clearAllBtn" class="btn btn-outline-danger btn-sm">
+                                        <i class="fas fa-times me-1"></i>Clear All
+                                    </button>
+                                    <button type="button" id="expandAllBtn" class="btn btn-outline-primary btn-sm">
+                                        <i class="fas fa-expand-alt me-1"></i>Expand All
+                                    </button>
+                                    <button type="button" id="collapseAllBtn" class="btn btn-outline-secondary btn-sm">
+                                        <i class="fas fa-compress-alt me-1"></i>Collapse All
+                                    </button>
                                 </div>
                             </div>
-                            <div class="col-lg col-md-4 col-6 mb-3">
-                                <div class="card border-success h-100">
-                                    <div class="card-body text-center">
-                                        <i class="fas fa-puzzle-piece fa-2x text-success mb-2"></i>
-                                        <h4 id="totalParts" class="mb-1">0</h4>
-                                        <small class="text-muted">Parts</small>
-                                        <div class="mt-1">
-                                            <small class="text-success fw-bold">Selected: <span id="selectedParts">0</span></small>
-                                        </div>
-                                    </div>
-                                </div>
+                            <div class="col-md-4">
+                                <input type="text" id="searchInput" class="form-control form-control-sm" 
+                                       placeholder="Search items...">
                             </div>
-                            <div class="col-lg col-md-4 col-6 mb-3">
-                                <div class="card border-dark h-100">
-                                    <div class="card-body text-center">
-                                        <i class="fas fa-th-large fa-2x text-dark mb-2"></i>
-                                        <h4 id="totalDetachedProducts" class="mb-1">0</h4>
-                                        <small class="text-muted">Detached Products</small>
-                                        <div class="mt-1">
-                                            <small class="text-success fw-bold">Selected: <span id="selectedDetachedProducts">0</span></small>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-lg col-md-4 col-6 mb-3">
-                                <div class="card border-info h-100">
-                                    <div class="card-body text-center">
-                                        <i class="fas fa-tools fa-2x text-info mb-2"></i>
-                                        <h4 id="totalHardware" class="mb-1">0</h4>
-                                        <small class="text-muted">Hardware</small>
-                                        <div class="mt-1">
-                                            <small class="text-success fw-bold">Selected: <span id="selectedHardware">0</span></small>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-lg col-md-4 col-6 mb-3">
-                                <div class="card border-secondary h-100">
-                                    <div class="card-body text-center">
-                                        <i class="fas fa-cut fa-2x text-secondary mb-2"></i>
-                                        <h4 id="totalNestSheets" class="mb-1">0</h4>
-                                        <small class="text-muted">Nest Sheets</small>
-                                        <div class="mt-1">
-                                            <small class="text-success fw-bold">Selected: <span id="selectedNestSheets">0</span></small>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Selection Summary -->
-                    <div id="selectionSummary" class="selection-summary d-none">
-                        <h6><i class="fas fa-check-circle me-2"></i>Selection Summary</h6>
-                        <div class="row">
-                            <div class="col-lg-2 col-md-4 col-6">
-                                <strong>Products:</strong> <span id="summaryProducts">0</span>
-                            </div>
-                            <div class="col-lg-2 col-md-4 col-6">
-                                <strong>Parts:</strong> <span id="summaryParts">0</span>
-                            </div>
-                            <div class="col-lg-2 col-md-4 col-6">
-                                <strong>Detached Products:</strong> <span id="summaryDetachedProducts">0</span>
-                            </div>
-                            <div class="col-lg-2 col-md-4 col-6">
-                                <strong>Hardware:</strong> <span id="summaryHardware">0</span>
-                            </div>
-                            <div class="col-lg-2 col-md-4 col-6">
-                                <strong>Nest Sheets:</strong> <span id="summaryNestSheets">0</span>
+                            <div class="col-md-4">
+                                <button type="button" id="downloadCsvBtn" class="btn btn-outline-info btn-sm">
+                                    <i class="fas fa-download me-1"></i>Export Raw Data CSV
+                                </button>
                             </div>
                         </div>
                     </div>
 
                     <!-- Selection Warnings -->
-                    <div id="selectionWarnings" class="selection-warning d-none">
+                    <div id="selectionWarnings" class="selection-warnings d-none">
                         <h6><i class="fas fa-exclamation-triangle me-2"></i>Selection Issues</h6>
                         <ul id="warningsList" class="mb-0">
                         </ul>
                     </div>
 
-                    <div class="mb-4">
-                        <h5>Data Structure Preview</h5>
-                        <div id="unifiedTreeContainer">
-                            <!-- Unified tree component will be initialized here -->
-                        </div>
+                    <!-- Unified Tree Container -->
+                    <div id="workOrderTree" class="unified-tree-container">
+                        <!-- Tree content will be rendered here by the unified component -->
                     </div>
 
                     <div class="d-grid gap-2">
@@ -333,18 +214,16 @@
 
 @section Scripts {
     <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/7.0.0/signalr.min.js"></script>
-    <script src="~/js/WorkOrderTreeView.js"></script>
     <script>
         // Global variables
         let currentSessionId = null;
         let signalRConnection = null;
         let importData = null;
-        let treeComponent = null; // Unified tree component
         let selectionState = new Map(); // Track selection state by node ID
         let selectionCounts = {
             products: 0,
             parts: 0,
-            detachedProducts: 0,
+            subassemblies: 0,
             hardware: 0,
             nestSheets: 0
         };
@@ -372,15 +251,22 @@
         const finalWorkOrderName = document.getElementById('finalWorkOrderName');
         const totalProducts = document.getElementById('totalProducts');
         const totalParts = document.getElementById('totalParts');
-        const totalDetachedProducts = document.getElementById('totalDetachedProducts');
+        const totalSubassemblies = document.getElementById('totalSubassemblies');
         const totalHardware = document.getElementById('totalHardware');
         const totalNestSheets = document.getElementById('totalNestSheets');
         const selectedProducts = document.getElementById('selectedProducts');
         const selectedParts = document.getElementById('selectedParts');
-        const selectedDetachedProducts = document.getElementById('selectedDetachedProducts');
+        const selectedSubassemblies = document.getElementById('selectedSubassemblies');
         const selectedHardware = document.getElementById('selectedHardware');
         const selectedNestSheets = document.getElementById('selectedNestSheets');
         const treeView = document.getElementById('treeView');
+        const searchFilter = document.getElementById('searchFilter');
+        const selectAllProductsBtn = document.getElementById('selectAllProductsBtn');
+        const selectAllNestSheetsBtn = document.getElementById('selectAllNestSheetsBtn');
+        const clearAllBtn = document.getElementById('clearAllBtn');
+        const expandAllBtn = document.getElementById('expandAllBtn');
+        const collapseAllBtn = document.getElementById('collapseAllBtn');
+        const downloadCsvBtn = document.getElementById('downloadCsvBtn');
         const confirmImportBtn = document.getElementById('confirmImportBtn');
         const startOverBtn = document.getElementById('startOverBtn');
         const selectionSummary = document.getElementById('selectionSummary');
@@ -388,7 +274,7 @@
         const warningsList = document.getElementById('warningsList');
         const summaryProducts = document.getElementById('summaryProducts');
         const summaryParts = document.getElementById('summaryParts');
-        const summaryDetachedProducts = document.getElementById('summaryDetachedProducts');
+        const summarySubassemblies = document.getElementById('summarySubassemblies');
         const summaryHardware = document.getElementById('summaryHardware');
         const summaryNestSheets = document.getElementById('summaryNestSheets');
 
@@ -618,78 +504,73 @@
             }
             
             const stats = importData.statistics;
-            
-            // Calculate detached products based on single-part products (they will be converted during import)
-            const singlePartProductsCount = importData.products ? 
-                importData.products.filter(product => product.parts && product.parts.length === 1).length : 0;
-            const actualDetachedProducts = stats.totalDetachedProducts + singlePartProductsCount;
-            
-            totalProducts.textContent = stats.totalProducts - singlePartProductsCount; // Subtract single-part products
+            totalProducts.textContent = stats.totalProducts;
             totalParts.textContent = stats.totalParts;
-            totalDetachedProducts.textContent = actualDetachedProducts;
+            totalSubassemblies.textContent = stats.totalSubassemblies;
             totalHardware.textContent = stats.totalHardware;
             totalNestSheets.textContent = stats.totalNestSheets;
         }
 
         function buildTreeView() {
-            // Initialize unified tree component for import mode
-            if (treeComponent) {
-                // Clean up existing component
-                const container = document.getElementById('unifiedTreeContainer');
-                container.innerHTML = '';
+            treeView.innerHTML = '';
+            selectionState.clear(); // Reset selection state
+            
+            if (!importData.products || importData.products.length === 0) {
+                treeView.innerHTML = '<p class="text-muted">No products found in import data.</p>';
+                return;
             }
 
-            treeComponent = new WorkOrderTreeView('unifiedTreeContainer', {
-                mode: 'import',
-                apiUrl: '/Import/GetImportTreeData',
-                sessionId: currentSessionId,
-                onSelectionChange: (summary) => {
-                    // Update statistics from tree component selection
-                    updateSelectionCountsFromTree(summary);
-                    updateSelectionSummary();
-                    validateSelection();
-                }
+            // Display products directly (no wrapper categories)
+            importData.products.forEach(product => {
+                const productNode = createProductNode(product, 0);
+                treeView.appendChild(productNode);
             });
 
-            // Load data via sessionId instead of workOrderId
-            if (currentSessionId) {
-                fetch(`/Import/GetImportTreeData?sessionId=${currentSessionId}`)
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.error) {
-                            console.error('Error loading tree data:', data.error);
-                            document.getElementById('unifiedTreeContainer').innerHTML = 
-                                '<p class="text-muted">Error loading import data for preview.</p>';
-                            return;
-                        }
-                        
-                        // Set the tree data directly
-                        treeComponent.setData(data);
-                    })
-                    .catch(error => {
-                        console.error('Failed to load tree data:', error);
-                        document.getElementById('unifiedTreeContainer').innerHTML = 
-                            '<p class="text-muted">Failed to load import data for preview.</p>';
-                    });
+            // Add standalone hardware if any
+            if (importData.hardware && importData.hardware.length > 0) {
+                importData.hardware.forEach(hardware => {
+                    const hardwareNode = createHardwareNode(hardware, 0);
+                    treeView.appendChild(hardwareNode);
+                });
             }
-        }
 
-        function updateSelectionCountsFromTree(summary) {
-            // Update global selection counts from tree component
-            // Tree component returns counts in nested object: { counts: { products: 0, parts: 0, ... } }
-            const counts = summary.counts || {};
-            selectionCounts.products = counts.products || 0;
-            selectionCounts.parts = counts.parts || 0;
-            selectionCounts.detachedProducts = counts.detachedProducts || 0;
-            selectionCounts.hardware = counts.hardware || 0;
-            selectionCounts.nestSheets = counts.nestSheets || 0;
+            // Add detached products if any
+            if (importData.detachedProducts && importData.detachedProducts.length > 0) {
+                importData.detachedProducts.forEach(detached => {
+                    const detachedNode = createDetachedProductNode(detached, 0);
+                    treeView.appendChild(detachedNode);
+                });
+            }
 
-            // Update the displayed counts
-            selectedProducts.textContent = selectionCounts.products;
-            selectedParts.textContent = selectionCounts.parts;
-            selectedDetachedProducts.textContent = selectionCounts.detachedProducts;
-            selectedHardware.textContent = selectionCounts.hardware;
-            selectedNestSheets.textContent = selectionCounts.nestSheets;
+            // Add nest sheets if any (always auto-selected)
+            if (importData.nestSheets && importData.nestSheets.length > 0) {
+                const nestSheetsHeader = createTreeNode('📄', `Nest Sheets (${importData.nestSheets.length})`, 'nestsheets-header', true, 0);
+                treeView.appendChild(nestSheetsHeader);
+                
+                importData.nestSheets.forEach(nestSheet => {
+                    const nestSheetNode = createNestSheetNode(nestSheet, 1);
+                    treeView.appendChild(nestSheetNode);
+                    
+                    // Auto-select all nest sheets and make them non-interactive
+                    const nestSheetId = nestSheetNode.dataset.itemId;
+                    const nestSheetState = selectionState.get(nestSheetId);
+                    if (nestSheetState) {
+                        nestSheetState.selected = true;
+                        // Disable the checkbox since nest sheets are always imported
+                        const checkbox = nestSheetNode.querySelector('.tree-checkbox');
+                        if (checkbox) {
+                            checkbox.checked = true;
+                            checkbox.disabled = true;
+                            checkbox.title = "Nest sheets are always imported";
+                        }
+                    }
+                });
+            }
+
+            // Initialize selection counts and summary
+            updateSelectionCounts();
+            updateSelectionSummary();
+            validateSelection();
         }
 
         function createTreeNode(icon, text, type, expanded = false, level = 0, itemId = null, itemData = null) {
@@ -1003,7 +884,7 @@
             selectionCounts = {
                 products: 0,
                 parts: 0,
-                detachedProducts: 0,
+                subassemblies: 0,
                 hardware: 0,
                 nestSheets: 0
             };
@@ -1018,8 +899,8 @@
                         case 'part':
                             selectionCounts.parts++;
                             break;
-                        case 'detached_product':
-                            selectionCounts.detachedProducts++;
+                        case 'subassembly':
+                            selectionCounts.subassemblies++;
                             break;
                         case 'hardware':
                             selectionCounts.hardware++;
@@ -1034,20 +915,20 @@
             // Update UI
             selectedProducts.textContent = selectionCounts.products;
             selectedParts.textContent = selectionCounts.parts;
-            selectedDetachedProducts.textContent = selectionCounts.detachedProducts;
+            selectedSubassemblies.textContent = selectionCounts.subassemblies;
             selectedHardware.textContent = selectionCounts.hardware;
             selectedNestSheets.textContent = selectionCounts.nestSheets;
         }
 
         function updateSelectionSummary() {
             const hasSelection = selectionCounts.products > 0 || selectionCounts.parts > 0 || 
-                               selectionCounts.detachedProducts > 0 || selectionCounts.hardware > 0 || selectionCounts.nestSheets > 0;
+                               selectionCounts.subassemblies > 0 || selectionCounts.hardware > 0 || selectionCounts.nestSheets > 0;
 
             if (hasSelection) {
                 selectionSummary.classList.remove('d-none');
                 summaryProducts.textContent = selectionCounts.products;
                 summaryParts.textContent = selectionCounts.parts;
-                summaryDetachedProducts.textContent = selectionCounts.detachedProducts;
+                summarySubassemblies.textContent = selectionCounts.subassemblies;
                 summaryHardware.textContent = selectionCounts.hardware;
                 summaryNestSheets.textContent = selectionCounts.nestSheets;
             } else {
@@ -1059,21 +940,25 @@
             const warnings = [];
             let hasValidSelection = false;
 
-            // Check if tree component is available and has selections
-            if (treeComponent) {
-                const selectedItems = treeComponent.getSelectedItems();
-                
-                // Check for any selected items (products, hardware, nestsheets)
-                hasValidSelection = selectedItems.some(item => 
-                    item.type === 'product' || item.type === 'hardware' || item.type === 'nestsheet'
-                );
-                
-                // For now, we'll keep validation simple since the tree component handles
-                // parent-child relationships properly
-            } else {
-                // Fallback to selection counts
-                hasValidSelection = selectionCounts.products > 0 || selectionCounts.nestSheets > 0;
-            }
+            // Check for products with incomplete selections
+            selectionState.forEach((state, nodeId) => {
+                if (state.type === 'product' && state.partiallySelected) {
+                    warnings.push(`Product "${state.itemData?.productNumber || nodeId}" has incomplete selection. Select all parts or deselect the product.`);
+                }
+                if (state.selected && (state.type === 'product' || state.type === 'hardware' || state.type === 'detached')) {
+                    hasValidSelection = true;
+                }
+            });
+
+            // Check for orphaned parts/subassemblies (selected without parent)
+            selectionState.forEach((state, nodeId) => {
+                if (state.selected && (state.type === 'part' || state.type === 'subassembly') && state.parentId) {
+                    const parentState = selectionState.get(state.parentId);
+                    if (parentState && !parentState.selected && !parentState.partiallySelected) {
+                        warnings.push(`${state.type === 'part' ? 'Part' : 'Subassembly'} "${state.itemData?.name || nodeId}" is selected but its parent is not. Select the parent product first.`);
+                    }
+                }
+            });
 
             // Update warnings UI
             if (warnings.length > 0) {
@@ -1090,11 +975,101 @@
             return isValid;
         }
 
-        // Tree view controls are now handled by the unified tree component
+        // Tree view controls
+        selectAllProductsBtn.addEventListener('click', () => {
+            // Select all products (which will auto-select their children)
+            selectionState.forEach((state, nodeId) => {
+                if (state.type === 'product' || state.type === 'hardware' || state.type === 'detached') {
+                    if (!state.selected) {
+                        state.selected = true;
+                        updateNodeVisualState(nodeId);
+                        selectAllChildren(nodeId);
+                    }
+                }
+            });
+            updateSelectionCounts();
+            updateSelectionSummary();
+            validateSelection();
+        });
+
+        selectAllNestSheetsBtn.addEventListener('click', () => {
+            // Select all nest sheets
+            selectionState.forEach((state, nodeId) => {
+                if (state.type === 'nestsheet') {
+                    if (!state.selected) {
+                        state.selected = true;
+                        updateNodeVisualState(nodeId);
+                        selectAllChildren(nodeId);
+                    }
+                }
+            });
+            updateSelectionCounts();
+            updateSelectionSummary();
+            validateSelection();
+        });
+
+        clearAllBtn.addEventListener('click', () => {
+            // Deselect everything
+            selectionState.forEach((state, nodeId) => {
+                if (state.selected) {
+                    state.selected = false;
+                    state.partiallySelected = false;
+                    updateNodeVisualState(nodeId);
+                }
+            });
+            updateSelectionCounts();
+            updateSelectionSummary();
+            validateSelection();
+        });
+
+        expandAllBtn.addEventListener('click', () => {
+            const toggles = treeView.querySelectorAll('.tree-toggle');
+            toggles.forEach(toggle => {
+                toggle.dataset.expanded = 'true';
+                toggle.querySelector('i').className = 'fas fa-chevron-down';
+                const content = toggle.closest('.tree-node').querySelector('.tree-content');
+                if (content) content.style.display = 'block';
+            });
+        });
+
+        collapseAllBtn.addEventListener('click', () => {
+            const toggles = treeView.querySelectorAll('.tree-toggle');
+            toggles.forEach(toggle => {
+                toggle.dataset.expanded = 'false';
+                toggle.querySelector('i').className = 'fas fa-chevron-right';
+                const content = toggle.closest('.tree-node').querySelector('.tree-content');
+                if (content) content.style.display = 'none';
+            });
+        });
+
+        // Search functionality
+        searchFilter.addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            const nodes = treeView.querySelectorAll('.tree-node');
+            
+            nodes.forEach(node => {
+                const text = node.textContent.toLowerCase();
+                const shouldShow = searchTerm === '' || text.includes(searchTerm);
+                node.style.display = shouldShow ? 'block' : 'none';
+            });
+        });
 
         // CSV download functionality
-        // Confirm import - Updated for unified tree component
+        downloadCsvBtn.addEventListener('click', () => {
+            if (currentSessionId) {
+                window.location.href = `/Import/ExportRawDataCsv?sessionId=${currentSessionId}`;
+            } else {
+                alert('No import session available for CSV export.');
+            }
+        });
+
+        // Confirm import
         confirmImportBtn.addEventListener('click', async () => {
+            if (!validateSelection()) {
+                alert('Please fix the selection issues before proceeding.');
+                return;
+            }
+
             if (!currentSessionId) {
                 alert('No import session available.');
                 return;
@@ -1107,43 +1082,34 @@
                 return;
             }
 
-            if (!treeComponent) {
-                alert('Tree component not initialized.');
-                return;
-            }
-
-            // Get selection data from unified tree component
-            const selectionSummary = treeComponent.getSelectionSummary();
-            if (!selectionSummary || !selectionSummary.selectedItems || selectionSummary.selectedItems.length === 0) {
-                alert('Please select at least one item to import.');
-                return;
-            }
-
             try {
                 // Disable button during processing
                 confirmImportBtn.disabled = true;
                 confirmImportBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing...';
 
-                // Prepare selection data from tree component - filter out category items
-                const actualItems = selectionSummary.selectedItems.filter(item => item.type !== 'category');
-                
-                if (actualItems.length === 0) {
-                    alert('Please select at least one actual item (product, part, hardware, or nest sheet) to import.');
-                    confirmImportBtn.disabled = false;
-                    confirmImportBtn.innerHTML = '<i class="fas fa-check me-2"></i>Confirm Import';
-                    return;
-                }
-                
-                const selectedItemIds = actualItems.map(item => item.id);
+                // Prepare selection data
+                const selectedItemIds = [];
                 const selectionDetails = {};
-                
-                actualItems.forEach(item => {
-                    selectionDetails[item.id] = {
-                        itemId: item.id,
-                        itemType: item.type,
-                        selected: true,
-                        parentId: null, // Tree component handles hierarchy
-                        childIds: []
+
+                selectionState.forEach((state, nodeId) => {
+                    // Only include actual items, not header/category nodes
+                    const isHeaderNode = state.type.includes('-header') || 
+                                       state.type === 'work-order' || 
+                                       state.type === 'products-header' || 
+                                       state.type === 'hardware-header' || 
+                                       state.type === 'detached-header' ||
+                                       state.type === 'nestsheets-header';
+                    
+                    if (state.selected && !isHeaderNode) {
+                        selectedItemIds.push(nodeId);
+                    }
+                    
+                    selectionDetails[nodeId] = {
+                        itemId: nodeId,
+                        itemType: state.type,
+                        selected: state.selected,
+                        parentId: state.parentId,
+                        childIds: state.childIds || []
                     };
                 });
 
@@ -1172,7 +1138,7 @@
                           `Saved:\n` +
                           `• ${result.statistics.convertedProducts} Products\n` +
                           `• ${result.statistics.convertedParts} Parts\n` +
-                          `• ${result.statistics.convertedDetachedProducts} Detached Products\n` +
+                          `• ${result.statistics.convertedSubassemblies} Subassemblies\n` +
                           `• ${result.statistics.convertedHardware} Hardware\n` +
                           `• ${result.statistics.convertedNestSheets} Nest Sheets\n\n` +
                           `Work Order ID: ${result.workOrderId}\n` +

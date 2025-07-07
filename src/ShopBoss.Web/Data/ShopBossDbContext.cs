@@ -91,10 +91,16 @@ public class ShopBossDbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Name).IsRequired();
             entity.Property(e => e.Qty).IsRequired();
+            entity.Property(e => e.Status).IsRequired();
             
             entity.HasOne(e => e.WorkOrder)
                 .WithMany(w => w.Hardware)
                 .HasForeignKey(e => e.WorkOrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+                
+            entity.HasOne(e => e.Product)
+                .WithMany(p => p.Hardware)
+                .HasForeignKey(e => e.ProductId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

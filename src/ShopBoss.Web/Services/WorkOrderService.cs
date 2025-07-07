@@ -65,7 +65,7 @@ public class WorkOrderService
                 .ToListAsync();
 
             // Build object graph in memory (small dataset)
-            var productNodes = BuildProductNodes(products, parts, subassemblies, subassemblyParts);
+            var productNodes = BuildProductNodes(products, parts, subassemblies, subassemblyParts, hardware);
 
             // Calculate NestSheet summary
             var nestSheetSummary = new NestSheetSummary
@@ -82,7 +82,8 @@ public class WorkOrderService
                 ProductNodes = productNodes,
                 AvailableStatuses = Enum.GetValues<PartStatus>().ToList(),
                 NestSheets = nestSheets,
-                NestSheetSummary = nestSheetSummary
+                NestSheetSummary = nestSheetSummary,
+                DetachedProducts = detachedProducts
             };
         }
         catch (Exception ex)
@@ -150,7 +151,7 @@ public class WorkOrderService
         }
     }
 
-    private List<ProductStatusNode> BuildProductNodes(List<Product> products, List<Part> parts, List<Subassembly> subassemblies, List<Part> subassemblyParts)
+    private List<ProductStatusNode> BuildProductNodes(List<Product> products, List<Part> parts, List<Subassembly> subassemblies, List<Part> subassemblyParts, List<Hardware> hardware)
     {
         var productNodes = new List<ProductStatusNode>();
 
@@ -161,6 +162,9 @@ public class WorkOrderService
             
             // Get subassemblies for this product
             var productSubassemblies = subassemblies.Where(s => s.ProductId == product.Id).ToList();
+            
+            // Get hardware for this product
+            var productHardware = hardware.Where(h => h.ProductId == product.Id).ToList();
             
             // Attach parts to subassemblies
             foreach (var subassembly in productSubassemblies)
@@ -178,7 +182,7 @@ public class WorkOrderService
                 Product = product,
                 Parts = productParts,
                 Subassemblies = productSubassemblies,
-                Hardware = new List<Hardware>(),
+                Hardware = productHardware,
                 EffectiveStatus = effectiveStatus
             });
         }
@@ -213,6 +217,7 @@ public class WorkOrderManagementData
     public List<PartStatus> AvailableStatuses { get; set; } = new();
     public List<NestSheet> NestSheets { get; set; } = new();
     public NestSheetSummary NestSheetSummary { get; set; } = new();
+    public List<DetachedProduct> DetachedProducts { get; set; } = new();
 }
 
 public class NestSheetSummary

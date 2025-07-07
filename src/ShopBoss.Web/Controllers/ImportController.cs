@@ -469,6 +469,263 @@ public class ImportController : Controller
             });
         }
     }
+
+    [HttpGet]
+    public IActionResult GetImportTreeData(string sessionId)
+    {
+        if (!_importSessions.TryGetValue(sessionId, out var session))
+        {
+            return NotFound(new { error = "Import session not found" });
+        }
+
+        if (session.Status != ImportStatus.Completed || session.ImportWorkOrder == null)
+        {
+            return BadRequest(new { error = "Import not completed or no data available" });
+        }
+
+        try
+        {
+            var importData = session.ImportWorkOrder;
+            var response = new Models.Api.TreeDataResponse
+            {
+                WorkOrderId = importData.Id,
+                WorkOrderName = importData.Name,
+                Items = new List<Models.Api.TreeItem>()
+            };
+
+            // Create fixed top-level categories: Products, DetachedProducts, and Nest Sheets
+            
+            // 1. Products Category
+            if (importData.Products.Any())
+            {
+                var productsCategory = new Models.Api.TreeItem
+                {
+                    Id = "category_products",
+                    Name = $"Products ({importData.Products.Count})",
+                    Type = "category",
+                    Quantity = importData.Products.Count,
+                    Status = null,
+                    Children = new List<Models.Api.TreeItem>()
+                };
+
+                foreach (var product in importData.Products)
+                {
+                    var productItem = new Models.Api.TreeItem
+                    {
+                        Id = product.Id,
+                        Name = product.Name,
+                        Type = "product",
+                        Quantity = product.Quantity,
+                        Status = null,
+                        Children = new List<Models.Api.TreeItem>()
+                    };
+
+                    // Add subcategories under each product (only if they have items)
+                    
+                    // Parts subcategory
+                    if (product.Parts.Any())
+                    {
+                        var partsCategory = new Models.Api.TreeItem
+                        {
+                            Id = $"category_parts_{product.Id}",
+                            Name = $"Parts ({product.Parts.Count})",
+                            Type = "category",
+                            Quantity = product.Parts.Count,
+                            Status = null,
+                            Children = new List<Models.Api.TreeItem>()
+                        };
+
+                        foreach (var part in product.Parts)
+                        {
+                            partsCategory.Children.Add(new Models.Api.TreeItem
+                            {
+                                Id = part.Id,
+                                Name = part.Name,
+                                Type = "part",
+                                Quantity = part.Quantity,
+                                Status = null,
+                                Children = new List<Models.Api.TreeItem>()
+                            });
+                        }
+
+                        productItem.Children.Add(partsCategory);
+                    }
+
+                    // Subassemblies subcategory
+                    if (product.Subassemblies.Any())
+                    {
+                        var subassembliesCategory = new Models.Api.TreeItem
+                        {
+                            Id = $"category_subassemblies_{product.Id}",
+                            Name = $"Subassemblies ({product.Subassemblies.Count})",
+                            Type = "category",
+                            Quantity = product.Subassemblies.Count,
+                            Status = null,
+                            Children = new List<Models.Api.TreeItem>()
+                        };
+
+                        foreach (var subassembly in product.Subassemblies)
+                        {
+                            var subassemblyItem = new Models.Api.TreeItem
+                            {
+                                Id = subassembly.Id,
+                                Name = subassembly.Name,
+                                Type = "subassembly",
+                                Quantity = subassembly.Quantity,
+                                Status = null,
+                                Children = new List<Models.Api.TreeItem>()
+                            };
+
+                            // Add parts under subassembly
+                            foreach (var part in subassembly.Parts)
+                            {
+                                subassemblyItem.Children.Add(new Models.Api.TreeItem
+                                {
+                                    Id = part.Id,
+                                    Name = part.Name,
+                                    Type = "part",
+                                    Quantity = part.Quantity,
+                                    Status = null,
+                                    Children = new List<Models.Api.TreeItem>()
+                                });
+                            }
+
+                            // Add hardware under subassembly
+                            foreach (var hardware in subassembly.Hardware)
+                            {
+                                subassemblyItem.Children.Add(new Models.Api.TreeItem
+                                {
+                                    Id = hardware.Id,
+                                    Name = hardware.Name,
+                                    Type = "hardware",
+                                    Quantity = hardware.Quantity,
+                                    Status = null,
+                                    Children = new List<Models.Api.TreeItem>()
+                                });
+                            }
+
+                            subassembliesCategory.Children.Add(subassemblyItem);
+                        }
+
+                        productItem.Children.Add(subassembliesCategory);
+                    }
+
+                    // Hardware subcategory
+                    if (product.Hardware.Any())
+                    {
+                        var hardwareCategory = new Models.Api.TreeItem
+                        {
+                            Id = $"category_hardware_{product.Id}",
+                            Name = $"Hardware ({product.Hardware.Count})",
+                            Type = "category",
+                            Quantity = product.Hardware.Count,
+                            Status = null,
+                            Children = new List<Models.Api.TreeItem>()
+                        };
+
+                        foreach (var hardware in product.Hardware)
+                        {
+                            hardwareCategory.Children.Add(new Models.Api.TreeItem
+                            {
+                                Id = hardware.Id,
+                                Name = hardware.Name,
+                                Type = "hardware",
+                                Quantity = hardware.Quantity,
+                                Status = null,
+                                Children = new List<Models.Api.TreeItem>()
+                            });
+                        }
+
+                        productItem.Children.Add(hardwareCategory);
+                    }
+
+                    productsCategory.Children.Add(productItem);
+                }
+
+                response.Items.Add(productsCategory);
+            }
+
+            // 2. DetachedProducts Category
+            if (importData.DetachedProducts.Any())
+            {
+                var detachedProductsCategory = new Models.Api.TreeItem
+                {
+                    Id = "category_detached_products",
+                    Name = $"Detached Products ({importData.DetachedProducts.Count})",
+                    Type = "category",
+                    Quantity = importData.DetachedProducts.Count,
+                    Status = null,
+                    Children = new List<Models.Api.TreeItem>()
+                };
+
+                foreach (var detachedProduct in importData.DetachedProducts)
+                {
+                    detachedProductsCategory.Children.Add(new Models.Api.TreeItem
+                    {
+                        Id = detachedProduct.Id,
+                        Name = detachedProduct.Name,
+                        Type = "detached_product",
+                        Quantity = detachedProduct.Quantity,
+                        Status = null,
+                        Children = new List<Models.Api.TreeItem>()
+                    });
+                }
+
+                response.Items.Add(detachedProductsCategory);
+            }
+
+            // 3. Nest Sheets Category
+            if (importData.NestSheets.Any())
+            {
+                var nestSheetsCategory = new Models.Api.TreeItem
+                {
+                    Id = "category_nestsheets",
+                    Name = $"Nest Sheets ({importData.NestSheets.Count})",
+                    Type = "category",
+                    Quantity = importData.NestSheets.Count,
+                    Status = null,
+                    Children = new List<Models.Api.TreeItem>()
+                };
+
+                foreach (var nestSheet in importData.NestSheets)
+                {
+                    var nestSheetItem = new Models.Api.TreeItem
+                    {
+                        Id = nestSheet.Id,
+                        Name = nestSheet.Name,
+                        Type = "nestsheet",
+                        Quantity = 1,
+                        Status = null,
+                        Children = new List<Models.Api.TreeItem>()
+                    };
+
+                    foreach (var part in nestSheet.Parts)
+                    {
+                        nestSheetItem.Children.Add(new Models.Api.TreeItem
+                        {
+                            Id = part.Id,
+                            Name = part.Name,
+                            Type = "part",
+                            Quantity = part.Quantity,
+                            Status = null,
+                            Children = new List<Models.Api.TreeItem>()
+                        });
+                    }
+
+                    nestSheetsCategory.Children.Add(nestSheetItem);
+                }
+
+                response.Items.Add(nestSheetsCategory);
+            }
+
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error generating tree data for import session {SessionId}", sessionId);
+            return StatusCode(500, new { error = "Failed to generate tree data" });
+        }
+    }
 }
 
 public class ImportSession

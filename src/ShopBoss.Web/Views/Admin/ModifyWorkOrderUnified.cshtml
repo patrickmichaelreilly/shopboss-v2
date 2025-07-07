@@ -1,56 +1,73 @@
-@model string
-
+@model ShopBoss.Web.Services.WorkOrderManagementData
 @{
-    ViewData["Title"] = "Modify Work Order";
+    ViewData["Title"] = $"Modify Work Order - {Model.WorkOrder.Name}";
 }
 
 @section Styles {
     <link rel="stylesheet" href="~/css/tree-view.css" />
     <style>
-        .status-management-container {
-            padding: 1rem;
-        }
-        
-        .work-order-header {
-            background-color: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 0.375rem;
-            padding: 1.5rem;
-            margin-bottom: 1.5rem;
-        }
-        
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1rem;
-            margin-bottom: 1.5rem;
-        }
-        
-        .stat-card {
-            background: white;
+        .tree-view {
+            max-height: 400px;
+            overflow-y: auto;
             border: 1px solid #dee2e6;
             border-radius: 0.375rem;
             padding: 1rem;
-            text-align: center;
+            background-color: #ffffff;
         }
         
-        .stat-icon {
-            font-size: 2rem;
-            margin-bottom: 0.5rem;
+        .tree-node {
+            padding: 0.25rem 0;
         }
         
-        .stat-number {
-            font-size: 1.5rem;
-            font-weight: bold;
-            margin-bottom: 0.25rem;
-        }
+        .tree-node.level-0 { margin-left: 0; }
+        .tree-node.level-1 { margin-left: 1.5rem; }
+        .tree-node.level-2 { margin-left: 3rem; }
+        .tree-node.level-3 { margin-left: 4.5rem; }
+        .tree-node.level-4 { margin-left: 6rem; }
         
-        .stat-label {
+        .tree-toggle {
+            cursor: pointer;
+            user-select: none;
             color: #6c757d;
-            font-size: 0.875rem;
+            display: inline-flex !important;
+            align-items: center;
+            justify-content: center;
+            min-width: 16px;
+            height: 16px;
         }
         
-        .controls-section {
+        .tree-toggle:hover {
+            color: #495057;
+            background-color: #e9ecef;
+            border-radius: 2px;
+        }
+        
+        .tree-toggle i {
+            font-size: 12px !important;
+            line-height: 1;
+        }
+        
+        .tree-checkbox {
+            margin-right: 0.5rem;
+        }
+        
+        .tree-checkbox.indeterminate {
+            opacity: 0.6;
+        }
+        
+        .tree-node.selected {
+            background-color: #e3f2fd;
+            border-radius: 0.25rem;
+            padding: 0.125rem 0.25rem;
+        }
+        
+        .tree-node.partially-selected {
+            background-color: #fff3e0;
+            border-radius: 0.25rem;
+            padding: 0.125rem 0.25rem;
+        }
+        
+        .selection-summary {
             background-color: #f8f9fa;
             border: 1px solid #dee2e6;
             border-radius: 0.375rem;
@@ -58,20 +75,12 @@
             margin-bottom: 1rem;
         }
         
-        .tree-container {
-            background: white;
-            border: 1px solid #dee2e6;
+        .selection-warning {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
             border-radius: 0.375rem;
-            min-height: 600px;
-            position: relative;
-        }
-        
-        .alert-container {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 1050;
-            max-width: 400px;
+            padding: 0.75rem;
+            margin-bottom: 1rem;
         }
         
         .loading-overlay {
@@ -86,188 +95,255 @@
             justify-content: center;
             z-index: 10;
         }
+        
+        .alert-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1050;
+            max-width: 400px;
+        }
     </style>
 }
 
-<div class="status-management-container">
-    <!-- Page Header -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h2>Modify Work Order</h2>
-            <nav aria-label="breadcrumb">
-                <ol class="breadcrumb">
-                    <li class="breadcrumb-item"><a asp-action="Index">Work Orders</a></li>
-                    <li class="breadcrumb-item active" aria-current="page" id="work-order-name">Loading...</li>
-                </ol>
-            </nav>
-        </div>
-        <div>
-            <a asp-action="Index" class="btn btn-secondary">
-                <i class="fas fa-arrow-left me-2"></i>Back to Work Orders
-            </a>
-        </div>
-    </div>
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h3 class="card-title mb-0">
+                    <i class="fas fa-edit me-2"></i>Modify Work Order
+                </h3>
+                <a asp-action="Index" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left me-2"></i>Back to Work Orders
+                </a>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Status Management:</strong> Use the dropdowns to update item statuses. 
+                    Changes are saved automatically and updated in real-time.
+                </div>
 
-    <!-- Work Order Header -->
-    <div class="work-order-header" id="work-order-header" style="display: none;">
-        <div class="row">
-            <div class="col-md-3">
-                <strong>Work Order ID:</strong><br>
-                <span class="text-muted" id="work-order-id">-</span>
-            </div>
-            <div class="col-md-3">
-                <strong>Work Order Name:</strong><br>
-                <span class="text-muted" id="work-order-name-detail">-</span>
-            </div>
-            <div class="col-md-3">
-                <strong>Imported Date:</strong><br>
-                <span class="text-muted" id="work-order-imported">-</span>
-            </div>
-            <div class="col-md-3">
-                <strong>Total Items:</strong><br>
-                <span class="text-muted" id="work-order-total-items">-</span>
-            </div>
-        </div>
-    </div>
+                <!-- Work Order Information Section (Unified Pattern) -->
+                <div class="mb-4">
+                    <h5>Work Order Information</h5>
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <strong>Work Order Name:</strong><br>
+                                    <span class="text-muted" id="work-order-name-detail">@Model.WorkOrder.Name</span>
+                                </div>
+                                <div class="col-md-4">
+                                    <strong>Work Order ID:</strong><br>
+                                    <span class="text-muted" id="work-order-id">@Model.WorkOrder.Id</span>
+                                </div>
+                                <div class="col-md-4">
+                                    <strong>Imported Date:</strong><br>
+                                    <span class="text-muted" id="work-order-imported">@Model.WorkOrder.ImportedDate.ToString("yyyy-MM-dd HH:mm")</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-    <!-- Statistics Grid -->
-    <div class="stats-grid" id="stats-grid" style="display: none;">
-        <div class="stat-card">
-            <div class="stat-icon text-primary">
-                <i class="fas fa-boxes"></i>
-            </div>
-            <div class="stat-number" id="products-count">0</div>
-            <div class="stat-label">Products</div>
-            <div class="mt-1">
-                <small class="text-info" id="products-details">0 Parts • 0 Subassemblies</small>
-            </div>
-        </div>
-        
-        <div class="stat-card">
-            <div class="stat-icon text-warning">
-                <i class="fas fa-tools"></i>
-            </div>
-            <div class="stat-number" id="hardware-count">0</div>
-            <div class="stat-label">Hardware Items</div>
-            <div class="mt-1">
-                <small class="text-info" id="hardware-details">Total Qty: 0</small>
-            </div>
-        </div>
-        
-        <div class="stat-card">
-            <div class="stat-icon text-info">
-                <i class="fas fa-puzzle-piece"></i>
-            </div>
-            <div class="stat-number" id="detached-count">0</div>
-            <div class="stat-label">Detached Products</div>
-            <div class="mt-1">
-                <small class="text-info" id="detached-details">Total Qty: 0</small>
-            </div>
-        </div>
-        
-        <div class="stat-card">
-            <div class="stat-icon text-secondary">
-                <i class="fas fa-cut"></i>
-            </div>
-            <div class="stat-number" id="nestsheets-count">0</div>
-            <div class="stat-label">Nest Sheets</div>
-            <div class="mt-1">
-                <small class="text-success" id="nestsheets-processed">0 Processed</small><br/>
-                <small class="text-warning" id="nestsheets-pending">0 Pending</small><br/>
-                <small class="text-info" id="nestsheets-parts">0 Parts Total</small>
-            </div>
-        </div>
-    </div>
+                <div class="mb-4">
+                    <h5>Status Statistics</h5>
+                    <div class="row">
+                        <div class="col-lg col-md-4 col-6 mb-3">
+                            <div class="card border-primary h-100">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-boxes fa-2x text-primary mb-2"></i>
+                                    <h4 id="totalProducts" class="mb-1">0</h4>
+                                    <small class="text-muted">Products</small>
+                                    <div class="mt-1">
+                                        <div class="row g-1 text-center">
+                                            <div class="col-6"><small class="text-muted" id="products-pending">0 Pending</small></div>
+                                            <div class="col-6"><small class="text-warning" id="products-cut">0 Cut</small></div>
+                                        </div>
+                                        <div class="row g-1 text-center">
+                                            <div class="col-4"><small class="text-info" id="products-sorted">0 Sorted</small></div>
+                                            <div class="col-4"><small class="text-success text-nowrap" id="products-assembled">0 Assembled</small></div>
+                                            <div class="col-4"><small class="text-primary" id="products-shipped">0 Shipped</small></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg col-md-4 col-6 mb-3">
+                            <div class="card border-success h-100">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-puzzle-piece fa-2x text-success mb-2"></i>
+                                    <h4 id="totalParts" class="mb-1">0</h4>
+                                    <small class="text-muted">Parts</small>
+                                    <div class="mt-1">
+                                        <div class="row g-1 text-center">
+                                            <div class="col-6"><small class="text-muted" id="parts-pending">0 Pending</small></div>
+                                            <div class="col-6"><small class="text-warning" id="parts-cut">0 Cut</small></div>
+                                        </div>
+                                        <div class="row g-1 text-center">
+                                            <div class="col-4"><small class="text-info" id="parts-sorted">0 Sorted</small></div>
+                                            <div class="col-4"><small class="text-success text-nowrap" id="parts-assembled">0 Assembled</small></div>
+                                            <div class="col-4"><small class="text-primary" id="parts-shipped">0 Shipped</small></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg col-md-4 col-6 mb-3">
+                            <div class="card border-dark h-100">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-th-large fa-2x text-dark mb-2"></i>
+                                    <h4 id="totalDetachedProducts" class="mb-1">0</h4>
+                                    <small class="text-muted">Detached Products</small>
+                                    <div class="mt-1">
+                                        <div class="row g-1 text-center">
+                                            <div class="col-6"><small class="text-muted" id="detachedproducts-pending">0 Pending</small></div>
+                                            <div class="col-6"><small class="text-primary" id="detachedproducts-shipped">0 Shipped</small></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg col-md-4 col-6 mb-3">
+                            <div class="card border-info h-100">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-tools fa-2x text-info mb-2"></i>
+                                    <h4 id="totalHardware" class="mb-1">0</h4>
+                                    <small class="text-muted">Hardware</small>
+                                    <div class="mt-1">
+                                        <div class="row g-1 text-center">
+                                            <div class="col-6"><small class="text-muted" id="hardware-pending">0 Pending</small></div>
+                                            <div class="col-6"><small class="text-warning" id="hardware-cut">0 Cut</small></div>
+                                        </div>
+                                        <div class="row g-1 text-center">
+                                            <div class="col-4"><small class="text-info" id="hardware-sorted">0 Sorted</small></div>
+                                            <div class="col-4"><small class="text-success text-nowrap" id="hardware-assembled">0 Assembled</small></div>
+                                            <div class="col-4"><small class="text-primary" id="hardware-shipped">0 Shipped</small></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg col-md-4 col-6 mb-3">
+                            <div class="card border-secondary h-100">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-cut fa-2x text-secondary mb-2"></i>
+                                    <h4 id="totalNestSheets" class="mb-1">0</h4>
+                                    <small class="text-muted">Nest Sheets</small>
+                                    <div class="mt-1">
+                                        <div class="row g-1 text-center">
+                                            <div class="col-6"><small class="text-success" id="nestsheets-processed">0 Processed</small></div>
+                                            <div class="col-6"><small class="text-warning" id="nestsheets-pending">0 Pending</small></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-    <!-- Controls Section -->
-    <div class="controls-section">
-        <div class="row g-3 align-items-end">
-            <div class="col-md-4">
-                <label for="searchInput" class="form-label">Search</label>
-                <div class="input-group">
-                    <span class="input-group-text">
-                        <i class="fas fa-search"></i>
-                    </span>
-                    <input type="text" id="searchInput" class="form-control" 
-                           placeholder="Search by product name, part name, or item ID...">
-                    <button type="button" id="clearSearchBtn" class="btn btn-outline-secondary">
-                        <i class="fas fa-times"></i>
+                <!-- Controls Section -->
+                <div class="mb-3">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-4">
+                            <label for="searchInput" class="form-label">Search</label>
+                            <div class="input-group">
+                                <span class="input-group-text">
+                                    <i class="fas fa-search"></i>
+                                </span>
+                                <input type="text" id="searchInput" class="form-control" 
+                                       placeholder="Search by product name, part name, or item ID...">
+                                <button type="button" id="clearSearchBtn" class="btn btn-outline-secondary">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <button type="button" id="expandAllBtn" class="btn btn-outline-primary me-2">
+                                <i class="fas fa-expand-alt me-1"></i>Expand All
+                            </button>
+                            <button type="button" id="collapseAllBtn" class="btn btn-outline-secondary">
+                                <i class="fas fa-compress-alt me-1"></i>Collapse All
+                            </button>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input type="checkbox" id="selectAllItems" class="form-check-input">
+                                <label for="selectAllItems" class="form-check-label">Select All</label>
+                            </div>
+                            <div id="selection-info" class="text-muted">
+                                <small><span id="selectedCount">0</span> items selected</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bulk Actions Section -->
+                <div class="mb-3" id="bulk-actions" style="display: none;">
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <div class="row g-3 align-items-center">
+                                <div class="col-md-3">
+                                    <label for="bulkStatusSelect" class="form-label">Bulk Status Change:</label>
+                                    <select id="bulkStatusSelect" class="form-select">
+                                        <option value="">Select Status</option>
+                                        <option value="Pending">Pending</option>
+                                        <option value="Cut">Cut</option>
+                                        <option value="Sorted">Sorted</option>
+                                        <option value="Assembled">Assembled</option>
+                                        <option value="Shipped">Shipped</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-check mt-4">
+                                        <input type="checkbox" id="bulkCascadeOption" class="form-check-input">
+                                        <label for="bulkCascadeOption" class="form-check-label">Cascade to Parts</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <button type="button" id="applyBulkChangesBtn" class="btn btn-warning mt-4" disabled>
+                                        <i class="fas fa-edit me-1"></i>Apply Changes
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tree View Container -->
+                <div class="tree-view" style="position: relative; min-height: 400px;">
+                    <div id="workOrderTree"></div>
+                    <div class="loading-overlay" id="loadingOverlay">
+                        <div class="text-center">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <div class="mt-2">Processing...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="d-flex justify-content-end mt-4">
+                    <button type="button" id="refreshDataBtn" class="btn btn-outline-primary">
+                        <i class="fas fa-sync me-2"></i>Refresh Data
                     </button>
                 </div>
             </div>
-            <div class="col-md-3">
-                <button type="button" id="expandAllBtn" class="btn btn-outline-primary me-2">
-                    <i class="fas fa-expand-alt me-1"></i>Expand All
-                </button>
-                <button type="button" id="collapseAllBtn" class="btn btn-outline-secondary">
-                    <i class="fas fa-compress-alt me-1"></i>Collapse All
-                </button>
-            </div>
-            <div class="col-md-2">
-                <div class="form-check">
-                    <input type="checkbox" id="selectAllItems" class="form-check-input">
-                    <label for="selectAllItems" class="form-check-label">Select All</label>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div id="selection-info" class="text-muted">
-                    <small><span id="selectedCount">0</span> items selected</small>
-                </div>
-            </div>
         </div>
     </div>
-
-    <!-- Bulk Actions Section -->
-    <div class="controls-section" id="bulk-actions" style="display: none;">
-        <div class="row g-3 align-items-center">
-            <div class="col-md-3">
-                <label for="bulkStatusSelect" class="form-label">Bulk Status Change:</label>
-                <select id="bulkStatusSelect" class="form-select">
-                    <option value="">Select Status</option>
-                    <option value="Pending">Pending</option>
-                    <option value="Cut">Cut</option>
-                    <option value="Sorted">Sorted</option>
-                    <option value="Assembled">Assembled</option>
-                    <option value="Shipped">Shipped</option>
-                </select>
-            </div>
-            <div class="col-md-3">
-                <div class="form-check mt-4">
-                    <input type="checkbox" id="bulkCascadeOption" class="form-check-input">
-                    <label for="bulkCascadeOption" class="form-check-label">Cascade to Parts</label>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <button type="button" id="applyBulkChangesBtn" class="btn btn-warning mt-4" disabled>
-                    <i class="fas fa-edit me-1"></i>Apply Changes
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Tree Container -->
-    <div class="tree-container">
-        <div id="workOrderTree"></div>
-        <div class="loading-overlay" id="loadingOverlay">
-            <div class="text-center">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-                <div class="mt-2">Processing...</div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Alert Container -->
-    <div class="alert-container" id="alertContainer"></div>
 </div>
+
+<!-- Alert Container -->
+<div class="alert-container" id="alertContainer"></div>
 
 @section Scripts {
     <script src="~/js/WorkOrderTreeView.js"></script>
     <script>
         let treeView;
         let selectedItems = new Set();
-        const workOrderId = '@Model';
+        const workOrderId = '@Model.WorkOrder.Id';
 
         $(document).ready(function() {
             if (!workOrderId) {
@@ -283,16 +359,12 @@
                 // Initialize the tree view
                 treeView = new WorkOrderTreeView('workOrderTree', {
                     mode: 'modify',
+                    apiUrl: '/api/WorkOrderTreeApi',
                     workOrderId: workOrderId,
-                    enableSelection: true,
-                    enableModification: true,
-                    enableBulkActions: true,
-                    onNodeSelected: handleNodeSelection,
-                    onStatusChanged: handleStatusChange
+                    onSelectionChange: handleSelectionChange,
+                    onStatusChange: handleStatusChange,
+                    onDataLoaded: handleDataLoaded
                 });
-
-                // Load work order data and update UI
-                await loadWorkOrderInfo();
 
                 // Setup additional event handlers
                 setupEventHandlers();
@@ -303,71 +375,103 @@
             }
         }
 
-        async function loadWorkOrderInfo() {
-            try {
-                const response = await fetch(`/api/workorder/${workOrderId}/summary`);
-                const result = await response.json();
-
-                if (result.success && result.workOrder) {
-                    updateWorkOrderHeader(result.workOrder);
-                }
-
-                // Load tree data to get statistics
-                const treeResponse = await fetch(`/api/workorder/${workOrderId}/tree`);
-                const treeResult = await treeResponse.json();
-
-                if (treeResult.success && treeResult.data) {
-                    updateStatistics(treeResult.data);
-                }
-            } catch (error) {
-                console.error('Error loading work order info:', error);
+        function handleDataLoaded(data) {
+            console.log('Tree data loaded:', data);
+            
+            // The WorkOrderTreeView component should provide the items directly
+            // If data is the API response, access data.Items; if it's already the items array, use it directly
+            let items = data;
+            if (data && data.Items) {
+                items = data.Items;
+            } else if (data && data.items) {
+                items = data.items;
+            }
+            
+            if (items && Array.isArray(items)) {
+                calculateAndUpdateStatistics(items);
             }
         }
 
-        function updateWorkOrderHeader(workOrder) {
-            document.getElementById('work-order-name').textContent = workOrder.name;
-            document.getElementById('work-order-id').textContent = workOrder.id;
-            document.getElementById('work-order-name-detail').textContent = workOrder.name;
-            document.getElementById('work-order-imported').textContent = new Date(workOrder.importedDate).toLocaleString();
-            
-            document.getElementById('work-order-header').style.display = 'block';
-        }
+        function calculateAndUpdateStatistics(items) {
+            const stats = {
+                products: { total: 0, pending: 0, cut: 0, sorted: 0, assembled: 0, shipped: 0 },
+                parts: { total: 0, pending: 0, cut: 0, sorted: 0, assembled: 0, shipped: 0 },
+                hardware: { total: 0, pending: 0, cut: 0, sorted: 0, assembled: 0, shipped: 0 },
+                detachedproducts: { total: 0, pending: 0, shipped: 0 },
+                nestsheets: { total: 0, processed: 0, pending: 0 }
+            };
 
-        function updateStatistics(data) {
-            // Products
-            const productsCount = data.productNodes.length;
-            const totalParts = data.productNodes.reduce((sum, pn) => sum + pn.parts.length, 0);
-            const totalSubassemblies = data.productNodes.reduce((sum, pn) => sum + pn.subassemblies.length, 0);
-            
-            document.getElementById('products-count').textContent = productsCount;
-            document.getElementById('products-details').textContent = `${totalParts} Parts • ${totalSubassemblies} Subassemblies`;
+            // Recursively count items by type and status
+            function countItems(items) {
+                items.forEach(item => {
+                    if (item.type === 'product') {
+                        stats.products.total++;
+                        if (item.status) {
+                            stats.products[item.status.toLowerCase()]++;
+                        }
+                    } else if (item.type === 'part') {
+                        stats.parts.total++;
+                        if (item.status) {
+                            stats.parts[item.status.toLowerCase()]++;
+                        }
+                    } else if (item.type === 'hardware') {
+                        stats.hardware.total++;
+                        if (item.status) {
+                            stats.hardware[item.status.toLowerCase()]++;
+                        }
+                    } else if (item.type === 'nestsheet') {
+                        stats.nestsheets.total++;
+                        if (item.status === 'Processed') {
+                            stats.nestsheets.processed++;
+                        } else {
+                            stats.nestsheets.pending++;
+                        }
+                    } else if (item.type === 'detached_product') {
+                        stats.detachedproducts.total++;
+                        if (item.status === 'Shipped') {
+                            stats.detachedproducts.shipped++;
+                        } else {
+                            stats.detachedproducts.pending++;
+                        }
+                    }
 
-            // Hardware
-            const hardwareCount = data.workOrder.hardware.length;
-            const hardwareQty = data.workOrder.hardware.reduce((sum, h) => sum + h.qty, 0);
-            
-            document.getElementById('hardware-count').textContent = hardwareCount;
-            document.getElementById('hardware-details').textContent = `Total Qty: ${hardwareQty}`;
+                    if (item.children && item.children.length > 0) {
+                        countItems(item.children);
+                    }
+                });
+            }
 
-            // Detached Products
-            const detachedCount = data.workOrder.detachedProducts.length;
-            const detachedQty = data.workOrder.detachedProducts.reduce((sum, d) => sum + d.qty, 0);
-            
-            document.getElementById('detached-count').textContent = detachedCount;
-            document.getElementById('detached-details').textContent = `Total Qty: ${detachedQty}`;
+            countItems(items);
 
-            // Nest Sheets
-            const nestSummary = data.nestSheetSummary;
-            document.getElementById('nestsheets-count').textContent = nestSummary.totalNestSheets;
-            document.getElementById('nestsheets-processed').textContent = `${nestSummary.processedNestSheets} Processed`;
-            document.getElementById('nestsheets-pending').textContent = `${nestSummary.pendingNestSheets} Pending`;
-            document.getElementById('nestsheets-parts').textContent = `${nestSummary.totalPartsOnNestSheets} Parts Total`;
+            // Update UI
+            document.getElementById('totalProducts').textContent = stats.products.total;
+            document.getElementById('products-pending').textContent = `${stats.products.pending} Pending`;
+            document.getElementById('products-cut').textContent = `${stats.products.cut} Cut`;
+            document.getElementById('products-sorted').textContent = `${stats.products.sorted} Sorted`;
+            document.getElementById('products-assembled').textContent = `${stats.products.assembled} Assembled`;
+            document.getElementById('products-shipped').textContent = `${stats.products.shipped} Shipped`;
 
-            // Total items
-            const totalItems = totalParts + totalSubassemblies + hardwareCount + detachedCount;
-            document.getElementById('work-order-total-items').textContent = `${totalItems} items`;
+            document.getElementById('totalParts').textContent = stats.parts.total;
+            document.getElementById('parts-pending').textContent = `${stats.parts.pending} Pending`;
+            document.getElementById('parts-cut').textContent = `${stats.parts.cut} Cut`;
+            document.getElementById('parts-sorted').textContent = `${stats.parts.sorted} Sorted`;
+            document.getElementById('parts-assembled').textContent = `${stats.parts.assembled} Assembled`;
+            document.getElementById('parts-shipped').textContent = `${stats.parts.shipped} Shipped`;
 
-            document.getElementById('stats-grid').style.display = 'grid';
+            document.getElementById('totalHardware').textContent = stats.hardware.total;
+            document.getElementById('hardware-pending').textContent = `${stats.hardware.pending} Pending`;
+            document.getElementById('hardware-cut').textContent = `${stats.hardware.cut} Cut`;
+            document.getElementById('hardware-sorted').textContent = `${stats.hardware.sorted} Sorted`;
+            document.getElementById('hardware-assembled').textContent = `${stats.hardware.assembled} Assembled`;
+            document.getElementById('hardware-shipped').textContent = `${stats.hardware.shipped} Shipped`;
+
+            document.getElementById('totalDetachedProducts').textContent = stats.detachedproducts.total;
+            document.getElementById('detachedproducts-pending').textContent = `${stats.detachedproducts.pending} Pending`;
+            document.getElementById('detachedproducts-shipped').textContent = `${stats.detachedproducts.shipped} Shipped`;
+
+            document.getElementById('totalNestSheets').textContent = stats.nestsheets.total;
+            document.getElementById('nestsheets-processed').textContent = `${stats.nestsheets.processed} Processed`;
+            document.getElementById('nestsheets-pending').textContent = `${stats.nestsheets.pending} Pending`;
         }
 
         function setupEventHandlers() {
@@ -406,7 +510,7 @@
                     if (isChecked) {
                         treeView.selectAll();
                     } else {
-                        treeView.selectNone();
+                        treeView.clearAll();
                     }
                 }
             });
@@ -414,24 +518,63 @@
             // Bulk actions
             $('#bulkStatusSelect').change(updateBulkActionsState);
             $('#applyBulkChangesBtn').click(applyBulkStatusChanges);
+
+            // Refresh button
+            $('#refreshDataBtn').click(function() {
+                if (treeView && treeView.refreshData) {
+                    treeView.refreshData();
+                }
+            });
         }
 
-        function handleNodeSelection(event) {
-            if (event.isSelected) {
-                selectedItems.add(event.nodeId);
-            } else {
-                selectedItems.delete(event.nodeId);
-            }
-
+        function handleSelectionChange(summary) {
+            selectedItems = new Set(summary.selectedIds || []);
             updateSelectionDisplay();
             updateBulkActionsState();
         }
 
-        function handleStatusChange(event) {
-            if (event.success) {
-                showSuccess(event.message || 'Status updated successfully');
-            } else {
-                showError(event.message || 'Failed to update status');
+        async function handleStatusChange(nodeId, newStatus, itemType) {
+            try {
+                console.log(`Status change: ${nodeId} -> ${newStatus} (${itemType})`);
+                
+                // Call the existing UpdateStatus endpoint
+                const response = await fetch('/Admin/UpdateStatus', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: new URLSearchParams({
+                        itemId: nodeId,
+                        itemType: itemType,
+                        newStatus: newStatus,
+                        workOrderId: workOrderId,
+                        cascadeToChildren: false
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showSuccess(`${itemType} status updated to ${newStatus}`);
+                    // Refresh statistics after status change
+                    setTimeout(() => {
+                        if (treeView && treeView.refreshData) {
+                            treeView.refreshData();
+                        }
+                    }, 500);
+                } else {
+                    showError(`Failed to update status: ${result.message}`);
+                    // Refresh tree to revert changes
+                    if (treeView && treeView.refreshData) {
+                        treeView.refreshData();
+                    }
+                }
+            } catch (error) {
+                console.error('Error updating status:', error);
+                showError('Error updating status');
+                if (treeView && treeView.refreshData) {
+                    treeView.refreshData();
+                }
             }
         }
 
@@ -476,20 +619,19 @@
             try {
                 showLoading(true);
 
-                // Build updates array by getting item info from tree
-                const updates = [];
-                selectedItemsArray.forEach(nodeId => {
-                    const element = document.querySelector(`[data-item-id="${nodeId}"]`);
-                    if (element) {
-                        const itemType = element.dataset.type;
-                        updates.push({
-                            ItemId: nodeId,
-                            ItemType: itemType,
-                            NewStatus: newStatus,
-                            CascadeToChildren: cascadeToChildren
-                        });
-                    }
-                });
+                // Get selected items from tree view
+                const selectedItemsData = treeView?.getSelectedItems();
+                if (!selectedItemsData || selectedItemsData.length === 0) {
+                    showError('No items selected');
+                    return;
+                }
+                
+                const updates = selectedItemsData.map(item => ({
+                    ItemId: item.id,
+                    ItemType: item.type,
+                    NewStatus: newStatus,
+                    CascadeToChildren: cascadeToChildren
+                }));
 
                 const response = await fetch('/Admin/BulkUpdateStatus', {
                     method: 'POST',
@@ -513,8 +655,8 @@
                     
                     // Reload tree data
                     setTimeout(() => {
-                        if (treeView) {
-                            treeView.loadWorkOrderData();
+                        if (treeView && treeView.refreshData) {
+                            treeView.refreshData();
                         }
                     }, 1500);
                 } else {

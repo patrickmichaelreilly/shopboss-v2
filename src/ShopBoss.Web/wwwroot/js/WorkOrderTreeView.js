@@ -1,7 +1,6 @@
 /**
- * Unified Work Order Tree View Component
- * Supports multiple modes: import, modify, view
- * Based on successful Import interface pattern with modification capabilities
+ * WorkOrderTreeView - Reusable tree component for hierarchical work order data
+ * Supports both Import Preview mode and Modify Status mode
  */
 class WorkOrderTreeView {
     constructor(containerId, options = {}) {
@@ -10,613 +9,555 @@ class WorkOrderTreeView {
             throw new Error(`Container element with ID '${containerId}' not found`);
         }
 
-        // Configuration options
-        this.options = {
-            mode: options.mode || 'view', // 'import', 'modify', 'view'
-            workOrderId: options.workOrderId || null,
-            enableSelection: options.enableSelection !== false, // Default true
-            enableModification: options.mode === 'modify',
-            enableBulkActions: options.enableBulkActions !== false,
-            pageSize: options.pageSize || 100,
-            ...options
-        };
-
+        // Configuration
+        this.mode = options.mode || 'import'; // 'import' or 'modify'
+        this.apiUrl = options.apiUrl || null;
+        this.workOrderId = options.workOrderId || null;
+        this.onSelectionChange = options.onSelectionChange || (() => {});
+        this.onStatusChange = options.onStatusChange || (() => {});
+        this.onDataLoaded = options.onDataLoaded || (() => {});
+        
         // State management
+        this.data = null;
         this.selectionState = new Map();
-        this.expandedNodes = new Set();
-        this.loadedNodes = new Set();
-        this.statusOptions = ['Pending', 'Cut', 'Sorted', 'Assembled', 'Shipped'];
-
-        // Event handlers
-        this.eventHandlers = {
-            nodeSelected: options.onNodeSelected || (() => {}),
-            statusChanged: options.onStatusChanged || (() => {}),
-            bulkAction: options.onBulkAction || (() => {})
+        this.selectionCounts = {
+            products: 0,
+            parts: 0,
+            subassemblies: 0,
+            hardware: 0,
+            nestSheets: 0,
+            detachedProducts: 0
         };
 
-        this.initialize();
+        // Initialize
+        this.init();
     }
 
-    async initialize() {
-        this.setupEventListeners();
-        
-        if (this.options.workOrderId) {
-            await this.loadWorkOrderData();
+    init() {
+        this.createTreeContainer();
+        if (this.mode === 'modify' && this.apiUrl && this.workOrderId) {
+            this.loadData();
         }
     }
 
-    setupEventListeners() {
-        // Tree toggle events
-        this.container.addEventListener('click', (e) => {
-            if (e.target.closest('.tree-toggle')) {
-                e.preventDefault();
-                this.handleTreeToggle(e.target.closest('.tree-toggle'));
-            }
-        });
+    createTreeContainer() {
+        this.container.innerHTML = `
+            <div class="tree-view-container">
+                <div class="tree-view-controls mb-3 d-flex justify-content-between align-items-center">
+                    <div class="tree-controls">
+                        ${this.mode === 'import' ? this.createImportControls() : this.createModifyControls()}
+                    </div>
+                    <div class="tree-search">
+                        <input type="text" id="treeSearch" class="form-control form-control-sm" 
+                               placeholder="Search items..." style="width: 200px;">
+                    </div>
+                </div>
+                <div class="tree-view-content">
+                    <div id="treeViewContent" class="tree-view">
+                        <div class="text-center py-4">
+                            <i class="fas fa-spinner fa-spin"></i>
+                            <p class="mt-2 text-muted">Loading tree data...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
 
-        // Selection events
-        if (this.options.enableSelection) {
-            this.container.addEventListener('change', (e) => {
-                if (e.target.classList.contains('tree-checkbox')) {
-                    this.handleNodeSelection(e.target);
-                }
-            });
+        this.bindEvents();
+    }
+
+    createImportControls() {
+        return `
+            <button type="button" id="selectAllProducts" class="btn btn-outline-success btn-sm">
+                <i class="fas fa-check-double me-1"></i>Select All Products
+            </button>
+            <button type="button" id="selectAllNestSheets" class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-check-double me-1"></i>Select All Nest Sheets
+            </button>
+            <button type="button" id="clearAll" class="btn btn-outline-danger btn-sm">
+                <i class="fas fa-times me-1"></i>Clear All
+            </button>
+            <button type="button" id="expandAll" class="btn btn-outline-primary btn-sm">
+                <i class="fas fa-expand-alt me-1"></i>Expand All
+            </button>
+            <button type="button" id="collapseAll" class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-compress-alt me-1"></i>Collapse All
+            </button>
+        `;
+    }
+
+    createModifyControls() {
+        return `
+            <button type="button" id="expandAll" class="btn btn-outline-primary btn-sm">
+                <i class="fas fa-expand-alt me-1"></i>Expand All
+            </button>
+            <button type="button" id="collapseAll" class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-compress-alt me-1"></i>Collapse All
+            </button>
+            <button type="button" id="refreshTree" class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-refresh me-1"></i>Refresh
+            </button>
+        `;
+    }
+
+    bindEvents() {
+        // Control buttons
+        const selectAllProducts = this.container.querySelector('#selectAllProducts');
+        const selectAllNestSheets = this.container.querySelector('#selectAllNestSheets');
+        const clearAll = this.container.querySelector('#clearAll');
+        const expandAll = this.container.querySelector('#expandAll');
+        const collapseAll = this.container.querySelector('#collapseAll');
+        const refreshTree = this.container.querySelector('#refreshTree');
+        const searchInput = this.container.querySelector('#treeSearch');
+
+        if (selectAllProducts) {
+            selectAllProducts.addEventListener('click', () => this.selectAllProducts());
         }
-
-        // Status change events
-        if (this.options.enableModification) {
-            this.container.addEventListener('change', (e) => {
-                if (e.target.classList.contains('status-select')) {
-                    this.handleStatusChange(e.target);
-                }
-            });
+        if (selectAllNestSheets) {
+            selectAllNestSheets.addEventListener('click', () => this.selectAllNestSheets());
+        }
+        if (clearAll) {
+            clearAll.addEventListener('click', () => this.clearAllSelections());
+        }
+        if (expandAll) {
+            expandAll.addEventListener('click', () => this.expandAll());
+        }
+        if (collapseAll) {
+            collapseAll.addEventListener('click', () => this.collapseAll());
+        }
+        if (refreshTree) {
+            refreshTree.addEventListener('click', () => this.loadData());
+        }
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => this.filterTree(e.target.value));
         }
     }
 
-    async loadWorkOrderData(page = 0) {
-        try {
-            this.showLoading(true);
-            
-            const response = await fetch(`/api/workorder/${this.options.workOrderId}/tree?page=${page}&size=${this.options.pageSize}`);
-            if (!response.ok) {
-                throw new Error('Failed to load work order data');
-            }
-
-            const data = await response.json();
-            if (data.success) {
-                this.renderTree(data.data);
-            } else {
-                throw new Error(data.message || 'Unknown error loading data');
-            }
-        } catch (error) {
-            console.error('Error loading work order data:', error);
-            this.showError('Failed to load work order data: ' + error.message);
-        } finally {
-            this.showLoading(false);
-        }
-    }
-
-    renderTree(data) {
-        this.container.innerHTML = '';
-        
-        if (!data || !data.workOrder) {
-            this.container.innerHTML = '<div class="text-muted p-3">No work order data available</div>';
+    async loadData() {
+        if (!this.apiUrl || !this.workOrderId) {
+            console.error('API URL and Work Order ID required for data loading');
             return;
         }
 
-        // Create tree structure
-        const treeContent = document.createElement('div');
-        treeContent.className = 'tree-content';
+        try {
+            const includeStatus = this.mode === 'modify';
+            const response = await fetch(`${this.apiUrl}/${this.workOrderId}?includeStatus=${includeStatus}`);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
 
-        // Work order header
-        const workOrderNode = this.createWorkOrderNode(data.workOrder);
-        treeContent.appendChild(workOrderNode);
-
-        // Create work order children container
-        const workOrderChildren = this.createNodesContainer('work-order-children');
-
-        // Products section
-        if (data.productNodes && data.productNodes.length > 0) {
-            const productsHeader = this.createSectionHeader('Products', '📦', data.productNodes.length);
-            workOrderChildren.appendChild(productsHeader);
-
-            const productsContainer = this.createNodesContainer('products-container');
-            data.productNodes.forEach(productNode => {
-                const productElement = this.createProductNode(productNode);
-                productsContainer.appendChild(productElement);
-            });
-            workOrderChildren.appendChild(productsContainer);
+            this.data = await response.json();
+            this.renderTree();
+            this.onDataLoaded(this.data);
+        } catch (error) {
+            console.error('Error loading tree data:', error);
+            this.showError('Failed to load tree data: ' + error.message);
         }
-
-        // Hardware section
-        if (data.workOrder.hardware && data.workOrder.hardware.length > 0) {
-            const hardwareHeader = this.createSectionHeader('Hardware', '🔧', data.workOrder.hardware.length);
-            workOrderChildren.appendChild(hardwareHeader);
-
-            const hardwareContainer = this.createNodesContainer('hardware-container');
-            data.workOrder.hardware.forEach(hardware => {
-                const hardwareElement = this.createHardwareNode(hardware);
-                hardwareContainer.appendChild(hardwareElement);
-            });
-            workOrderChildren.appendChild(hardwareContainer);
-        }
-
-        // Detached products section
-        if (data.workOrder.detachedProducts && data.workOrder.detachedProducts.length > 0) {
-            const detachedHeader = this.createSectionHeader('Detached Products', '📄', data.workOrder.detachedProducts.length);
-            workOrderChildren.appendChild(detachedHeader);
-
-            const detachedContainer = this.createNodesContainer('detached-products-container');
-            data.workOrder.detachedProducts.forEach(detached => {
-                const detachedElement = this.createDetachedProductNode(detached);
-                detachedContainer.appendChild(detachedElement);
-            });
-            workOrderChildren.appendChild(detachedContainer);
-        }
-
-        // Append the work order children to the tree
-        treeContent.appendChild(workOrderChildren);
-
-        this.container.appendChild(treeContent);
-        this.initializeNodeStates();
     }
 
-    createWorkOrderNode(workOrder) {
+    setData(data) {
+        this.data = data;
+        this.renderTree();
+    }
+
+    renderTree() {
+        const treeContent = this.container.querySelector('#treeViewContent');
+        if (!this.data || !this.data.items) {
+            treeContent.innerHTML = '<p class="text-muted">No data available.</p>';
+            return;
+        }
+
+        treeContent.innerHTML = '';
+        this.selectionState.clear();
+
+        this.data.items.forEach(item => {
+            const itemNode = this.createTreeNode(item, 0);
+            treeContent.appendChild(itemNode);
+        });
+
+        this.updateSelectionCounts();
+        this.onSelectionChange(this.getSelectionSummary());
+    }
+
+    createTreeNode(item, level = 0) {
         const node = document.createElement('div');
-        node.className = 'tree-node level-0 work-order-node';
-        node.dataset.type = 'work-order';
-        node.dataset.itemId = workOrder.id;
+        node.className = `tree-node level-${level}`;
+        node.dataset.itemId = item.id;
+        node.dataset.itemType = item.type;
+
+        const hasChildren = item.children && item.children.length > 0;
+        const nodeId = item.id;
+
+        // Determine if this should be expanded by default
+        // Top-level categories (level 0 and type "category") should default to expanded
+        const shouldDefaultExpand = level === 0 && item.type === 'category';
+
+        // Initialize selection state
+        if (!this.selectionState.has(nodeId)) {
+            this.selectionState.set(nodeId, {
+                selected: this.mode === 'import', // Default selected for import mode
+                type: item.type,
+                itemData: item,
+                parentId: null,
+                childIds: []
+            });
+        }
+
+        const nodeState = this.selectionState.get(nodeId);
+        const icon = this.getItemIcon(item.type);
 
         node.innerHTML = `
-            <div class="tree-item-content">
-                <span class="tree-toggle" data-target="work-order-children">
-                    <i class="fas fa-chevron-down"></i>
-                </span>
-                <i class="fas fa-briefcase item-type-icon text-primary"></i>
-                <div class="item-info">
-                    <div class="item-name">${workOrder.name}</div>
-                    <div class="item-details">
-                        Work Order ${workOrder.id} • Imported ${new Date(workOrder.importedDate).toLocaleDateString()}
-                    </div>
+            <div class="d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center">
+                    ${hasChildren ? 
+                        `<span class="tree-toggle me-2" data-expanded="${shouldDefaultExpand}" style="width: 16px; display: inline-flex; align-items: center; justify-content: center; min-width: 16px; height: 16px; cursor: pointer; user-select: none; color: #6c757d;">
+                            <i class="fas fa-chevron-${shouldDefaultExpand ? 'down' : 'right'}" style="font-size: 12px;"></i>
+                        </span>` : 
+                        '<span class="me-2" style="width: 16px; display: inline-block;"></span>'
+                    }
+                    ${this.mode === 'import' ? 
+                        `<input type="checkbox" class="tree-checkbox form-check-input me-2" ${nodeState.selected ? 'checked' : ''} data-node-id="${nodeId}">` :
+                        ''
+                    }
+                    <span class="me-2">${icon}</span>
+                    <span>${this.formatItemName(item)}</span>
                 </div>
-                ${this.createNodeControls('work-order', workOrder)}
+                ${this.mode === 'modify' && item.type !== 'category' ? 
+                    `<div class="status-dropdown-container">
+                        ${this.createStatusDropdown(item)}
+                    </div>` :
+                    ''
+                }
             </div>
         `;
 
-        return node;
-    }
+        // Add children container
+        if (hasChildren) {
+            const childrenContainer = document.createElement('div');
+            childrenContainer.className = 'tree-content';
+            childrenContainer.style.display = shouldDefaultExpand ? 'block' : 'none';
 
-    createSectionHeader(title, icon, count) {
-        const header = document.createElement('div');
-        header.className = 'tree-node level-1 section-header';
-        header.dataset.type = 'section-header';
-        header.dataset.itemId = `${title.toLowerCase()}-header`;
+            const childIds = [];
+            item.children.forEach(child => {
+                const childNode = this.createTreeNode(child, level + 1);
+                childrenContainer.appendChild(childNode);
+                childIds.push(child.id);
 
-        const targetId = title === 'Detached Products' ? 'detached-products-container' : `${title.toLowerCase()}-container`;
-        
-        header.innerHTML = `
-            <div class="tree-item-content">
-                <span class="tree-toggle" data-target="${targetId}">
-                    <i class="fas fa-chevron-down"></i>
-                </span>
-                <i class="${icon} item-type-icon text-secondary"></i>
-                <div class="item-info">
-                    <div class="item-name">${title}</div>
-                    <div class="item-details">${count} items</div>
-                </div>
-                ${this.createNodeControls('section-header', { title, count })}
-            </div>
-        `;
-
-        return header;
-    }
-
-    createProductNode(productNode) {
-        const product = productNode.product;
-        const node = document.createElement('div');
-        node.className = 'tree-node level-2 product-node';
-        node.dataset.type = 'product';
-        node.dataset.itemId = product.id;
-
-        const effectiveStatus = productNode.effectiveStatus || 'Pending';
-        
-        node.innerHTML = `
-            <div class="tree-item-content">
-                <span class="tree-toggle" data-target="product-${product.id}">
-                    <i class="fas fa-chevron-down"></i>
-                </span>
-                <i class="fas fa-cube item-type-icon text-primary"></i>
-                <div class="item-info">
-                    <div class="item-name">${product.name}</div>
-                    <div class="item-details">
-                        Product #${product.productNumber} • 
-                        ${productNode.parts ? productNode.parts.length : 0} parts • 
-                        ${productNode.subassemblies ? productNode.subassemblies.length : 0} subassemblies
-                    </div>
-                    <div class="product-status-summary">
-                        Effective Status: <span class="badge status-${effectiveStatus.toLowerCase()}">${effectiveStatus}</span>
-                    </div>
-                </div>
-                ${this.createNodeControls('product', product, effectiveStatus)}
-            </div>
-            <div id="product-${product.id}" class="tree-children">
-                ${this.createProductChildren(productNode)}
-            </div>
-        `;
-
-        return node;
-    }
-
-    createProductChildren(productNode) {
-        let childrenHtml = '';
-
-        // Direct parts
-        if (productNode.parts && productNode.parts.length > 0) {
-            productNode.parts.forEach(part => {
-                childrenHtml += this.createPartNodeHtml(part, 3);
+                // Set parent relationship
+                const childState = this.selectionState.get(child.id);
+                if (childState) {
+                    childState.parentId = nodeId;
+                }
             });
+
+            // Update parent with child IDs
+            nodeState.childIds = childIds;
+            node.appendChild(childrenContainer);
+
+            // Bind toggle event
+            const toggle = node.querySelector('.tree-toggle');
+            if (toggle) {
+                toggle.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.toggleNode(toggle, childrenContainer);
+                });
+            }
         }
 
-        // Subassemblies
-        if (productNode.subassemblies && productNode.subassemblies.length > 0) {
-            productNode.subassemblies.forEach(subassembly => {
-                childrenHtml += this.createSubassemblyNodeHtml(subassembly, 3);
-            });
-        }
-
-        return childrenHtml;
-    }
-
-    createPartNodeHtml(part, level) {
-        return `
-            <div class="tree-node level-${level} part-node" data-type="part" data-item-id="${part.id}">
-                <div class="tree-item-content">
-                    <span class="tree-toggle"></span>
-                    <i class="fas fa-puzzle-piece item-type-icon text-success"></i>
-                    <div class="item-info">
-                        <div class="item-name">${part.name}</div>
-                        <div class="item-details">
-                            Qty: ${part.qty} • ${part.length}mm × ${part.width}mm × ${part.thickness}mm • ${part.material}
-                        </div>
-                    </div>
-                    ${this.createNodeControls('part', part, part.status)}
-                </div>
-            </div>
-        `;
-    }
-
-    createSubassemblyNodeHtml(subassembly, level) {
-        let subassemblyHtml = `
-            <div class="tree-node level-${level}" data-type="subassembly" data-item-id="${subassembly.id}">
-                <div class="tree-item-content">
-                    <span class="tree-toggle" data-target="sub-${subassembly.id}">
-                        <i class="fas fa-chevron-down"></i>
-                    </span>
-                    <i class="fas fa-layer-group item-type-icon text-info"></i>
-                    <div class="item-info">
-                        <div class="item-name">${subassembly.name}</div>
-                        <div class="item-details">
-                            Subassembly • Qty: ${subassembly.qty} • ${subassembly.parts ? subassembly.parts.length : 0} parts
-                        </div>
-                    </div>
-                    ${this.createNodeControls('subassembly', subassembly)}
-                </div>
-                <div id="sub-${subassembly.id}" class="tree-children">
-        `;
-
-        // Subassembly parts
-        if (subassembly.parts && subassembly.parts.length > 0) {
-            subassembly.parts.forEach(part => {
-                subassemblyHtml += this.createPartNodeHtml(part, level + 1);
-            });
-        }
-
-        subassemblyHtml += `
-                </div>
-            </div>
-        `;
-
-        return subassemblyHtml;
-    }
-
-    createHardwareNode(hardware) {
-        const node = document.createElement('div');
-        node.className = 'tree-node level-2 hardware-node';
-        node.dataset.type = 'hardware';
-        node.dataset.itemId = hardware.id;
-
-        const status = hardware.isShipped ? 'Shipped' : 'Pending';
-
-        node.innerHTML = `
-            <div class="tree-item-content">
-                <span class="tree-toggle"></span>
-                <i class="fas fa-cog item-type-icon text-warning"></i>
-                <div class="item-info">
-                    <div class="item-name">${hardware.name}</div>
-                    <div class="item-details">Qty: ${hardware.qty}</div>
-                </div>
-                ${this.createNodeControls('hardware', hardware, status)}
-            </div>
-        `;
-
-        return node;
-    }
-
-    createDetachedProductNode(detached) {
-        const node = document.createElement('div');
-        node.className = 'tree-node level-2 detached-node';
-        node.dataset.type = 'detachedproduct';
-        node.dataset.itemId = detached.id;
-
-        const status = detached.isShipped ? 'Shipped' : 'Pending';
-
-        node.innerHTML = `
-            <div class="tree-item-content">
-                <span class="tree-toggle"></span>
-                <i class="fas fa-box-open item-type-icon text-secondary"></i>
-                <div class="item-info">
-                    <div class="item-name">${detached.name}</div>
-                    <div class="item-details">
-                        Product #${detached.productNumber} • Qty: ${detached.qty} • 
-                        ${detached.length}mm × ${detached.width}mm × ${detached.thickness}mm
-                    </div>
-                </div>
-                ${this.createNodeControls('detachedproduct', detached, status)}
-            </div>
-        `;
-
-        return node;
-    }
-
-    createNodeControls(type, item, status = null) {
-        let controls = '';
-
-        // Selection checkbox
-        if (this.options.enableSelection) {
-            controls += `
-                <input type="checkbox" class="tree-checkbox form-check-input" 
-                       value="${item.id}" data-item-type="${type}">
-            `;
-        }
-
-        // Status controls for modification mode
-        if (this.options.enableModification && status !== null) {
-            const statusOptions = type === 'hardware' || type === 'detachedproduct' 
-                ? ['Pending', 'Shipped']
-                : this.statusOptions;
-
-            controls += `
-                <div class="status-controls">
-                    <span class="badge status-${status.toLowerCase()} me-2">${status}</span>
-                    <select class="form-select status-select" data-item-id="${item.id}" data-item-type="${type}">
-                        ${statusOptions.map(opt => `
-                            <option value="${opt}" ${opt === status ? 'selected' : ''}>${opt}</option>
-                        `).join('')}
-                    </select>
-                    ${type === 'product' ? `
-                        <div class="form-check cascade-option">
-                            <input type="checkbox" class="form-check-input cascade-checkbox" 
-                                   id="cascade-${item.id}" checked>
-                            <label class="form-check-label" for="cascade-${item.id}">
-                                <small>Cascade</small>
-                            </label>
-                        </div>
-                    ` : ''}
-                </div>
-            `;
-        }
-
-        return controls ? `<div class="node-controls">${controls}</div>` : '';
-    }
-
-    createNodesContainer(id) {
-        const container = document.createElement('div');
-        container.id = id;
-        container.className = 'tree-children';
-        container.style.display = 'block';
-        return container;
-    }
-
-    handleTreeToggle(toggleElement) {
-        const targetId = toggleElement.dataset.target;
-        if (!targetId) return;
-
-        const targetElement = document.getElementById(targetId);
-        if (!targetElement) return;
-
-        const icon = toggleElement.querySelector('i');
-        const isExpanded = targetElement.style.display !== 'none';
-
-        if (isExpanded) {
-            targetElement.style.display = 'none';
-            icon.className = 'fas fa-chevron-right';
-            this.expandedNodes.delete(targetId);
+        // Bind selection events
+        if (this.mode === 'import') {
+            const checkbox = node.querySelector('.tree-checkbox');
+            if (checkbox) {
+                checkbox.addEventListener('change', (e) => {
+                    e.stopPropagation();
+                    this.handleNodeSelection(nodeId, checkbox.checked);
+                });
+            }
         } else {
-            targetElement.style.display = 'block';
-            icon.className = 'fas fa-chevron-down';
-            this.expandedNodes.add(targetId);
+            const statusSelect = node.querySelector('.status-dropdown');
+            if (statusSelect) {
+                statusSelect.addEventListener('change', (e) => {
+                    this.handleStatusChange(nodeId, e.target.value);
+                });
+            }
         }
+
+        return node;
     }
 
-    handleNodeSelection(checkbox) {
-        const nodeId = checkbox.value;
-        const itemType = checkbox.dataset.itemType;
-        const isSelected = checkbox.checked;
+    createStatusDropdown(item) {
+        const statuses = ['Pending', 'Cut', 'Sorted', 'Assembled', 'Shipped'];
+        const currentStatus = item.status || 'Pending';
+        
+        return `
+            <select class="status-dropdown form-select form-select-sm" style="width: auto; min-width: 100px;" data-node-id="${item.id}">
+                ${statuses.map(status => 
+                    `<option value="${status}" ${status === currentStatus ? 'selected' : ''}>${status}</option>`
+                ).join('')}
+            </select>
+        `;
+    }
 
-        // Update selection state
-        this.updateSelectionState(nodeId, itemType, isSelected);
+    getItemIcon(type) {
+        const icons = {
+            'product': '🚪',
+            'subassembly': '📁',
+            'part': '📄',
+            'hardware': '🔧',
+            'nestsheet': '📋',
+            'detached': '📄',
+            'category': '📂'
+        };
+        return icons[type] || '📄';
+    }
 
-        // Fire event
-        this.eventHandlers.nodeSelected({
-            nodeId,
-            itemType,
-            isSelected,
-            selectionState: this.getSelectionSummary()
+    formatItemName(item) {
+        let name = item.name;
+        if (item.quantity && item.quantity > 1) {
+            name += ` - Qty. ${item.quantity}`;
+        }
+        return name;
+    }
+
+    toggleNode(toggle, content) {
+        const isExpanded = toggle.dataset.expanded === 'true';
+        toggle.dataset.expanded = !isExpanded;
+        
+        const icon = toggle.querySelector('i');
+        if (icon) {
+            icon.className = `fas fa-chevron-${!isExpanded ? 'down' : 'right'}`;
+        }
+        
+        content.style.display = !isExpanded ? 'block' : 'none';
+    }
+
+    handleNodeSelection(nodeId, isSelected) {
+        if (this.mode !== 'import') return;
+
+        const nodeState = this.selectionState.get(nodeId);
+        if (!nodeState) return;
+
+        nodeState.selected = isSelected;
+
+        if (isSelected) {
+            this.selectAllChildren(nodeId);
+        } else {
+            this.deselectAllChildren(nodeId);
+        }
+
+        this.updateParentState(nodeState.parentId);
+        this.updateNodeVisualState(nodeId);
+        this.updateSelectionCounts();
+        this.onSelectionChange(this.getSelectionSummary());
+    }
+
+    handleStatusChange(nodeId, newStatus) {
+        if (this.mode !== 'modify') return;
+        
+        this.onStatusChange(nodeId, newStatus);
+    }
+
+    selectAllChildren(parentId) {
+        const parentState = this.selectionState.get(parentId);
+        if (!parentState) return;
+
+        parentState.childIds.forEach(childId => {
+            const childState = this.selectionState.get(childId);
+            if (childState && !childState.selected) {
+                childState.selected = true;
+                this.updateNodeVisualState(childId);
+                this.selectAllChildren(childId);
+            }
         });
     }
 
-    async handleStatusChange(selectElement) {
-        const itemId = selectElement.dataset.itemId;
-        const itemType = selectElement.dataset.itemType;
-        const newStatus = selectElement.value;
-        const cascadeElement = selectElement.closest('.tree-node').querySelector('.cascade-checkbox');
-        const cascadeToChildren = cascadeElement ? cascadeElement.checked : false;
+    deselectAllChildren(parentId) {
+        const parentState = this.selectionState.get(parentId);
+        if (!parentState) return;
 
-        try {
-            // Show loading state
-            selectElement.disabled = true;
-
-            // Call status update API
-            const response = await fetch('/Admin/UpdateStatus', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: new URLSearchParams({
-                    itemId,
-                    itemType,
-                    newStatus,
-                    cascadeToChildren,
-                    workOrderId: this.options.workOrderId
-                })
-            });
-
-            const result = await response.json();
-
-            if (result.success) {
-                // Update UI to reflect changes
-                this.updateStatusBadge(itemId, itemType, newStatus);
-                if (cascadeToChildren && itemType === 'product') {
-                    this.updateChildStatusBadges(itemId, newStatus);
-                }
-
-                // Fire event
-                this.eventHandlers.statusChanged({
-                    itemId,
-                    itemType,
-                    newStatus,
-                    cascadeToChildren,
-                    success: true,
-                    message: result.message
-                });
-            } else {
-                // Revert selection on failure
-                this.revertStatusSelect(itemId, itemType);
-                
-                this.eventHandlers.statusChanged({
-                    itemId,
-                    itemType,
-                    newStatus,
-                    success: false,
-                    message: result.message
-                });
+        parentState.childIds.forEach(childId => {
+            const childState = this.selectionState.get(childId);
+            if (childState && childState.selected) {
+                childState.selected = false;
+                this.updateNodeVisualState(childId);
+                this.deselectAllChildren(childId);
             }
-        } catch (error) {
-            console.error('Error updating status:', error);
-            this.revertStatusSelect(itemId, itemType);
-            
-            this.eventHandlers.statusChanged({
-                itemId,
-                itemType,
-                newStatus,
-                success: false,
-                message: 'Network error occurred'
-            });
-        } finally {
-            selectElement.disabled = false;
+        });
+    }
+
+    updateParentState(parentId) {
+        if (!parentId) return;
+
+        const parentState = this.selectionState.get(parentId);
+        if (!parentState) return;
+
+        const selectedChildren = parentState.childIds.filter(childId => {
+            const childState = this.selectionState.get(childId);
+            return childState && childState.selected;
+        });
+
+        const allSelected = selectedChildren.length === parentState.childIds.length;
+        const noneSelected = selectedChildren.length === 0;
+
+        if (allSelected) {
+            parentState.selected = true;
+            parentState.partiallySelected = false;
+        } else if (noneSelected) {
+            parentState.selected = false;
+            parentState.partiallySelected = false;
+        } else {
+            parentState.selected = false;
+            parentState.partiallySelected = true;
+        }
+
+        this.updateNodeVisualState(parentId);
+        this.updateParentState(parentState.parentId);
+    }
+
+    updateNodeVisualState(nodeId) {
+        const nodeState = this.selectionState.get(nodeId);
+        if (!nodeState) return;
+
+        const nodeElement = this.container.querySelector(`[data-item-id="${nodeId}"]`);
+        if (!nodeElement) return;
+
+        const checkbox = nodeElement.querySelector('.tree-checkbox');
+        if (checkbox) {
+            checkbox.checked = nodeState.selected;
+            checkbox.indeterminate = nodeState.partiallySelected || false;
+            if (nodeState.partiallySelected) {
+                checkbox.classList.add('indeterminate');
+            } else {
+                checkbox.classList.remove('indeterminate');
+            }
+        }
+
+        nodeElement.classList.remove('selected', 'partially-selected');
+        if (nodeState.selected) {
+            nodeElement.classList.add('selected');
+        } else if (nodeState.partiallySelected) {
+            nodeElement.classList.add('partially-selected');
         }
     }
 
-    updateSelectionState(nodeId, itemType, isSelected) {
-        this.selectionState.set(nodeId, {
-            selected: isSelected,
-            type: itemType,
-            nodeId: nodeId
+    updateSelectionCounts() {
+        this.selectionCounts = {
+            products: 0,
+            parts: 0,
+            subassemblies: 0,
+            hardware: 0,
+            nestSheets: 0,
+            detachedProducts: 0
+        };
+
+        this.selectionState.forEach(state => {
+            if (state.selected) {
+                switch (state.type) {
+                    case 'product':
+                        this.selectionCounts.products++;
+                        break;
+                    case 'part':
+                        this.selectionCounts.parts++;
+                        break;
+                    case 'subassembly':
+                        this.selectionCounts.subassemblies++;
+                        break;
+                    case 'hardware':
+                        this.selectionCounts.hardware++;
+                        break;
+                    case 'nestsheet':
+                        this.selectionCounts.nestSheets++;
+                        break;
+                    case 'detached_product':
+                        this.selectionCounts.detachedProducts++;
+                        break;
+                }
+            }
         });
     }
 
     getSelectionSummary() {
-        const summary = {
-            total: 0,
-            selected: 0,
-            byType: {}
+        return {
+            counts: { ...this.selectionCounts },
+            selectedItems: Array.from(this.selectionState.entries())
+                .filter(([_, state]) => state.selected)
+                .map(([id, state]) => ({ id, type: state.type, data: state.itemData }))
         };
+    }
 
+    // Control methods
+    selectAllProducts() {
         this.selectionState.forEach((state, nodeId) => {
-            summary.total++;
+            if ((state.type === 'product' || state.type === 'hardware' || state.type === 'detached') && !state.selected) {
+                state.selected = true;
+                this.updateNodeVisualState(nodeId);
+                this.selectAllChildren(nodeId);
+            }
+        });
+        this.updateSelectionCounts();
+        this.onSelectionChange(this.getSelectionSummary());
+    }
+
+    selectAllNestSheets() {
+        this.selectionState.forEach((state, nodeId) => {
+            if (state.type === 'nestsheet' && !state.selected) {
+                state.selected = true;
+                this.updateNodeVisualState(nodeId);
+                this.selectAllChildren(nodeId);
+            }
+        });
+        this.updateSelectionCounts();
+        this.onSelectionChange(this.getSelectionSummary());
+    }
+
+    clearAllSelections() {
+        this.selectionState.forEach((state, nodeId) => {
             if (state.selected) {
-                summary.selected++;
-            }
-            
-            if (!summary.byType[state.type]) {
-                summary.byType[state.type] = { total: 0, selected: 0 };
-            }
-            summary.byType[state.type].total++;
-            if (state.selected) {
-                summary.byType[state.type].selected++;
+                state.selected = false;
+                state.partiallySelected = false;
+                this.updateNodeVisualState(nodeId);
             }
         });
-
-        return summary;
+        this.updateSelectionCounts();
+        this.onSelectionChange(this.getSelectionSummary());
     }
 
-    updateStatusBadge(itemId, itemType, newStatus) {
-        const node = this.container.querySelector(`[data-item-id="${itemId}"][data-type="${itemType}"]`);
-        if (!node) return;
-
-        const badge = node.querySelector('.badge');
-        if (badge) {
-            badge.className = `badge status-${newStatus.toLowerCase()} me-2`;
-            badge.textContent = newStatus;
-        }
-    }
-
-    updateChildStatusBadges(productId, newStatus) {
-        const productNode = this.container.querySelector(`[data-item-id="${productId}"][data-type="product"]`);
-        if (!productNode) return;
-
-        const childBadges = productNode.querySelectorAll('.tree-children .badge');
-        childBadges.forEach(badge => {
-            badge.className = `badge status-${newStatus.toLowerCase()} me-2`;
-            badge.textContent = newStatus;
+    expandAll() {
+        const toggles = this.container.querySelectorAll('.tree-toggle');
+        toggles.forEach(toggle => {
+            toggle.dataset.expanded = 'true';
+            toggle.querySelector('i').className = 'fas fa-chevron-down';
+            const content = toggle.closest('.tree-node').querySelector('.tree-content');
+            if (content) content.style.display = 'block';
         });
     }
 
-    revertStatusSelect(itemId, itemType) {
-        const select = this.container.querySelector(`[data-item-id="${itemId}"][data-item-type="${itemType}"]`);
-        if (!select) return;
-
-        const badge = select.closest('.tree-node').querySelector('.badge');
-        if (badge) {
-            const currentStatus = badge.textContent;
-            select.value = currentStatus;
-        }
-    }
-
-    initializeNodeStates() {
-        // Initialize selection states for all checkboxes
-        const checkboxes = this.container.querySelectorAll('.tree-checkbox');
-        checkboxes.forEach(checkbox => {
-            this.updateSelectionState(checkbox.value, checkbox.dataset.itemType, checkbox.checked);
+    collapseAll() {
+        const toggles = this.container.querySelectorAll('.tree-toggle');
+        toggles.forEach(toggle => {
+            toggle.dataset.expanded = 'false';
+            toggle.querySelector('i').className = 'fas fa-chevron-right';
+            const content = toggle.closest('.tree-node').querySelector('.tree-content');
+            if (content) content.style.display = 'none';
         });
     }
 
-    showLoading(show) {
-        if (show) {
-            this.container.innerHTML = `
-                <div class="text-center p-4">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Loading...</span>
-                    </div>
-                    <div class="mt-2">Loading work order data...</div>
-                </div>
-            `;
-        }
+    filterTree(searchTerm) {
+        const nodes = this.container.querySelectorAll('.tree-node');
+        const lowerSearchTerm = searchTerm.toLowerCase();
+        
+        nodes.forEach(node => {
+            const text = node.textContent.toLowerCase();
+            const shouldShow = searchTerm === '' || text.includes(lowerSearchTerm);
+            node.style.display = shouldShow ? 'block' : 'none';
+        });
     }
 
     showError(message) {
-        this.container.innerHTML = `
-            <div class="alert alert-danger" role="alert">
+        const treeContent = this.container.querySelector('#treeViewContent');
+        treeContent.innerHTML = `
+            <div class="alert alert-danger">
                 <i class="fas fa-exclamation-triangle me-2"></i>
                 ${message}
             </div>
@@ -624,96 +565,25 @@ class WorkOrderTreeView {
     }
 
     // Public API methods
-    expandAll() {
-        const toggles = this.container.querySelectorAll('.tree-toggle[data-target]');
-        toggles.forEach(toggle => {
-            const targetId = toggle.dataset.target;
-            const targetElement = document.getElementById(targetId);
-            if (targetElement && targetElement.style.display === 'none') {
-                this.handleTreeToggle(toggle);
-            }
-        });
-    }
-
-    collapseAll() {
-        const toggles = this.container.querySelectorAll('.tree-toggle[data-target]');
-        toggles.forEach(toggle => {
-            const targetId = toggle.dataset.target;
-            const targetElement = document.getElementById(targetId);
-            if (targetElement && targetElement.style.display !== 'none') {
-                this.handleTreeToggle(toggle);
-            }
-        });
-    }
-
     getSelectedItems() {
-        const selected = [];
-        this.selectionState.forEach((state, nodeId) => {
-            if (state.selected) {
-                selected.push(state);
-            }
-        });
-        return selected;
+        return Array.from(this.selectionState.entries())
+            .filter(([_, state]) => state.selected)
+            .map(([id, state]) => ({ id, type: state.type, data: state.itemData }));
     }
 
-    selectAll() {
-        const checkboxes = this.container.querySelectorAll('.tree-checkbox');
-        checkboxes.forEach(checkbox => {
-            if (!checkbox.checked) {
-                checkbox.checked = true;
-                this.handleNodeSelection(checkbox);
-            }
-        });
-    }
-
-    selectNone() {
-        const checkboxes = this.container.querySelectorAll('.tree-checkbox');
-        checkboxes.forEach(checkbox => {
-            if (checkbox.checked) {
-                checkbox.checked = false;
-                this.handleNodeSelection(checkbox);
-            }
-        });
-    }
-
-    filterNodes(searchTerm) {
-        const nodes = this.container.querySelectorAll('.tree-node');
-        
-        if (!searchTerm) {
-            nodes.forEach(node => node.style.display = '');
-            return;
+    setMode(mode) {
+        this.mode = mode;
+        this.createTreeContainer();
+        if (this.data) {
+            this.renderTree();
         }
-
-        const term = searchTerm.toLowerCase();
-        
-        nodes.forEach(node => {
-            const text = node.querySelector('.item-name, .item-details')?.textContent?.toLowerCase() || '';
-            const matches = text.includes(term);
-            
-            if (matches || node.classList.contains('level-0')) {
-                node.style.display = '';
-            } else {
-                node.style.display = 'none';
-            }
-        });
-
-        // Show parent nodes if children match
-        const visibleNodes = this.container.querySelectorAll('.tree-node[style=""], .tree-node:not([style])');
-        visibleNodes.forEach(node => {
-            let parent = node.parentElement;
-            while (parent && parent !== this.container) {
-                if (parent.classList.contains('tree-node')) {
-                    parent.style.display = '';
-                }
-                parent = parent.parentElement;
-            }
-        });
     }
-}
 
-// Export for use
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = WorkOrderTreeView;
-} else if (typeof window !== 'undefined') {
-    window.WorkOrderTreeView = WorkOrderTreeView;
+    refresh() {
+        if (this.mode === 'modify' && this.apiUrl && this.workOrderId) {
+            this.loadData();
+        } else if (this.data) {
+            this.renderTree();
+        }
+    }
 }

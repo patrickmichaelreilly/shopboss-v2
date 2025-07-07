@@ -340,34 +340,10 @@ public class AdminController : Controller
     }
 
     // Modify Work Order Methods
-    public async Task<IActionResult> ModifyWorkOrder(string id)
+    public IActionResult ModifyWorkOrder(string id)
     {
-        if (string.IsNullOrEmpty(id))
-        {
-            TempData["ErrorMessage"] = "Work order ID is required to modify work order.";
-            return RedirectToAction(nameof(Index));
-        }
-
-        try
-        {
-            // Verify work order exists using lightweight query
-            var workOrder = await _workOrderService.GetWorkOrderByIdAsync(id);
-            
-            if (workOrder == null)
-            {
-                TempData["ErrorMessage"] = "Work order not found.";
-                return RedirectToAction(nameof(Index));
-            }
-
-            // Use new unified view with just the work order ID
-            return View("ModifyWorkOrderUnified", id);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error loading modify work order interface for work order {WorkOrderId}", id);
-            TempData["ErrorMessage"] = "An error occurred while loading the modify work order interface.";
-            return RedirectToAction(nameof(Index));
-        }
+        // Redirect to unified interface
+        return RedirectToAction(nameof(ModifyWorkOrderUnified), new { id = id });
     }
 
     [HttpPost]
@@ -821,6 +797,42 @@ public class AdminController : Controller
 
         _context.Bins.AddRange(bins);
         await _context.SaveChangesAsync();
+    }
+
+    public IActionResult TreeTestHarness()
+    {
+        return View();
+    }
+
+    // Unified Modify Work Order Interface (Phase 6C)
+    public async Task<IActionResult> ModifyWorkOrderUnified(string id)
+    {
+        if (string.IsNullOrEmpty(id))
+        {
+            TempData["ErrorMessage"] = "Work order ID is required to modify work order.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        try
+        {
+            // Load work order data using WorkOrderService
+            var workOrderData = await _workOrderService.GetWorkOrderManagementDataAsync(id);
+            
+            if (workOrderData.WorkOrder == null)
+            {
+                TempData["ErrorMessage"] = "Work order not found.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            // Pass the work order data to the unified view
+            return View(workOrderData);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error loading unified modify work order interface for work order {WorkOrderId}", id);
+            TempData["ErrorMessage"] = "An error occurred while loading the modify work order interface.";
+            return RedirectToAction(nameof(Index));
+        }
     }
 
     [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]

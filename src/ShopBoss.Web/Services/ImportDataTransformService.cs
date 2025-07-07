@@ -226,7 +226,7 @@ public class ImportDataTransformService
             Id = subassemblyId,
             Name = _columnMapping.GetStringValue(subassemblyData, "SUBASSEMBLIES", "Name"),
             Description = string.Empty, // Description not available in SUBASSEMBLIES table
-            Quantity = 1, // Quantity not available in SUBASSEMBLIES table, default to 1
+            Quantity = _columnMapping.GetIntValue(subassemblyData, "SUBASSEMBLIES", "Quantity"), // Extract actual quantity from SDF data
             Width = 0, // Width not available in SUBASSEMBLIES table
             Height = 0, // Height not available in SUBASSEMBLIES table
             Depth = 0, // Depth not available in SUBASSEMBLIES table

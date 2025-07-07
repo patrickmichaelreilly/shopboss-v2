@@ -26,4 +26,6 @@ public class Product
     public List<Part> Parts { get; set; } = new();
     
     public List<Subassembly> Subassemblies { get; set; } = new();
+    
+    public List<Hardware> Hardware { get; set; } = new();
 }

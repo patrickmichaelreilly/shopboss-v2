@@ -281,6 +281,36 @@ public class ImportSelectionService
         return normalizedProducts;
     }
 
+    private List<Subassembly> NormalizeSubassemblyQuantities(ImportSubassembly importSubassembly, string? productId)
+    {
+        var normalizedSubassemblies = new List<Subassembly>();
+        var subassemblyQuantity = importSubassembly.Quantity;
+        
+        if (subassemblyQuantity > 1)
+        {
+            _logger.LogInformation("Converting subassembly '{SubassemblyName}' (ID: {SubassemblyId}) with quantity {Quantity} to {Quantity} individual subassembly instances",
+                importSubassembly.Name, importSubassembly.Id, subassemblyQuantity, subassemblyQuantity);
+        }
+        
+        for (int i = 1; i <= subassemblyQuantity; i++)
+        {
+            // Create individual subassembly instance with Qty = 1
+            var subassembly = ConvertToSubassemblyEntity(importSubassembly, productId, null, productId);
+            
+            // Make each subassembly instance unique if quantity > 1
+            if (subassemblyQuantity > 1)
+            {
+                subassembly.Id = $"{importSubassembly.Id}_{i}";
+                subassembly.Name = $"{importSubassembly.Name} (Instance {i})";
+            }
+            subassembly.Qty = 1; // Each instance is quantity 1
+            
+            normalizedSubassemblies.Add(subassembly);
+        }
+        
+        return normalizedSubassemblies;
+    }
+
     private void ProcessProductContent(
         ImportProduct importProduct,
         SelectionRequest selection,
@@ -332,13 +362,18 @@ public class ImportSelectionService
 
         foreach (var importSubassembly in importProduct.Subassemblies.Where(s => selectedSubassemblyIds.Contains(s.Id)))
         {
-            var subassembly = ConvertToSubassemblyEntity(importSubassembly, product.Id, null, product.Id);
-            product.Subassemblies.Add(subassembly);
+            // Apply two-phase processing: normalize subassembly quantities
+            var normalizedSubassemblies = NormalizeSubassemblyQuantities(importSubassembly, product.Id);
+            
+            foreach (var subassembly in normalizedSubassemblies)
+            {
+                product.Subassemblies.Add(subassembly);
 
-            // Recursively process selected items within this subassembly
-            ProcessSelectedItemsInSubassembly(importSubassembly, selection, subassembly, workOrder, result, product.Id);
+                // Recursively process selected items within this subassembly
+                ProcessSelectedItemsInSubassembly(importSubassembly, selection, subassembly, workOrder, result, product.Id);
 
-            result.Statistics.ConvertedSubassemblies++;
+                result.Statistics.ConvertedSubassemblies++;
+            }
         }
     }
 
@@ -363,10 +398,11 @@ public class ImportSelectionService
                 MicrovellumId = importHardware.Id,
                 Name = importHardware.Name,
                 Qty = importHardware.Quantity, // Original quantity per product
-                WorkOrderId = product.WorkOrderId
+                WorkOrderId = product.WorkOrderId,
+                ProductId = product.Id
             };
             
-            workOrder.Hardware.Add(hardware);
+            product.Hardware.Add(hardware);
             result.Statistics.ConvertedHardware++;
         }
     }
@@ -397,16 +433,42 @@ public class ImportSelectionService
             result.Statistics.ConvertedParts++;
         }
 
-        // Process nested subassemblies
+        // Process nested subassemblies with two-phase processing
         foreach (var importNested in importSubassembly.NestedSubassemblies.Where(s => selectedSubassemblyIds.Contains(s.Id)))
         {
-            var nested = ConvertToSubassemblyEntity(importNested, subassembly.ProductId, subassembly.Id, productInstanceId);
-            subassembly.ChildSubassemblies.Add(nested);
+            // Apply two-phase processing: normalize nested subassembly quantities
+            var normalizedNestedSubassemblies = NormalizeSubassemblyQuantities(importNested, subassembly.ProductId);
+            
+            foreach (var normalizedNested in normalizedNestedSubassemblies)
+            {
+                subassembly.ChildSubassemblies.Add(normalizedNested);
 
-            // Recursively process items in nested subassembly
-            ProcessSelectedItemsInSubassembly(importNested, selection, nested, workOrder, result, productInstanceId);
+                // Recursively process items in each normalized nested subassembly instance
+                ProcessSelectedItemsInSubassembly(importNested, selection, normalizedNested, workOrder, result, productInstanceId);
 
-            result.Statistics.ConvertedSubassemblies++;
+                result.Statistics.ConvertedSubassemblies++;
+            }
+        }
+
+        // Process hardware in this subassembly
+        var selectedHardwareIds = selection.SelectedItemIds
+            .Where(id => selection.SelectionDetails.ContainsKey(id) && 
+                        selection.SelectionDetails[id].ItemType == "hardware")
+            .ToHashSet();
+
+        foreach (var importHardware in importSubassembly.Hardware.Where(h => selectedHardwareIds.Contains(h.Id)))
+        {
+            var hardware = new Hardware
+            {
+                Id = Guid.NewGuid().ToString(),
+                MicrovellumId = importHardware.Id,
+                Name = importHardware.Name,
+                Qty = importHardware.Quantity, // Original quantity per subassembly instance
+                WorkOrderId = subassembly.ProductId
+            };
+            
+            workOrder.Hardware.Add(hardware);
+            result.Statistics.ConvertedHardware++;
         }
     }
 

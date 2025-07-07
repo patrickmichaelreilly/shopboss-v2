@@ -1,122 +1,70 @@
 namespace ShopBoss.Web.Models.Api;
 
-// Response wrapper classes
 public class TreeDataResponse
 {
-    public bool Success { get; set; }
-    public string? Message { get; set; }
-    public TreeData? Data { get; set; }
-    public PaginationInfo? Pagination { get; set; }
+    public string WorkOrderId { get; set; } = string.Empty;
+    public string WorkOrderName { get; set; } = string.Empty;
+    public List<TreeItem> Items { get; set; } = new();
+    public WorkOrderStatistics? Statistics { get; set; }
 }
 
-public class ProductDetailsResponse
-{
-    public bool Success { get; set; }
-    public string? Message { get; set; }
-    public ProductTreeNode? Product { get; set; }
-}
-
-public class WorkOrderSummaryResponse
-{
-    public bool Success { get; set; }
-    public string? Message { get; set; }
-    public WorkOrderSummary? WorkOrder { get; set; }
-}
-
-// Data transfer objects
-public class TreeData
-{
-    public WorkOrderTreeNode WorkOrder { get; set; } = null!;
-    public List<ProductTreeNode> ProductNodes { get; set; } = new();
-    public NestSheetSummaryInfo NestSheetSummary { get; set; } = new();
-}
-
-public class WorkOrderTreeNode
+public class TreeItem
 {
     public string Id { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
-    public DateTime ImportedDate { get; set; }
-    public List<HardwareTreeNode> Hardware { get; set; } = new();
-    public List<DetachedProductTreeNode> DetachedProducts { get; set; } = new();
+    public string Type { get; set; } = string.Empty; // "product", "subassembly", "part", "hardware", "category"
+    public int Quantity { get; set; }
+    public string? Status { get; set; } // Only included when includeStatus=true
+    public List<TreeItem> Children { get; set; } = new();
 }
 
-public class ProductTreeNode
+public class WorkOrderStatistics
 {
-    public ProductInfo Product { get; set; } = null!;
-    public List<PartTreeNode> Parts { get; set; } = new();
-    public List<SubassemblyTreeNode> Subassemblies { get; set; } = new();
-    public string EffectiveStatus { get; set; } = "Pending";
+    public ProductStatistics Products { get; set; } = new();
+    public PartStatistics Parts { get; set; } = new();
+    public SubassemblyStatistics Subassemblies { get; set; } = new();
+    public HardwareStatistics Hardware { get; set; } = new();
+    public NestSheetStatistics NestSheets { get; set; } = new();
 }
 
-public class ProductInfo
+public class ProductStatistics
 {
-    public string Id { get; set; } = string.Empty;
-    public string Name { get; set; } = string.Empty;
-    public string ProductNumber { get; set; } = string.Empty;
-    public int Qty { get; set; }
+    public int Total { get; set; }
+    public StatusBreakdown StatusBreakdown { get; set; } = new();
 }
 
-public class PartTreeNode
+public class PartStatistics
 {
-    public string Id { get; set; } = string.Empty;
-    public string Name { get; set; } = string.Empty;
-    public int Qty { get; set; }
-    public double Length { get; set; }
-    public double Width { get; set; }
-    public double Thickness { get; set; }
-    public string Material { get; set; } = string.Empty;
-    public string Status { get; set; } = "Pending";
+    public int Total { get; set; }
+    public StatusBreakdown StatusBreakdown { get; set; } = new();
 }
 
-public class SubassemblyTreeNode
+public class SubassemblyStatistics
 {
-    public string Id { get; set; } = string.Empty;
-    public string Name { get; set; } = string.Empty;
-    public int Qty { get; set; }
-    public List<PartTreeNode> Parts { get; set; } = new();
+    public int Total { get; set; }
+    public StatusBreakdown StatusBreakdown { get; set; } = new();
 }
 
-public class HardwareTreeNode
+public class HardwareStatistics
 {
-    public string Id { get; set; } = string.Empty;
-    public string Name { get; set; } = string.Empty;
-    public int Qty { get; set; }
-    public bool IsShipped { get; set; }
+    public int Total { get; set; }
+    public int TotalQuantity { get; set; }
+    public StatusBreakdown StatusBreakdown { get; set; } = new();
 }
 
-public class DetachedProductTreeNode
+public class NestSheetStatistics
 {
-    public string Id { get; set; } = string.Empty;
-    public string Name { get; set; } = string.Empty;
-    public string ProductNumber { get; set; } = string.Empty;
-    public int Qty { get; set; }
-    public double Length { get; set; }
-    public double Width { get; set; }
-    public double Thickness { get; set; }
-    public bool IsShipped { get; set; }
+    public int Total { get; set; }
+    public int Processed { get; set; }
+    public int Pending { get; set; }
+    public int TotalParts { get; set; }
 }
 
-public class NestSheetSummaryInfo
+public class StatusBreakdown
 {
-    public int TotalNestSheets { get; set; }
-    public int ProcessedNestSheets { get; set; }
-    public int PendingNestSheets { get; set; }
-    public int TotalPartsOnNestSheets { get; set; }
-}
-
-public class WorkOrderSummary
-{
-    public string Id { get; set; } = string.Empty;
-    public string Name { get; set; } = string.Empty;
-    public DateTime ImportedDate { get; set; }
-}
-
-public class PaginationInfo
-{
-    public int Page { get; set; }
-    public int Size { get; set; }
-    public int TotalItems { get; set; }
-    public int TotalPages { get; set; }
-    public bool HasNextPage { get; set; }
-    public bool HasPreviousPage { get; set; }
+    public int Pending { get; set; }
+    public int Cut { get; set; }
+    public int Sorted { get; set; }
+    public int Assembled { get; set; }
+    public int Shipped { get; set; }
 }
