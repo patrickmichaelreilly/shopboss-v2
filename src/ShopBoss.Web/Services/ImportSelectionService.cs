@@ -53,9 +53,6 @@ public class ImportSelectionService
             // Process selected items
             ProcessSelectedProducts(importData, selection, workOrder, result);
             ProcessSelectedDetachedProducts(importData, selection, workOrder, result);
-            
-            // Identify products with only 1 part as detached products
-            ProcessSinglePartProductsAsDetached(workOrder, result);
 
             // Save to database
             _context.WorkOrders.Add(workOrder);
@@ -481,7 +478,7 @@ public class ImportSelectionService
     {
         var selectedDetachedIds = selection.SelectedItemIds
             .Where(id => selection.SelectionDetails.ContainsKey(id) && 
-                        selection.SelectionDetails[id].ItemType == "detached")
+                        selection.SelectionDetails[id].ItemType == "detached_product")
             .ToHashSet();
 
         foreach (var importDetached in importData.DetachedProducts.Where(d => selectedDetachedIds.Contains(d.Id)))
@@ -489,6 +486,11 @@ public class ImportSelectionService
             var detached = ConvertToDetachedProductEntity(importDetached, workOrder.Id);
             workOrder.DetachedProducts.Add(detached);
             result.Statistics.ConvertedDetachedProducts++;
+        }
+        
+        if (selectedDetachedIds.Any())
+        {
+            _logger.LogInformation("Imported {Count} selected detached products", selectedDetachedIds.Count);
         }
     }
 
@@ -684,55 +686,6 @@ public class ImportSelectionService
         return defaultNestSheet;
     }
 
-    private void ProcessSinglePartProductsAsDetached(WorkOrder workOrder, ImportConversionResult result)
-    {
-        // Find products with exactly 1 part and treat them as detached products
-        // This applies to both original products and normalized product instances
-        var singlePartProducts = workOrder.Products
-            .Where(p => p.Parts.Count == 1)
-            .ToList();
-        
-        // Create list to track products to remove after conversion
-        var productsToRemove = new List<Product>();
-        
-        foreach (var product in singlePartProducts)
-        {
-            var singlePart = product.Parts.First();
-            
-            // Create a detached product from this single-part product
-            var detachedProduct = new DetachedProduct
-            {
-                Id = $"{product.Id}_detached", // Create unique ID to avoid conflicts
-                ProductNumber = product.ProductNumber,
-                Name = product.Name,
-                Qty = product.Qty,
-                Length = singlePart.Length,
-                Width = singlePart.Width,
-                Thickness = singlePart.Thickness,
-                Material = singlePart.Material,
-                EdgebandingTop = singlePart.EdgebandingTop,
-                EdgebandingBottom = singlePart.EdgebandingBottom,
-                EdgebandingLeft = singlePart.EdgebandingLeft,
-                EdgebandingRight = singlePart.EdgebandingRight,
-                WorkOrderId = workOrder.Id
-            };
-            
-            workOrder.DetachedProducts.Add(detachedProduct);
-            productsToRemove.Add(product);
-            result.Statistics.ConvertedDetachedProducts++;
-        }
-        
-        // Remove the original single-part products to avoid Entity Framework tracking conflicts
-        foreach (var product in productsToRemove)
-        {
-            workOrder.Products.Remove(product);
-        }
-        
-        if (singlePartProducts.Any())
-        {
-            _logger.LogInformation("Identified {Count} single-part products as detached products", singlePartProducts.Count);
-        }
-    }
 }
 
 public class SelectionValidationResult

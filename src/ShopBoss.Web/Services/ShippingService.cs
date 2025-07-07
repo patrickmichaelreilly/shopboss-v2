@@ -7,11 +7,13 @@ namespace ShopBoss.Web.Services;
 public class ShippingService
 {
     private readonly ShopBossDbContext _context;
+    private readonly WorkOrderService _workOrderService;
     private readonly ILogger<ShippingService> _logger;
 
-    public ShippingService(ShopBossDbContext context, ILogger<ShippingService> logger)
+    public ShippingService(ShopBossDbContext context, WorkOrderService workOrderService, ILogger<ShippingService> logger)
     {
         _context = context;
+        _workOrderService = workOrderService;
         _logger = logger;
     }
 
@@ -46,43 +48,99 @@ public class ShippingService
         }
     }
 
+    private Task<List<string>> GetProductsReadyForShippingOptimizedAsync(ShippingStationData shippingStationData)
+    {
+        try
+        {
+            var readyProducts = new List<string>();
+
+            foreach (var product in shippingStationData.Products)
+            {
+                // Get part status counts for this product
+                var productPartStatuses = shippingStationData.PartStatusSummaries
+                    .Where(pss => pss.ProductId == product.Id)
+                    .ToList();
+
+                // Check if product has parts and all are assembled
+                var totalParts = productPartStatuses.Sum(pss => pss.Count);
+                var assembledParts = productPartStatuses
+                    .Where(pss => pss.Status == PartStatus.Assembled)
+                    .Sum(pss => pss.Count);
+
+                if (totalParts > 0 && assembledParts == totalParts)
+                {
+                    readyProducts.Add(product.Id);
+                }
+            }
+
+            return Task.FromResult(readyProducts);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting products ready for shipping (optimized) for work order {WorkOrderId}", shippingStationData.WorkOrder?.Id);
+            return Task.FromResult(new List<string>());
+        }
+    }
+
+    private List<ProductShippingStatus> BuildProductShippingStatusOptimized(
+        List<Product> products,
+        List<PartStatusSummary> partStatusSummaries,
+        List<string> readyProductIds)
+    {
+        return products.Select(p =>
+        {
+            // Get part status counts for this product
+            var productPartStatuses = partStatusSummaries
+                .Where(pss => pss.ProductId == p.Id)
+                .ToList();
+
+            var totalParts = productPartStatuses.Sum(pss => pss.Count);
+            var assembledParts = productPartStatuses
+                .Where(pss => pss.Status == PartStatus.Assembled)
+                .Sum(pss => pss.Count);
+            var shippedParts = productPartStatuses
+                .Where(pss => pss.Status == PartStatus.Shipped)
+                .Sum(pss => pss.Count);
+
+            var isShipped = totalParts > 0 && shippedParts == totalParts;
+
+            return new ProductShippingStatus
+            {
+                Product = p,
+                IsReadyForShipping = readyProductIds.Contains(p.Id),
+                IsShipped = isShipped,
+                AssembledPartsCount = assembledParts,
+                ShippedPartsCount = shippedParts,
+                TotalPartsCount = totalParts
+            };
+        }).ToList();
+    }
+
     public async Task<ShippingDashboardData> GetShippingDashboardDataAsync(string workOrderId)
     {
         try
         {
-            var workOrder = await _context.WorkOrders
-                .Include(w => w.Products)
-                    .ThenInclude(p => p.Parts)
-                .Include(w => w.Hardware)
-                .Include(w => w.DetachedProducts)
-                .FirstOrDefaultAsync(w => w.Id == workOrderId);
+            // Use optimized data loading to eliminate cartesian products
+            var shippingStationData = await _workOrderService.GetShippingStationDataAsync(workOrderId);
 
-            if (workOrder == null)
+            if (shippingStationData.WorkOrder == null)
             {
                 return new ShippingDashboardData();
             }
 
-            var readyProductIds = await GetProductsReadyForShippingAsync(workOrderId);
+            var readyProductIds = await GetProductsReadyForShippingOptimizedAsync(shippingStationData);
 
             return new ShippingDashboardData
             {
-                WorkOrder = workOrder,
+                WorkOrder = shippingStationData.WorkOrder,
                 ReadyProductIds = readyProductIds,
-                Products = workOrder.Products.Select(p => new ProductShippingStatus
-                {
-                    Product = p,
-                    IsReadyForShipping = readyProductIds.Contains(p.Id),
-                    IsShipped = p.Parts.Any() && p.Parts.All(part => part.Status == PartStatus.Shipped),
-                    AssembledPartsCount = p.Parts.Count(part => part.Status == PartStatus.Assembled),
-                    ShippedPartsCount = p.Parts.Count(part => part.Status == PartStatus.Shipped),
-                    TotalPartsCount = p.Parts.Count
-                }).ToList(),
-                Hardware = workOrder.Hardware.Select(h => new HardwareShippingStatus
+                Products = BuildProductShippingStatusOptimized(shippingStationData.Products, shippingStationData.PartStatusSummaries, readyProductIds),
+                Hardware = shippingStationData.Hardware.Select(h => new HardwareShippingStatus
                 {
                     Hardware = h,
                     IsShipped = h.IsShipped
                 }).ToList(),
-                DetachedProducts = workOrder.DetachedProducts.Select(d => new DetachedProductShippingStatus
+                DetachedProducts = shippingStationData.DetachedProducts.Select(d => new DetachedProductShippingStatus
                 {
                     DetachedProduct = d,
                     IsShipped = d.IsShipped
@@ -133,19 +191,21 @@ public class ShippingService
     {
         try
         {
-            var workOrder = await _context.WorkOrders
-                .Include(w => w.Products)
-                    .ThenInclude(p => p.Parts)
-                .FirstOrDefaultAsync(w => w.Id == workOrderId);
+            // Use optimized query to check if all parts in work order are assembled
+            var totalParts = await _context.Parts
+                .Where(p => p.Product.WorkOrderId == workOrderId)
+                .CountAsync();
 
-            if (workOrder == null)
+            if (totalParts == 0)
             {
                 return false;
             }
 
-            // Work order is ready for shipping if all products have all their parts assembled
-            return workOrder.Products.All(product => 
-                product.Parts.Any() && product.Parts.All(part => part.Status == PartStatus.Assembled));
+            var assembledParts = await _context.Parts
+                .Where(p => p.Product.WorkOrderId == workOrderId && p.Status == PartStatus.Assembled)
+                .CountAsync();
+
+            return assembledParts == totalParts;
         }
         catch (Exception ex)
         {
@@ -188,9 +248,6 @@ public class ShippingService
         try
         {
             var product = await _context.Products
-                .Include(p => p.Parts)
-                .Include(p => p.Subassemblies)
-                    .ThenInclude(s => s.Parts)
                 .FirstOrDefaultAsync(p => p.Id == productId);
 
             if (product == null)
@@ -200,21 +257,27 @@ public class ShippingService
 
             if (cascadeToParts)
             {
+                // Update all parts for this product in optimized bulk operations
+                var productParts = await _context.Parts
+                    .Where(p => p.ProductId == productId)
+                    .ToListAsync();
+
+                var subassemblyParts = await _context.Parts
+                    .Where(p => p.Subassembly.ProductId == productId)
+                    .ToListAsync();
+
                 // Update all direct parts
-                foreach (var part in product.Parts)
+                foreach (var part in productParts)
                 {
                     part.Status = newStatus;
                     part.StatusUpdatedDate = DateTime.UtcNow;
                 }
 
                 // Update all subassembly parts
-                foreach (var subassembly in product.Subassemblies)
+                foreach (var part in subassemblyParts)
                 {
-                    foreach (var part in subassembly.Parts)
-                    {
-                        part.Status = newStatus;
-                        part.StatusUpdatedDate = DateTime.UtcNow;
-                    }
+                    part.Status = newStatus;
+                    part.StatusUpdatedDate = DateTime.UtcNow;
                 }
             }
 

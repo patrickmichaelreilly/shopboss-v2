@@ -12,6 +12,7 @@ namespace ShopBoss.Web.Controllers;
 public class AssemblyController : Controller
 {
     private readonly ShopBossDbContext _context;
+    private readonly WorkOrderService _workOrderService;
     private readonly SortingRuleService _sortingRuleService;
     private readonly PartFilteringService _partFilteringService;
     private readonly AuditTrailService _auditTrailService;
@@ -21,6 +22,7 @@ public class AssemblyController : Controller
 
     public AssemblyController(
         ShopBossDbContext context,
+        WorkOrderService workOrderService,
         SortingRuleService sortingRuleService,
         PartFilteringService partFilteringService,
         AuditTrailService auditTrailService,
@@ -29,6 +31,7 @@ public class AssemblyController : Controller
         ILogger<AssemblyController> logger)
     {
         _context = context;
+        _workOrderService = workOrderService;
         _sortingRuleService = sortingRuleService;
         _partFilteringService = partFilteringService;
         _auditTrailService = auditTrailService;
@@ -47,14 +50,10 @@ public class AssemblyController : Controller
             return View("NoActiveWorkOrder");
         }
 
-        var workOrder = await _context.WorkOrders
-            .Include(w => w.Products)
-                .ThenInclude(p => p.Parts)
-            .Include(w => w.Hardware)
-            .Include(w => w.DetachedProducts)
-            .FirstOrDefaultAsync(w => w.Id == activeWorkOrderId);
+        // Use optimized data loading to eliminate cartesian products
+        var assemblyStationData = await _workOrderService.GetAssemblyStationDataAsync(activeWorkOrderId);
 
-        if (workOrder == null)
+        if (assemblyStationData.WorkOrder == null)
         {
             TempData["ErrorMessage"] = "Active work order not found. Please select a valid work order.";
             return View("NoActiveWorkOrder");
@@ -66,20 +65,20 @@ public class AssemblyController : Controller
         // Get rack information to show sorting status
         var racks = await _sortingRuleService.GetActiveRacksAsync();
 
-        // Prepare assembly readiness data
+        // Prepare assembly readiness data using optimized data
         var assemblyData = new AssemblyDashboardData
         {
-            WorkOrder = workOrder,
+            WorkOrder = assemblyStationData.WorkOrder,
             ReadyProductIds = readyProductIds,
             StorageRacks = racks,
-            Products = await GetProductsWithAssemblyStatus(workOrder.Products, readyProductIds),
-            FilteredParts = await GetFilteredPartsLocations(workOrder.Products)
+            Products = GetProductsWithAssemblyStatusOptimized(assemblyStationData.Products, assemblyStationData.Parts, readyProductIds),
+            FilteredParts = GetFilteredPartsLocationsOptimized(assemblyStationData.Products, assemblyStationData.Parts)
         };
 
         return View(assemblyData);
     }
 
-    private async Task<List<ProductAssemblyStatus>> GetProductsWithAssemblyStatus(
+    private List<ProductAssemblyStatus> GetProductsWithAssemblyStatus(
         List<Product> products, 
         List<string> readyProductIds)
     {
@@ -157,13 +156,160 @@ public class AssemblyController : Controller
                     .ToList();
     }
 
-    private async Task<List<FilteredPartLocation>> GetFilteredPartsLocations(List<Product> products)
+    private List<ProductAssemblyStatus> GetProductsWithAssemblyStatusOptimized(
+        List<Product> products,
+        List<PartSummary> allParts,
+        List<string> readyProductIds)
+    {
+        var result = new List<ProductAssemblyStatus>();
+
+        foreach (var product in products)
+        {
+            // Get parts for this product from the optimized part list
+            var productParts = allParts.Where(p => p.ProductId == product.Id).ToList();
+            
+            // Convert PartSummary to Part objects for filtering service compatibility
+            var convertedParts = productParts.Select(ps => new Part
+            {
+                Id = ps.Id,
+                Name = ps.Name,
+                Status = ps.Status,
+                Qty = ps.Qty,
+                Location = ps.Location,
+                Length = ps.Length,
+                Width = ps.Width,
+                Thickness = ps.Thickness,
+                Material = ps.Material
+            }).ToList();
+
+            var carcassParts = _partFilteringService.GetCarcassPartsOnly(convertedParts);
+            var filteredParts = _partFilteringService.GetFilteredParts(convertedParts);
+            
+            var sortedCarcassParts = carcassParts.Count(p => p.Status == PartStatus.Sorted);
+            var totalCarcassParts = carcassParts.Count;
+            var sortedFilteredParts = filteredParts.Count(p => p.Status == PartStatus.Sorted);
+            var totalFilteredParts = filteredParts.Count;
+            
+            var isReady = readyProductIds.Contains(product.Id);
+            var isCompleted = carcassParts.All(p => p.Status == PartStatus.Assembled) && carcassParts.Any();
+
+            // Get simplified rack locations - just carcass bin and doors/fronts bin
+            var carcassLocation = carcassParts
+                .Where(p => p.Status == PartStatus.Sorted && !string.IsNullOrEmpty(p.Location))
+                .Select(p => p.Location)
+                .FirstOrDefault();
+                
+            var doorsLocation = filteredParts
+                .Where(p => p.Status == PartStatus.Sorted && !string.IsNullOrEmpty(p.Location))
+                .Select(p => p.Location)
+                .FirstOrDefault();
+
+            var partLocations = new List<PartLocation>();
+            if (!string.IsNullOrEmpty(carcassLocation))
+            {
+                partLocations.Add(new PartLocation
+                {
+                    PartName = "Carcass Parts",
+                    Location = carcassLocation,
+                    Quantity = sortedCarcassParts
+                });
+            }
+            if (!string.IsNullOrEmpty(doorsLocation))
+            {
+                partLocations.Add(new PartLocation
+                {
+                    PartName = "Doors & Fronts",
+                    Location = doorsLocation,
+                    Quantity = sortedFilteredParts
+                });
+            }
+            else if (totalFilteredParts > 0)
+            {
+                partLocations.Add(new PartLocation
+                {
+                    PartName = "Doors & Fronts",
+                    Location = "N/A",
+                    Quantity = 0
+                });
+            }
+
+            result.Add(new ProductAssemblyStatus
+            {
+                Product = product,
+                CarcassPartsCount = totalCarcassParts,
+                SortedCarcassPartsCount = sortedCarcassParts,
+                FilteredPartsCount = totalFilteredParts,
+                SortedFilteredPartsCount = sortedFilteredParts,
+                IsReadyForAssembly = isReady,
+                IsCompleted = isCompleted,
+                CompletionPercentage = totalCarcassParts > 0 ? (int)((double)sortedCarcassParts / totalCarcassParts * 100) : 0,
+                PartLocations = partLocations
+            });
+        }
+
+        return result.OrderByDescending(p => p.IsReadyForAssembly)
+                    .ThenByDescending(p => p.CompletionPercentage)
+                    .ToList();
+    }
+
+    private List<FilteredPartLocation> GetFilteredPartsLocations(List<Product> products)
     {
         var result = new List<FilteredPartLocation>();
 
         foreach (var product in products)
         {
             var filteredParts = _partFilteringService.GetFilteredParts(product.Parts);
+            
+            foreach (var part in filteredParts)
+            {
+                var category = _partFilteringService.ClassifyPart(part);
+                var location = !string.IsNullOrEmpty(part.Location) ? part.Location : "Not Sorted";
+                
+                result.Add(new FilteredPartLocation
+                {
+                    ProductId = product.Id,
+                    ProductName = product.Name,
+                    PartName = part.Name,
+                    Category = category.ToString(),
+                    Location = location,
+                    Status = part.Status.ToString(),
+                    Quantity = part.Qty
+                });
+            }
+        }
+
+        return result.OrderBy(f => f.ProductName)
+                    .ThenBy(f => f.Category)
+                    .ThenBy(f => f.PartName)
+                    .ToList();
+    }
+
+    private List<FilteredPartLocation> GetFilteredPartsLocationsOptimized(
+        List<Product> products,
+        List<PartSummary> allParts)
+    {
+        var result = new List<FilteredPartLocation>();
+
+        foreach (var product in products)
+        {
+            // Get parts for this product from the optimized part list
+            var productParts = allParts.Where(p => p.ProductId == product.Id).ToList();
+            
+            // Convert PartSummary to Part objects for filtering service compatibility
+            var convertedParts = productParts.Select(ps => new Part
+            {
+                Id = ps.Id,
+                Name = ps.Name,
+                Status = ps.Status,
+                Qty = ps.Qty,
+                Location = ps.Location,
+                Length = ps.Length,
+                Width = ps.Width,
+                Thickness = ps.Thickness,
+                Material = ps.Material
+            }).ToList();
+
+            var filteredParts = _partFilteringService.GetFilteredParts(convertedParts);
             
             foreach (var part in filteredParts)
             {

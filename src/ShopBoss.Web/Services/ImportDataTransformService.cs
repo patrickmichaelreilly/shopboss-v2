@@ -127,6 +127,9 @@ public class ImportDataTransformService
             // Establish nest sheet to part relationships using OptimizationResults
             EstablishNestSheetPartRelationships(rawData, workOrder);
 
+            // Process single-part products as detached products
+            ProcessSinglePartProductsAsDetached(workOrder);
+
             // Calculate statistics
             workOrder.Statistics = CalculateStatistics(workOrder);
 
@@ -450,6 +453,50 @@ public class ImportDataTransformService
             {
                 part.NestSheetName = sheetIdToNameMapping[part.NestSheetId];
             }
+        }
+    }
+
+    private void ProcessSinglePartProductsAsDetached(ImportWorkOrder workOrder)
+    {
+        // Find products with exactly 1 part and convert them to detached products
+        var singlePartProducts = workOrder.Products
+            .Where(p => p.Parts.Count == 1 && p.Subassemblies.Count == 0)
+            .ToList();
+        
+        // Create list to track products to remove after conversion
+        var productsToRemove = new List<ImportProduct>();
+        
+        foreach (var product in singlePartProducts)
+        {
+            var singlePart = product.Parts.First();
+            
+            // Create a detached product from this single-part product
+            var detachedProduct = new ImportDetachedProduct
+            {
+                Id = $"{product.Id}_detached", // Create unique ID to avoid conflicts
+                Name = product.Name,
+                Quantity = product.Quantity,
+                Height = singlePart.Height,
+                Width = singlePart.Width,
+                Thickness = singlePart.Thickness,
+                Material = singlePart.Material,
+                EdgeBanding = singlePart.EdgeBanding,
+                WorkOrderId = workOrder.Id
+            };
+            
+            workOrder.DetachedProducts.Add(detachedProduct);
+            productsToRemove.Add(product);
+        }
+        
+        // Remove the original single-part products
+        foreach (var product in productsToRemove)
+        {
+            workOrder.Products.Remove(product);
+        }
+        
+        if (singlePartProducts.Any())
+        {
+            _logger.LogInformation("Identified {Count} single-part products as detached products during transformation", singlePartProducts.Count);
         }
     }
 

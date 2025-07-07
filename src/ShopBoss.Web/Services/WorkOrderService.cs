@@ -97,10 +97,34 @@ public class WorkOrderService
     {
         try
         {
-            return await _context.WorkOrders
+            // Load work order with nest sheets first to avoid cartesian products
+            var workOrder = await _context.WorkOrders
                 .Include(w => w.NestSheets)
-                    .ThenInclude(n => n.Parts)
                 .FirstOrDefaultAsync(w => w.Id == workOrderId);
+
+            if (workOrder == null)
+            {
+                return null;
+            }
+
+            // Load parts for nest sheets in separate query
+            var nestSheetIds = workOrder.NestSheets.Select(n => n.Id).ToList();
+            var nestSheetsWithParts = await _context.NestSheets
+                .Where(n => nestSheetIds.Contains(n.Id))
+                .Include(n => n.Parts)
+                .ToListAsync();
+
+            // Update nest sheets with loaded parts
+            foreach (var nestSheet in workOrder.NestSheets)
+            {
+                var nestSheetWithParts = nestSheetsWithParts.FirstOrDefault(n => n.Id == nestSheet.Id);
+                if (nestSheetWithParts != null)
+                {
+                    nestSheet.Parts = nestSheetWithParts.Parts;
+                }
+            }
+
+            return workOrder;
         }
         catch (Exception ex)
         {
@@ -109,30 +133,38 @@ public class WorkOrderService
         }
     }
 
-    public async Task<List<WorkOrder>> GetWorkOrderSummariesAsync(string searchTerm = "")
+    public async Task<List<WorkOrderSummary>> GetWorkOrderSummariesAsync(string searchTerm = "")
     {
         try
         {
-            var query = _context.WorkOrders
-                .Include(w => w.Products)
-                .Include(w => w.Hardware)
-                .Include(w => w.DetachedProducts)
-                .AsQueryable();
+            var baseQuery = _context.WorkOrders.AsQueryable();
 
             // Apply search filter if provided
             if (!string.IsNullOrEmpty(searchTerm))
             {
-                query = query.Where(w => w.Name.Contains(searchTerm) || w.Id.Contains(searchTerm));
+                baseQuery = baseQuery.Where(w => w.Name.Contains(searchTerm) || w.Id.Contains(searchTerm));
             }
 
-            return await query
+            // Use optimized query with aggregations to avoid loading all related entities
+            var summaries = await baseQuery
+                .Select(w => new WorkOrderSummary
+                {
+                    Id = w.Id,
+                    Name = w.Name,
+                    ImportedDate = w.ImportedDate,
+                    ProductsCount = w.Products.Count(),
+                    HardwareCount = w.Hardware.Count(),
+                    DetachedProductsCount = w.DetachedProducts.Count()
+                })
                 .OrderByDescending(w => w.ImportedDate)
                 .ToListAsync();
+
+            return summaries;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting work order summaries with search term {SearchTerm}", searchTerm);
-            return new List<WorkOrder>();
+            return new List<WorkOrderSummary>();
         }
     }
 
@@ -147,6 +179,160 @@ public class WorkOrderService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting work order by ID {WorkOrderId}", workOrderId);
+            return null;
+        }
+    }
+
+    public async Task<AssemblyStationData> GetAssemblyStationDataAsync(string workOrderId)
+    {
+        try
+        {
+            // Load work order basic info first
+            var workOrder = await _context.WorkOrders
+                .FirstOrDefaultAsync(w => w.Id == workOrderId);
+
+            if (workOrder == null)
+            {
+                return new AssemblyStationData();
+            }
+
+            // Load products separately to avoid cartesian products
+            var products = await _context.Products
+                .Where(p => p.WorkOrderId == workOrderId)
+                .ToListAsync();
+
+            // Load all parts in a single query for this work order
+            var allParts = await _context.Parts
+                .Where(p => p.Product.WorkOrderId == workOrderId)
+                .Select(p => new PartSummary
+                {
+                    Id = p.Id,
+                    Name = p.Name,
+                    ProductId = p.ProductId,
+                    Status = p.Status,
+                    Qty = p.Qty,
+                    Location = p.Location,
+                    Length = p.Length,
+                    Width = p.Width,
+                    Thickness = p.Thickness,
+                    Material = p.Material
+                })
+                .ToListAsync();
+
+            // Load hardware separately
+            var hardware = await _context.Hardware
+                .Where(h => h.WorkOrderId == workOrderId)
+                .ToListAsync();
+
+            // Load detached products separately
+            var detachedProducts = await _context.DetachedProducts
+                .Where(d => d.WorkOrderId == workOrderId)
+                .ToListAsync();
+
+            return new AssemblyStationData
+            {
+                WorkOrder = workOrder,
+                Products = products,
+                Parts = allParts,
+                Hardware = hardware,
+                DetachedProducts = detachedProducts
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting assembly station data for work order {WorkOrderId}", workOrderId);
+            return new AssemblyStationData();
+        }
+    }
+
+    public async Task<ShippingStationData> GetShippingStationDataAsync(string workOrderId)
+    {
+        try
+        {
+            // Load work order basic info first
+            var workOrder = await _context.WorkOrders
+                .FirstOrDefaultAsync(w => w.Id == workOrderId);
+
+            if (workOrder == null)
+            {
+                return new ShippingStationData();
+            }
+
+            // Load products separately to avoid cartesian products
+            var products = await _context.Products
+                .Where(p => p.WorkOrderId == workOrderId)
+                .ToListAsync();
+
+            // Load all parts with status counts in a single optimized query
+            var partStatusSummaries = await _context.Parts
+                .Where(p => p.Product.WorkOrderId == workOrderId)
+                .GroupBy(p => new { p.ProductId, p.Status })
+                .Select(g => new PartStatusSummary
+                {
+                    ProductId = g.Key.ProductId,
+                    Status = g.Key.Status,
+                    Count = g.Count()
+                })
+                .ToListAsync();
+
+            // Load hardware separately
+            var hardware = await _context.Hardware
+                .Where(h => h.WorkOrderId == workOrderId)
+                .ToListAsync();
+
+            // Load detached products separately
+            var detachedProducts = await _context.DetachedProducts
+                .Where(d => d.WorkOrderId == workOrderId)
+                .ToListAsync();
+
+            return new ShippingStationData
+            {
+                WorkOrder = workOrder,
+                Products = products,
+                PartStatusSummaries = partStatusSummaries,
+                Hardware = hardware,
+                DetachedProducts = detachedProducts
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting shipping station data for work order {WorkOrderId}", workOrderId);
+            return new ShippingStationData();
+        }
+    }
+
+    public async Task<ProductWithPartCounts?> GetProductForShippingScanAsync(string workOrderId, string barcode)
+    {
+        try
+        {
+            // Find the product by barcode without Include chains
+            var product = await _context.Products
+                .FirstOrDefaultAsync(p => p.WorkOrderId == workOrderId && 
+                                    (p.Id == barcode || p.Name == barcode || p.ProductNumber == barcode));
+
+            if (product == null)
+            {
+                return null;
+            }
+
+            // Get part status counts for this product in a separate optimized query
+            var partStatusCounts = await _context.Parts
+                .Where(p => p.ProductId == product.Id)
+                .GroupBy(p => p.Status)
+                .Select(g => new { Status = g.Key, Count = g.Count() })
+                .ToListAsync();
+
+            return new ProductWithPartCounts
+            {
+                Product = product,
+                TotalParts = partStatusCounts.Sum(psc => psc.Count),
+                AssembledParts = partStatusCounts.Where(psc => psc.Status == PartStatus.Assembled).Sum(psc => psc.Count),
+                ShippedParts = partStatusCounts.Where(psc => psc.Status == PartStatus.Shipped).Sum(psc => psc.Count)
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting product for shipping scan for work order {WorkOrderId}, barcode {Barcode}", workOrderId, barcode);
             return null;
         }
     }
@@ -235,4 +421,61 @@ public class ProductStatusNode
     public List<Subassembly> Subassemblies { get; set; } = new();
     public List<Hardware> Hardware { get; set; } = new();
     public PartStatus EffectiveStatus { get; set; }
+}
+
+public class WorkOrderSummary
+{
+    public string Id { get; set; } = null!;
+    public string Name { get; set; } = null!;
+    public DateTime ImportedDate { get; set; }
+    public int ProductsCount { get; set; }
+    public int HardwareCount { get; set; }
+    public int DetachedProductsCount { get; set; }
+}
+
+public class AssemblyStationData
+{
+    public WorkOrder WorkOrder { get; set; } = null!;
+    public List<Product> Products { get; set; } = new();
+    public List<PartSummary> Parts { get; set; } = new();
+    public List<Hardware> Hardware { get; set; } = new();
+    public List<DetachedProduct> DetachedProducts { get; set; } = new();
+}
+
+public class PartSummary
+{
+    public string Id { get; set; } = null!;
+    public string Name { get; set; } = null!;
+    public string? ProductId { get; set; }
+    public PartStatus Status { get; set; }
+    public int Qty { get; set; }
+    public string? Location { get; set; }
+    public decimal? Length { get; set; }
+    public decimal? Width { get; set; }
+    public decimal? Thickness { get; set; }
+    public string Material { get; set; } = string.Empty;
+}
+
+public class ShippingStationData
+{
+    public WorkOrder WorkOrder { get; set; } = null!;
+    public List<Product> Products { get; set; } = new();
+    public List<PartStatusSummary> PartStatusSummaries { get; set; } = new();
+    public List<Hardware> Hardware { get; set; } = new();
+    public List<DetachedProduct> DetachedProducts { get; set; } = new();
+}
+
+public class PartStatusSummary
+{
+    public string? ProductId { get; set; }
+    public PartStatus Status { get; set; }
+    public int Count { get; set; }
+}
+
+public class ProductWithPartCounts
+{
+    public Product Product { get; set; } = null!;
+    public int TotalParts { get; set; }
+    public int AssembledParts { get; set; }
+    public int ShippedParts { get; set; }
 }

@@ -266,22 +266,29 @@
 **Risk:** MEDIUM - Multiple station performance improvements
 
 **Tasks:**
-1. Optimize Admin work order list queries in `WorkOrderService.GetWorkOrderSummariesAsync()`
-2. Migrate Assembly Station to unified API with 'view' mode
-3. Migrate Shipping Station to unified API or optimized endpoints
-4. Remove cartesian product Include chains from all station loading
+1. [DONE] Optimize Admin work order list queries in `WorkOrderService.GetWorkOrderSummariesAsync()`
+2. Create optimized Assembly Station endpoints that eliminate cartesian product Include chains
+3. Create optimized Shipping Station endpoints that eliminate cartesian product Include chains
+4. Remove cartesian product Include chains from all remaining station loading methods
+
+**Implementation Details:**
+- Assembly and Shipping stations have specialized data requirements that don't fit the tree view pattern
+- Create dedicated API endpoints or service methods for assembly readiness, part filtering, and shipping status
+- Use split queries and projection to avoid loading unnecessary related entities
+- Maintain existing UI structure while optimizing backend data loading performance
 
 **Success Criteria:**
 - Admin work order list loads < 2 seconds with 50+ work orders
-- Assembly Station loads < 3 seconds for large work orders
-- Shipping Station loads < 3 seconds for large work orders
-- All stations use optimized split-query architecture
+- Assembly Station loads < 3 seconds for large work orders (1000+ parts)
+- Shipping Station loads < 3 seconds for large work orders (1000+ parts)
+- All stations use optimized split-query architecture without cartesian products
 
 **Testing Instructions:**
 - Test Admin index with many work orders for fast loading
 - Test Assembly Station with large work order (1000+ parts)
-- Test Shipping Station with large work order
+- Test Shipping Station with large work order (1000+ parts)
 - Verify no memory leaks during extended sessions
+- Monitor database query execution plans to confirm cartesian product elimination
 
 **Post-Completion:**
 - Follow Collaboration_Guidelines.md for git commit and documentation

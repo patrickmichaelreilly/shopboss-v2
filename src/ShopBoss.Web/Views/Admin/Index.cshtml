@@ -1,4 +1,4 @@
-@model IEnumerable<ShopBoss.Web.Models.WorkOrder>
+@model IEnumerable<ShopBoss.Web.Services.WorkOrderSummary>
 
 @{
     ViewData["Title"] = "Work Orders";
@@ -110,13 +110,13 @@ else
                         </td>
                         <td>@workOrder.ImportedDate.ToString("yyyy-MM-dd HH:mm")</td>
                         <td>
-                            <span class="badge bg-primary">@workOrder.Products.Count</span>
+                            <span class="badge bg-primary">@workOrder.ProductsCount</span>
                         </td>
                         <td>
-                            <span class="badge bg-secondary">@workOrder.Hardware.Count</span>
+                            <span class="badge bg-secondary">@workOrder.HardwareCount</span>
                         </td>
                         <td>
-                            <span class="badge bg-info">@workOrder.DetachedProducts.Count</span>
+                            <span class="badge bg-info">@workOrder.DetachedProductsCount</span>
                         </td>
                         <td>
                             <div class="btn-group" role="group">

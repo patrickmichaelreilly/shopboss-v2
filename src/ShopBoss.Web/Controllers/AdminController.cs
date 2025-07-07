@@ -39,19 +39,19 @@ public class AdminController : Controller
     {
         try
         {
-            var workOrders = await _workOrderService.GetWorkOrderSummariesAsync(search);
+            var workOrderSummaries = await _workOrderService.GetWorkOrderSummariesAsync(search);
 
             // Get current active work order from session
             ViewBag.ActiveWorkOrderId = HttpContext.Session.GetString("ActiveWorkOrderId");
             ViewBag.SearchTerm = search;
 
-            return View(workOrders);
+            return View(workOrderSummaries);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving work orders");
             TempData["ErrorMessage"] = "An error occurred while loading the work orders.";
-            return View(new List<WorkOrder>());
+            return View(new List<WorkOrderSummary>());
         }
     }
 

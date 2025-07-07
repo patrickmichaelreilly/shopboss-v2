@@ -245,12 +245,46 @@ public class SortingRuleService
 
     public async Task<StorageRack?> GetRackWithBinsAsync(string rackId)
     {
-        return await _context.StorageRacks
+        // Load rack with bins first to avoid cartesian products
+        var rack = await _context.StorageRacks
             .Include(r => r.Bins)
-                .ThenInclude(b => b.Part)
-            .Include(r => r.Bins)
-                .ThenInclude(b => b.Product)
             .FirstOrDefaultAsync(r => r.Id == rackId);
+
+        if (rack == null)
+        {
+            return null;
+        }
+
+        // Load parts and products for bins in separate queries
+        var binIds = rack.Bins.Select(b => b.Id).ToList();
+        
+        var binsWithParts = await _context.Bins
+            .Where(b => binIds.Contains(b.Id) && b.PartId != null)
+            .Include(b => b.Part)
+            .ToListAsync();
+
+        var binsWithProducts = await _context.Bins
+            .Where(b => binIds.Contains(b.Id) && b.ProductId != null)
+            .Include(b => b.Product)
+            .ToListAsync();
+
+        // Update the bins in the rack with the loaded relationships
+        foreach (var bin in rack.Bins)
+        {
+            var binWithPart = binsWithParts.FirstOrDefault(b => b.Id == bin.Id);
+            if (binWithPart != null)
+            {
+                bin.Part = binWithPart.Part;
+            }
+
+            var binWithProduct = binsWithProducts.FirstOrDefault(b => b.Id == bin.Id);
+            if (binWithProduct != null)
+            {
+                bin.Product = binWithProduct.Product;
+            }
+        }
+
+        return rack;
     }
 
     public async Task<List<string>> CheckAssemblyReadinessAsync(string workOrderId)

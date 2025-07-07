@@ -619,14 +619,9 @@
             
             const stats = importData.statistics;
             
-            // Calculate detached products based on single-part products (they will be converted during import)
-            const singlePartProductsCount = importData.products ? 
-                importData.products.filter(product => product.parts && product.parts.length === 1).length : 0;
-            const actualDetachedProducts = stats.totalDetachedProducts + singlePartProductsCount;
-            
-            totalProducts.textContent = stats.totalProducts - singlePartProductsCount; // Subtract single-part products
+            totalProducts.textContent = stats.totalProducts;
             totalParts.textContent = stats.totalParts;
-            totalDetachedProducts.textContent = actualDetachedProducts;
+            totalDetachedProducts.textContent = stats.totalDetachedProducts;
             totalHardware.textContent = stats.totalHardware;
             totalNestSheets.textContent = stats.totalNestSheets;
         }
