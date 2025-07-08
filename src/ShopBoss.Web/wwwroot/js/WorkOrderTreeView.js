@@ -277,8 +277,15 @@ class WorkOrderTreeView {
         } else {
             const statusSelect = node.querySelector('.status-dropdown');
             if (statusSelect) {
-                statusSelect.addEventListener('change', (e) => {
-                    this.handleStatusChange(nodeId, e.target.value);
+                // Remove any existing event listeners to prevent duplicates
+                statusSelect.replaceWith(statusSelect.cloneNode(true));
+                const newStatusSelect = node.querySelector('.status-dropdown');
+                
+                newStatusSelect.addEventListener('change', (e) => {
+                    e.stopPropagation();
+                    const itemType = e.target.dataset.itemType;
+                    const targetNodeId = e.target.dataset.nodeId;
+                    this.handleStatusChange(targetNodeId, e.target.value, itemType);
                 });
             }
         }
@@ -291,7 +298,7 @@ class WorkOrderTreeView {
         const currentStatus = item.status || 'Pending';
         
         return `
-            <select class="status-dropdown form-select form-select-sm" style="width: auto; min-width: 100px;" data-node-id="${item.id}">
+            <select class="status-dropdown form-select form-select-sm" style="width: auto; min-width: 100px;" data-node-id="${item.id}" data-item-type="${item.type}">
                 ${statuses.map(status => 
                     `<option value="${status}" ${status === currentStatus ? 'selected' : ''}>${status}</option>`
                 ).join('')}
@@ -352,10 +359,10 @@ class WorkOrderTreeView {
         this.onSelectionChange(this.getSelectionSummary());
     }
 
-    handleStatusChange(nodeId, newStatus) {
+    handleStatusChange(nodeId, newStatus, itemType) {
         if (this.mode !== 'modify') return;
         
-        this.onStatusChange(nodeId, newStatus);
+        this.onStatusChange(nodeId, newStatus, itemType);
     }
 
     selectAllChildren(parentId) {

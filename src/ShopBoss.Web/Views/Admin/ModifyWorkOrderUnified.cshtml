@@ -505,8 +505,8 @@
 
             // Refresh button
             $('#refreshDataBtn').click(function() {
-                if (treeView && treeView.refreshData) {
-                    treeView.refreshData();
+                if (treeView && treeView.refresh) {
+                    treeView.refresh();
                 }
             });
         }
@@ -521,6 +521,15 @@
             try {
                 console.log(`Status change: ${nodeId} -> ${newStatus} (${itemType})`);
                 
+                // Map frontend item types to backend expectations
+                let backendItemType = itemType;
+                if (itemType === 'detached_product') {
+                    backendItemType = 'detachedproduct';
+                }
+                
+                // Enable cascading for products to update child parts
+                const shouldCascade = itemType === 'product';
+                
                 // Call the existing UpdateStatus endpoint
                 const response = await fetch('/Admin/UpdateStatus', {
                     method: 'POST',
@@ -529,10 +538,10 @@
                     },
                     body: new URLSearchParams({
                         itemId: nodeId,
-                        itemType: itemType,
+                        itemType: backendItemType,
                         newStatus: newStatus,
                         workOrderId: workOrderId,
-                        cascadeToChildren: false
+                        cascadeToChildren: shouldCascade
                     })
                 });
                 
@@ -540,24 +549,24 @@
                 
                 if (result.success) {
                     showSuccess(`${itemType} status updated to ${newStatus}`);
-                    // Refresh statistics after status change
+                    // Refresh tree to show cascaded status changes
                     setTimeout(() => {
-                        if (treeView && treeView.refreshData) {
-                            treeView.refreshData();
+                        if (treeView && treeView.refresh) {
+                            treeView.refresh();
                         }
                     }, 500);
                 } else {
                     showError(`Failed to update status: ${result.message}`);
                     // Refresh tree to revert changes
-                    if (treeView && treeView.refreshData) {
-                        treeView.refreshData();
+                    if (treeView && treeView.refresh) {
+                        treeView.refresh();
                     }
                 }
             } catch (error) {
                 console.error('Error updating status:', error);
                 showError('Error updating status');
-                if (treeView && treeView.refreshData) {
-                    treeView.refreshData();
+                if (treeView && treeView.refresh) {
+                    treeView.refresh();
                 }
             }
         }
@@ -639,8 +648,8 @@
                     
                     // Reload tree data
                     setTimeout(() => {
-                        if (treeView && treeView.refreshData) {
-                            treeView.refreshData();
+                        if (treeView && treeView.refresh) {
+                            treeView.refresh();
                         }
                     }, 1500);
                 } else {
