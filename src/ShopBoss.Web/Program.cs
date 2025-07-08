@@ -42,6 +42,10 @@ builder.Services.AddScoped<SortingRuleService>();
 builder.Services.AddScoped<PartFilteringService>();
 builder.Services.AddScoped<ShippingService>();
 builder.Services.AddScoped<WorkOrderService>();
+builder.Services.AddScoped<BackupService>();
+
+// Add background services
+builder.Services.AddHostedService<BackupBackgroundService>();
 
 var app = builder.Build();
 

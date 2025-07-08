@@ -21,6 +21,8 @@ public class ShopBossDbContext : DbContext
     public DbSet<ScanHistory> ScanHistory { get; set; }
     public DbSet<StorageRack> StorageRacks { get; set; }
     public DbSet<Bin> Bins { get; set; }
+    public DbSet<BackupConfiguration> BackupConfigurations { get; set; }
+    public DbSet<BackupStatus> BackupStatuses { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -222,6 +224,33 @@ public class ShopBossDbContext : DbContext
             entity.HasIndex(e => e.Status);
             entity.HasIndex(e => e.PartId);
             entity.HasIndex(e => e.ProductId);
+        });
+
+        modelBuilder.Entity<BackupConfiguration>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.BackupIntervalMinutes).IsRequired();
+            entity.Property(e => e.MaxBackupRetention).IsRequired();
+            entity.Property(e => e.EnableCompression).IsRequired();
+            entity.Property(e => e.BackupDirectoryPath).IsRequired();
+            entity.Property(e => e.EnableAutomaticBackups).IsRequired();
+            entity.Property(e => e.LastUpdated).IsRequired();
+        });
+
+        modelBuilder.Entity<BackupStatus>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.CreatedDate).IsRequired();
+            entity.Property(e => e.BackupType).IsRequired();
+            entity.Property(e => e.FilePath).IsRequired();
+            entity.Property(e => e.OriginalSize).IsRequired();
+            entity.Property(e => e.BackupSize).IsRequired();
+            entity.Property(e => e.IsSuccessful).IsRequired();
+            entity.Property(e => e.Duration).IsRequired();
+            
+            entity.HasIndex(e => e.CreatedDate);
+            entity.HasIndex(e => e.BackupType);
+            entity.HasIndex(e => e.IsSuccessful);
         });
     }
 }
