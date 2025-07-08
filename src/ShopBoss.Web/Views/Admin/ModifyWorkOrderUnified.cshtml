@@ -549,12 +549,15 @@
                 
                 if (result.success) {
                     showSuccess(`${itemType} status updated to ${newStatus}`);
-                    // Refresh tree to show cascaded status changes
-                    setTimeout(() => {
-                        if (treeView && treeView.refresh) {
-                            treeView.refresh();
-                        }
-                    }, 500);
+                    // Only refresh if cascading was enabled (for products)
+                    // This ensures child part status updates are reflected
+                    if (shouldCascade) {
+                        setTimeout(() => {
+                            if (treeView && treeView.refresh) {
+                                treeView.refresh();
+                            }
+                        }, 750); // Increased delay to ensure DB commit
+                    }
                 } else {
                     showError(`Failed to update status: ${result.message}`);
                     // Refresh tree to revert changes

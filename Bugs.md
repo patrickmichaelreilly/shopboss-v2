@@ -4,20 +4,11 @@
     View audit logs
     Group multiple related work orders (project phases)
     Workflow for re-cuts, supplementary Nest Sheets
-    Multiple quantities of products and parts breaks everything
-    Active Work Order selection at top banner
 
 # Import Process
-    Do part filtering now, add field to part data indicating Part Type (which drives storage rack and readiness calc.)??
-    Not handling multiple quantities correctly. Especially hardware.
     Handle repeat work order names
 
-
-# Dashboard
-    Eliminate. Open direct to work order view
-
 # Work Order Detail View
-    Nest Sheets count is stuck at 0
     Group similar hardware and "detached products"
     Filtering
     Archive functionality
@@ -29,7 +20,6 @@
     Recent Scan History modal glitches out
     Nest sheet detail view with sticker printing (recuts as well)
     Nest cut status does not correctly update if all the parts from the nest are marked cut by other means
-
 
 # Sorting Station
     The storage rack fill counts next to their names does not update when i empty a bin.

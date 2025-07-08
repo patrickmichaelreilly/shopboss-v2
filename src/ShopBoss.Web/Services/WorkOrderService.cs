@@ -133,11 +133,17 @@ public class WorkOrderService
         }
     }
 
-    public async Task<List<WorkOrderSummary>> GetWorkOrderSummariesAsync(string searchTerm = "")
+    public async Task<List<WorkOrderSummary>> GetWorkOrderSummariesAsync(string searchTerm = "", bool includeArchived = false)
     {
         try
         {
             var baseQuery = _context.WorkOrders.AsQueryable();
+
+            // Apply archive filter
+            if (!includeArchived)
+            {
+                baseQuery = baseQuery.Where(w => !w.IsArchived);
+            }
 
             // Apply search filter if provided
             if (!string.IsNullOrEmpty(searchTerm))
@@ -152,6 +158,8 @@ public class WorkOrderService
                     Id = w.Id,
                     Name = w.Name,
                     ImportedDate = w.ImportedDate,
+                    IsArchived = w.IsArchived,
+                    ArchivedDate = w.ArchivedDate,
                     ProductsCount = w.Products.Count(),
                     HardwareCount = w.Hardware.Count(),
                     DetachedProductsCount = w.DetachedProducts.Count()
@@ -337,6 +345,90 @@ public class WorkOrderService
         }
     }
 
+    public async Task<bool> ArchiveWorkOrderAsync(string workOrderId)
+    {
+        try
+        {
+            var workOrder = await _context.WorkOrders.FindAsync(workOrderId);
+            if (workOrder == null)
+            {
+                _logger.LogWarning("Attempted to archive non-existent work order {WorkOrderId}", workOrderId);
+                return false;
+            }
+
+            if (workOrder.IsArchived)
+            {
+                _logger.LogWarning("Attempted to archive already archived work order {WorkOrderId}", workOrderId);
+                return false;
+            }
+
+            workOrder.IsArchived = true;
+            workOrder.ArchivedDate = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Work order {WorkOrderId} archived successfully", workOrderId);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error archiving work order {WorkOrderId}", workOrderId);
+            return false;
+        }
+    }
+
+    public async Task<bool> UnarchiveWorkOrderAsync(string workOrderId)
+    {
+        try
+        {
+            var workOrder = await _context.WorkOrders.FindAsync(workOrderId);
+            if (workOrder == null)
+            {
+                _logger.LogWarning("Attempted to unarchive non-existent work order {WorkOrderId}", workOrderId);
+                return false;
+            }
+
+            if (!workOrder.IsArchived)
+            {
+                _logger.LogWarning("Attempted to unarchive non-archived work order {WorkOrderId}", workOrderId);
+                return false;
+            }
+
+            workOrder.IsArchived = false;
+            workOrder.ArchivedDate = null;
+
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Work order {WorkOrderId} unarchived successfully", workOrderId);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error unarchiving work order {WorkOrderId}", workOrderId);
+            return false;
+        }
+    }
+
+    public async Task<bool> IsWorkOrderActiveAsync(string workOrderId)
+    {
+        try
+        {
+            // A work order is considered active if it has any parts that are not in their final state
+            var hasActiveParts = await _context.Parts
+                .Where(p => p.Product.WorkOrderId == workOrderId && p.Status != PartStatus.Shipped)
+                .AnyAsync();
+
+            var hasActiveDetachedProducts = await _context.DetachedProducts
+                .Where(d => d.WorkOrderId == workOrderId && !d.IsShipped)
+                .AnyAsync();
+
+            return hasActiveParts || hasActiveDetachedProducts;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error checking if work order {WorkOrderId} is active", workOrderId);
+            return true; // Default to active if there's an error to prevent accidental archiving
+        }
+    }
+
     private List<ProductStatusNode> BuildProductNodes(List<Product> products, List<Part> parts, List<Subassembly> subassemblies, List<Part> subassemblyParts, List<Hardware> hardware)
     {
         var productNodes = new List<ProductStatusNode>();
@@ -428,6 +520,8 @@ public class WorkOrderSummary
     public string Id { get; set; } = null!;
     public string Name { get; set; } = null!;
     public DateTime ImportedDate { get; set; }
+    public bool IsArchived { get; set; }
+    public DateTime? ArchivedDate { get; set; }
     public int ProductsCount { get; set; }
     public int HardwareCount { get; set; }
     public int DetachedProductsCount { get; set; }

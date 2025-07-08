@@ -34,23 +34,33 @@
 <div class="card mb-4">
     <div class="card-body">
         <div class="row g-3">
-            <div class="col-md-8">
+            <div class="col-md-6">
                 <form asp-action="Index" method="get" class="d-flex">
                     <input type="text" name="search" class="form-control me-2" 
                            placeholder="Search by work order name or ID..." 
                            value="@ViewBag.SearchTerm">
+                    <input type="hidden" name="includeArchived" value="@ViewBag.IncludeArchived" />
                     <button type="submit" class="btn btn-outline-secondary">
                         <i class="fas fa-search"></i>
                     </button>
                     @if (!string.IsNullOrEmpty(ViewBag.SearchTerm))
                     {
-                        <a asp-action="Index" class="btn btn-outline-secondary ms-2">
+                        <a asp-action="Index" asp-route-includeArchived="@ViewBag.IncludeArchived" class="btn btn-outline-secondary ms-2">
                             <i class="fas fa-times"></i>
                         </a>
                     }
                 </form>
             </div>
-            <div class="col-md-4 text-end">
+            <div class="col-md-3">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="includeArchivedToggle" 
+                           onchange="toggleArchiveFilter()" @(ViewBag.IncludeArchived ? "checked" : "")>
+                    <label class="form-check-label" for="includeArchivedToggle">
+                        <i class="fas fa-archive me-1"></i>Show Archived
+                    </label>
+                </div>
+            </div>
+            <div class="col-md-3 text-end">
                 <button type="button" class="btn btn-outline-danger" id="bulkDeleteBtn" 
                         onclick="performBulkDelete()" disabled>
                     <i class="fas fa-trash me-2"></i>Delete Selected
@@ -89,7 +99,8 @@ else
                 @foreach (var workOrder in Model)
                 {
                     var isActive = ViewBag.ActiveWorkOrderId?.ToString() == workOrder.Id;
-                    <tr class="@(isActive ? "table-warning" : "")">
+                    var rowClass = isActive ? "table-warning" : (workOrder.IsArchived ? "table-secondary" : "");
+                    <tr class="@rowClass">
                         <td>
                             <input type="checkbox" class="form-check-input work-order-checkbox" 
                                    value="@workOrder.Id" onchange="updateBulkActions()">
@@ -98,9 +109,17 @@ else
                             <div class="d-flex align-items-center">
                                 @if (isActive)
                                 {
-                                    <i class="fas fa-star text-warning me-2" title="Active Work Order"></i>
+                                    <i class="fas fa-star text-warning me-2" title="Active Work Order (In Service)"></i>
                                 }
-                                <a asp-action="ModifyWorkOrder" asp-route-id="@workOrder.Id" class="text-decoration-none">
+                                else if (workOrder.IsArchived)
+                                {
+                                    <i class="fas fa-archive text-muted me-2" title="Archived Work Order"></i>
+                                }
+                                else
+                                {
+                                    <i class="fas fa-star text-muted me-2" title="Inactive Work Order"></i>
+                                }
+                                <a asp-action="ModifyWorkOrder" asp-route-id="@workOrder.Id" class="text-decoration-none @(workOrder.IsArchived ? "text-muted" : "")">
                                     @workOrder.Name
                                 </a>
                             </div>
@@ -120,17 +139,46 @@ else
                         </td>
                         <td>
                             <div class="btn-group" role="group">
-                                @if (!isActive)
+                                @if (isActive)
+                                {
+                                    <button type="button" class="btn btn-sm btn-outline-success" disabled title="Currently Active Work Order">
+                                        <i class="fas fa-star"></i>
+                                    </button>
+                                }
+                                else if (!workOrder.IsArchived)
                                 {
                                     <button type="button" class="btn btn-sm btn-outline-success" 
                                             onclick="setActiveWorkOrder('@workOrder.Id')" title="Set as Active">
                                         <i class="fas fa-star"></i>
                                     </button>
                                 }
-                                <a asp-action="ModifyWorkOrder" asp-route-id="@workOrder.Id" 
-                                   class="btn btn-sm btn-outline-warning" title="Modify Work Order">
-                                    <i class="fas fa-edit"></i>
-                                </a>
+                                else
+                                {
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" disabled title="Cannot set archived work order as active">
+                                        <i class="fas fa-star"></i>
+                                    </button>
+                                }
+                                @if (!workOrder.IsArchived)
+                                {
+                                    <a asp-action="ModifyWorkOrder" asp-route-id="@workOrder.Id" 
+                                       class="btn btn-sm btn-outline-warning" title="Modify Work Order">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" 
+                                            onclick="archiveWorkOrder('@workOrder.Id', '@workOrder.Name')" title="Archive">
+                                        <i class="fas fa-archive"></i>
+                                    </button>
+                                }
+                                else
+                                {
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" disabled title="Cannot modify archived work order">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" 
+                                            onclick="unarchiveWorkOrder('@workOrder.Id', '@workOrder.Name')" title="Unarchive">
+                                        <i class="fas fa-box-open"></i>
+                                    </button>
+                                }
                                 <button type="button" class="btn btn-sm btn-outline-danger" 
                                         onclick="confirmDelete('@workOrder.Id', '@workOrder.Name')" title="Delete">
                                     <i class="fas fa-trash"></i>
@@ -243,6 +291,70 @@ else
 
                 document.getElementById('bulkDeleteForm').action = '@Url.Action("BulkDeleteWorkOrders")';
                 document.getElementById('bulkDeleteForm').submit();
+            }
+        }
+
+        // Archive work order function
+        function archiveWorkOrder(id, name) {
+            if (confirm(`Are you sure you want to archive work order "${name}"?\n\nArchived work orders are hidden from the default view but can be restored later.`)) {
+                fetch('@Url.Action("ArchiveWorkOrder")', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
+                    },
+                    body: 'id=' + encodeURIComponent(id)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        location.reload();
+                    } else {
+                        alert('Error: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred while archiving the work order.');
+                });
+            }
+        }
+
+        // Unarchive work order function
+        function unarchiveWorkOrder(id, name) {
+            if (confirm(`Are you sure you want to restore work order "${name}" from archive?`)) {
+                fetch('@Url.Action("UnarchiveWorkOrder")', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
+                    },
+                    body: 'id=' + encodeURIComponent(id)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        location.reload();
+                    } else {
+                        alert('Error: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred while unarchiving the work order.');
+                });
+            }
+        }
+
+        // Toggle archive filter
+        function toggleArchiveFilter() {
+            const includeArchived = document.getElementById('includeArchivedToggle').checked;
+            const currentSearch = '@ViewBag.SearchTerm';
+            const url = '@Url.Action("Index")' + '?includeArchived=' + includeArchived;
+            if (currentSearch) {
+                window.location.href = url + '&search=' + encodeURIComponent(currentSearch);
+            } else {
+                window.location.href = url;
             }
         }
 

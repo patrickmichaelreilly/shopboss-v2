@@ -11,6 +11,10 @@ public class WorkOrder
     
     public DateTime ImportedDate { get; set; }
     
+    public bool IsArchived { get; set; } = false;
+    
+    public DateTime? ArchivedDate { get; set; }
+    
     public List<Product> Products { get; set; } = new();
     
     public List<Hardware> Hardware { get; set; } = new();

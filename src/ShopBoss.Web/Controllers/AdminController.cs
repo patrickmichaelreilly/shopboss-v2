@@ -35,15 +35,16 @@ public class AdminController : Controller
         _hubContext = hubContext;
     }
 
-    public async Task<IActionResult> Index(string search = "")
+    public async Task<IActionResult> Index(string search = "", bool includeArchived = false)
     {
         try
         {
-            var workOrderSummaries = await _workOrderService.GetWorkOrderSummariesAsync(search);
+            var workOrderSummaries = await _workOrderService.GetWorkOrderSummariesAsync(search, includeArchived);
 
             // Get current active work order from session
             ViewBag.ActiveWorkOrderId = HttpContext.Session.GetString("ActiveWorkOrderId");
             ViewBag.SearchTerm = search;
+            ViewBag.IncludeArchived = includeArchived;
 
             return View(workOrderSummaries);
         }
@@ -83,6 +84,100 @@ public class AdminController : Controller
             _logger.LogError(ex, "Error deleting work order {WorkOrderId}", id);
             TempData["ErrorMessage"] = "An error occurred while deleting the work order.";
             return RedirectToAction(nameof(Index));
+        }
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> ArchiveWorkOrder(string id)
+    {
+        if (string.IsNullOrEmpty(id))
+        {
+            return Json(new { success = false, message = "Invalid work order ID." });
+        }
+
+        try
+        {
+            // Check if work order is currently active
+            var activeWorkOrderId = HttpContext.Session.GetString("ActiveWorkOrderId");
+            if (activeWorkOrderId == id)
+            {
+                return Json(new { success = false, message = "Cannot archive the currently active work order. Please set a different work order as active first." });
+            }
+
+            // Check if work order has active parts
+            var isActive = await _workOrderService.IsWorkOrderActiveAsync(id);
+            if (isActive)
+            {
+                return Json(new { success = false, message = "Cannot archive work order with active parts. All parts must be shipped before archiving." });
+            }
+
+            var success = await _workOrderService.ArchiveWorkOrderAsync(id);
+            if (success)
+            {
+                // Log the archive action
+                await _auditTrailService.LogAsync(
+                    action: "ArchiveWorkOrder",
+                    entityType: "WorkOrder",
+                    entityId: id,
+                    oldValue: "Active",
+                    newValue: "Archived",
+                    station: "Admin",
+                    workOrderId: id,
+                    details: "Work order archived via Admin interface",
+                    sessionId: HttpContext.Session.Id
+                );
+
+                return Json(new { success = true, message = "Work order archived successfully." });
+            }
+            else
+            {
+                return Json(new { success = false, message = "Failed to archive work order." });
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error archiving work order {WorkOrderId}", id);
+            return Json(new { success = false, message = "An error occurred while archiving the work order." });
+        }
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> UnarchiveWorkOrder(string id)
+    {
+        if (string.IsNullOrEmpty(id))
+        {
+            return Json(new { success = false, message = "Invalid work order ID." });
+        }
+
+        try
+        {
+            var success = await _workOrderService.UnarchiveWorkOrderAsync(id);
+            if (success)
+            {
+                // Log the unarchive action
+                await _auditTrailService.LogAsync(
+                    action: "UnarchiveWorkOrder",
+                    entityType: "WorkOrder",
+                    entityId: id,
+                    oldValue: "Archived",
+                    newValue: "Active",
+                    station: "Admin",
+                    workOrderId: id,
+                    details: "Work order unarchived via Admin interface",
+                    sessionId: HttpContext.Session.Id
+                );
+
+                return Json(new { success = true, message = "Work order unarchived successfully." });
+            }
+            else
+            {
+                return Json(new { success = false, message = "Failed to unarchive work order." });
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error unarchiving work order {WorkOrderId}", id);
+            return Json(new { success = false, message = "An error occurred while unarchiving the work order." });
         }
     }
 
