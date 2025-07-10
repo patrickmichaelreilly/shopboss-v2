@@ -239,11 +239,22 @@ else
 
         // Load rack details and display grid
         function loadRackDetails(rackId) {
+            console.log('loadRackDetails called with rackId:', rackId);
             currentRackId = rackId;
             
-            fetch(`/Sorting/GetRackDetails/${rackId}`)
-                .then(response => response.json())
+            if (!rackId) {
+                console.error('loadRackDetails: No rackId provided');
+                showError('No rack ID provided for loading details');
+                return;
+            }
+            
+            fetch(`/Sorting/GetRackDetails/${encodeURIComponent(rackId)}`)
+                .then(response => {
+                    console.log('GetRackDetails response status:', response.status);
+                    return response.json();
+                })
                 .then(data => {
+                    console.log('GetRackDetails response data:', data);
                     if (data.success) {
                         displayRackGrid(data.rack);
                     } else {
@@ -536,19 +547,33 @@ else
         document.addEventListener('DOMContentLoaded', function() {
             const firstTab = document.querySelector('.nav-link');
             if (firstTab && firstTab.id) {
-                const rackId = firstTab.id.split('-')[1];
-                // Ensure the first tab is properly activated
-                if (!firstTab.classList.contains('active')) {
-                    firstTab.classList.add('active');
+                const parts = firstTab.id.split('-');
+                // Expected format: rack-{uuid}-tab, so extract the full UUID
+                if (parts.length >= 3 && parts[0] === 'rack' && parts[parts.length - 1] === 'tab') {
+                    // Join all middle parts to reconstruct the full UUID
+                    const rackId = parts.slice(1, -1).join('-');
+                    console.log('DOMContentLoaded: Loading rack', rackId, 'from tab', firstTab.id);
+                    // Ensure the first tab is properly activated
+                    if (!firstTab.classList.contains('active')) {
+                        firstTab.classList.add('active');
+                    }
+                    loadRackDetails(rackId);
+                } else {
+                    console.error('DOMContentLoaded: Invalid tab ID format:', firstTab.id);
                 }
-                loadRackDetails(rackId);
             } else {
                 // Fallback: Try to find any rack tab and activate it
                 const anyTab = document.querySelector('[data-bs-toggle="pill"]');
                 if (anyTab && anyTab.id) {
-                    const rackId = anyTab.id.split('-')[1];
-                    anyTab.classList.add('active');
-                    loadRackDetails(rackId);
+                    const parts = anyTab.id.split('-');
+                    if (parts.length >= 3 && parts[0] === 'rack' && parts[parts.length - 1] === 'tab') {
+                        const rackId = parts.slice(1, -1).join('-');
+                        console.log('DOMContentLoaded: Fallback loading rack', rackId, 'from tab', anyTab.id);
+                        anyTab.classList.add('active');
+                        loadRackDetails(rackId);
+                    } else {
+                        console.error('DOMContentLoaded: No valid rack tabs found');
+                    }
                 }
             }
             
@@ -630,10 +655,17 @@ else
                 if (data.success) {
                     scanner.showScanResult(true, data.message);
                     
-                    // Refresh page to show updated rack status
+                    // Instead of reloading the page, refresh the current rack data
                     setTimeout(() => {
-                        location.reload();
-                    }, 2000);
+                        if (currentRackId) {
+                            console.log('Refreshing rack after successful scan:', currentRackId);
+                            loadRackDetails(currentRackId);
+                        }
+                        // Update cut parts count
+                        if (data.remainingCutParts !== undefined) {
+                            updateCutPartsCount(data.remainingCutParts);
+                        }
+                    }, 1000);
                 } else {
                     scanner.showScanResult(false, data.message || 'Part sorting failed');
                 }
@@ -764,12 +796,16 @@ else
             const activeTab = document.querySelector('.nav-link.active');
             if (activeTab && activeTab.id) {
                 const parts = activeTab.id.split('-');
-                // Expected format: rack-{id}-tab, so rackId should be at index 1
-                if (parts.length >= 3 && parts[0] === 'rack' && parts[2] === 'tab') {
-                    return parts[1];
+                // Expected format: rack-{uuid}-tab, so extract the full UUID
+                if (parts.length >= 3 && parts[0] === 'rack' && parts[parts.length - 1] === 'tab') {
+                    // Join all middle parts to reconstruct the full UUID
+                    const rackId = parts.slice(1, -1).join('-');
+                    console.log('getCurrentlySelectedRackId: Found rack', rackId, 'from tab', activeTab.id);
+                    return rackId;
                 }
             }
             // Fallback: try to get from currentRackId global variable
+            console.log('getCurrentlySelectedRackId: Using fallback currentRackId', currentRackId);
             return currentRackId;
         }
 
