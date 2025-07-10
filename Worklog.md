@@ -1,3 +1,33 @@
+## Emergency Fix: Universal Scanner Sorting Station Issues - COMPLETED (2025-07-10)
+
+**Objective:** Fix critical Universal Scanner issues in Sorting Station that were blocking testing, specifically the "Preferred rack 'b80f6d70' not found or inactive" error and ensure the sorting page always opens with a rack selected.
+
+### Root Cause Analysis
+- **Invalid Rack ID**: Universal Scanner was passing invalid rack IDs to the sorting logic due to parsing errors in `getCurrentlySelectedRackId()`
+- **No Default Rack Selection**: Sorting page could open without any rack selected, causing undefined behavior
+- **Rigid Error Handling**: SortingRuleService would fail completely when preferred rack wasn't found instead of graceful fallback
+
+### Fixes Implemented
+- **Enhanced Rack ID Parsing**: Fixed `getCurrentlySelectedRackId()` to properly parse rack IDs from tab elements and include fallback to global `currentRackId`
+- **Guaranteed Rack Selection**: Modified sorting page initialization to ensure first available rack is always selected and activated on page load
+- **Graceful Fallback Logic**: Updated SortingRuleService to fall back to standard sorting logic when preferred rack is invalid instead of failing
+- **Improved Error Messages**: Enhanced error messages to provide better guidance when rack selection fails
+- **Debug Logging**: Added console debugging to track rack ID selection and sorting request parameters
+
+### Technical Changes
+- **SortingRuleService.cs**: Added fallback logic in `FindOptimalBinForPartAsync()` when preferred rack is not found
+- **Sorting/Index.cshtml**: Enhanced rack tab initialization and `getCurrentlySelectedRackId()` function
+- **Enhanced Rack Tab Logic**: Ensured first rack is always marked as active with proper fallback mechanisms
+
+### Business Logic Preservation
+- **Carcass Part Grouping**: Maintained existing logic where carcass parts prefer currently displayed rack for grouping
+- **Specialized Routing**: Preserved specialized routing for doors, drawer fronts, and adjustable shelves
+- **Product Grouping**: Continued grouping parts by product when same product already has parts in a rack
+
+**Status:** ✅ COMPLETED - Universal Scanner now correctly handles rack context and gracefully falls back when preferred rack is unavailable. Sorting station ready for testing.
+
+---
+
 ## Phase C4: Universal Scanner Architecture Refactoring - COMPLETED (2025-07-10)
 
 **Objective:** Refactor Universal Scanner to be a pure input component that emits events, with each page handling scans using existing station-specific logic.
