@@ -617,6 +617,63 @@ namespace ShopBoss.Web.Migrations
                     b.ToTable("Subassemblies");
                 });
 
+            modelBuilder.Entity("ShopBoss.Web.Models.SystemHealthStatus", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ActiveWorkOrderCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<double>("AvailableDiskSpaceGB")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("AverageResponseTimeMs")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("DatabaseConnectionTimeMs")
+                        .HasColumnType("REAL");
+
+                    b.Property<int>("DatabaseStatus")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("DiskSpaceStatus")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("LastHealthCheck")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("MemoryStatus")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<double>("MemoryUsagePercentage")
+                        .HasColumnType("REAL");
+
+                    b.Property<int>("OverallStatus")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ResponseTimeStatus")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<double>("TotalDiskSpaceGB")
+                        .HasColumnType("REAL");
+
+                    b.Property<int>("TotalPartsCount")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LastHealthCheck");
+
+                    b.HasIndex("OverallStatus");
+
+                    b.ToTable("SystemHealthStatus");
+                });
+
             modelBuilder.Entity("ShopBoss.Web.Models.WorkOrder", b =>
                 {
                     b.Property<string>("Id")

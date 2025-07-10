@@ -104,6 +104,23 @@ public class HealthMonitoringService : BackgroundService
 - ✅ Performance metrics tracking
 - ✅ Critical issue detection and response
 
+### **B1.5: Emergency Migration Fix & Health Events Cleanup (30 minutes)**
+**Emergency Fix for Broken Import Process**
+
+**Root Cause:** SystemHealthMonitoring migration broke migration tracking, causing migrations to run every startup and corrupting database schema where StatusUpdatedDate became NOT NULL despite being nullable.
+
+**Implementation Plan:**
+- Revert Program.cs from `context.Database.Migrate()` back to `context.Database.EnsureCreated()`
+- Remove SystemHealthMonitoring migration files entirely  
+- Remove Recent Health Events logging from HealthMonitoringService and HealthDashboard
+- Clean up migration references in model snapshot
+
+**Deliverables:**
+- ✅ Import process restored to full functionality
+- ✅ Health monitoring real-time metrics only (no historical events)
+- ✅ SystemHealthStatus table created once with EnsureCreated()
+- ✅ Stable database schema matching model definitions
+
 ### **B2: Production Deployment Architecture (1 hour)**
 **Implementation Plan:**
 ```powershell
@@ -112,6 +129,7 @@ public class HealthMonitoringService : BackgroundService
 - Windows service integration
 - PowerShell installation scripts
 - Production appsettings configuration
+- Automate port forwarding in Windows firewall
 ```
 
 **Deliverables:**

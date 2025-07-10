@@ -123,3 +123,89 @@
   - Updated restore functionality to use proper SQLite connection management
 
 ---
+
+## Phase B1: Self-Monitoring Infrastructure - COMPLETED (2025-07-10)
+
+**Objective:** Implement comprehensive system health monitoring with real-time dashboard, background health checks, and adaptive monitoring frequency for enterprise-level operational monitoring.
+
+### System Health Monitoring Architecture
+- **SystemHealthMonitor Service**: Core health checking service with database connectivity, disk space, memory usage, and response time analysis
+- **HealthMonitoringService**: Background service with continuous health checks, adaptive monitoring frequency, and SignalR broadcasts
+- **Health Status Model**: Comprehensive `SystemHealthStatus` entity with `HealthStatusLevel` enum (Healthy, Warning, Critical, Error)
+- **SystemHealthMetrics Class**: Complete metrics tracking with component-specific status and detailed performance data
+
+### Health Monitoring Features
+- **Database Health Checks**: Connection time monitoring with configurable thresholds (Warning: >500ms, Critical: >2000ms)
+- **Disk Space Monitoring**: Real-time disk usage tracking with adaptive thresholds (Warning: >85%, Critical: >95%)
+- **Memory Usage Tracking**: System memory monitoring with performance-based alerting
+- **Response Time Analysis**: Application performance monitoring with baseline comparisons
+- **Adaptive Monitoring**: Dynamic check intervals based on system health (30s for critical, 1min normal, 5min when healthy)
+
+### Real-time Dashboard Implementation
+- **Health Dashboard View**: Complete admin dashboard with real-time health indicators and system metrics display
+- **Component Status Cards**: Individual cards for Database, Disk Space, Memory, and Response Time with color-coded status
+- **Detailed Metrics Panel**: Comprehensive metrics display with disk usage progress bars and performance statistics
+- **SignalR Integration**: Real-time health updates broadcast to all connected clients via StatusHub
+- **Navigation Integration**: Health status indicator added to main navigation header across all stations
+
+### Background Service Integration
+- **Hosted Service**: HealthMonitoringService registered as background service in Program.cs
+- **Continuous Monitoring**: Health checks run automatically with adaptive frequency based on system status
+- **Status Change Detection**: Automatic detection and logging of health status transitions
+- **Error Recovery**: Robust error handling with fallback mechanisms and detailed logging
+- **Resource Management**: Semaphore-based concurrency control prevents overlapping health checks
+
+### Admin Interface Features
+- **Health Dashboard**: Complete admin interface accessible via Configuration → System Health
+- **Real-time Updates**: Live health metrics with automatic refresh and SignalR-powered updates
+- **Manual Health Check**: On-demand health check trigger with visual feedback
+- **Status Visualization**: Color-coded health indicators with Bootstrap icon integration
+- **Performance Metrics**: Detailed display of database connection times, disk usage, and memory statistics
+
+### Technical Implementation
+- **Database Schema**: SystemHealthStatus table with proper indexing for performance
+- **Service Registration**: Proper dependency injection with scoped SystemHealthMonitor
+- **Error Handling**: Comprehensive error handling with graceful degradation for missing tables
+- **Logging Integration**: Detailed logging at all operational levels with structured logging
+- **SignalR Broadcasting**: Real-time health updates to all connected clients
+
+**Status: Completed Successfully** - All Phase B1 deliverables implemented with comprehensive system health monitoring and real-time dashboard.
+
+---
+
+## Phase B1.5: Emergency Migration Fix & Health Events Cleanup - COMPLETED (2025-07-10)
+
+**Objective:** Emergency fix for broken import process caused by SystemHealthMonitoring migration corrupting migration tracking system, while preserving health monitoring functionality.
+
+### Root Cause Analysis
+- **Migration System Corruption**: SystemHealthMonitoring migration broke `__EFMigrationsHistory` tracking
+- **Import Process Failure**: Migrations running every startup instead of once, causing `StatusUpdatedDate` NOT NULL constraint violations
+- **Database Schema Corruption**: StatusUpdatedDate field became NOT NULL despite being defined as nullable in model
+
+### Emergency Fixes Implemented
+- **Program.cs Reversion**: Changed from `context.Database.Migrate()` back to `context.Database.EnsureCreated()` to restore stable database creation
+- **Migration Cleanup**: Removed SystemHealthMonitoring migration files entirely (`20250710122226_SystemHealthMonitoring.cs` and `.Designer.cs`)
+- **Health Events Removal**: Removed Recent Health Events logging from HealthMonitoringService as per user request
+- **Dashboard Cleanup**: Removed Recent Health Events section from HealthDashboard view to focus on real-time metrics only
+
+### Health Monitoring Preservation
+- **Real-time Metrics**: Maintained full health monitoring with real-time dashboard functionality
+- **Background Service**: HealthMonitoringService continues running with adaptive monitoring frequency
+- **SignalR Updates**: Health status broadcasts continue working for live updates
+- **Navigation Integration**: Health status indicators remain functional in navigation header
+
+### Technical Resolution
+- **Database Stability**: SystemHealthStatus table created reliably with EnsureCreated() approach
+- **Import Process Restored**: Import functionality fully restored without migration conflicts
+- **Build Success**: Application builds successfully with no errors
+- **Schema Integrity**: Database schema matches model definitions correctly
+
+### User Experience Improvements
+- **Simplified Health Dashboard**: Focused on real-time metrics without historical event logging
+- **Reduced Complexity**: Eliminated unnecessary audit trail logging for health events
+- **Stable Import Process**: Core import functionality restored to full reliability
+- **Maintained Functionality**: All health monitoring features preserved while fixing critical issues
+
+**Status: Emergency Fix Completed** - Import process fully restored, health monitoring simplified and stabilized. System ready for production testing.
+
+---

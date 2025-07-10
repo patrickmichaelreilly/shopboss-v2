@@ -6,6 +6,7 @@
     <title>@ViewData["Title"] - ShopBoss</title>
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/ShopBoss.Web.styles.css" asp-append-version="true" />
     @await RenderSectionAsync("Styles", required: false)
@@ -45,12 +46,21 @@
                                 <li><a class="dropdown-item" asp-controller="Admin" asp-action="BackupManagement">
                                     <i class="fas fa-database me-2"></i>Backup Management
                                 </a></li>
+                                <li><a class="dropdown-item" asp-controller="Admin" asp-action="HealthDashboard">
+                                    <i class="fas fa-heartbeat me-2"></i>Health Dashboard
+                                </a></li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="#" onclick="showComingSoon('Other Settings')">Other Settings</a></li>
                             </ul>
                         </li>
                     </ul>
                     <ul class="navbar-nav">
+                        <li class="nav-item me-2" id="healthStatusNavItem">
+                            <a class="nav-link" asp-controller="Admin" asp-action="HealthDashboard" title="System Health Dashboard">
+                                <i id="healthStatusIcon" class="fas fa-heartbeat text-success"></i>
+                                <span id="healthStatusText" class="d-none d-md-inline ms-1">Healthy</span>
+                            </a>
+                        </li>
                         <li class="nav-item dropdown" id="activeWorkOrderNavItem">
                             <a class="nav-link dropdown-toggle work-order-nav-link" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false" id="activeWorkOrderDropdown">
                                 <div class="work-order-content">
@@ -113,6 +123,9 @@
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
+    
+    <!-- SignalR -->
+    <script src="~/lib/signalr/dist/browser/signalr.js"></script>
     
     <script>
         // Global Active Work Order functionality
@@ -287,7 +300,99 @@
         // Load work order dropdown on page load
         document.addEventListener('DOMContentLoaded', function() {
             loadWorkOrderDropdown();
+            initializeHealthStatusMonitoring();
         });
+
+        // Health Status Monitoring
+        function initializeHealthStatusMonitoring() {
+            // Initialize SignalR connection for health monitoring
+            const healthConnection = new signalR.HubConnectionBuilder()
+                .withUrl("/hubs/status")
+                .build();
+
+            // Start connection
+            healthConnection.start().then(function () {
+                console.log("Health monitoring connected");
+                // Load initial health status
+                loadHealthStatus();
+            }).catch(function (err) {
+                console.error("Error connecting to health monitoring:", err);
+                // Set error state
+                updateHealthStatusDisplay('Error', 'Connection failed');
+            });
+
+            // Listen for health updates
+            healthConnection.on("HealthUpdate", function (healthData) {
+                updateHealthStatusDisplay(healthData.OverallStatus, healthData.ErrorMessage);
+            });
+
+            // Auto-refresh health status every 60 seconds
+            setInterval(loadHealthStatus, 60000);
+        }
+
+        // Load health status from server
+        function loadHealthStatus() {
+            fetch('/Admin/GetHealthMetrics')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        updateHealthStatusDisplay('Error', data.error);
+                    } else {
+                        updateHealthStatusDisplay(data.overallStatus, data.errorMessage);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading health status:', error);
+                    updateHealthStatusDisplay('Error', 'Network error');
+                });
+        }
+
+        // Update health status display in navbar
+        function updateHealthStatusDisplay(status, errorMessage) {
+            const healthIcon = document.getElementById('healthStatusIcon');
+            const healthText = document.getElementById('healthStatusText');
+            
+            if (!healthIcon || !healthText) return;
+
+            let iconClass, textClass, statusText, title;
+            
+            switch (status) {
+                case 'Healthy':
+                    iconClass = 'fas fa-heartbeat text-success';
+                    textClass = 'text-success';
+                    statusText = 'Healthy';
+                    title = 'System Health: Healthy';
+                    break;
+                case 'Warning':
+                    iconClass = 'fas fa-exclamation-triangle text-warning';
+                    textClass = 'text-warning';
+                    statusText = 'Warning';
+                    title = 'System Health: Warning - Click for details';
+                    break;
+                case 'Critical':
+                    iconClass = 'fas fa-times-circle text-danger';
+                    textClass = 'text-danger';
+                    statusText = 'Critical';
+                    title = 'System Health: Critical - Click for details';
+                    break;
+                case 'Error':
+                    iconClass = 'fas fa-exclamation-circle text-danger';
+                    textClass = 'text-danger';
+                    statusText = 'Error';
+                    title = errorMessage ? `System Health: Error - ${errorMessage}` : 'System Health: Error';
+                    break;
+                default:
+                    iconClass = 'fas fa-question-circle text-muted';
+                    textClass = 'text-muted';
+                    statusText = 'Unknown';
+                    title = 'System Health: Unknown';
+            }
+            
+            healthIcon.className = iconClass;
+            healthText.className = `d-none d-md-inline ms-1 ${textClass}`;
+            healthText.textContent = statusText;
+            healthIcon.parentElement.title = title;
+        }
     </script>
     
     @await RenderSectionAsync("Scripts", required: false)

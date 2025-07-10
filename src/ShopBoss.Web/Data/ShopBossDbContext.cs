@@ -23,6 +23,7 @@ public class ShopBossDbContext : DbContext
     public DbSet<Bin> Bins { get; set; }
     public DbSet<BackupConfiguration> BackupConfigurations { get; set; }
     public DbSet<BackupStatus> BackupStatuses { get; set; }
+    public DbSet<SystemHealthStatus> SystemHealthStatus { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -251,6 +252,27 @@ public class ShopBossDbContext : DbContext
             entity.HasIndex(e => e.CreatedDate);
             entity.HasIndex(e => e.BackupType);
             entity.HasIndex(e => e.IsSuccessful);
+        });
+
+        modelBuilder.Entity<SystemHealthStatus>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.OverallStatus).IsRequired();
+            entity.Property(e => e.DatabaseStatus).IsRequired();
+            entity.Property(e => e.DiskSpaceStatus).IsRequired();
+            entity.Property(e => e.MemoryStatus).IsRequired();
+            entity.Property(e => e.ResponseTimeStatus).IsRequired();
+            entity.Property(e => e.AvailableDiskSpaceGB).IsRequired();
+            entity.Property(e => e.TotalDiskSpaceGB).IsRequired();
+            entity.Property(e => e.MemoryUsagePercentage).IsRequired();
+            entity.Property(e => e.AverageResponseTimeMs).IsRequired();
+            entity.Property(e => e.DatabaseConnectionTimeMs).IsRequired();
+            entity.Property(e => e.ActiveWorkOrderCount).IsRequired();
+            entity.Property(e => e.TotalPartsCount).IsRequired();
+            entity.Property(e => e.LastHealthCheck).IsRequired();
+            
+            entity.HasIndex(e => e.LastHealthCheck);
+            entity.HasIndex(e => e.OverallStatus);
         });
     }
 }

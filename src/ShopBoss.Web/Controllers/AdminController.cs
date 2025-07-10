@@ -19,6 +19,7 @@ public class AdminController : Controller
     private readonly AuditTrailService _auditTrailService;
     private readonly IHubContext<StatusHub> _hubContext;
     private readonly BackupService _backupService;
+    private readonly SystemHealthMonitor _healthMonitor;
 
     public AdminController(
         ShopBossDbContext context, 
@@ -27,7 +28,8 @@ public class AdminController : Controller
         WorkOrderService workOrderService,
         AuditTrailService auditTrailService,
         IHubContext<StatusHub> hubContext,
-        BackupService backupService)
+        BackupService backupService,
+        SystemHealthMonitor healthMonitor)
     {
         _context = context;
         _logger = logger;
@@ -36,6 +38,7 @@ public class AdminController : Controller
         _auditTrailService = auditTrailService;
         _hubContext = hubContext;
         _backupService = backupService;
+        _healthMonitor = healthMonitor;
     }
 
     public async Task<IActionResult> Index(string search = "", bool includeArchived = false)
@@ -1061,6 +1064,104 @@ public class AdminController : Controller
             _logger.LogError(ex, "Error loading unified modify work order interface for work order {WorkOrderId}", id);
             TempData["ErrorMessage"] = "An error occurred while loading the modify work order interface.";
             return RedirectToAction(nameof(Index));
+        }
+    }
+
+    public async Task<IActionResult> HealthDashboard()
+    {
+        try
+        {
+            // Get current health status from database
+            var healthStatus = await _healthMonitor.GetOrCreateHealthStatusAsync();
+            
+            // Get recent health metrics
+            var currentMetrics = await _healthMonitor.CheckSystemHealthAsync();
+            
+            // Get recent audit logs for health-related activities
+            var recentHealthLogs = await _context.AuditLogs
+                .Where(log => log.EntityType == "SystemHealth" || log.EntityType == "System")
+                .OrderByDescending(log => log.Timestamp)
+                .Take(20)
+                .ToListAsync();
+
+            var viewModel = new HealthDashboardViewModel
+            {
+                CurrentHealthStatus = healthStatus,
+                CurrentMetrics = currentMetrics,
+                RecentHealthLogs = recentHealthLogs,
+                PageTitle = "System Health Dashboard"
+            };
+
+            return View(viewModel);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error loading health dashboard");
+            TempData["ErrorMessage"] = "An error occurred while loading the health dashboard.";
+            return RedirectToAction(nameof(Index));
+        }
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> RunHealthCheck()
+    {
+        try
+        {
+            // Force an immediate health check
+            var metrics = await _healthMonitor.CheckSystemHealthAsync();
+            await _healthMonitor.UpdateHealthStatusAsync(metrics);
+            
+            await _auditTrailService.LogAsync(
+                "SystemHealth",
+                "ManualHealthCheck",
+                "System",
+                "1",
+                "Admin",
+                "Manual health check initiated from admin dashboard");
+
+            return Json(new { success = true, message = "Health check completed successfully." });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error running manual health check");
+            return Json(new { success = false, message = "An error occurred while running the health check." });
+        }
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> GetHealthMetrics()
+    {
+        try
+        {
+            // Get current health status
+            var healthStatus = await _healthMonitor.GetOrCreateHealthStatusAsync();
+            
+            var response = new
+            {
+                overallStatus = healthStatus.OverallStatus.ToString(),
+                databaseStatus = healthStatus.DatabaseStatus.ToString(),
+                diskSpaceStatus = healthStatus.DiskSpaceStatus.ToString(),
+                memoryStatus = healthStatus.MemoryStatus.ToString(),
+                responseTimeStatus = healthStatus.ResponseTimeStatus.ToString(),
+                availableDiskSpaceGB = healthStatus.AvailableDiskSpaceGB,
+                totalDiskSpaceGB = healthStatus.TotalDiskSpaceGB,
+                diskUsagePercentage = healthStatus.TotalDiskSpaceGB > 0 ? 
+                    ((healthStatus.TotalDiskSpaceGB - healthStatus.AvailableDiskSpaceGB) / healthStatus.TotalDiskSpaceGB) * 100 : 0,
+                memoryUsagePercentage = healthStatus.MemoryUsagePercentage,
+                averageResponseTimeMs = healthStatus.AverageResponseTimeMs,
+                databaseConnectionTimeMs = healthStatus.DatabaseConnectionTimeMs,
+                activeWorkOrderCount = healthStatus.ActiveWorkOrderCount,
+                totalPartsCount = healthStatus.TotalPartsCount,
+                lastHealthCheck = healthStatus.LastHealthCheck,
+                errorMessage = healthStatus.ErrorMessage
+            };
+
+            return Json(response);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving health metrics");
+            return Json(new { error = "Failed to retrieve health metrics" });
         }
     }
 

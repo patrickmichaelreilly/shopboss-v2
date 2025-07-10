@@ -43,9 +43,11 @@ builder.Services.AddScoped<PartFilteringService>();
 builder.Services.AddScoped<ShippingService>();
 builder.Services.AddScoped<WorkOrderService>();
 builder.Services.AddScoped<BackupService>();
+builder.Services.AddScoped<SystemHealthMonitor>();
 
 // Add background services
 builder.Services.AddHostedService<BackupBackgroundService>();
+builder.Services.AddHostedService<HealthMonitoringService>();
 
 var app = builder.Build();
 
@@ -53,6 +55,9 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<ShopBossDbContext>();
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+    
+    // Ensure database is created
     context.Database.EnsureCreated();
     
     // Seed default storage racks
