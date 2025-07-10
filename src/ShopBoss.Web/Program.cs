@@ -50,7 +50,7 @@ builder.Services.AddScoped<ShippingService>();
 builder.Services.AddScoped<WorkOrderService>();
 builder.Services.AddScoped<BackupService>();
 builder.Services.AddScoped<SystemHealthMonitor>();
-builder.Services.AddScoped<UniversalScannerService>();
+// UniversalScannerService removed - using event-based architecture instead
 
 // Add background services
 builder.Services.AddHostedService<BackupBackgroundService>();

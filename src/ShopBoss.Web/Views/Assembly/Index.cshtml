@@ -145,13 +145,30 @@
 
 @{
     ViewData["ContainerId"] = "assembly-scanner";
-    ViewData["Station"] = "Assembly";
+    ViewData["Title"] = "Universal Scanner - Assembly Station";
     ViewData["ShowHelp"] = true;
     ViewData["ShowRecentScans"] = true;
     ViewData["Placeholder"] = "Scan part barcode for assembly or enter command...";
 }
 
 <partial name="_UniversalScanner" />
+
+<!-- Inline Location Guidance -->
+<div id="locationGuidanceSection" class="row mb-4" style="display: none;">
+    <div class="col-12">
+        <div class="card border-success">
+            <div class="card-header bg-success text-white">
+                <h6 class="mb-0">
+                    <i class="fas fa-map-marker-alt me-2"></i>
+                    Component Location Guidance
+                </h6>
+            </div>
+            <div class="card-body" id="locationGuidanceContent">
+                <!-- Content will be populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- Assembly Queue -->
 <div class="row">
@@ -470,6 +487,11 @@
             showToast(`🔧 Product "${data.ProductName}" assembled via scan!`, 'success');
             updateProductStatus(data.ProductId, 'completed');
             updateShippingReadinessStatus(data);
+            
+            // Refresh the page to show updated assembly queue
+            setTimeout(() => {
+                location.reload();
+            }, 2000);
         });
 
         // Listen for new products ready for assembly (from sorting station)
@@ -477,19 +499,6 @@
             console.log("ProductReadyForAssembly event received:", data);
             showToast(`Product "${data.productName}" is now ready for assembly!`, 'info');
             updateProductStatus(data.productId, 'ready');
-        });
-
-        // Listen for products assembled via scanning
-        connection.on("ProductAssembledByScan", function (data) {
-            console.log("ProductAssembledByScan event received:", data);
-            showToast(`Product "${data.ProductName}" assembled successfully!`, 'success');
-            updateProductStatus(data.ProductId, 'completed');
-            updateShippingReadinessStatus(data);
-            
-            // Refresh the page to show updated assembly queue
-            setTimeout(() => {
-                location.reload();
-            }, 2000);
         });
 
         // Listen for products assembled via manual button
@@ -802,100 +811,74 @@
             });
         }
 
-        // Barcode scanning functions
-        function openScanModal() {
-            const modal = new bootstrap.Modal(document.getElementById('assemblyScanModal'));
-            resetScanModal();
-            modal.show();
-        }
+        // Old barcode modal functions removed - using Universal Scanner instead
 
-        function resetScanModal() {
-            document.getElementById('assemblyBarcodeInput').value = '';
-            document.getElementById('assemblyScanStatus').style.display = 'none';
-            document.getElementById('assemblyBarcodeInput').classList.remove('is-invalid', 'is-valid');
-        }
+        // Old processScanForAssembly function removed - using Universal Scanner instead
 
-        // Auto-focus on barcode input when modal opens
-        document.getElementById('assemblyScanModal').addEventListener('shown.bs.modal', function () {
-            document.getElementById('assemblyBarcodeInput').focus();
-        });
+        // Old showScanStatus function removed - using Universal Scanner instead
 
-        // Handle Enter key in barcode input
-        document.getElementById('assemblyBarcodeInput').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                processScanForAssembly();
-            }
-        });
-
-        function processScanForAssembly() {
-            const barcodeInput = document.getElementById('assemblyBarcodeInput');
-            const barcode = barcodeInput.value.trim();
-            const statusDiv = document.getElementById('assemblyScanStatus');
-
-            if (!barcode) {
-                showScanStatus('Please enter a barcode', 'danger');
-                barcodeInput.focus();
-                return;
-            }
-
-            showScanStatus('🔍 Processing barcode scan...', 'info', true);
-
-            fetch('/Assembly/ScanPartForAssembly', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: new URLSearchParams({
-                    barcode: barcode
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    showScanStatus(data.message, 'success');
-                    barcodeInput.classList.add('is-valid');
-                    barcodeInput.classList.remove('is-invalid');
-                    
-                    // Show filtered parts guidance if needed
-                    console.log('Assembly scan response:', data);
-                    console.log('Has filtered parts:', data.hasFilteredParts);
-                    console.log('Filtered parts guidance:', data.filteredPartsGuidance);
-                    
-                    if (data.hasFilteredParts && data.filteredPartsGuidance.length > 0) {
-                        setTimeout(() => {
-                            showFilteredPartsGuidance(data.productName, data.filteredPartsGuidance);
-                            bootstrap.Modal.getInstance(document.getElementById('assemblyScanModal')).hide();
-                        }, 2000);
-                    } else {
-                        setTimeout(() => {
-                            bootstrap.Modal.getInstance(document.getElementById('assemblyScanModal')).hide();
-                            location.reload();
-                        }, 2000);
-                    }
-                } else {
-                    showScanStatus(`❌ ${data.message}`, 'danger');
-                    barcodeInput.classList.add('is-invalid');
-                    barcodeInput.classList.remove('is-valid');
-                }
-            })
-            .catch(error => {
-                console.error('Error processing scan:', error);
-                showScanStatus('❌ Error processing scan', 'danger');
-                barcodeInput.classList.add('is-invalid');
-            });
-        }
-
-        function showScanStatus(message, type, isLoading = false) {
-            const statusDiv = document.getElementById('assemblyScanStatus');
-            statusDiv.className = `alert alert-${type}`;
-            statusDiv.style.display = 'block';
+        function showInlineLocationGuidance(productName, filteredParts) {
+            console.log('showInlineLocationGuidance called with:', { productName, filteredParts });
             
-            if (isLoading) {
-                statusDiv.innerHTML = `<i class="fas fa-spinner fa-spin me-2"></i>${message}`;
-            } else {
-                statusDiv.innerHTML = message;
-            }
+            const section = document.getElementById('locationGuidanceSection');
+            const content = document.getElementById('locationGuidanceContent');
+            
+            let html = `
+                <div class="alert alert-success mb-3">
+                    <h6><i class="fas fa-check-circle me-2"></i>Carcass Assembly Complete!</h6>
+                    <p class="mb-0">Product "<strong>${productName}</strong>" carcass is assembled. Now collect these finishing components:</p>
+                </div>
+            `;
+            
+            // Group by category
+            const categories = {};
+            filteredParts.forEach(part => {
+                if (!categories[part.category]) {
+                    categories[part.category] = [];
+                }
+                categories[part.category].push(part);
+            });
+            
+            // Display parts by category
+            Object.keys(categories).forEach(category => {
+                html += `
+                    <div class="mb-3">
+                        <h6 class="text-primary mb-2">
+                            <i class="fas fa-folder me-1"></i>${category}
+                        </h6>
+                `;
+                
+                categories[category].forEach(part => {
+                    const locationBadge = part.location && part.location !== 'Not Sorted' 
+                        ? `<span class="badge bg-success ms-2">${part.location}</span>`
+                        : `<span class="badge bg-warning ms-2">Not Sorted</span>`;
+                    
+                    html += `
+                        <div class="d-flex justify-content-between align-items-center p-2 mb-1 bg-light rounded">
+                            <span><strong>${part.partName}</strong> (Qty: ${part.quantity})</span>
+                            ${locationBadge}
+                        </div>
+                    `;
+                });
+                
+                html += `</div>`;
+            });
+            
+            html += `
+                <div class="alert alert-info mb-0">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Next Step:</strong> Collect these components and continue with assembly. 
+                    This guidance will disappear automatically in 30 seconds.
+                </div>
+            `;
+            
+            content.innerHTML = html;
+            section.style.display = 'block';
+            
+            // Auto-hide after 30 seconds for scanner-friendly workflow
+            setTimeout(() => {
+                section.style.display = 'none';
+            }, 30000);
         }
 
         function showFilteredPartsGuidance(productName, filteredParts) {
@@ -986,6 +969,74 @@
             });
             
             modal.show();
+        }
+        
+        // Listen for scan events from Universal Scanner (auto-initialized)
+        // First, remove any existing listeners to prevent duplicates
+        if (window.assemblyScanHandler) {
+            document.removeEventListener('scanReceived', window.assemblyScanHandler);
+            console.log('Removed existing Assembly scan handler');
+        }
+        
+        window.assemblyScanHandler = function(event) {
+            const { barcode, containerId } = event.detail;
+            console.log('Assembly Station: Received scan event', { barcode, containerId });
+            
+            // Get the scanner instance from global registry  
+            const scanner = window.universalScanners[containerId];
+            if (scanner) {
+                handleAssemblyScan(barcode, scanner);
+            }
+        };
+        
+        document.addEventListener('scanReceived', window.assemblyScanHandler);
+        console.log('Added Assembly scan handler');
+        
+        // Clean up event listener when page unloads
+        window.addEventListener('beforeunload', function() {
+            if (window.assemblyScanHandler) {
+                document.removeEventListener('scanReceived', window.assemblyScanHandler);
+                window.assemblyScanHandler = null;
+            }
+        });
+        
+        // Assembly scan handler that integrates Universal Scanner with existing logic
+        async function handleAssemblyScan(barcode, scanner) {
+            try {
+                // Show processing status
+                scanner.showScanResult(false, '🔄 Processing assembly scan...', false);
+                
+                // Use existing assembly endpoint with correct Content-Type
+                const response = await fetch('/Assembly/ScanPartForAssembly', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: `barcode=${encodeURIComponent(barcode)}`
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    scanner.showScanResult(true, data.message);
+                    
+                    // Show filtered parts guidance if needed
+                    if (data.hasFilteredParts && data.filteredPartsGuidance && data.filteredPartsGuidance.length > 0) {
+                        showInlineLocationGuidance(data.productName, data.filteredPartsGuidance);
+                    }
+                    
+                    // Auto-refresh after 3 seconds to show updated queue
+                    setTimeout(() => {
+                        location.reload();
+                    }, 3000);
+                } else {
+                    scanner.showScanResult(false, data.message || 'Assembly scan failed');
+                }
+            } catch (error) {
+                console.error('Assembly scan error:', error);
+                scanner.showScanResult(false, '❌ Network error. Please try again.');
+            }
         }
     </script>
 }

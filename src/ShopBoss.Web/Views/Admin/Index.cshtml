@@ -30,15 +30,6 @@
     </div>
 </div>
 
-@{
-    ViewData["ContainerId"] = "admin-scanner";
-    ViewData["Station"] = "Admin";
-    ViewData["ShowHelp"] = true;
-    ViewData["ShowRecentScans"] = true;
-    ViewData["Placeholder"] = "Scan barcode or enter admin command...";
-}
-
-<partial name="_UniversalScanner" />
 
 <!-- Search and Bulk Operations -->
 <div class="card mb-4">
@@ -215,7 +206,6 @@ else
 </form>
 
 @section Scripts {
-    <script src="~/js/universal-scanner.js"></script>
     <script>
         // Single delete function
         function confirmDelete(id, name) {

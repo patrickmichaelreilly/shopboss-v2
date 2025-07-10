@@ -223,6 +223,207 @@ public class UniversalScannerService
 - ✅ Production-ready visual feedback and focus management
 - ✅ Refined command barcode set for manufacturing operations
 
+### **C4: Universal Scanner Architecture Refactoring (2-3 hours)**
+**Objective:** Refactor Universal Scanner to be a pure input component that emits events, with each page handling scans using existing station-specific logic.
+
+**Implementation Plan:**
+```csharp
+// Refactor Universal Scanner Component (90 min)
+- Remove all API calls and business logic from universal-scanner.js
+- Convert to event-based architecture: emit scanReceived(barcode) events
+- Keep good UX: collapsible interface, localStorage persistence, visual feedback
+- Remove station parameter requirement (make truly universal)
+- Preserve auto-focus, keyboard handling, recent scans display
+
+// Update Each Station to Handle Scan Events (60 min)
+- Assembly: Listen for scanReceived, use existing assembly scan logic
+- CNC: Integrate with existing nest sheet scanning
+- Sorting: Use existing part scanning logic  
+- Shipping: Integrate with existing shipping confirmation
+- Admin: Handle navigation commands directly
+
+// Repurpose UniversalScannerService Logic (30 min)
+- Move station-specific logic into each station's existing controllers
+- Keep barcode type detection as utility functions
+- Remove /api/scanner/process endpoint
+- Update command barcode handling per station
+
+// Preserve Recent Bug Fixes (15 min)
+- Ensure Assembly Station duplicate notification fix is preserved
+- Keep location guidance improvements (move to assembly-specific code)
+- Maintain auto-refresh functionality
+```
+
+**Deliverables:**
+- ✅ Universal Scanner as pure input component with event emission
+- ✅ Each station handles scan events with existing logic patterns  
+- ✅ Preserved collapsible UI, persistence, and UX improvements
+- ✅ Clean separation of concerns (presentation vs business logic)
+- ✅ All recent bug fixes maintained
+- ✅ Consistent scanner behavior across stations without business logic coupling
+
+**Status: ✅ COMPLETED** - Universal Scanner successfully refactored to clean event-based architecture while preserving all functionality and recent bug fixes.
+
+#### **Critical Implementation Notes & Lessons Learned:**
+
+**Universal Scanner Architecture:**
+- Universal Scanner is now a **pure input component** that only emits `scanReceived` events
+- **No station parameters required** - truly universal across all pages
+- Auto-initializes based on `.universal-scanner-input` elements with `data-container` attribute
+- Emits events on `document` with `{ barcode, containerId, timestamp, scanner }` detail
+
+**Major Bug Fixes Applied:**
+1. **Duplicate Event Emission (Root Cause)**: Universal Scanner was dispatching events twice:
+   - Once to container element (which bubbled to document)  
+   - Once directly to document
+   - **Fix**: Remove container dispatch, only dispatch to document
+
+2. **Content-Type Mismatch**: CNC controller expects form data but was receiving JSON
+   - **Fix**: Change from `application/json` to `application/x-www-form-urlencoded`
+   - Use `body: \`barcode=${encodeURIComponent(barcode)}\`` instead of `JSON.stringify()`
+
+3. **Duplicate Recent Scans**: Scanner was adding entries in both `processScan()` and `showScanResult()`
+   - **Fix**: Remove duplicate entry creation from `showScanResult()` method
+
+4. **Event Listener Cleanup**: Prevents duplicate listeners when navigating between stations
+   - **Fix**: Remove existing listeners before adding new ones, add `beforeunload` cleanup
+
+**Station Integration Pattern:**
+```javascript
+// Each station should follow this pattern:
+// 1. Remove existing listeners to prevent duplicates
+if (window.stationScanHandler) {
+    document.removeEventListener('scanReceived', window.stationScanHandler);
+}
+
+// 2. Create named handler function
+window.stationScanHandler = function(event) {
+    const { barcode, containerId } = event.detail;
+    const scanner = window.universalScanners[containerId];
+    if (scanner) {
+        handleStationScan(barcode, scanner);
+    }
+};
+
+// 3. Add single event listener
+document.addEventListener('scanReceived', window.stationScanHandler);
+
+// 4. Add cleanup on page unload
+window.addEventListener('beforeunload', function() {
+    if (window.stationScanHandler) {
+        document.removeEventListener('scanReceived', window.stationScanHandler);
+        window.stationScanHandler = null;
+    }
+});
+```
+
+**ViewData Configuration for Universal Scanner:**
+```csharp
+ViewData["ContainerId"] = "station-scanner";
+ViewData["Title"] = "Universal Scanner - Station Name";
+ViewData["ShowHelp"] = true;
+ViewData["ShowRecentScans"] = true;
+ViewData["Placeholder"] = "Scan barcode or enter command...";
+// NO ViewData["Station"] needed - scanner is now truly universal
+```
+
+**Critical Testing Checklist for Each Station:**
+- [ ] Only 1 "Station: Received scan event" message in console
+- [ ] Only 1 "Universal Scanner: Emitted scanReceived event" message  
+- [ ] Only 1 entry appears in Recent Scans per scan
+- [ ] Actual business logic executes (parts marked, items processed, etc.)
+- [ ] Correct Content-Type used for server requests
+- [ ] Event listeners properly cleaned up between page navigations
+
+---
+
+## **Phase C5: Universal Scanner Bug Fixes & UX Polish (1-2 hours)**
+*Critical fixes for Universal Scanner functionality and user experience*
+
+### **C5.1: Fix Collapsed Scanner Functionality (30 minutes)**
+**Implementation Plan:**
+```javascript
+// Fix processScanFromInvisible method in universal-scanner.js
+// Replace old API calls with new event-based architecture
+async function processScanFromInvisible() {
+    if (!this.isCollapsed()) return;
+    
+    const barcode = this.invisibleInput.value.trim();
+    this.invisibleInput.value = '';
+    
+    if (!barcode) return;
+    
+    // Emit scanReceived event instead of calling submitScan API
+    this.emitScanEvent(barcode);
+}
+```
+
+**Deliverables:**
+- ✅ Universal Scanner works correctly when collapsed on all stations
+- ✅ Invisible input properly emits scanReceived events
+- ✅ Focus management works correctly in collapsed state
+
+### **C5.2: Fix Sorting Station Issues (45 minutes)**
+**Implementation Plan:**
+```javascript
+// Debug rack details loading errors
+// Fix sorting logic to respect currently displayed rack
+// Pass selectedRackId context to scan handler
+async function handleSortingScan(barcode, scanner) {
+    // Get currently displayed rack ID
+    const selectedRackId = getCurrentlySelectedRackId();
+    
+    // Pass selected rack context to sorting endpoint
+    const response = await fetch('/Sorting/ScanPart', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `barcode=${encodeURIComponent(barcode)}&selectedRackId=${encodeURIComponent(selectedRackId)}`
+    });
+}
+```
+
+**Deliverables:**
+- ✅ Sorting station loads without red error alerts
+- ✅ Carcass parts go to currently displayed rack first
+- ✅ Only filtered parts (Doors, Drawer Fronts, Adjustable Shelves) auto-route to specialized racks
+- ✅ Rack selection context properly passed to scanning logic
+
+### **C5.3: Fix Assembly Station Location Guidance (15 minutes)**
+**Implementation Plan:**
+```javascript
+// Fix property name mapping in filtered parts guidance
+categories[category].forEach(part => {
+    const partName = part.partName || part.Name || 'Unknown Part';
+    const partQuantity = part.quantity || part.Qty || 0;
+    const partLocation = part.location || part.Location || 'Unknown Location';
+});
+```
+
+**Deliverables:**
+- ✅ Location guidance shows proper part names, quantities, and locations
+- ✅ No more "undefined (qty 1) in unknown location" displays
+- ✅ Correct data mapping from controller to view
+
+### **C5.4: Clean Up Shipping Station UI (15 minutes)**
+**Implementation Plan:**
+```html
+<!-- Remove righthand sidebar entirely -->
+<div class="row">
+    <div class="col-12"> <!-- Changed from col-lg-8 to col-12 -->
+        <!-- Existing shipping sections stay -->
+    </div>
+    <!-- Remove col-lg-4 sidebar with "Scan to Ship" and "Recent Scans" -->
+</div>
+```
+
+**Deliverables:**
+- ✅ Removed "Scan to Ship" box from righthand sidebar
+- ✅ Removed "Recent Scans" box from righthand sidebar
+- ✅ Layout uses full width without sidebar
+- ✅ Manual "Ship" buttons preserved (working correctly)
+
+**Status:** 🔄 PENDING - Critical UX fixes needed for production readiness
+
 ---
 
 ## **Phase D: User Interface Polish (4-5 hours)**

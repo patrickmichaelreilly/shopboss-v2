@@ -103,30 +103,6 @@
             color: #721c24;
         }
         
-        .scan-interface {
-            position: sticky;
-            top: 20px;
-            z-index: 100;
-        }
-        
-        .scan-card {
-            border: 2px solid #004F00;
-            border-radius: 8px;
-            background: white;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-        
-        .scan-input {
-            border: 2px solid #004F00;
-            border-radius: 6px;
-            padding: 12px;
-            font-size: 1.1rem;
-        }
-        
-        .scan-input:focus {
-            border-color: #0a58ca;
-            box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
-        }
         
         .progress-ring {
             width: 60px;
@@ -146,27 +122,6 @@
             font-weight: 500;
         }
         
-        .recent-scans {
-            max-height: 200px;
-            overflow-y: auto;
-        }
-        
-        .recent-scan-item {
-            padding: 8px 12px;
-            background: #f8f9fa;
-            border-radius: 4px;
-            margin-bottom: 8px;
-        }
-        
-        .recent-scan-item.success {
-            background: #d1e7dd;
-            border-left: 3px solid #198754;
-        }
-        
-        .recent-scan-item.error {
-            background: #f8d7da;
-            border-left: 3px solid #dc3545;
-        }
         
         .shipping-complete {
             background: #d1e7dd;
@@ -203,7 +158,7 @@
 
     @{
         ViewData["ContainerId"] = "shipping-scanner";
-        ViewData["Station"] = "Shipping";
+        ViewData["Title"] = "Universal Scanner - Shipping Station";
         ViewData["ShowHelp"] = true;
         ViewData["ShowRecentScans"] = true;
         ViewData["Placeholder"] = "Scan product, part, or hardware barcode...";
@@ -235,7 +190,7 @@
     </div>
 
     <div class="row">
-        <div class="col-lg-8">
+        <div class="col-12">
             <!-- Products Section -->
             <div class="shipping-section products">
                 <div class="shipping-section-header">
@@ -401,52 +356,6 @@
                 }
             </div>
         </div>
-
-        <div class="col-lg-4">
-            <div class="scan-interface">
-                <div class="scan-card">
-                    <div class="card-header bg-primary text-white">
-                        <h5 class="mb-0">
-                            <i class="fas fa-barcode me-2"></i>
-                            Scan to Ship
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="mb-3">
-                            <label for="barcodeInput" class="form-label">Barcode</label>
-                            <input type="text" class="form-control scan-input" id="barcodeInput" 
-                                   placeholder="Scan or enter barcode..." autofocus>
-                        </div>
-                        <div class="d-grid gap-2">
-                            <button type="button" class="btn btn-primary btn-lg" id="scanButton">
-                                <i class="fas fa-shipping-fast me-2"></i>
-                                Ship Item
-                            </button>
-                        </div>
-                        <div class="mt-3">
-                            <small class="text-muted">
-                                <i class="fas fa-info-circle me-1"></i>
-                                Scan products, hardware, or detached products to mark as shipped
-                            </small>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="card mt-3">
-                    <div class="card-header">
-                        <h6 class="mb-0">
-                            <i class="fas fa-history me-2"></i>
-                            Recent Scans
-                        </h6>
-                    </div>
-                    <div class="card-body">
-                        <div id="recentScans" class="recent-scans">
-                            <p class="text-muted mb-0">No recent scans</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
     </div>
 </div>
 
@@ -489,177 +398,8 @@
             // Initialize page
             setTimeout(updateOverallProgress, 500); // Delay to ensure page is fully loaded
             
-            // Barcode scanning functionality
-            $('#barcodeInput').on('keypress', function(e) {
-                if (e.which === 13) { // Enter key
-                    processScan();
-                }
-            });
 
-            $('#scanButton').on('click', function() {
-                processScan();
-            });
 
-            // Auto-focus barcode input
-            $('#barcodeInput').focus();
-
-            function processScan() {
-                const barcode = $('#barcodeInput').val().trim();
-                console.log('Processing scan for barcode:', barcode);
-                
-                if (!barcode) {
-                    showAlert('Please enter a barcode', 'warning');
-                    return;
-                }
-
-                // Disable input during processing
-                $('#barcodeInput').prop('disabled', true);
-                $('#scanButton').prop('disabled', true);
-
-                // Try scanning as part first (most common case)
-                scanPart(barcode)
-                    .then(result => {
-                        console.log('Part scan result:', result);
-                        if (result.success) {
-                            handleScanSuccess(result, 'Part');
-                            return { success: true, processed: true };
-                        } else {
-                            // Try as product
-                            return scanProduct(barcode);
-                        }
-                    })
-                    .then(result => {
-                        if (result.processed) return result; // Already handled
-                        
-                        console.log('Product scan result:', result);
-                        if (result.success) {
-                            handleScanSuccess(result, 'Product');
-                            return { success: true, processed: true };
-                        } else {
-                            // Try as hardware
-                            return scanHardware(barcode);
-                        }
-                    })
-                    .then(result => {
-                        if (result.processed) return result; // Already handled
-                        
-                        console.log('Hardware scan result:', result);
-                        if (result.success) {
-                            handleScanSuccess(result, 'Hardware');
-                            return { success: true, processed: true };
-                        } else {
-                            // Try as detached product
-                            return scanDetachedProduct(barcode);
-                        }
-                    })
-                    .then(result => {
-                        if (result.processed) return result; // Already handled
-                        
-                        console.log('Detached product scan result:', result);
-                        if (result.success) {
-                            handleScanSuccess(result, 'Detached Product');
-                        } else {
-                            // If we tried all types and none worked
-                            handleScanError(result.message || 'Item not found');
-                        }
-                    })
-                    .catch(error => {
-                        handleScanError('Error processing scan');
-                        console.error('Scan error:', error);
-                    })
-                    .always(() => {
-                        // Re-enable input
-                        $('#barcodeInput').prop('disabled', false);
-                        $('#scanButton').prop('disabled', false);
-                        $('#barcodeInput').val('').focus();
-                    });
-            }
-
-            function scanProduct(barcode) {
-                return $.ajax({
-                    url: '/Shipping/ScanProduct',
-                    method: 'POST',
-                    data: { barcode: barcode },
-                    dataType: 'json'
-                });
-            }
-
-            function scanPart(barcode) {
-                return $.ajax({
-                    url: '/Shipping/ScanPart',
-                    method: 'POST',
-                    data: { barcode: barcode },
-                    dataType: 'json'
-                });
-            }
-
-            function scanHardware(barcode) {
-                return $.ajax({
-                    url: '/Shipping/ScanHardware',
-                    method: 'POST',
-                    data: { barcode: barcode },
-                    dataType: 'json'
-                });
-            }
-
-            function scanDetachedProduct(barcode) {
-                return $.ajax({
-                    url: '/Shipping/ScanDetachedProduct',
-                    method: 'POST',
-                    data: { barcode: barcode },
-                    dataType: 'json'
-                });
-            }
-
-            function handleScanSuccess(result, type) {
-                showAlert(result.message, 'success');
-                addRecentScan(result.message, true);
-                
-                // Update progress
-                updateOverallProgress();
-                
-                // Update UI based on what was shipped
-                if (result.productId) {
-                    updateProductShippedUI(result.productId);
-                } else if (result.hardwareId) {
-                    updateHardwareShippedUI(result.hardwareId);
-                } else if (result.detachedProductId) {
-                    updateDetachedProductShippedUI(result.detachedProductId);
-                }
-                
-                // No page reload - keep Recent Scans intact
-            }
-
-            function handleScanError(message) {
-                showAlert(message, 'danger');
-                addRecentScan(message, false);
-            }
-
-            function addRecentScan(message, isSuccess) {
-                const recentScans = $('#recentScans');
-                const timestamp = new Date().toLocaleTimeString();
-                
-                // Remove "No recent scans" message
-                if (recentScans.find('p.text-muted').length > 0) {
-                    recentScans.empty();
-                }
-                
-                const scanItem = $(`
-                    <div class="recent-scan-item ${isSuccess ? 'success' : 'error'}">
-                        <div class="d-flex justify-content-between">
-                            <span>${message}</span>
-                            <small>${timestamp}</small>
-                        </div>
-                    </div>
-                `);
-                
-                recentScans.prepend(scanItem);
-                
-                // Keep only last 5 scans
-                if (recentScans.children().length > 5) {
-                    recentScans.children().last().remove();
-                }
-            }
 
             function updateOverallProgress() {
                 console.log('Updating overall progress...');
@@ -734,7 +474,7 @@
                 })
                 .done(function(response) {
                     if (response.success) {
-                        handleScanSuccess(response, 'Product (Manual)');
+                        showAlert(response.message, 'success');
                         updateOverallProgress();
                         // Hide the ship button and update UI for this product
                         updateProductShippedUI(productId);
@@ -760,7 +500,7 @@
                 })
                 .done(function(response) {
                     if (response.success) {
-                        handleScanSuccess(response, 'Hardware (Manual)');
+                        showAlert(response.message, 'success');
                         updateOverallProgress();
                         // Hide the ship button and update UI for this hardware
                         updateHardwareShippedUI(hardwareId);
@@ -786,7 +526,7 @@
                 })
                 .done(function(response) {
                     if (response.success) {
-                        handleScanSuccess(response, 'Detached Product (Manual)');
+                        showAlert(response.message, 'success');
                         updateOverallProgress();
                         // Hide the ship button and update UI for this detached product
                         updateDetachedProductShippedUI(detachedProductId);
@@ -851,5 +591,81 @@
                 statusBadge.html('<i class="fas fa-check me-1"></i>Shipped');
             }
         });
+        
+        // Listen for scan events from Universal Scanner (auto-initialized)
+        // First, remove any existing listeners to prevent duplicates
+        if (window.shippingScanHandler) {
+            document.removeEventListener('scanReceived', window.shippingScanHandler);
+            console.log('Removed existing Shipping scan handler');
+        }
+        
+        window.shippingScanHandler = function(event) {
+            const { barcode, containerId } = event.detail;
+            console.log('Shipping Station: Received scan event', { barcode, containerId });
+            
+            // Get the scanner instance from global registry  
+            const scanner = window.universalScanners[containerId];
+            if (scanner) {
+                handleShippingScan(barcode, scanner);
+            }
+        };
+        
+        document.addEventListener('scanReceived', window.shippingScanHandler);
+        console.log('Added Shipping scan handler');
+        
+        // Clean up event listener when page unloads
+        window.addEventListener('beforeunload', function() {
+            if (window.shippingScanHandler) {
+                document.removeEventListener('scanReceived', window.shippingScanHandler);
+                window.shippingScanHandler = null;
+            }
+        });
+        
+        // Shipping scan handler that tries different shipping endpoints in sequence
+        async function handleShippingScan(barcode, scanner) {
+            try {
+                // Show processing status
+                scanner.showScanResult(false, '🔄 Processing shipping scan...', false);
+                
+                // Try shipping endpoints in sequence: Product → Part → Hardware → DetachedProduct
+                const endpoints = [
+                    { url: '/Shipping/ScanProduct', type: 'Product' },
+                    { url: '/Shipping/ScanPart', type: 'Part' },
+                    { url: '/Shipping/ScanHardware', type: 'Hardware' },
+                    { url: '/Shipping/ScanDetachedProduct', type: 'Detached Product' }
+                ];
+                
+                for (const endpoint of endpoints) {
+                    const response = await fetch(endpoint.url, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: `barcode=${encodeURIComponent(barcode)}`
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        scanner.showScanResult(true, `${endpoint.type}: ${data.message}`);
+                        updateOverallProgress();
+                        
+                        // Refresh page to show updated shipping status
+                        setTimeout(() => {
+                            location.reload();
+                        }, 2000);
+                        return; // Exit on first successful match
+                    }
+                }
+                
+                // If we get here, none of the endpoints recognized the barcode
+                scanner.showScanResult(false, `❌ Barcode '${barcode}' not found in shipping items`);
+                
+            } catch (error) {
+                console.error('Shipping scan error:', error);
+                scanner.showScanResult(false, '❌ Network error. Please try again.');
+            }
+        }
     </script>
 }

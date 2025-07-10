@@ -15,16 +15,13 @@ public class CncController : Controller
     private readonly ILogger<CncController> _logger;
     private readonly IHubContext<StatusHub> _hubContext;
     private readonly AuditTrailService _auditTrail;
-    private readonly UniversalScannerService _scannerService;
-
     public CncController(ShopBossDbContext context, ILogger<CncController> logger, 
-        IHubContext<StatusHub> hubContext, AuditTrailService auditTrail, UniversalScannerService scannerService)
+        IHubContext<StatusHub> hubContext, AuditTrailService auditTrail)
     {
         _context = context;
         _logger = logger;
         _hubContext = hubContext;
         _auditTrail = auditTrail;
-        _scannerService = scannerService;
     }
 
     public async Task<IActionResult> Index()
@@ -61,15 +58,7 @@ public class CncController : Controller
         }
     }
 
-    [HttpPost]
-    public async Task<IActionResult> ProcessScan(string barcode)
-    {
-        var sessionId = HttpContext.Session.Id;
-        var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
-        
-        var result = await _scannerService.ProcessScanAsync(barcode, "CNC", sessionId, ipAddress);
-        return Json(result);
-    }
+    // ProcessScan method removed - using event-based Universal Scanner architecture
 
     [HttpPost]
     public async Task<IActionResult> ProcessNestSheet(string barcode)

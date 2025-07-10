@@ -1,6 +1,6 @@
 @{
     string containerId = ViewData["ContainerId"]?.ToString() ?? "scanner-container";
-    string station = ViewData["Station"]?.ToString() ?? "Unknown";
+    string title = ViewData["Title"]?.ToString() ?? "Universal Scanner";
     bool showHelp = ViewData["ShowHelp"] as bool? ?? true;
     bool showRecentScans = ViewData["ShowRecentScans"] as bool? ?? true;
     string placeholder = ViewData["Placeholder"]?.ToString() ?? "Scan barcode or enter command...";
@@ -14,7 +14,7 @@
                     aria-expanded="true" aria-controls="scanner-body-@containerId"
                     onclick="toggleScannerCollapse('@containerId')">
                 <i class="fas fa-barcode me-2"></i>
-                <h5 class="mb-0 me-2">Universal Scanner - @station Station</h5>
+                <h5 class="mb-0 me-2">@title</h5>
                 <i class="fas fa-chevron-down scanner-toggle-icon" id="scanner-toggle-@containerId"></i>
             </button>
             <div class="d-flex align-items-center gap-2">
@@ -43,7 +43,6 @@
                                id="scanner-input-@containerId" 
                                class="form-control form-control-lg universal-scanner-input" 
                                placeholder="@placeholder"
-                               data-station="@station"
                                data-container="@containerId"
                                autocomplete="off"
                                spellcheck="false">

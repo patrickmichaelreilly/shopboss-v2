@@ -1,8 +1,7 @@
-// Universal Scanner JavaScript Module
+// Universal Scanner JavaScript Module - Pure Input Component
 class UniversalScanner {
     constructor(containerId, options = {}) {
         this.containerId = containerId;
-        this.station = options.station || 'Unknown';
         this.autoFocus = options.autoFocus !== false;
         this.clearOnSuccess = options.clearOnSuccess !== false;
         this.showRecentScans = options.showRecentScans !== false;
@@ -41,10 +40,7 @@ class UniversalScanner {
             this.focus();
         }
         
-        // Load recent scans if enabled
-        if (this.showRecentScans) {
-            this.loadRecentScans();
-        }
+        // Recent scans will be populated in real-time as scans happen
         
         // Set up periodic focus return for barcode scanners
         this.setupFocusManagement();
@@ -52,7 +48,7 @@ class UniversalScanner {
         // Initialize collapse state
         this.initializeCollapseState();
         
-        console.log(`Universal Scanner initialized for ${this.station} station`);
+        console.log(`Universal Scanner initialized for container: ${this.containerId}`);
     }
     
     handleKeydown(event) {
@@ -110,11 +106,33 @@ class UniversalScanner {
         this.setProcessingState(true);
         
         try {
-            const result = await this.submitScan(barcode);
-            await this.handleScanResult(result);
+            // Track last scanned barcode
+            this.lastScannedBarcode = barcode;
+            
+            // Emit scan event instead of making API calls
+            this.emitScanEvent(barcode);
+            
+            // Show basic feedback
+            this.showStatus('info', `📡 Scan received: ${barcode}`, false);
+            
+            // Clear input if configured
+            if (this.clearOnSuccess) {
+                this.clearInput();
+            }
+            
+            // Add to recent scans
+            if (this.showRecentScans) {
+                this.addToRecentScans({
+                    barcode: barcode,
+                    result: 'Forwarded to page handler',
+                    success: true,
+                    timestamp: new Date()
+                });
+            }
+            
         } catch (error) {
             console.error('Scan processing error:', error);
-            this.showStatus('danger', '❌ Network error. Please try again.');
+            this.showStatus('danger', '❌ Error processing scan.');
         } finally {
             this.isProcessing = false;
             this.setProcessingState(false);
@@ -122,76 +140,31 @@ class UniversalScanner {
         }
     }
     
-    async submitScan(barcode) {
-        const sessionId = this.getSessionId();
-        
-        const response = await fetch('/api/scanner/process', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            body: JSON.stringify({
+    emitScanEvent(barcode) {
+        // Create and dispatch a custom event that pages can listen to
+        const scanEvent = new CustomEvent('scanReceived', {
+            detail: {
                 barcode: barcode,
-                station: this.station,
-                sessionId: sessionId
-            })
+                timestamp: new Date(),
+                containerId: this.containerId,
+                scanner: this
+            },
+            bubbles: true
         });
         
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
+        // Dispatch on document for global listeners
+        document.dispatchEvent(scanEvent);
         
-        return await response.json();
+        console.log('Universal Scanner: Emitted scanReceived event', { barcode, containerId: this.containerId });
     }
     
-    async handleScanResult(result) {
-        if (!result) {
-            this.showStatus('danger', '❌ Invalid response from server');
-            return;
-        }
+    // Public method for pages to show scan results
+    showScanResult(success, message, autoHide = true) {
+        const statusType = success ? 'success' : 'danger';
+        this.showStatus(statusType, message, autoHide);
         
-        // Show status
-        const statusType = result.success ? 'success' : 'danger';
-        this.showStatus(statusType, result.message || 'Unknown result');
-        
-        // Show detailed results
-        if (result.additionalData || result.suggestions) {
-            this.showResults(result);
-        }
-        
-        // Handle redirects
-        if (result.success && result.redirectUrl) {
-            this.showStatus('info', `🧭 Redirecting...`);
-            setTimeout(() => {
-                window.location.href = result.redirectUrl;
-            }, 1500);
-            return;
-        }
-        
-        // Handle refresh requests
-        if (result.success && result.requiresRefresh) {
-            this.showStatus('info', '🔄 Refreshing page...');
-            setTimeout(() => {
-                window.location.reload();
-            }, 1500);
-            return;
-        }
-        
-        // Clear input on success
-        if (result.success && this.clearOnSuccess) {
-            this.clearInput();
-        }
-        
-        // Update recent scans
-        if (this.showRecentScans) {
-            this.addToRecentScans({
-                barcode: this.input.value,
-                result: result.message,
-                success: result.success,
-                timestamp: new Date()
-            });
-        }
+        // Don't add to recent scans here - already added in processScan()
+        // This prevents duplicate entries when pages call showScanResult()
     }
     
     showStatus(type, message, autoHide = true) {
@@ -275,26 +248,8 @@ class UniversalScanner {
         this.recentScansDiv.style.display = 'block';
     }
     
-    async loadRecentScans() {
-        try {
-            const response = await fetch(`/api/scanner/recent-scans?station=${encodeURIComponent(this.station)}&limit=5`);
-            if (response.ok) {
-                const scans = await response.json();
-                if (scans && scans.length > 0) {
-                    scans.forEach(scan => {
-                        this.addToRecentScans({
-                            barcode: scan.barcode,
-                            result: scan.result,
-                            success: scan.success,
-                            timestamp: new Date(scan.scanDate)
-                        });
-                    });
-                }
-            }
-        } catch (error) {
-            console.warn('Failed to load recent scans:', error);
-        }
-    }
+    // Recent scans are now populated in real-time by the scanner itself
+    // No API calls needed - each page can persist its own recent scans if needed
     
     clearInput() {
         if (this.input) {
@@ -417,15 +372,43 @@ class UniversalScanner {
         
         if (!barcode) return;
         
+        // Cooldown check
+        const now = Date.now();
+        if (now - this.lastScanTime < this.scanCooldown) {
+            return;
+        }
+        this.lastScanTime = now;
+        
+        if (this.isProcessing) {
+            return;
+        }
+        
         this.isProcessing = true;
         this.updateStatusIndicator('processing', 'Processing scan...');
         
         try {
-            const result = await this.submitScan(barcode);
-            await this.handleScanResult(result);
+            // Track last scanned barcode
+            this.lastScannedBarcode = barcode;
+            
+            // Emit scan event instead of making API calls
+            this.emitScanEvent(barcode);
+            
+            // Add to recent scans
+            if (this.showRecentScans) {
+                this.addToRecentScans({
+                    barcode: barcode,
+                    result: 'Forwarded to page handler',
+                    success: true,
+                    timestamp: new Date()
+                });
+            }
+            
+            // Show basic feedback via status indicator
+            this.updateStatusIndicator('info', `Scan received: ${barcode}`);
+            
         } catch (error) {
             console.error('Scan processing error:', error);
-            this.updateStatusIndicator('error', 'Network error. Please try again.');
+            this.updateStatusIndicator('error', 'Error processing scan.');
         } finally {
             this.isProcessing = false;
             setTimeout(() => {
@@ -436,14 +419,7 @@ class UniversalScanner {
         }
     }
     
-    getSessionId() {
-        // Get session ID from meta tag or generate one
-        let sessionId = document.querySelector('meta[name="session-id"]')?.content;
-        if (!sessionId) {
-            sessionId = 'session-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-        }
-        return sessionId;
-    }
+    // Session ID handling removed - no longer needed for pure input component
     
     escapeHtml(text) {
         const div = document.createElement('div');
@@ -452,7 +428,7 @@ class UniversalScanner {
     }
     
     initializeCollapseState() {
-        const storageKey = `scanner-collapsed-${this.station}`;
+        const storageKey = `scanner-collapsed-${this.containerId}`;
         const isCollapsed = localStorage.getItem(storageKey) === 'true';
         
         if (isCollapsed && this.bodyElement) {
@@ -563,11 +539,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     scannerInputs.forEach(input => {
         const containerId = input.dataset.container;
-        const station = input.dataset.station;
         
-        if (containerId && station && !window.universalScanners[containerId]) {
+        if (containerId && !window.universalScanners[containerId]) {
             window.createUniversalScanner(containerId, {
-                station: station,
                 autoFocus: true,
                 clearOnSuccess: true,
                 showRecentScans: true

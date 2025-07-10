@@ -22,14 +22,7 @@
             </small>
         }
     </div>
-    <div class="btn-group" role="group">
-        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#cncScanModal">
-            <i class="fas fa-barcode me-2"></i>Scan Nest Sheet
-        </button>
-        <button type="button" class="btn btn-outline-info" onclick="loadRecentScans()">
-            <i class="fas fa-history me-2"></i>Recent Scans
-        </button>
-    </div>
+    <!-- Old scan buttons removed - using Universal Scanner instead -->
 </div>
 
 @if (!string.IsNullOrEmpty(ViewBag.ErrorMessage))
@@ -42,7 +35,7 @@
 
 @{
     ViewData["ContainerId"] = "cnc-scanner";
-    ViewData["Station"] = "CNC";
+    ViewData["Title"] = "Universal Scanner - CNC Station";
     ViewData["ShowHelp"] = true;
     ViewData["ShowRecentScans"] = true;
     ViewData["Placeholder"] = "Scan nest sheet barcode or enter command...";
@@ -160,54 +153,7 @@ else
 }
 
 <!-- Barcode Scan Modal -->
-<div class="modal fade" id="cncScanModal" tabindex="-1" aria-labelledby="cncScanModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="cncScanModalLabel">
-                    <i class="fas fa-barcode me-2"></i>Scan Nest Sheet
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <form id="cncScanForm">
-                    <div class="mb-3">
-                        <label for="barcodeInput" class="form-label">Barcode</label>
-                        <div class="input-group">
-                            <input type="text" class="form-control" id="barcodeInput" placeholder="Scan or enter barcode" required>
-                            <button type="button" class="btn btn-outline-secondary" id="validateBtn" onclick="validateBarcodeInput()">
-                                <i class="fas fa-check"></i>
-                            </button>
-                        </div>
-                        <div id="validationFeedback" class="form-text"></div>
-                        <div id="suggestions" class="mt-2" style="display: none;">
-                            <small class="text-muted">Did you mean:</small>
-                            <div id="suggestionsList" class="mt-1"></div>
-                        </div>
-                    </div>
-                    
-                    <!-- Real-time scan status indicator -->
-                    <div id="scanStatus" class="mb-3" style="display: none;">
-                        <div class="d-flex align-items-center">
-                            <div id="scanSpinner" class="spinner-border spinner-border-sm me-2" role="status" style="display: none;">
-                                <span class="visually-hidden">Processing...</span>
-                            </div>
-                            <div id="scanStatusText" class="flex-grow-1"></div>
-                            <div id="scanStatusIcon"></div>
-                        </div>
-                    </div>
-                    
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="processBarcodeFromModal()">
-                    <i class="fas fa-cut me-2"></i>Process Nest Sheet
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
+<!-- Old CNC scan modal removed - using Universal Scanner instead -->
 
 
 <!-- Nest Sheet Details Modal -->
@@ -257,6 +203,10 @@ else
     <script src="~/lib/signalr/dist/browser/signalr.js"></script>
     <script src="~/js/universal-scanner.js"></script>
     <script>
+        console.log('=== CNC SCRIPT EXECUTION START ===', new Date().toISOString());
+        if (!window.cncExecutionCount) window.cncExecutionCount = 0;
+        window.cncExecutionCount++;
+        console.log('CNC script execution #', window.cncExecutionCount);
         // Initialize SignalR connection
         const connection = new signalR.HubConnectionBuilder()
             .withUrl("/hubs/status")
@@ -328,165 +278,17 @@ else
 
 
         // Enhanced barcode validation with visual feedback
-        function validateBarcodeInput() {
-            const barcode = document.getElementById('barcodeInput').value.trim();
-            const feedback = document.getElementById('validationFeedback');
-            const suggestions = document.getElementById('suggestions');
-            const suggestionsList = document.getElementById('suggestionsList');
-            
-            if (!barcode) {
-                updateValidationFeedback('Please enter a barcode.', 'text-danger');
-                return;
-            }
+        // Old scanning validation functions removed - using Universal Scanner instead
 
-            // Show loading state
-            updateValidationFeedback('Validating barcode...', 'text-info');
-            
-            fetch('/Cnc/ValidateBarcode', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: `barcode=${encodeURIComponent(barcode)}`
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    updateValidationFeedback(`✅ ${data.message}`, 'text-success');
-                    suggestions.style.display = 'none';
-                } else {
-                    updateValidationFeedback(`⚠️ ${data.message}`, 'text-danger');
-                    
-                    // Show suggestions if available
-                    if (data.suggestions && data.suggestions.length > 0) {
-                        suggestionsList.innerHTML = data.suggestions.map(s => 
-                            `<button type="button" class="btn btn-sm btn-outline-primary me-1 mb-1" onclick="selectSuggestion('${s}')">${s}</button>`
-                        ).join('');
-                        suggestions.style.display = 'block';
-                    } else {
-                        suggestions.style.display = 'none';
-                    }
-                }
-            })
-            .catch(error => {
-                console.error('Validation error:', error);
-                updateValidationFeedback('Validation failed. Please try again.', 'text-danger');
-            });
-        }
+        // Old processBarcodeFromModal function removed - using Universal Scanner instead
 
-        function updateValidationFeedback(message, className) {
-            const feedback = document.getElementById('validationFeedback');
-            feedback.textContent = message;
-            feedback.className = `form-text ${className}`;
-        }
+        // Old processNestSheetWithFeedback function removed - using Universal Scanner instead
 
-        function selectSuggestion(barcode) {
-            document.getElementById('barcodeInput').value = barcode;
-            document.getElementById('suggestions').style.display = 'none';
-            validateBarcodeInput();
-        }
+        // Old getErrorIcon function removed - using Universal Scanner instead
 
-        // Process nest sheet from scan modal with enhanced feedback
-        function processBarcodeFromModal() {
-            const barcode = document.getElementById('barcodeInput').value.trim();
-            if (!barcode) {
-                updateValidationFeedback('Please enter a barcode.', 'text-danger');
-                return;
-            }
-            
-            // Show processing state
-            const scanStatus = document.getElementById('scanStatus');
-            const scanSpinner = document.getElementById('scanSpinner');
-            const scanStatusText = document.getElementById('scanStatusText');
-            const scanStatusIcon = document.getElementById('scanStatusIcon');
-            
-            scanStatus.style.display = 'block';
-            scanSpinner.style.display = 'block';
-            scanStatusText.textContent = 'Processing nest sheet...';
-            scanStatusIcon.innerHTML = '';
-            
-            processNestSheetWithFeedback(barcode);
-        }
+        // Old animateSuccess function removed - using Universal Scanner instead
 
-        function processNestSheetWithFeedback(barcode) {
-            fetch('/Cnc/ProcessNestSheet', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: `barcode=${encodeURIComponent(barcode)}`
-            })
-            .then(response => response.json())
-            .then(data => {
-                const scanStatus = document.getElementById('scanStatus');
-                const scanSpinner = document.getElementById('scanSpinner');
-                const scanStatusText = document.getElementById('scanStatusText');
-                const scanStatusIcon = document.getElementById('scanStatusIcon');
-                
-                scanSpinner.style.display = 'none';
-                
-                if (data.success) {
-                    scanStatusText.textContent = data.message;
-                    scanStatusIcon.innerHTML = '<i class="fas fa-check-circle text-success"></i>';
-                    
-                    // Show success animation
-                    animateSuccess();
-                    
-                    // Close modal after delay
-                    setTimeout(() => {
-                        const modal = bootstrap.Modal.getInstance(document.getElementById('cncScanModal'));
-                        modal.hide();
-                        resetScanModal();
-                        location.reload(); // Refresh to show updated status
-                    }, 2000);
-                } else {
-                    scanStatusText.textContent = data.message;
-                    scanStatusIcon.innerHTML = getErrorIcon(data.type);
-                    
-                    // Handle specific error types
-                    if (data.type === 'not_found' && data.suggestions) {
-                        const suggestionsList = document.getElementById('suggestionsList');
-                        suggestionsList.innerHTML = data.suggestions.map(s => 
-                            `<button type="button" class="btn btn-sm btn-outline-primary me-1 mb-1" onclick="selectSuggestion('${s}')">${s}</button>`
-                        ).join('');
-                        document.getElementById('suggestions').style.display = 'block';
-                    }
-                }
-            })
-            .catch(error => {
-                console.error('Processing error:', error);
-                const scanSpinner = document.getElementById('scanSpinner');
-                const scanStatusText = document.getElementById('scanStatusText');
-                const scanStatusIcon = document.getElementById('scanStatusIcon');
-                
-                scanSpinner.style.display = 'none';
-                scanStatusText.textContent = 'An unexpected error occurred. Please try again.';
-                scanStatusIcon.innerHTML = '<i class="fas fa-exclamation-triangle text-danger"></i>';
-            });
-        }
-
-        function getErrorIcon(errorType) {
-            switch (errorType) {
-                case 'validation': return '<i class="fas fa-exclamation-triangle text-warning"></i>';
-                case 'not_found': return '<i class="fas fa-search text-info"></i>';
-                case 'duplicate': return '<i class="fas fa-clock text-warning"></i>';
-                case 'already_processed': return '<i class="fas fa-check-circle text-info"></i>';
-                case 'session': return '<i class="fas fa-user-times text-warning"></i>';
-                default: return '<i class="fas fa-times-circle text-danger"></i>';
-            }
-        }
-
-        function animateSuccess() {
-            const scanStatusIcon = document.getElementById('scanStatusIcon');
-            scanStatusIcon.classList.add('animate__animated', 'animate__pulse');
-        }
-
-        function resetScanModal() {
-            document.getElementById('barcodeInput').value = '';
-            document.getElementById('validationFeedback').textContent = '';
-            document.getElementById('scanStatus').style.display = 'none';
-            document.getElementById('suggestions').style.display = 'none';
-        }
+        // Old resetScanModal function removed - using Universal Scanner instead
 
         // Process nest sheet by barcode
         function processNestSheet(barcode, sheetName) {
@@ -686,40 +488,92 @@ else
             `;
         }
 
-        // Real-time barcode validation as user types
-        document.getElementById('barcodeInput').addEventListener('input', function(e) {
-            const barcode = e.target.value.trim();
-            if (barcode.length >= 3) {
-                // Debounce validation calls
-                clearTimeout(window.validationTimeout);
-                window.validationTimeout = setTimeout(() => {
-                    validateBarcodeInput();
-                }, 500);
-            }
-        });
+        // Old barcode input event listener removed - using Universal Scanner instead
 
-        // Auto-focus barcode input when modal opens
-        document.getElementById('cncScanModal').addEventListener('shown.bs.modal', function () {
-            document.getElementById('barcodeInput').focus();
-            resetScanModal();
-        });
+        // Old CNC scan modal event listeners removed - using Universal Scanner instead
 
-        document.getElementById('cncScanModal').addEventListener('hidden.bs.modal', function () {
-            resetScanModal();
-        });
-
-        // Handle Enter key in barcode input
-        document.getElementById('barcodeInput').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                processBarcodeFromModal();
-            }
-        });
+        // Old barcode input keypress handler removed - using Universal Scanner instead
 
 
         // Auto-refresh recent scans when modal is opened
         document.getElementById('recentScansModal').addEventListener('shown.bs.modal', function () {
             loadRecentScans();
         });
+        
+        // Listen for scan events from Universal Scanner (auto-initialized)
+        // First, remove any existing listeners to prevent duplicates
+        if (window.cncScanHandler) {
+            document.removeEventListener('scanReceived', window.cncScanHandler);
+            console.log('Removed existing CNC scan handler');
+        }
+        
+        window.cncScanHandler = function(event) {
+            const { barcode, containerId } = event.detail;
+            console.log('CNC Station: Received scan event', { barcode, containerId });
+            
+            // Get the scanner instance from global registry  
+            const scanner = window.universalScanners[containerId];
+            if (scanner) {
+                handleCncScan(barcode, scanner);
+            }
+        };
+        
+        document.addEventListener('scanReceived', window.cncScanHandler);
+        console.log('Added CNC scan handler');
+        
+        // Debug: Check if getEventListeners is available and inspect listeners
+        setTimeout(() => {
+            if (typeof getEventListeners === 'function') {
+                const listeners = getEventListeners(document);
+                console.log('All document event listeners:', listeners);
+                if (listeners.scanReceived) {
+                    console.log('scanReceived listeners count:', listeners.scanReceived.length);
+                }
+            } else {
+                console.log('getEventListeners not available - try in dev tools console');
+            }
+        }, 1000);
+        
+        // Clean up event listener when page unloads
+        window.addEventListener('beforeunload', function() {
+            if (window.cncScanHandler) {
+                document.removeEventListener('scanReceived', window.cncScanHandler);
+                window.cncScanHandler = null;
+            }
+        });
+        
+        // CNC scan handler that integrates Universal Scanner with existing logic
+        async function handleCncScan(barcode, scanner) {
+            try {
+                // Show processing status
+                scanner.showScanResult(false, '🔄 Processing nest sheet scan...', false);
+                
+                // Use existing CNC endpoint
+                const response = await fetch('/Cnc/ProcessNestSheet', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: `barcode=${encodeURIComponent(barcode)}`
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    scanner.showScanResult(true, data.message);
+                    
+                    // Refresh page to show updated nest sheets
+                    setTimeout(() => {
+                        location.reload();
+                    }, 2000);
+                } else {
+                    scanner.showScanResult(false, data.message || 'Nest sheet scan failed');
+                }
+            } catch (error) {
+                console.error('CNC scan error:', error);
+                scanner.showScanResult(false, '❌ Network error. Please try again.');
+            }
+        }
     </script>
 }

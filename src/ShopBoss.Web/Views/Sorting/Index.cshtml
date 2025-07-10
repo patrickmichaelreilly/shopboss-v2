@@ -22,10 +22,8 @@
             </small>
         }
     </div>
+    <!-- Old scan buttons removed - using Universal Scanner instead -->
     <div class="btn-group" role="group">
-        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#scanModal">
-            <i class="fas fa-barcode me-2"></i>Scan Part
-        </button>
         <button type="button" class="btn btn-outline-info" onclick="loadCutParts()" id="cutPartsButton">
             <i class="fas fa-list me-2"></i>Cut Parts (<span id="cutPartsCount">@ViewBag.CutPartsCount</span>)
         </button>
@@ -45,7 +43,7 @@
 
 @{
     ViewData["ContainerId"] = "sorting-scanner";
-    ViewData["Station"] = "Sorting";
+    ViewData["Title"] = "Universal Scanner - Sorting Station";
     ViewData["ShowHelp"] = true;
     ViewData["ShowRecentScans"] = true;
     ViewData["Placeholder"] = "Scan part barcode or enter command...";
@@ -142,59 +140,7 @@ else
     </div>
 }
 
-<!-- Part Scan Modal -->
-<div class="modal fade" id="scanModal" tabindex="-1" aria-labelledby="scanModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <div>
-                    <h5 class="modal-title" id="scanModalLabel">
-                        <i class="fas fa-barcode me-2"></i>Scan Part for Sorting
-                    </h5>
-                    <div id="selectedRackInfo" class="small text-muted" style="display: none;">
-                        Sorting to: <span id="selectedRackName" class="fw-bold"></span>
-                    </div>
-                </div>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <form id="scanForm">
-                    <div class="mb-3">
-                        <label for="partBarcodeInput" class="form-label">Part Barcode</label>
-                        <div class="input-group">
-                            <input type="text" class="form-control" id="partBarcodeInput" placeholder="Scan or enter part barcode" required>
-                            <button type="button" class="btn btn-outline-secondary" onclick="scanPart()">
-                                <i class="fas fa-search"></i>
-                            </button>
-                        </div>
-                        <div id="scanFeedback" class="form-text"></div>
-                    </div>
-                    
-                    <!-- Scan status indicator -->
-                    <div id="scanStatus" class="mb-3" style="display: none;">
-                        <div class="d-flex align-items-center">
-                            <div id="scanSpinner" class="spinner-border spinner-border-sm me-2" role="status" style="display: none;"></div>
-                            <div id="scanStatusText" class="flex-grow-1"></div>
-                            <div id="scanStatusIcon"></div>
-                        </div>
-                    </div>
-
-                    <!-- Placement guidance -->
-                    <div id="placementGuidance" class="alert alert-info" style="display: none;">
-                        <h6><i class="fas fa-map-marker-alt me-2"></i>Placement Guidance</h6>
-                        <div id="placementMessage"></div>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="scanPart()">
-                    <i class="fas fa-sort me-2"></i>Sort Part
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
+<!-- Old part scan modal removed - using Universal Scanner instead -->
 
 <!-- Cut Parts List Modal -->
 <div class="modal fade" id="cutPartsModal" tabindex="-1" aria-labelledby="cutPartsModalLabel" aria-hidden="true">
@@ -421,138 +367,11 @@ else
             }
         }
 
-        // Scan part for sorting
-        function scanPart() {
-            const barcode = document.getElementById('partBarcodeInput').value.trim();
-            if (!barcode) {
-                updateScanFeedback('Please enter a part barcode.', 'text-danger');
-                return;
-            }
-            
-            // Check if a rack is selected
-            if (!currentRackId) {
-                updateScanFeedback('Please select a storage rack first by clicking on one of the rack tabs above.', 'text-warning');
-                return;
-            }
-            
-            // Enhanced scan feedback - show detailed progress
-            showScanStatus('🔍 Validating part barcode...', true);
-            
-            // Include current rack ID if one is selected
-            let requestBody = `barcode=${encodeURIComponent(barcode)}`;
-            if (currentRackId) {
-                requestBody += `&selectedRackId=${encodeURIComponent(currentRackId)}`;
-            }
-            
-            fetch('/Sorting/ScanPart', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: requestBody
-            })
-            .then(response => response.json())
-            .then(data => {
-                hideScanStatus();
-                
-                if (data.success) {
-                    // Enhanced success feedback with visual confirmation
-                    updateScanFeedback(`✅ ${data.message}`, 'text-success');
-                    showPlacementGuidance(data.placementMessage);
-                    
-                    // Show scan success animation
-                    showScanSuccessAnimation(data);
-                    
-                    // Update rack badge and cut parts count immediately
-                    if (data.updatedRackOccupancy) {
-                        updateRackBadge(data.updatedRackOccupancy.rackId, 
-                                       data.updatedRackOccupancy.occupiedBins, 
-                                       data.updatedRackOccupancy.totalBins);
-                    }
-                    
-                    if (data.remainingCutParts !== undefined) {
-                        updateCutPartsCount(data.remainingCutParts);
-                    }
-                    
-                    // Check for assembly readiness
-                    if (data.assemblyReadiness) {
-                        showAssemblyReadinessAlert(data.assemblyReadiness);
-                    }
-                    
-                    // Close modal after delay with enhanced feedback
-                    setTimeout(() => {
-                        const modal = bootstrap.Modal.getInstance(document.getElementById('scanModal'));
-                        modal.hide();
-                        resetScanModal();
-                        
-                        // Refresh current rack if it matches
-                        if (currentRackId === data.rackId) {
-                            loadRackDetails(currentRackId);
-                        }
-                        
-                        // Show completion toast
-                        showToast(`Part sorted successfully to ${data.binLabel || 'assigned bin'}`, 'success');
-                    }, 2500);
-                } else {
-                    // Enhanced error feedback with suggested actions
-                    updateScanFeedback(`⚠️ ${data.message}`, 'text-danger');
-                    
-                    // Show suggested next steps for common errors
-                    if (data.suggestions) {
-                        showErrorSuggestions(data.suggestions);
-                    }
-                }
-            })
-            .catch(error => {
-                console.error('Scan error:', error);
-                hideScanStatus();
-                updateScanFeedback('Network error - please check connection and try again.', 'text-danger');
-            });
-        }
+        // Old scanPart function removed - using Universal Scanner instead
 
-        function showScanStatus(message, showSpinner = false) {
-            document.getElementById('scanStatus').style.display = 'block';
-            document.getElementById('scanSpinner').style.display = showSpinner ? 'block' : 'none';
-            document.getElementById('scanStatusText').textContent = message;
-            document.getElementById('scanStatusIcon').innerHTML = '';
-        }
+        // Old scan status functions removed - using Universal Scanner instead
 
-        function hideScanStatus() {
-            document.getElementById('scanStatus').style.display = 'none';
-            document.getElementById('scanSpinner').style.display = 'none';
-        }
-
-        function updateScanFeedback(message, className) {
-            const feedback = document.getElementById('scanFeedback');
-            feedback.textContent = message;
-            feedback.className = `form-text ${className}`;
-        }
-
-        function showPlacementGuidance(message) {
-            const guidance = document.getElementById('placementGuidance');
-            const messageDiv = document.getElementById('placementMessage');
-            messageDiv.textContent = message;
-            guidance.style.display = 'block';
-        }
-
-        function updateSelectedRackInfo(rackName) {
-            const rackInfo = document.getElementById('selectedRackInfo');
-            const rackNameSpan = document.getElementById('selectedRackName');
-            
-            if (rackName && rackInfo && rackNameSpan) {
-                rackNameSpan.textContent = rackName;
-                rackInfo.style.display = 'block';
-            } else if (rackInfo) {
-                rackInfo.style.display = 'none';
-            }
-        }
-
-        function resetScanModal() {
-            document.getElementById('partBarcodeInput').value = '';
-            document.getElementById('scanFeedback').textContent = '';
-            document.getElementById('placementGuidance').style.display = 'none';
-            hideScanStatus();
-        }
+        // Old modal functions removed - using Universal Scanner instead
 
         // Load cut parts list
         function loadCutParts() {
@@ -709,19 +528,7 @@ else
             showToast(message, 'error');
         }
 
-        // Auto-focus on modal show
-        document.getElementById('scanModal').addEventListener('shown.bs.modal', function () {
-            document.getElementById('partBarcodeInput').focus();
-            resetScanModal();
-        });
-
-        // Handle Enter key in barcode input
-        document.getElementById('partBarcodeInput').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                scanPart();
-            }
-        });
+        // Old modal event listeners removed - using Universal Scanner instead
 
         // Load first rack on page load
         document.addEventListener('DOMContentLoaded', function() {
@@ -744,6 +551,78 @@ else
             // Check initial assembly readiness
             checkInitialAssemblyReadiness();
         });
+        
+        // Listen for scan events from Universal Scanner (auto-initialized)
+        // First, remove any existing listeners to prevent duplicates
+        if (window.sortingScanHandler) {
+            document.removeEventListener('scanReceived', window.sortingScanHandler);
+            console.log('Removed existing Sorting scan handler');
+        }
+        
+        window.sortingScanHandler = function(event) {
+            const { barcode, containerId } = event.detail;
+            console.log('Sorting Station: Received scan event', { barcode, containerId });
+            
+            // Get the scanner instance from global registry  
+            const scanner = window.universalScanners[containerId];
+            if (scanner) {
+                handleSortingScan(barcode, scanner);
+            }
+        };
+        
+        document.addEventListener('scanReceived', window.sortingScanHandler);
+        console.log('Added Sorting scan handler');
+        
+        // Clean up event listener when page unloads
+        window.addEventListener('beforeunload', function() {
+            if (window.sortingScanHandler) {
+                document.removeEventListener('scanReceived', window.sortingScanHandler);
+                window.sortingScanHandler = null;
+            }
+        });
+        
+        // Sorting scan handler that integrates Universal Scanner with existing logic
+        async function handleSortingScan(barcode, scanner) {
+            try {
+                // Show processing status
+                scanner.showScanResult(false, '🔄 Processing part for sorting...', false);
+                
+                // Get currently displayed rack ID
+                const selectedRackId = getCurrentlySelectedRackId();
+                
+                // Build request body with selected rack context
+                let requestBody = `barcode=${encodeURIComponent(barcode)}`;
+                if (selectedRackId) {
+                    requestBody += `&selectedRackId=${encodeURIComponent(selectedRackId)}`;
+                }
+                
+                // Use existing sorting endpoint with correct Content-Type
+                const response = await fetch('/Sorting/ScanPart', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: requestBody
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    scanner.showScanResult(true, data.message);
+                    
+                    // Refresh page to show updated rack status
+                    setTimeout(() => {
+                        location.reload();
+                    }, 2000);
+                } else {
+                    scanner.showScanResult(false, data.message || 'Part sorting failed');
+                }
+            } catch (error) {
+                console.error('Sorting scan error:', error);
+                scanner.showScanResult(false, '❌ Network error. Please try again.');
+            }
+        }
 
         function checkInitialAssemblyReadiness() {
             // Check if any products are ready for assembly on page load
@@ -1618,3 +1497,4 @@ else
         }
     </style>
 }
+
