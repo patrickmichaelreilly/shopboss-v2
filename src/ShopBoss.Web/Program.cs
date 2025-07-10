@@ -5,6 +5,9 @@ using ShopBoss.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Configure for Windows Service hosting
+builder.Host.UseWindowsService();
+
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 builder.Services.AddSignalR();
