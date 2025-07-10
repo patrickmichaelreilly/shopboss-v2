@@ -113,12 +113,6 @@
             Active Work Order: <strong>@Model.WorkOrder.Name</strong>
         </p>
     </div>
-    <div>
-        <button type="button" class="btn btn-primary btn-lg" onclick="openScanModal()">
-            <i class="fas fa-barcode me-2"></i>
-            Scan Part to Assemble
-        </button>
-    </div>
     <div class="text-end">
         <div class="row g-2">
             <div class="col">
@@ -447,6 +441,12 @@
         connection.start().then(function () {
             console.log("Assembly Station SignalR connection established");
             
+            // Join assembly station group
+            connection.invoke("JoinGroup", "assembly-station");
+            
+            // Join all-stations group to receive product assembly broadcasts
+            connection.invoke("JoinGroup", "all-stations");
+            
             // Join work order group for notifications
             const activeWorkOrderId = '@Model.WorkOrder.Id';
             if (activeWorkOrderId) {
@@ -477,6 +477,32 @@
             console.log("ProductReadyForAssembly event received:", data);
             showToast(`Product "${data.productName}" is now ready for assembly!`, 'info');
             updateProductStatus(data.productId, 'ready');
+        });
+
+        // Listen for products assembled via scanning
+        connection.on("ProductAssembledByScan", function (data) {
+            console.log("ProductAssembledByScan event received:", data);
+            showToast(`Product "${data.ProductName}" assembled successfully!`, 'success');
+            updateProductStatus(data.ProductId, 'completed');
+            updateShippingReadinessStatus(data);
+            
+            // Refresh the page to show updated assembly queue
+            setTimeout(() => {
+                location.reload();
+            }, 2000);
+        });
+
+        // Listen for products assembled via manual button
+        connection.on("ProductAssembledManually", function (data) {
+            console.log("ProductAssembledManually event received:", data);
+            showToast(`Product "${data.ProductName}" assembled successfully!`, 'success');
+            updateProductStatus(data.ProductId, 'completed');
+            updateShippingReadinessStatus(data);
+            
+            // Refresh the page to show updated assembly queue
+            setTimeout(() => {
+                location.reload();
+            }, 2000);
         });
 
         // Listen for general status updates
