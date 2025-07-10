@@ -109,7 +109,13 @@ class UniversalScanner {
             // Track last scanned barcode
             this.lastScannedBarcode = barcode;
             
-            // Emit scan event instead of making API calls
+            // Check if this is a command barcode
+            if (this.isCommandBarcode(barcode)) {
+                this.handleCommand(barcode);
+                return;
+            }
+            
+            // Emit scan event for non-command barcodes
             this.emitScanEvent(barcode);
             
             // Show basic feedback
@@ -138,6 +144,82 @@ class UniversalScanner {
             this.setProcessingState(false);
             this.focus();
         }
+    }
+    
+    // Command barcode detection and handling
+    isCommandBarcode(barcode) {
+        return barcode.toUpperCase().startsWith('NAV-');
+    }
+    
+    handleCommand(barcode) {
+        const command = barcode.toUpperCase();
+        
+        // Navigation commands
+        if (command.startsWith('NAV-')) {
+            this.handleNavigationCommand(command);
+            return;
+        }
+        
+        // Unknown command
+        this.showStatus('warning', `❓ Unknown command: ${barcode}`);
+        this.addToRecentScans({
+            barcode: barcode,
+            result: 'Unknown command',
+            success: false,
+            timestamp: new Date()
+        });
+    }
+    
+    handleNavigationCommand(command) {
+        const destination = command.replace('NAV-', '');
+        let url = null;
+        let stationName = '';
+        
+        switch (destination) {
+            case 'ADMIN':
+                url = '/Admin';
+                stationName = 'Admin Station';
+                break;
+            case 'CNC':
+                url = '/Cnc';
+                stationName = 'CNC Station';
+                break;
+            case 'SORTING':
+                url = '/Sorting';
+                stationName = 'Sorting Station';
+                break;
+            case 'ASSEMBLY':
+                url = '/Assembly';
+                stationName = 'Assembly Station';
+                break;
+            case 'SHIPPING':
+                url = '/Shipping';
+                stationName = 'Shipping Station';
+                break;
+            default:
+                this.showStatus('warning', `❓ Unknown navigation destination: ${destination}`);
+                this.addToRecentScans({
+                    barcode: command,
+                    result: 'Unknown navigation destination',
+                    success: false,
+                    timestamp: new Date()
+                });
+                return;
+        }
+        
+        // Show navigation feedback
+        this.showStatus('success', `🧭 Navigating to ${stationName}...`, false);
+        this.addToRecentScans({
+            barcode: command,
+            result: `Navigating to ${stationName}`,
+            success: true,
+            timestamp: new Date()
+        });
+        
+        // Navigate after a brief delay for user feedback
+        setTimeout(() => {
+            window.location.href = url;
+        }, 1500);
     }
     
     emitScanEvent(barcode) {
@@ -390,7 +472,13 @@ class UniversalScanner {
             // Track last scanned barcode
             this.lastScannedBarcode = barcode;
             
-            // Emit scan event instead of making API calls
+            // Check if this is a command barcode
+            if (this.isCommandBarcode(barcode)) {
+                this.handleCommand(barcode);
+                return;
+            }
+            
+            // Emit scan event for non-command barcodes
             this.emitScanEvent(barcode);
             
             // Add to recent scans
@@ -429,7 +517,8 @@ class UniversalScanner {
     
     initializeCollapseState() {
         const storageKey = `scanner-collapsed-${this.containerId}`;
-        const isCollapsed = localStorage.getItem(storageKey) === 'true';
+        // Default to collapsed unless explicitly set to expanded
+        const isCollapsed = localStorage.getItem(storageKey) !== 'false';
         
         if (isCollapsed && this.bodyElement) {
             this.bodyElement.classList.remove('show');
