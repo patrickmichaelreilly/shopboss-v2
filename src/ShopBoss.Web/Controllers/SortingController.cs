@@ -259,6 +259,11 @@ public class SortingController : Controller
             _logger.LogInformation("SCAN DEBUG: Looking for barcode '{Barcode}' among {Count} cut parts: {Parts}", 
                 cleanBarcode, allCutParts.Count, string.Join(", ", allCutParts.Select(p => $"{p.Id}/{p.Name}")));
 
+            // Also check if this is a DetachedProduct part specifically
+            var detachedProductParts = allCutParts.Where(p => _context.DetachedProducts.Any(dp => dp.Id == p.ProductId)).ToList();
+            _logger.LogInformation("SCAN DEBUG: {DetachedCount} of these parts belong to DetachedProducts: {DetachedParts}", 
+                detachedProductParts.Count, string.Join(", ", detachedProductParts.Select(p => $"{p.Id}/{p.Name} (DetachedProduct: {p.ProductId})")));
+
             // Find the cut part by barcode (assuming part name or ID as barcode)
             var part = await _context.Parts
                 .Include(p => p.NestSheet)
