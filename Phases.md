@@ -452,6 +452,11 @@ categories[category].forEach(part => {
 - Improve part scanning feedback
 - Enhance assembly readiness indicators
 - Optimize rack assignment algorithm display
+- Add rack-specific navigation commands (NAV-RACK-1, NAV-RACK-2, etc.)
+  - Extend Universal Scanner to support NAV-RACK-[ID] pattern
+  - Update SortingController to accept rackId parameter
+  - Modify sorting station to auto-select specified rack on load
+  - Enable direct navigation to specific racks from any station (15-20 min)
 
 ### **D4: Assembly Station Enhancement (1 hour)**
 **Tasks:**
