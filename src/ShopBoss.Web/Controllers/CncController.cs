@@ -15,14 +15,16 @@ public class CncController : Controller
     private readonly ILogger<CncController> _logger;
     private readonly IHubContext<StatusHub> _hubContext;
     private readonly AuditTrailService _auditTrail;
+    private readonly UniversalScannerService _scannerService;
 
     public CncController(ShopBossDbContext context, ILogger<CncController> logger, 
-        IHubContext<StatusHub> hubContext, AuditTrailService auditTrail)
+        IHubContext<StatusHub> hubContext, AuditTrailService auditTrail, UniversalScannerService scannerService)
     {
         _context = context;
         _logger = logger;
         _hubContext = hubContext;
         _auditTrail = auditTrail;
+        _scannerService = scannerService;
     }
 
     public async Task<IActionResult> Index()
@@ -57,6 +59,16 @@ public class CncController : Controller
             TempData["ErrorMessage"] = "An error occurred while loading the nest sheets.";
             return View(new List<NestSheet>());
         }
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> ProcessScan(string barcode)
+    {
+        var sessionId = HttpContext.Session.Id;
+        var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+        
+        var result = await _scannerService.ProcessScanAsync(barcode, "CNC", sessionId, ipAddress);
+        return Json(result);
     }
 
     [HttpPost]

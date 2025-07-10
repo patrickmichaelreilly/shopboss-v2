@@ -12,6 +12,9 @@ builder.Host.UseWindowsService();
 builder.Services.AddControllersWithViews();
 builder.Services.AddSignalR();
 
+// Add HTTP context accessor for services that need access to the current HTTP context
+builder.Services.AddHttpContextAccessor();
+
 // Add session support
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>
@@ -47,6 +50,7 @@ builder.Services.AddScoped<ShippingService>();
 builder.Services.AddScoped<WorkOrderService>();
 builder.Services.AddScoped<BackupService>();
 builder.Services.AddScoped<SystemHealthMonitor>();
+builder.Services.AddScoped<UniversalScannerService>();
 
 // Add background services
 builder.Services.AddHostedService<BackupBackgroundService>();

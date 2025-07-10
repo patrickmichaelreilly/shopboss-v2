@@ -149,6 +149,16 @@
     </div>
 </div>
 
+@{
+    ViewData["ContainerId"] = "assembly-scanner";
+    ViewData["Station"] = "Assembly";
+    ViewData["ShowHelp"] = true;
+    ViewData["ShowRecentScans"] = true;
+    ViewData["Placeholder"] = "Scan part barcode for assembly or enter command...";
+}
+
+<partial name="_UniversalScanner" />
+
 <!-- Assembly Queue -->
 <div class="row">
     <div class="col-lg-8">
@@ -426,6 +436,7 @@
 
 @section Scripts {
     <script src="~/lib/signalr/dist/browser/signalr.js"></script>
+    <script src="~/js/universal-scanner.js"></script>
     <script>
         // SignalR connection for real-time updates
         const connection = new signalR.HubConnectionBuilder()

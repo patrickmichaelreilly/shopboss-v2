@@ -43,6 +43,16 @@
     </div>
 }
 
+@{
+    ViewData["ContainerId"] = "sorting-scanner";
+    ViewData["Station"] = "Sorting";
+    ViewData["ShowHelp"] = true;
+    ViewData["ShowRecentScans"] = true;
+    ViewData["Placeholder"] = "Scan part barcode or enter command...";
+}
+
+<partial name="_UniversalScanner" />
+
 @if (!Model.Any())
 {
     <div class="alert alert-info">
@@ -270,6 +280,7 @@ else
 
 @section Scripts {
     <script src="~/lib/signalr/dist/browser/signalr.js"></script>
+    <script src="~/js/universal-scanner.js"></script>
     <script>
         let currentRackId = null;
         let currentCutPartsCount = @ViewBag.CutPartsCount;

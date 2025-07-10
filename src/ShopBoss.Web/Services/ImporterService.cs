@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
+using System.Reflection;
 
 namespace ShopBoss.Web.Services;
 
@@ -15,10 +16,11 @@ public class ImporterService
         
         if (!string.IsNullOrEmpty(configPath))
         {
-            // If it's a relative path, make it relative to the application directory
+            // If it's a relative path, make it relative to the executable directory
             if (!Path.IsPathRooted(configPath))
             {
-                _importerPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, configPath);
+                var baseDir = GetExecutableDirectory();
+                _importerPath = Path.Combine(baseDir, configPath);
             }
             else
             {
@@ -30,22 +32,51 @@ public class ImporterService
             _importerPath = GetDefaultImporterPath();
         }
         
-        _logger.LogInformation("Importer path resolved to: {ImporterPath}", _importerPath);
-        _logger.LogInformation("Importer executable exists: {Exists}", File.Exists(_importerPath));
+        _logger.LogInformation("UPDATED IMPORTER SERVICE: Importer path resolved to: {ImporterPath}", _importerPath);
+        _logger.LogInformation("UPDATED IMPORTER SERVICE: Importer executable exists: {Exists}", File.Exists(_importerPath));
     }
 
-    private static string GetDefaultImporterPath()
+    private string GetExecutableDirectory()
     {
-        // Start from the application directory and work our way up to find the tools directory
-        var currentDir = AppDomain.CurrentDomain.BaseDirectory;
-        var searchDir = currentDir;
+        // Simplified 2-strategy approach for reliable path resolution
+        // Works for both deploy-to-windows.sh testing and Windows Service production
         
-        // Look for the tools directory by going up the directory tree
+        // Strategy 1 (Primary): Use process path (available in .NET 6+)
+        try
+        {
+            var processPath = Environment.ProcessPath;
+            _logger.LogInformation("UPDATED IMPORTER SERVICE: Process path: {Path}", processPath);
+            if (!string.IsNullOrEmpty(processPath) && File.Exists(processPath))
+            {
+                var dir = Path.GetDirectoryName(processPath)!;
+                _logger.LogInformation("UPDATED IMPORTER SERVICE: Using process directory: {Directory}", dir);
+                return dir;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Process path strategy failed");
+        }
+        
+        // Strategy 2 (Fallback): AppDomain base directory
+        var baseDirPath = AppDomain.CurrentDomain.BaseDirectory;
+        _logger.LogInformation("UPDATED IMPORTER SERVICE: Fallback to AppDomain base directory: {Directory}", baseDirPath);
+        return baseDirPath;
+    }
+    
+    private string GetDefaultImporterPath()
+    {
+        var baseDir = GetExecutableDirectory();
+        _logger.LogInformation("Using base directory for importer search: {BaseDirectory}", baseDir);
+        
+        // Strategy 1: Look for tools directory relative to executable
+        var searchDir = baseDir;
         for (int i = 0; i < 10; i++) // Limit search to prevent infinite loop
         {
             var toolsPath = Path.Combine(searchDir, "tools", "importer", "bin", "Release", "net8.0", "win-x86", "Importer.exe");
             if (File.Exists(toolsPath))
             {
+                _logger.LogInformation("Found importer using directory traversal strategy at: {Path}", toolsPath);
                 return toolsPath;
             }
             
@@ -54,10 +85,41 @@ public class ImporterService
             searchDir = parentDir.FullName;
         }
         
-        // Fallback to the original relative path approach
-        var basePath = AppDomain.CurrentDomain.BaseDirectory;
-        var importerDir = Path.Combine(basePath, "..", "..", "..", "..", "..", "tools", "importer", "bin", "Release", "net8.0", "win-x86");
-        return Path.GetFullPath(Path.Combine(importerDir, "Importer.exe"));
+        // Strategy 2: Direct relative path from executable directory
+        var directPath = Path.Combine(baseDir, "tools", "importer", "bin", "Release", "net8.0", "win-x86", "Importer.exe");
+        if (File.Exists(directPath))
+        {
+            _logger.LogInformation("Found importer using direct relative path strategy at: {Path}", directPath);
+            return directPath;
+        }
+        
+        // Strategy 3: Look in common deployment locations (x86 only - x64 will NOT work)
+        var commonPaths = new[]
+        {
+            // Direct deployment paths
+            Path.Combine(baseDir, "tools", "importer", "bin", "Release", "net8.0", "win-x86", "Importer.exe"),
+            Path.Combine(baseDir, "tools", "importer", "bin", "Debug", "net8.0", "win-x86", "Importer.exe"),
+            // Parent directory searches
+            Path.Combine(baseDir, "..", "tools", "importer", "bin", "Release", "net8.0", "win-x86", "Importer.exe"),
+            Path.Combine(baseDir, "..", "..", "tools", "importer", "bin", "Release", "net8.0", "win-x86", "Importer.exe"),
+            // Simplified deployment fallback
+            Path.Combine(baseDir, "tools", "importer", "Importer.exe")
+        };
+        
+        foreach (var path in commonPaths)
+        {
+            var fullPath = Path.GetFullPath(path);
+            if (File.Exists(fullPath))
+            {
+                _logger.LogInformation("Found importer using common path strategy at: {Path}", fullPath);
+                return fullPath;
+            }
+        }
+        
+        // Final fallback - return the expected path even if it doesn't exist
+        var fallbackPath = Path.GetFullPath(Path.Combine(baseDir, "tools", "importer", "bin", "Release", "net8.0", "win-x86", "Importer.exe"));
+        _logger.LogWarning("Could not find importer executable. Using fallback path: {Path}", fallbackPath);
+        return fallbackPath;
     }
 
     public async Task<ImporterResult> ImportSdfFileAsync(string sdfFilePath, IProgress<ImporterProgress>? progress = null)

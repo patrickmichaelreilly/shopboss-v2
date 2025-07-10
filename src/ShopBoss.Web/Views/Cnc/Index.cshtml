@@ -40,6 +40,16 @@
     </div>
 }
 
+@{
+    ViewData["ContainerId"] = "cnc-scanner";
+    ViewData["Station"] = "CNC";
+    ViewData["ShowHelp"] = true;
+    ViewData["ShowRecentScans"] = true;
+    ViewData["Placeholder"] = "Scan nest sheet barcode or enter command...";
+}
+
+<partial name="_UniversalScanner" />
+
 @if (!Model.Any())
 {
     <div class="alert alert-info">
@@ -245,6 +255,7 @@ else
 
 @section Scripts {
     <script src="~/lib/signalr/dist/browser/signalr.js"></script>
+    <script src="~/js/universal-scanner.js"></script>
     <script>
         // Initialize SignalR connection
         const connection = new signalR.HubConnectionBuilder()

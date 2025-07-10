@@ -160,29 +160,68 @@ public class UniversalScannerService
 - Station-specific command sets
 ```
 
-### **C2: Station Scanner Integration (1-1.5 hours)**
+### **C2: Station-Based Scanner Implementation (1.5-2 hours)**
 **Implementation Plan:**
-```javascript
-// Unified scanner interface (45 min)
-class StationScannerInterface {
-    - Always-listening barcode capture
-    - Modal-free error display
-    - Scanner-navigable help system
-    - Real-time feedback
-}
+```csharp
+// Universal Scanner simplification (30 min)
+- Remove entity type detection entirely (DetermineEntityType method)
+- ProcessEntityScanAsync delegates to station controllers directly
+- No complex entity processing - just station-based delegation
 
-// Station migrations (30 min)
-- CNC, Sorting, Assembly, Shipping stations
-- Consistent error recovery patterns
-- Command barcode integration
+// Station delegation implementation (60 min)
+- CNC: Delegate to existing CncController.ProcessNestSheet(barcode)
+- Sorting: Delegate to existing SortingController.ScanPart(barcode)  
+- Assembly: Delegate to existing AssemblyController.ScanPartForAssembly(barcode)
+- Shipping: Try existing methods in sequence (ScanProduct → ScanPart → ScanHardware → ScanDetachedProduct)
+
+// Invisible barcode input interface (30 min)
+- Hide barcode input boxes on all station pages
+- Implement automatic keyboard listening for barcode scans (ending with Enter)
+- Universal scanner processes all input automatically
+- Real-time visual feedback for scan results
+
+// Command barcode fixes (Already complete)
+- Hyphen separators for Code 39 compatibility (NAV-ADMIN vs NAV:ADMIN)
+- Command detection and parsing working
 ```
 
 **Deliverables:**
-- ✅ Universal barcode processing service
-- ✅ Command barcode system for navigation
-- ✅ Unified scanner interface across all stations
-- ✅ Scanner-only error recovery
-- ✅ Printable command barcode sheets
+- ✅ Station-specific delegation to existing controller methods
+- ✅ Code 39 compatible command barcodes 
+- ✅ Invisible input boxes with automatic scan listening
+- ✅ No entity type detection (station context determines processing)
+- ✅ Reuse all existing, tested barcode processing logic
+- ✅ Real-time scan feedback across all stations
+
+### **C3: Universal Scanner Production Interface (1.5-2 hours)**
+**Implementation Plan:**
+```csharp
+// Collapsible scanner interface (45 min)
+- Add collapsible header bar to Universal Scanner blocks on all station pages
+- Implement toggle functionality to show/hide scanner input/button/log section
+- Scanner remains functionally active even when collapsed (invisible but listening)
+- Save collapse state in localStorage for user preference persistence
+
+// Deploy scanner to all stations (60 min)
+- Add Universal Scanner interface to Sorting, Assembly, Shipping, Admin pages
+- Copy CNC scanner block structure to other station views
+- Ensure consistent styling and behavior across all stations
+- Test scanner delegation works properly on all pages
+
+// Production UX refinements (30 min) 
+- Ensure proper keyboard focus management when collapsed/expanded
+- Add visual indicators for scan success/failure even when collapsed
+- Refine scanner block styling for production use
+- Clean up command set to remove non-applicable commands (login, help, etc.)
+```
+
+**Deliverables:**
+- ✅ Collapsible Universal Scanner interface on all station pages
+- ✅ Scanner functionality works when collapsed (invisible interface)
+- ✅ User preference persistence for collapse state
+- ✅ Consistent scanner behavior across CNC, Sorting, Assembly, Shipping, Admin
+- ✅ Production-ready visual feedback and focus management
+- ✅ Refined command barcode set for manufacturing operations
 
 ---
 
