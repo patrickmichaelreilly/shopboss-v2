@@ -62,15 +62,35 @@ public class SortingRuleService
                     
                 if (specificRack == null)
                 {
-                    return (null, null, null, $"Preferred rack '{preferredRackId}' not found or inactive");
+                    _logger.LogWarning("Preferred rack '{PreferredRackId}' not found or inactive, falling back to standard sorting logic", preferredRackId);
+                    // Fall back to standard logic instead of failing
+                    suitableRacks = await _context.StorageRacks
+                        .Include(r => r.Bins)
+                        .Where(r => r.IsActive && 
+                                   (r.Type == preferredRackType || 
+                                    (preferredRackType == RackType.Standard && r.Type != RackType.DoorsAndDrawerFronts)))
+                        .ToListAsync();
+
+                    // Sort in memory since OccupancyPercentage is a computed property
+                    suitableRacks = suitableRacks
+                        .OrderBy(r => r.Type == preferredRackType ? 0 : 1) // Prefer exact match
+                        .ThenBy(r => r.OccupancyPercentage) // Prefer less occupied racks
+                        .ToList();
+
+                    if (!suitableRacks.Any())
+                    {
+                        return (null, null, null, $"Preferred rack '{preferredRackId}' not found and no alternative suitable racks available for {partCategory} parts");
+                    }
                 }
-                
-                suitableRacks = new List<StorageRack> { specificRack };
-                
-                // Check if rack is completely full
-                if (specificRack.AvailableBins == 0)
+                else
                 {
-                    return (null, null, null, $"Rack '{specificRack.Name}' is full - no available bins. Please select a different rack.");
+                    suitableRacks = new List<StorageRack> { specificRack };
+                    
+                    // Check if rack is completely full
+                    if (specificRack.AvailableBins == 0)
+                    {
+                        return (null, null, null, $"Rack '{specificRack.Name}' is full - no available bins. Please select a different rack.");
+                    }
                 }
             }
             else

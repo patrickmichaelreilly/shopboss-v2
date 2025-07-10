@@ -53,9 +53,9 @@
 
 @if (!Model.Any())
 {
-    <div class="alert alert-info">
-        <i class="fas fa-info-circle me-2"></i>
-        No storage racks configured. Please configure storage racks in the Configuration tab.
+    <div class="alert alert-warning">
+        <i class="fas fa-exclamation-triangle me-2"></i>
+        <strong>No storage racks configured.</strong> Please configure storage racks in the Admin Station → Configuration → Storage Racks before using the sorting station.
     </div>
 }
 else
@@ -72,9 +72,12 @@ else
                 <div class="card-body">
                     <nav>
                         <div class="nav nav-pills" id="rack-tabs" role="tablist">
-                            @foreach (var rack in Model.OrderBy(r => r.Type).ThenBy(r => r.Name))
+                            @{
+                                var orderedRacks = Model.OrderBy(r => r.Type).ThenBy(r => r.Name).ToList();
+                            }
+                            @foreach (var rack in orderedRacks)
                             {
-                                var isFirst = rack == Model.First();
+                                var isFirst = rack == orderedRacks.First();
                                 var rackTypeIcon = rack.Type switch
                                 {
                                     ShopBoss.Web.Models.RackType.DoorsAndDrawerFronts => "fas fa-door-open",
@@ -529,12 +532,24 @@ else
 
         // Old modal event listeners removed - using Universal Scanner instead
 
-        // Load first rack on page load
+        // Load first rack on page load and ensure tab is properly activated
         document.addEventListener('DOMContentLoaded', function() {
             const firstTab = document.querySelector('.nav-link');
             if (firstTab && firstTab.id) {
                 const rackId = firstTab.id.split('-')[1];
+                // Ensure the first tab is properly activated
+                if (!firstTab.classList.contains('active')) {
+                    firstTab.classList.add('active');
+                }
                 loadRackDetails(rackId);
+            } else {
+                // Fallback: Try to find any rack tab and activate it
+                const anyTab = document.querySelector('[data-bs-toggle="pill"]');
+                if (anyTab && anyTab.id) {
+                    const rackId = anyTab.id.split('-')[1];
+                    anyTab.classList.add('active');
+                    loadRackDetails(rackId);
+                }
             }
             
             // Setup SignalR connection for real-time updates
@@ -588,11 +603,16 @@ else
                 
                 // Get currently displayed rack ID
                 const selectedRackId = getCurrentlySelectedRackId();
+                console.log('DEBUG: Selected rack ID for scan:', selectedRackId);
+                console.log('DEBUG: Current rack ID global:', currentRackId);
                 
                 // Build request body with selected rack context
                 let requestBody = `barcode=${encodeURIComponent(barcode)}`;
                 if (selectedRackId) {
                     requestBody += `&selectedRackId=${encodeURIComponent(selectedRackId)}`;
+                    console.log('DEBUG: Including selectedRackId in request:', selectedRackId);
+                } else {
+                    console.log('DEBUG: No rack selected, using default sorting logic');
                 }
                 
                 // Use existing sorting endpoint with correct Content-Type
@@ -743,9 +763,14 @@ else
         function getCurrentlySelectedRackId() {
             const activeTab = document.querySelector('.nav-link.active');
             if (activeTab && activeTab.id) {
-                return activeTab.id.split('-')[1];
+                const parts = activeTab.id.split('-');
+                // Expected format: rack-{id}-tab, so rackId should be at index 1
+                if (parts.length >= 3 && parts[0] === 'rack' && parts[2] === 'tab') {
+                    return parts[1];
+                }
             }
-            return null;
+            // Fallback: try to get from currentRackId global variable
+            return currentRackId;
         }
 
         function updateRackBadge(rackId, occupiedBins, totalBins) {
