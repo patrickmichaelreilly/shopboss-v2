@@ -249,21 +249,6 @@ public class SortingController : Controller
 
             var cleanBarcode = barcode.Trim();
 
-            // Debug: Log all cut parts for this work order to help troubleshoot
-            var allCutParts = await _context.Parts
-                .Include(p => p.NestSheet)
-                .Where(p => p.NestSheet!.WorkOrderId == activeWorkOrderId && p.Status == PartStatus.Cut)
-                .Select(p => new { p.Id, p.Name, p.ProductId })
-                .ToListAsync();
-            
-            _logger.LogInformation("SCAN DEBUG: Looking for barcode '{Barcode}' among {Count} cut parts: {Parts}", 
-                cleanBarcode, allCutParts.Count, string.Join(", ", allCutParts.Select(p => $"{p.Id}/{p.Name}")));
-
-            // Also check if this is a DetachedProduct part specifically
-            var detachedProductParts = allCutParts.Where(p => _context.DetachedProducts.Any(dp => dp.Id == p.ProductId)).ToList();
-            _logger.LogInformation("SCAN DEBUG: {DetachedCount} of these parts belong to DetachedProducts: {DetachedParts}", 
-                detachedProductParts.Count, string.Join(", ", detachedProductParts.Select(p => $"{p.Id}/{p.Name} (DetachedProduct: {p.ProductId})")));
-
             // Find the cut part by barcode (assuming part name or ID as barcode)
             var part = await _context.Parts
                 .Include(p => p.NestSheet)
