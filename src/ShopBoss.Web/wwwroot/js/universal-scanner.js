@@ -516,28 +516,23 @@ class UniversalScanner {
     }
     
     initializeCollapseState() {
-        const storageKey = `scanner-collapsed-${this.containerId}`;
-        // Default to collapsed unless explicitly set to expanded
-        const isCollapsed = localStorage.getItem(storageKey) !== 'false';
-        
-        if (isCollapsed && this.bodyElement) {
+        // Always start collapsed - no user preference storage
+        if (this.bodyElement) {
             this.bodyElement.classList.remove('show');
             if (this.toggleIcon) {
                 this.toggleIcon.classList.add('collapsed');
             }
         }
         
-        // Listen for bootstrap collapse events
+        // Listen for bootstrap collapse events for visual updates only
         if (this.bodyElement) {
             this.bodyElement.addEventListener('shown.bs.collapse', () => {
-                localStorage.setItem(storageKey, 'false');
                 if (this.toggleIcon) {
                     this.toggleIcon.classList.remove('collapsed');
                 }
             });
             
             this.bodyElement.addEventListener('hidden.bs.collapse', () => {
-                localStorage.setItem(storageKey, 'true');
                 if (this.toggleIcon) {
                     this.toggleIcon.classList.add('collapsed');
                 }

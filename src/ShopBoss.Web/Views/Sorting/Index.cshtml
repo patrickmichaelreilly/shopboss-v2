@@ -243,7 +243,6 @@ else
                 .then(data => {
                     if (data.success) {
                         displayRackGrid(data.rack);
-                        updateSelectedRackInfo(data.rack.name);
                     } else {
                         showError('Failed to load rack details: ' + data.message);
                     }
