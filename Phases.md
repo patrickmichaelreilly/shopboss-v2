@@ -1,93 +1,87 @@
 # ShopBoss Final Sprint Phases - Beta Ready
 
-**Objective:** Transform ShopBoss v2 from functional prototype to production-ready beta system with enterprise-level data safety, operational excellence, and polished user experience.
+**Objective:** Transform ShopBoss v2 from functional prototype to production-ready beta system with manual override capabilities, comprehensive error handling, and polished user experience.
 
 ---
 
-## **Phase T: DONE Testing Infrastructure & Data Safety (2 hours)**
-*Foundation for safe, efficient development and beta deployment*
+## **Phase M: Manual Status Management (5-6 hours)**
+*Critical safety net for beta operations - build UI first, add validation later*
 
-### **T1: Quick Win Scripts (30 minutes)**
+### **M1: Standalone Status Management Component (3 hours)**
+**Build NEW partial component with ALL capabilities, explore audit system**
+
 **Tasks:**
-- Move backup location to external directory via Admin interface
-- Create SQLite lock cleanup script for common "weird state" issues
-- Set up checkpoint folder structure for known-good states
-- Create testing alias for quick development workflow
+1. **Create `_StatusManagementPanel.cshtml`** as standalone partial
+   - Build fresh, avoid untangling existing Modify UI
+   - Design for drop-in replacement when ready
+
+2. **Explore Existing Audit System**
+   - Examine AuditLog table structure and capabilities
+   - Determine if JSON old/new values enable undo
+   - Query audit trail for entity history
+   - Report: Keep, enhance, or replace?
+
+3. **Build Comprehensive UI**
+   - Status dropdowns for ALL entities with ALL status options
+   - Bulk selection with "Apply Status" button
+   - Audit history display for each entity
+   - Manual bin clearing (individual and bulk)
+   - Undo interface (functional if audit supports it)
+
+**Architectural Approach:**
+- Start with everything possible, constrain later with validation
+- No business logic yet - just make all operations possible
+- Let invalid options exist in dropdowns for now
+- Focus on leveraging existing systems
 
 **Deliverables:**
-- ✅ External backup directory configured (`C:\ShopBoss-Backups`)
-- ✅ SQLite cleanup script (`scripts/clean-sqlite-locks.ps1`)
-- ✅ Checkpoint system folders created
-- ✅ Testing shortcuts configured
+- ✅ Standalone _StatusManagementPanel partial
+- ✅ All entities have status dropdowns with ALL options
+- ✅ Audit system evaluation and recommendation
+- ✅ Working audit history display
+- ✅ Bin management interface
+- ✅ Undo UI (functional or placeholder based on audit capabilities)
 
-### **T2: Beta Safety Infrastructure (1 hour)**
+### **M2: Business Logic & Validation (2 hours)**
+**Add intelligence to the UI created in M1**
+
 **Tasks:**
-- Implement external backup/restore scripts with compression
-- Test full backup/restore cycle with data verification
-- Create incremental backup strategy for beta patches
-- Document emergency recovery procedures
+1. **Define Status Transition Rules**
+   - Valid transitions per entity type
+   - Cascade effects (un-process nest sheet → revert parts)
+   - Orphan detection and cleanup rules
+
+2. **Implement Validation**
+   - Filter dropdown options based on current status
+   - Prevent invalid transitions
+   - Add confirmation dialogs for destructive operations
+
+3. **Enhance Audit Integration**
+   - Implement actual undo if possible
+   - Add comprehensive change tracking
+   - Create audit-based recovery procedures
 
 **Deliverables:**
-- ✅ External backup script with manifest (`scripts/backup-shopboss-beta.ps1`)
-- ✅ Restore script with validation (`scripts/restore-shopboss-beta.ps1`)
-- ✅ Verified backup/restore cycle
-- ✅ Beta patch procedures documented
+- ✅ Smart dropdowns showing only valid transitions
+- ✅ Cascade operations working correctly
+- ✅ Functional undo (if audit supports)
+- ✅ Complete validation rules
+- ✅ Safe bulk operations
 
-### **T3: Testing Documentation (30 minutes)**
+### **M3: Integration & Testing (1 hour)**
+**Replace existing Modify UI and verify all workflows**
+
 **Tasks:**
-- Create testing runbook with common issues/solutions
-- Update CLAUDE.md with testing handoff protocol
-- Document beta emergency procedures
-- Create quick reference cards for operators
+1. Replace existing Modify interface with new partial
+2. Test all status transitions and cascades
+3. Verify SignalR updates across stations
+4. Ensure data integrity through operations
+5. Document edge cases and limitations
 
 **Deliverables:**
-- ✅ Testing runbook (`docs/TESTING-RUNBOOK.md`)
-- ✅ Updated CLAUDE.md with clear test scenarios
-- ✅ Beta emergency procedures (`docs/BETA-EMERGENCY.md`)
-- ✅ Operator quick reference guides
-
----
-
-## **Phase M: Manual Status Management (4-5 hours)**
-*Critical safety net for beta operations*
-
-### **M1: Status Reversal Infrastructure (2 hours)**
-**Tasks:**
-- Implement "un-process" logic for nest sheets with cascade handling
-- Add manual bin clearing with orphan detection
-- Create entity-aware status transition validation
-- Ensure comprehensive audit trail for all manual changes
-
-**Deliverables:**
-- ✅ Un-process nest sheet functionality with part status reversal
-- ✅ Bin clearing with automatic orphan cleanup
-- ✅ Entity-specific status validation rules
-- ✅ Complete audit trail integration
-
-### **M2: Enhanced Modify Interface (2 hours)**
-**Tasks:**
-- Add status dropdowns with valid transitions only
-- Implement bulk status changes with confirmation dialogs
-- Add visual indicators for cascade operations
-- Create undo capability using audit trail data
-
-**Deliverables:**
-- ✅ Smart status dropdowns per entity type
-- ✅ Bulk operations with cascade warnings
-- ✅ Visual feedback for complex operations
-- ✅ Basic undo functionality
-
-### **M3: Integration Testing (1 hour)**
-**Tasks:**
-- Test all status transitions and cascades
-- Verify SignalR updates across stations
-- Ensure data integrity through all operations
-- Document edge cases and limitations
-
-**Deliverables:**
-- ✅ Verified cascade operations
-- ✅ Cross-station update confirmation
-- ✅ Data integrity validation
+- ✅ New status management in production
+- ✅ Cross-station updates verified
+- ✅ Data integrity validated
 - ✅ Edge case documentation
 
 ---
@@ -95,147 +89,91 @@
 ## **Phase E: Comprehensive Error Messaging (2-3 hours)**
 *Clear, actionable feedback for operators*
 
-### **E1: Station Error Inventory (1 hour)**
-**Tasks:**
-- Document all error scenarios per station
-- Create consistent error message templates
-- Design recovery action guidance
-- Implement error severity levels
+### **E1: Error Scenario Documentation (30 minutes)**
+**You will create a simple matrix of error scenarios before Claude Code implements**
+
+**Your Tasks (not Claude Code):**
+1. List common error scenarios per station
+2. Define recovery actions for each
+3. Specify which need billboard vs toast
+4. Prioritize by frequency/severity
+
+### **E2: Error Implementation (2 hours)**
+**Implement error messages based on your matrix**
+
+**Claude Code Tasks:**
+1. Implement all error messages from your matrix
+2. Use billboard for persistent errors (Sorting/Assembly)
+3. Use toasts for temporary notifications (CNC/Shipping)
+4. Add consistent icons and formatting
+5. Include recovery guidance in each message
 
 **Deliverables:**
-- ✅ Complete error scenario catalog
-- ✅ Standardized message templates
-- ✅ Recovery action library
-- ✅ Error severity classification
-
-### **E2: Error Implementation (1.5 hours)**
-**Station-specific error handling:**
-
-**CNC Station:**
-- "Barcode not found in active work order"
-- "Nest sheet already fully processed"
-- "No active work order selected"
-
-**Sorting Station:**
-- "Part already sorted"
-- "No bin available for this part type"
-- "Part belongs to different nest sheet"
-
-**Assembly Station:**
-- "Cannot assemble - missing parts: [list]"
-- "Product already assembled"
-- "Part not ready for assembly"
-
-**Shipping Station:**
-- "Cannot ship - product not assembled"
-- "Item already shipped"
-- "Work order incomplete - missing items: [list]"
-
-**Deliverables:**
-- ✅ All error messages implemented
-- ✅ Consistent formatting and icons
-- ✅ Clear next-step guidance
-- ✅ Proper error logging
+- ✅ All error scenarios handled
+- ✅ Consistent error formatting
+- ✅ Clear recovery guidance
+- ✅ Appropriate persistence (billboard vs toast)
 
 ### **E3: Error UX Polish (30 minutes)**
-**Tasks:**
-- Implement billboard-style persistent messages
-- Add sound/visual alerts for critical errors
-- Create error history display
-- Test error flows with operators
+**Enhance error visibility and tracking**
 
-**Deliverables:**
-- ✅ Persistent error display system
-- ✅ Multi-sensory error alerts
-- ✅ Error history tracking
-- ✅ Operator-validated messaging
+**Tasks:**
+1. Add sound for critical errors (optional)
+2. Implement error history log
+3. Test error flows with sample scenarios
+4. Refine message clarity based on testing
 
 ---
 
-## **Phase U: UI Polish & Scanner Optimization (3-4 hours)**
-*Production-ready interface refinements*
+## **Phase U: UI Polish & Production Readiness (4-5 hours)**
+*Final interface refinements - partially complete*
 
-### **U1: Scanner Interface Optimization (1 hour)**
-
-#### "Please execute Phase U1 with these specific constraints:
-IMPORTANT BOUNDARIES:
-
-- This is purely UI/visual changes - do NOT modify any business logic, scanning logic, or backend functionality
-- The billboard message area should display existing messages that currently use toasts or temporary notifications - do not create new message types
-- When creating the compact header widget, preserve all existing scanner functionality - only change the visual presentation
-- Do not modify any controller methods or service logic
-- Keep all existing event handlers and scanning behavior intact
-- The scanner health indicator should simply reflect whether the scanner is ready (listening) or not - no complex health checks
-
-#### SPECIFIC NOTES:
-
-- Billboard message area only for Sorting and Assembly stations (not CNC or Shipping)
-- The 'abandoned scanner health indicator' refers to the complex system health monitoring - just show scanner ready/not ready
-- Test that all existing scanning functionality still works after UI changes"
-
-**Tasks:**
-- Implement billboard message area for persistent feedback at the Sorting and Assembly stations only
-- Minimize scanner footprint to header widget
-- Remove redundant station names from scanner blocks
-- Remove abandoned scanner health indicator and implement simple yes or no indicator
-
-**Deliverables:**
-- ✅ Large persistent message display
-- ✅ Compact scanner header widget
-- ✅ Clean scanner interface
-- ✅ Visual scanner health indicator
+### **U1: Scanner Interface Optimization ✅ COMPLETED**
+- Billboard messaging for Sorting/Assembly
+- Compact scanner widget
+- Health indicators
 
 ### **U2: Station-Specific Polish (2 hours)**
-**Page-by-page refinements:**
+**Page-by-page refinements**
 
 **Admin Station:**
-- Remove Microvellum branding
-- Integrate archive controls
-- Add system health indicator
+- Remove all Microvellum branding
 - Polish work order management
+- Integrate archive controls naturally
 
 **CNC Station:**
 - Fix progress calculations
 - Ensure DetachedProducts visibility
 - Polish nest sheet interface
-- Enhance scan feedback
 
 **Sorting Station:**
-- Smart default rack display
-- Polish occupancy visualization
+- Smart default rack (never empty)
+- Polish rack visualization
 - Enhance assembly indicators
-- Optimize rack assignments
 
 **Assembly Station:**
 - Polish queue visualization
-- Improve completion workflow
 - Enhance location guidance
-- Refine readiness calculations
+- Refine completion workflow
 
 **Shipping Station:**
 - Polish checklist interface
-- Improve scan confirmations
 - Enhance progress tracking
 - Refine completion workflow
 
-**Deliverables:**
-- ✅ Consistent professional branding
-- ✅ Optimized station interfaces
-- ✅ Enhanced visual feedback
-- ✅ Production-ready layouts
-
 ### **U3: Navigation Enhancement (1 hour)**
+**Scanner-based navigation commands**
+
 **Tasks:**
-- Implement NAV-SORTING-RACK-X commands
-- Add quick navigation shortcuts
-- Create printable command sheets
-- Test scanner navigation flow
+1. Implement NAV-SORTING-RACK-X pattern
+2. Create command barcode sheet generator
+3. Test navigation flow across stations
+4. Document available commands
 
 **Deliverables:**
-- ✅ Rack-specific navigation commands
-- ✅ Navigation command processing
-- ✅ Printable barcode sheets
-- ✅ Tested navigation workflow
+- ✅ Rack-specific navigation
+- ✅ Printable command sheets
+- ✅ Tested navigation flow
 
 ---
 
@@ -243,113 +181,72 @@ IMPORTANT BOUNDARIES:
 *Final testing and production preparation*
 
 ### **V1: Integration Testing (1.5 hours)**
-**Complete workflow validation:**
-- Import → CNC → Sorting → Assembly → Shipping flow
-- Manual interventions and error recovery
-- Cross-station communication
-- Performance under load
+**Complete workflow validation**
 
 **Test Scenarios:**
-- 1000+ part work orders
-- Concurrent station usage
-- Network interruption recovery
-- Database backup/restore
+1. Full workflow: Import → CNC → Sort → Assembly → Ship
+2. Manual interventions via new status management
+3. Error recovery procedures
+4. Performance with 1000+ parts
+5. Concurrent station usage
 
-**Deliverables:**
-- ✅ End-to-end workflow validation
-- ✅ Performance benchmarks met
-- ✅ Reliability testing complete
-- ✅ Load testing passed
+### **V2: Beta Package Preparation (1 hour)**
+**Production deployment readiness**
 
-### **V2: Beta Deployment Package (1 hour)**
 **Tasks:**
-- Generate self-contained deployment
-- Create installation documentation
-- Prepare operator training materials
-- Package command barcode sheets
-
-**Deliverables:**
-- ✅ Production deployment package
-- ✅ Installation guide
-- ✅ Operator quick-start guides
-- ✅ Command barcode sheets
+1. Generate deployment package
+2. Create operator quick reference cards
+3. Prepare command barcode sheets
+4. Document emergency procedures
 
 ### **V3: Go-Live Checklist (30 minutes)**
-**Final verification:**
-- External backups configured and tested
-- Manual override procedures documented
-- Error recovery guides distributed
-- Emergency contacts established
-
-**Deliverables:**
-- ✅ Pre-flight checklist complete
-- ✅ Backup verification
-- ✅ Documentation distributed
-- ✅ Beta launch ready
+**Final verification**
+- External backups configured
+- Manual override procedures tested
+- Error recovery documented
+- Support contacts established
 
 ---
 
-## **Success Metrics**
+## **Success Criteria**
 
-### **Technical Excellence**
-- ✅ Sub-3 second page loads with 1000+ parts
-- ✅ 99.9% uptime with self-monitoring
-- ✅ Complete audit trail coverage
-- ✅ 5-minute recovery time from any failure
-
-### **Operational Readiness**
-- ✅ Scanner-only operation at all stations
-- ✅ Clear error messages with recovery paths
-- ✅ Manual override for all operations
-- ✅ External backup strategy implemented
-
-### **User Experience**
-- ✅ Consistent, professional interface
-- ✅ Persistent feedback messaging
-- ✅ Intuitive navigation flow
-- ✅ Minimal training required
+- ✅ Manual override capabilities for all operations
+- ✅ Clear error messages with recovery guidance
+- ✅ Polished, professional interfaces
+- ✅ Scanner-based navigation working
+- ✅ Sub-3 second page loads
+- ✅ Complete audit trail
+- ✅ 5-minute recovery from any state
 
 ---
 
-## **Risk Mitigation**
+## **Development Principles**
 
-### **High Priority Risks**
-1. **Data Loss** → External backup system + checkpoints
-2. **Operator Confusion** → Clear messaging + training
-3. **System Failures** → Manual overrides + recovery procedures
-4. **Integration Issues** → Comprehensive testing + rollback plans
+### Architectural Thinking
+- Build standalone components, not patches
+- Leverage existing systems before building new
+- UI first, validation second is valid approach
+- Clean swaps over messy refactors
 
-### **Contingency Planning**
-- Each phase can be partially deployed
-- Rollback procedures for each component
-- Manual workarounds documented
-- Support contact information distributed
+### Phase Execution
+- Each phase should reduce total code
+- Explore existing capabilities before building
+- Test in isolation before integration
+- Document discoveries for future reference
 
 ---
 
 ## **Timeline**
 
 **Week 1:**
-- Day 1 Morning: Phase T (Testing Infrastructure)
-- Day 1 PM - Day 2: Phase M (Manual Status Management)
+- Day 1-2: Phase M (Manual Status Management)
 - Day 3: Phase E (Error Messaging)
+- Day 4: Phase U (UI Polish)
 
 **Week 2:**
-- Day 4: Phase U (UI Polish)
 - Day 5: Phase V (Validation & Deployment)
 
-**Total Effort:** 13-17 focused development hours
-
----
-
-## **Phase Completion Criteria**
-
-Each phase is complete when:
-1. All deliverables are implemented
-2. Code builds without errors
-3. Integration tests pass
-4. Documentation is updated
-5. Testing scenarios are validated
+**Total Effort:** 11-14 focused development hours
 
 ---
 
@@ -357,9 +254,9 @@ Each phase is complete when:
 
 When implementing each phase:
 1. **Evaluate architectural fit** - If a deliverable requires hacky workarounds or doesn't align with existing patterns, stop and explain the architectural mismatch
-2. **Prefer elegant solutions** - Take time to implement features properly rather than quick patches that may cause future bugs
-3. **Maintain existing functionality** - Ensure new features don't break current workflows
-4. **Test incrementally** - Validate each component as you build, not just at phase end
-5. **Update Worklog.md** - Document implementation decisions, especially any architectural concerns or trade-offs
-6. **Provide clear testing instructions** - Specify exact scenarios to verify functionality
-7. **Flag technical debt** - If you must implement a workaround, clearly mark it as technical debt with a TODO comment and explanation
+2. **Build standalone components** - Like _StatusManagementPanel - test in isolation before integration
+3. **Explore before building** - Understand existing systems (like audit) before creating new ones
+4. **Prefer elegant solutions** - Take time to implement features properly rather than quick patches
+5. **Document discoveries** - Report what you learn about existing systems for future decisions
+6. **Test incrementally** - Validate each component as you build
+7. **Flag technical debt** - If you must implement a workaround, clearly mark it with TODO

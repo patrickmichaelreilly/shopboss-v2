@@ -64,8 +64,8 @@ using (var scope = app.Services.CreateScope())
     var context = scope.ServiceProvider.GetRequiredService<ShopBossDbContext>();
     var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
     
-    // Ensure database is created
-    context.Database.EnsureCreated();
+    // Apply any pending migrations
+    await context.Database.MigrateAsync();
     
     // Seed default storage racks
     await StorageRackSeedService.SeedDefaultRacksAsync(context);

@@ -240,6 +240,9 @@ namespace ShopBoss.Web.Migrations
                     b.Property<decimal?>("Length")
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("Status")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Material")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -452,6 +455,9 @@ namespace ShopBoss.Web.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<int>("Qty")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Status")
                         .HasColumnType("INTEGER");
 
                     b.Property<decimal?>("Width")

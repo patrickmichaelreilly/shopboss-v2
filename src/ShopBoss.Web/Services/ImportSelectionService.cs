@@ -550,7 +550,8 @@ public class ImportSelectionService
             ProductId = productId,
             SubassemblyId = subassemblyId,
             NestSheetId = nestSheet?.Id ?? CreateDefaultNestSheet(workOrder).Id,
-            Status = PartStatus.Pending // Set initial status
+            Status = PartStatus.Pending, // Set initial status
+            StatusUpdatedDate = DateTime.UtcNow // Fix NOT NULL constraint
         };
     }
 
@@ -740,7 +741,8 @@ public class ImportSelectionService
             ProductId = detachedProduct.Id, // Link Part to DetachedProduct via ProductId (no FK constraint)
             SubassemblyId = null, // DetachedProducts don't have subassemblies
             NestSheetId = nestSheetId,
-            Status = PartStatus.Pending // Set initial status
+            Status = PartStatus.Pending, // Set initial status
+            StatusUpdatedDate = DateTime.UtcNow // Fix NOT NULL constraint
         };
     }
 

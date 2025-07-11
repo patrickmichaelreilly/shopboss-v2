@@ -280,4 +280,44 @@ The system is in active development with core infrastructure complete. Recent ph
 - Shipping station with final verification and tracking
 - **Phase T Complete**: Testing infrastructure and data safety systems implemented
 
+## Core Development Philosophy
+
+### ALWAYS Think Architecturally
+Before implementing ANY feature, ask:
+1. Can I achieve this by removing/consolidating code rather than adding?
+2. Is there an existing pattern/component I can extend rather than create new?
+3. Will this make the system simpler or more complex?
+4. Can I solve multiple problems with one architectural change?
+
+### Code Reduction > Code Addition
+- **Adding features should make the codebase SMALLER** through:
+  - Consolidating duplicate patterns
+  - Creating reusable components
+  - Removing special cases with general solutions
+  - Eliminating redundant code paths
+
+### Examples:
+- **Good**: "Let's make the scanner universal, eliminating 3 separate implementations"
+- **Bad**: "Let's add a scanner for each station type"
+- **Good**: "This new feature reveals we can consolidate 5 controllers into 1"
+- **Bad**: "Let's add another controller for this new feature"
+
+### Red Flags to Avoid:
+- Copy-pasting code blocks
+- Creating station-specific versions of components
+- Adding parameters to handle special cases
+- "It works" without considering "it's maintainable"
+
+## ShopBoss Architectural Principles
+
+1. **Universal Components**: One scanner, one billboard, one tree view
+2. **Event-Driven**: Components emit events, pages handle them
+3. **No Special Cases**: If Sorting needs X, consider if ALL stations need X
+4. **Cascade Simplification**: Adding a feature should simplify related code
+
+## Before Writing Code, Ask:
+- "What can I delete to make room for this?"
+- "What pattern already exists that I can leverage?"
+- "How can this feature make the system simpler?"
+
 Current development follows the phased approach outlined in `Phases.md` with detailed progress tracking in `Worklog.md`.

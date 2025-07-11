@@ -21,6 +21,8 @@ public class Product
     
     public decimal? Width { get; set; }
     
+    public PartStatus Status { get; set; } = PartStatus.Pending;
+    
     public WorkOrder WorkOrder { get; set; } = null!;
     
     public List<Part> Parts { get; set; } = new();

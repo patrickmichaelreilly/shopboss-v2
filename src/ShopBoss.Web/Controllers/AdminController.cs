@@ -1170,4 +1170,287 @@ public class AdminController : Controller
     {
         return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
     }
+
+    // Status Management Page (Phase M1)
+    public IActionResult StatusManagement(string workOrderId)
+    {
+        if (string.IsNullOrEmpty(workOrderId))
+        {
+            TempData["ErrorMessage"] = "Please select a work order first.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        return View((object)workOrderId);
+    }
+
+    #region API Endpoints for Status Management Panel
+
+    [HttpPost("admin/api/updatestatus")]
+    public async Task<IActionResult> UpdateEntityStatus([FromBody] UpdateStatusRequest request)
+    {
+        try
+        {
+            int updatedCount = 0;
+            var activeWorkOrderId = HttpContext.Session.GetString("ActiveWorkOrderId");
+
+            foreach (var entityId in request.EntityIds)
+            {
+                switch (request.EntityType.ToLower())
+                {
+                    case "part":
+                        var part = await _context.Parts.FindAsync(entityId);
+                        if (part != null && Enum.TryParse<PartStatus>(request.NewStatus, out var partStatus))
+                        {
+                            var oldStatus = part.Status;
+                            part.Status = partStatus;
+                            part.StatusUpdatedDate = DateTime.UtcNow;
+                            
+                            await _auditTrailService.LogAsync("StatusChange", "Part", part.Id,
+                                new { Status = oldStatus.ToString(), StatusUpdatedDate = part.StatusUpdatedDate },
+                                new { Status = part.Status.ToString(), StatusUpdatedDate = part.StatusUpdatedDate },
+                                station: "Admin", workOrderId: activeWorkOrderId,
+                                details: $"Manual status change from {oldStatus} to {part.Status}");
+                            
+                            updatedCount++;
+                        }
+                        break;
+
+                    case "product":
+                        var product = await _context.Products.FindAsync(entityId);
+                        if (product != null && Enum.TryParse<PartStatus>(request.NewStatus, out var productStatus))
+                        {
+                            var oldStatus = product.Status;
+                            product.Status = productStatus;
+                            
+                            await _auditTrailService.LogAsync("StatusChange", "Product", product.Id,
+                                new { Status = oldStatus.ToString() },
+                                new { Status = product.Status.ToString() },
+                                station: "Admin", workOrderId: activeWorkOrderId,
+                                details: $"Manual status change from {oldStatus} to {product.Status}");
+                            
+                            updatedCount++;
+                        }
+                        break;
+
+                    case "nestsheet":
+                        var nestSheet = await _context.NestSheets.FindAsync(entityId);
+                        if (nestSheet != null)
+                        {
+                            var oldProcessed = nestSheet.IsProcessed;
+                            nestSheet.IsProcessed = request.NewStatus == "Processed";
+                            nestSheet.ProcessedDate = nestSheet.IsProcessed ? DateTime.UtcNow : null;
+                            
+                            await _auditTrailService.LogAsync("StatusChange", "NestSheet", nestSheet.Id,
+                                new { IsProcessed = oldProcessed, ProcessedDate = nestSheet.ProcessedDate },
+                                new { IsProcessed = nestSheet.IsProcessed, ProcessedDate = nestSheet.ProcessedDate },
+                                station: "Admin", workOrderId: activeWorkOrderId,
+                                details: $"Manual status change to {request.NewStatus}");
+                            
+                            updatedCount++;
+                        }
+                        break;
+
+                    case "detached_product":
+                        var detachedProduct = await _context.DetachedProducts.FindAsync(entityId);
+                        if (detachedProduct != null && Enum.TryParse<PartStatus>(request.NewStatus, out var detachedStatus))
+                        {
+                            var oldStatus = detachedProduct.Status;
+                            var oldShipped = detachedProduct.IsShipped;
+                            
+                            // Update both fields for compatibility
+                            detachedProduct.Status = detachedStatus;
+                            detachedProduct.IsShipped = (detachedStatus == PartStatus.Shipped);
+                            
+                            await _auditTrailService.LogAsync("StatusChange", "DetachedProduct", detachedProduct.Id,
+                                new { Status = oldStatus.ToString(), IsShipped = oldShipped },
+                                new { Status = detachedProduct.Status.ToString(), IsShipped = detachedProduct.IsShipped },
+                                station: "Admin", workOrderId: activeWorkOrderId,
+                                details: $"Manual status change from {oldStatus} to {detachedProduct.Status}");
+                            
+                            updatedCount++;
+                        }
+                        break;
+
+                    case "hardware":
+                        var hardware = await _context.Hardware.FindAsync(entityId);
+                        if (hardware != null && Enum.TryParse<PartStatus>(request.NewStatus, out var hwStatus))
+                        {
+                            var oldStatus = hardware.Status;
+                            var oldShipped = hardware.IsShipped;
+                            
+                            // Update both fields for compatibility
+                            hardware.Status = hwStatus;
+                            hardware.IsShipped = (hwStatus == PartStatus.Shipped);
+                            
+                            await _auditTrailService.LogAsync("StatusChange", "Hardware", hardware.Id,
+                                new { Status = oldStatus.ToString(), IsShipped = oldShipped },
+                                new { Status = hardware.Status.ToString(), IsShipped = hardware.IsShipped },
+                                station: "Admin", workOrderId: activeWorkOrderId,
+                                details: $"Manual status change from {oldStatus} to {hardware.Status}");
+                            
+                            updatedCount++;
+                        }
+                        break;
+                }
+            }
+
+            await _context.SaveChangesAsync();
+
+            // Send SignalR update
+            await _hubContext.Clients.All.SendAsync("RefreshStatus", new { 
+                workOrderId = activeWorkOrderId,
+                message = $"Status updated for {updatedCount} items"
+            });
+
+            return Ok(new { updatedCount });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating entity status");
+            return StatusCode(500, "An error occurred while updating status");
+        }
+    }
+
+    [HttpGet("admin/api/audithistory/{entityType}/{entityId}")]
+    public async Task<IActionResult> GetAuditHistory(string entityType, string entityId)
+    {
+        try
+        {
+            var auditEntries = await _auditTrailService.GetEntityAuditTrailAsync(entityType, entityId);
+            
+            return Ok(auditEntries.Select(e => new
+            {
+                e.Id,
+                e.Timestamp,
+                e.Action,
+                e.EntityType,
+                e.EntityId,
+                e.OldValue,
+                e.NewValue,
+                e.Station,
+                e.Details,
+                e.UserId
+            }));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving audit history for {EntityType} {EntityId}", entityType, entityId);
+            return StatusCode(500, "An error occurred while retrieving audit history");
+        }
+    }
+
+    [HttpGet("admin/api/racks")]
+    public async Task<IActionResult> GetRacks()
+    {
+        try
+        {
+            var racks = await _context.StorageRacks
+                .Where(r => r.IsActive)
+                .OrderBy(r => r.Name)
+                .Select(r => new
+                {
+                    r.Id,
+                    r.Name,
+                    r.Type,
+                    r.Rows,
+                    r.Columns
+                })
+                .ToListAsync();
+
+            return Ok(racks);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving racks");
+            return StatusCode(500, "An error occurred while retrieving racks");
+        }
+    }
+
+    [HttpGet("admin/api/racks/{rackId}/bins")]
+    public async Task<IActionResult> GetRackBins(string rackId)
+    {
+        try
+        {
+            var bins = await _context.Bins
+                .Where(b => b.StorageRackId == rackId)
+                .OrderBy(b => b.Row)
+                .ThenBy(b => b.Column)
+                .Select(b => new
+                {
+                    b.Id,
+                    Label = $"R{b.Row}C{b.Column}",
+                    b.PartId,
+                    b.Status,
+                    b.PartsCount
+                })
+                .ToListAsync();
+
+            return Ok(bins);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving bins for rack {RackId}", rackId);
+            return StatusCode(500, "An error occurred while retrieving bins");
+        }
+    }
+
+    [HttpPost("admin/api/clearbins")]
+    public async Task<IActionResult> ClearBins([FromBody] ClearBinsRequest request)
+    {
+        try
+        {
+            var bins = await _context.Bins
+                .Where(b => request.BinIds.Contains(b.Id))
+                .ToListAsync();
+
+            int clearedCount = 0;
+            var activeWorkOrderId = HttpContext.Session.GetString("ActiveWorkOrderId");
+
+            foreach (var bin in bins)
+            {
+                if (!string.IsNullOrEmpty(bin.PartId))
+                {
+                    await _auditTrailService.LogAsync("BinCleared", "Bin", bin.Id,
+                        new { PartId = bin.PartId, PartsCount = bin.PartsCount },
+                        new { PartId = (string)null, PartsCount = 0 },
+                        station: "Admin", workOrderId: activeWorkOrderId,
+                        details: $"Manual bin clear - removed part {bin.PartId}");
+
+                    bin.PartId = null;
+                    bin.PartsCount = 0;
+                    bin.Status = BinStatus.Empty;
+                    bin.LastUpdatedDate = DateTime.UtcNow;
+                    
+                    clearedCount++;
+                }
+            }
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new { clearedCount });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error clearing bins");
+            return StatusCode(500, "An error occurred while clearing bins");
+        }
+    }
+
+    #endregion
+
+    #region Request Models
+
+    public class UpdateStatusRequest
+    {
+        public string EntityType { get; set; } = string.Empty;
+        public List<string> EntityIds { get; set; } = new();
+        public string NewStatus { get; set; } = string.Empty;
+    }
+
+    public class ClearBinsRequest
+    {
+        public List<string> BinIds { get; set; } = new();
+    }
+
+    #endregion
 }

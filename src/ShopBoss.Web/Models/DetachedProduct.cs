@@ -33,6 +33,8 @@ public class DetachedProduct
     
     public string EdgebandingRight { get; set; } = string.Empty;
     
+    public PartStatus Status { get; set; } = PartStatus.Pending;
+    
     public bool IsShipped { get; set; } = false;
     
     public DateTime? ShippedDate { get; set; }
