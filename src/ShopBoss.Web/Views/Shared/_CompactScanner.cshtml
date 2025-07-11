@@ -1,0 +1,280 @@
+@{
+    string containerId = ViewData["ContainerId"]?.ToString() ?? "compact-scanner";
+    string title = ViewData["Title"]?.ToString() ?? "Scanner";
+    string placeholder = ViewData["Placeholder"]?.ToString() ?? "Scan barcode or enter command...";
+    bool showHelp = ViewData["ShowHelp"] as bool? ?? false;
+}
+
+<div id="@containerId" class="compact-scanner-container mb-3">
+    <div class="compact-scanner-header">
+        <div class="scanner-status-area">
+            <div class="scanner-health-indicator" id="scanner-health-@containerId" title="Scanner Ready">
+                <i class="fas fa-circle text-success"></i>
+            </div>
+            <div class="scanner-title">
+                <i class="fas fa-barcode me-2"></i>
+                Scanner
+            </div>
+        </div>
+        
+        <div class="scanner-input-area">
+            <div class="input-group input-group-sm">
+                <input type="text" 
+                       id="scanner-input-@containerId" 
+                       class="form-control universal-scanner-input compact-scanner-input" 
+                       placeholder="@placeholder"
+                       data-container="@containerId"
+                       autocomplete="off"
+                       spellcheck="false">
+                <button type="button" 
+                        id="scanner-clear-@containerId" 
+                        class="btn btn-outline-secondary btn-sm">
+                    <i class="fas fa-times"></i>
+                </button>
+                <button type="button" 
+                        id="scanner-submit-@containerId" 
+                        class="btn btn-primary btn-sm">
+                    <i class="fas fa-search"></i>
+                </button>
+            </div>
+        </div>
+        
+        <div class="scanner-controls">
+            @if (showHelp)
+            {
+                <button type="button" class="btn btn-outline-info btn-sm" 
+                        data-bs-toggle="collapse" 
+                        data-bs-target="#scanner-help-@containerId" 
+                        aria-expanded="false"
+                        title="Show Help">
+                    <i class="fas fa-question-circle"></i>
+                </button>
+            }
+            <button type="button" class="btn btn-outline-secondary btn-sm" 
+                    data-bs-toggle="collapse" 
+                    data-bs-target="#scanner-details-@containerId" 
+                    aria-expanded="false"
+                    title="Show Details">
+                <i class="fas fa-chevron-down" id="scanner-toggle-@containerId"></i>
+            </button>
+        </div>
+    </div>
+    
+    <!-- Status Display - Always visible but compact -->
+    <div id="scanner-status-@containerId" class="compact-scanner-status" style="display: none;">
+        <div class="alert alert-info alert-sm mb-0" role="alert">
+            <div class="d-flex align-items-center">
+                <div class="spinner-border spinner-border-sm me-2" role="status" style="display: none;">
+                    <span class="visually-hidden">Processing...</span>
+                </div>
+                <span class="status-message"></span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Collapsible Details Area -->
+    <div class="collapse mt-2" id="scanner-details-@containerId">
+        <div class="card card-body bg-light">
+            <!-- Results Display -->
+            <div id="scanner-results-@containerId" class="scanner-results" style="display: none;">
+                <div class="card border-0">
+                    <div class="card-header bg-transparent border-0 pb-0">
+                        <h6 class="mb-0">Scan Result</h6>
+                    </div>
+                    <div class="card-body pt-2">
+                        <div class="result-content"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Recent Scans -->
+            <div id="recent-scans-@containerId" class="recent-scans" style="display: none;">
+                <h6><i class="fas fa-history me-2"></i>Recent Scans</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Barcode</th>
+                                <th>Result</th>
+                            </tr>
+                        </thead>
+                        <tbody class="recent-scans-body">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    @if (showHelp)
+    {
+        <!-- Help Section -->
+        <div class="collapse mt-2" id="scanner-help-@containerId">
+            <div class="card card-body bg-light">
+                <h6><i class="fas fa-info-circle me-2"></i>Scanner Commands</h6>
+                <div class="row">
+                    <div class="col-md-4">
+                        <strong>Navigation:</strong>
+                        <ul class="list-unstyled small mt-1">
+                            <li><code>NAV-ADMIN</code> - Admin Panel</li>
+                            <li><code>NAV-CNC</code> - CNC Station</li>
+                            <li><code>NAV-SORTING</code> - Sorting Station</li>
+                            <li><code>NAV-ASSEMBLY</code> - Assembly Station</li>
+                            <li><code>NAV-SHIPPING</code> - Shipping Station</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-4">
+                        <strong>System:</strong>
+                        <ul class="list-unstyled small mt-1">
+                            <li><code>CMD:REFRESH</code> - Refresh page</li>
+                            <li><code>CMD:HELP</code> - Show help</li>
+                            <li><code>CMD:CLEAR</code> - Clear session</li>
+                            <li><code>CMD:RECENT</code> - Recent scans</li>
+                            <li><code>CMD:SUMMARY</code> - Work order summary</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-4">
+                        <strong>Admin:</strong>
+                        <ul class="list-unstyled small mt-1">
+                            <li><code>ADMIN:BACKUP</code> - Create backup</li>
+                            <li><code>ADMIN:ARCHIVE</code> - Archive work order</li>
+                            <li><code>ADMIN:HEALTHCHECK</code> - Run health check</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+.compact-scanner-container {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.compact-scanner-header {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.scanner-status-area {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.scanner-health-indicator {
+    width: 12px;
+    height: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.scanner-health-indicator.ready {
+    color: #28a745;
+}
+
+.scanner-health-indicator.not-ready {
+    color: #6c757d;
+}
+
+.scanner-health-indicator.processing {
+    color: #007bff;
+    animation: pulse 1s infinite;
+}
+
+.scanner-title {
+    font-weight: 600;
+    color: #495057;
+    font-size: 0.9rem;
+}
+
+.scanner-input-area {
+    flex-grow: 1;
+    min-width: 250px;
+}
+
+.compact-scanner-input {
+    font-family: 'Courier New', monospace;
+    font-size: 0.9rem;
+}
+
+.scanner-controls {
+    display: flex;
+    gap: 5px;
+    flex-shrink: 0;
+}
+
+.compact-scanner-status {
+    margin-top: 8px;
+}
+
+.compact-scanner-status .alert-sm {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+}
+
+.compact-scanner-container .scanner-results {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.compact-scanner-container .recent-scans {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.compact-scanner-container .recent-scans table {
+    font-size: 0.8rem;
+}
+
+.compact-scanner-container code {
+    background-color: #e9ecef;
+    padding: 0.125rem 0.25rem;
+    border-radius: 0.25rem;
+    font-size: 0.7rem;
+}
+
+.compact-scanner-container .status-message {
+    flex-grow: 1;
+}
+
+.compact-scanner-container #scanner-toggle-@containerId {
+    transition: transform 0.3s ease;
+}
+
+.compact-scanner-container .scanner-toggle-expanded {
+    transform: rotate(180deg);
+}
+
+@@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+/* Responsive adjustments */
+@@media (max-width: 768px) {
+    .compact-scanner-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+    
+    .scanner-input-area {
+        min-width: auto;
+    }
+    
+    .scanner-controls {
+        justify-content: center;
+    }
+}
+</style>

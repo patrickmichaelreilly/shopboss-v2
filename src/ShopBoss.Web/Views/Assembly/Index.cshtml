@@ -144,14 +144,21 @@
 </div>
 
 @{
+    ViewData["ContainerId"] = "assembly-billboard";
+    ViewData["InitialMessage"] = "";
+    ViewData["InitialType"] = "info";
+}
+
+<partial name="_BillboardMessage" />
+
+@{
     ViewData["ContainerId"] = "assembly-scanner";
-    ViewData["Title"] = "Universal Scanner - Assembly Station";
+    ViewData["Title"] = "Scanner";
     ViewData["ShowHelp"] = true;
-    ViewData["ShowRecentScans"] = true;
     ViewData["Placeholder"] = "Scan part barcode for assembly or enter command...";
 }
 
-<partial name="_UniversalScanner" />
+<partial name="_CompactScanner" />
 
 <!-- Inline Location Guidance -->
 <div id="locationGuidanceSection" class="row mb-4" style="display: none;">

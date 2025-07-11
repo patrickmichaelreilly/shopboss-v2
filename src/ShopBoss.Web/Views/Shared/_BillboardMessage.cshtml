@@ -1,0 +1,211 @@
+@{
+    string containerId = ViewData["ContainerId"]?.ToString() ?? "billboard-message";
+    string initialMessage = ViewData["InitialMessage"]?.ToString() ?? "";
+    string initialType = ViewData["InitialType"]?.ToString() ?? "info";
+}
+
+<div id="@containerId" class="billboard-message-container mb-4" style="@(string.IsNullOrEmpty(initialMessage) ? "display: none;" : "")">
+    <div class="billboard-message">
+        <div class="billboard-content">
+            <div class="billboard-icon">
+                <i class="fas fa-info-circle"></i>
+            </div>
+            <div class="billboard-text">
+                <div class="billboard-title">Status</div>
+                <div class="billboard-message-text">@initialMessage</div>
+            </div>
+            <div class="billboard-actions">
+                <button type="button" class="btn btn-sm btn-outline-light" onclick="hideBillboard('@containerId')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.billboard-message-container {
+    position: relative;
+    z-index: 10;
+}
+
+.billboard-message {
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+    color: white;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    animation: slideIn 0.3s ease-out;
+}
+
+.billboard-message.success {
+    background: linear-gradient(135deg, #28a745 0%, #1e7e34 100%);
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+}
+
+.billboard-message.warning {
+    background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
+    color: #212529;
+    box-shadow: 0 4px 12px rgba(255, 193, 7, 0.3);
+}
+
+.billboard-message.danger {
+    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
+}
+
+.billboard-content {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.billboard-icon {
+    font-size: 2.5rem;
+    opacity: 0.9;
+    flex-shrink: 0;
+}
+
+.billboard-text {
+    flex-grow: 1;
+}
+
+.billboard-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 5px;
+    opacity: 0.9;
+}
+
+.billboard-message-text {
+    font-size: 1.3rem;
+    font-weight: 500;
+    line-height: 1.3;
+}
+
+.billboard-actions {
+    flex-shrink: 0;
+}
+
+.billboard-actions .btn {
+    opacity: 0.8;
+    transition: opacity 0.2s ease;
+}
+
+.billboard-actions .btn:hover {
+    opacity: 1;
+}
+
+@@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Responsive adjustments */
+@@media (max-width: 768px) {
+    .billboard-message {
+        padding: 15px;
+    }
+    
+    .billboard-content {
+        gap: 10px;
+    }
+    
+    .billboard-icon {
+        font-size: 2rem;
+    }
+    
+    .billboard-message-text {
+        font-size: 1.1rem;
+    }
+}
+</style>
+
+<script>
+// Billboard message management functions
+window.showBillboard = function(containerId, message, type = 'info', title = 'Status', autoHide = false) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    
+    const billboard = container.querySelector('.billboard-message');
+    const icon = container.querySelector('.billboard-icon i');
+    const titleElement = container.querySelector('.billboard-title');
+    const messageElement = container.querySelector('.billboard-message-text');
+    
+    // Update content
+    titleElement.textContent = title;
+    messageElement.textContent = message;
+    
+    // Update icon based on type
+    const icons = {
+        success: 'fas fa-check-circle',
+        warning: 'fas fa-exclamation-triangle',
+        danger: 'fas fa-times-circle',
+        info: 'fas fa-info-circle'
+    };
+    
+    icon.className = icons[type] || icons.info;
+    
+    // Update styling
+    billboard.className = `billboard-message ${type}`;
+    
+    // Show container
+    container.style.display = 'block';
+    
+    // Auto-hide if requested
+    if (autoHide) {
+        setTimeout(() => {
+            hideBillboard(containerId);
+        }, 5000);
+    }
+};
+
+window.hideBillboard = function(containerId) {
+    const container = document.getElementById(containerId);
+    if (container) {
+        container.style.display = 'none';
+    }
+};
+
+window.updateBillboard = function(containerId, message, type = null, title = null) {
+    const container = document.getElementById(containerId);
+    if (!container || container.style.display === 'none') {
+        // If hidden, show it
+        showBillboard(containerId, message, type, title);
+        return;
+    }
+    
+    const messageElement = container.querySelector('.billboard-message-text');
+    const titleElement = container.querySelector('.billboard-title');
+    const billboard = container.querySelector('.billboard-message');
+    const icon = container.querySelector('.billboard-icon i');
+    
+    // Update message
+    messageElement.textContent = message;
+    
+    // Update title if provided
+    if (title) {
+        titleElement.textContent = title;
+    }
+    
+    // Update type if provided
+    if (type) {
+        const icons = {
+            success: 'fas fa-check-circle',
+            warning: 'fas fa-exclamation-triangle',
+            danger: 'fas fa-times-circle',
+            info: 'fas fa-info-circle'
+        };
+        
+        icon.className = icons[type] || icons.info;
+        billboard.className = `billboard-message ${type}`;
+    }
+};
+</script>

@@ -48,6 +48,9 @@ class UniversalScanner {
         // Initialize collapse state
         this.initializeCollapseState();
         
+        // Initialize health indicator
+        this.updateHealthIndicator('ready', 'Scanner Ready');
+        
         console.log(`Universal Scanner initialized for container: ${this.containerId}`);
     }
     
@@ -104,6 +107,7 @@ class UniversalScanner {
         
         this.isProcessing = true;
         this.setProcessingState(true);
+        this.updateHealthIndicator('processing', 'Processing scan...');
         
         try {
             // Track last scanned barcode
@@ -142,6 +146,7 @@ class UniversalScanner {
         } finally {
             this.isProcessing = false;
             this.setProcessingState(false);
+            this.updateHealthIndicator('ready', 'Scanner Ready');
             this.focus();
         }
     }
@@ -574,6 +579,31 @@ class UniversalScanner {
     
     isCollapsed() {
         return this.bodyElement && !this.bodyElement.classList.contains('show');
+    }
+    
+    // Health indicator management for compact mode
+    updateHealthIndicator(status = 'ready', message = '') {
+        const healthIndicator = document.getElementById(`scanner-health-${this.containerId}`);
+        if (!healthIndicator) return;
+        
+        // Clear existing classes
+        healthIndicator.classList.remove('ready', 'not-ready', 'processing');
+        
+        // Update based on status
+        switch(status) {
+            case 'ready':
+                healthIndicator.classList.add('ready');
+                healthIndicator.title = message || 'Scanner Ready';
+                break;
+            case 'not-ready':
+                healthIndicator.classList.add('not-ready');
+                healthIndicator.title = message || 'Scanner Not Ready';
+                break;
+            case 'processing':
+                healthIndicator.classList.add('processing');
+                healthIndicator.title = message || 'Processing Scan...';
+                break;
+        }
     }
     
     // Public API methods

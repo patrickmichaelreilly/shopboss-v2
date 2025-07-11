@@ -4,7 +4,7 @@
 
 ---
 
-## **Phase T: Testing Infrastructure & Data Safety (2 hours)**
+## **Phase T: DONE Testing Infrastructure & Data Safety (2 hours)**
 *Foundation for safe, efficient development and beta deployment*
 
 ### **T1: Quick Win Scripts (30 minutes)**
@@ -156,11 +156,28 @@
 *Production-ready interface refinements*
 
 ### **U1: Scanner Interface Optimization (1 hour)**
+
+#### "Please execute Phase U1 with these specific constraints:
+IMPORTANT BOUNDARIES:
+
+- This is purely UI/visual changes - do NOT modify any business logic, scanning logic, or backend functionality
+- The billboard message area should display existing messages that currently use toasts or temporary notifications - do not create new message types
+- When creating the compact header widget, preserve all existing scanner functionality - only change the visual presentation
+- Do not modify any controller methods or service logic
+- Keep all existing event handlers and scanning behavior intact
+- The scanner health indicator should simply reflect whether the scanner is ready (listening) or not - no complex health checks
+
+#### SPECIFIC NOTES:
+
+- Billboard message area only for Sorting and Assembly stations (not CNC or Shipping)
+- The 'abandoned scanner health indicator' refers to the complex system health monitoring - just show scanner ready/not ready
+- Test that all existing scanning functionality still works after UI changes"
+
 **Tasks:**
-- Implement billboard message area for persistent feedback
+- Implement billboard message area for persistent feedback at the Sorting and Assembly stations only
 - Minimize scanner footprint to header widget
 - Remove redundant station names from scanner blocks
-- Add scanner health indicator
+- Remove abandoned scanner health indicator and implement simple yes or no indicator
 
 **Deliverables:**
 - ✅ Large persistent message display

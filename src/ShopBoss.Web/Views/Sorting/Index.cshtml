@@ -42,14 +42,21 @@
 }
 
 @{
+    ViewData["ContainerId"] = "sorting-billboard";
+    ViewData["InitialMessage"] = "";
+    ViewData["InitialType"] = "info";
+}
+
+<partial name="_BillboardMessage" />
+
+@{
     ViewData["ContainerId"] = "sorting-scanner";
-    ViewData["Title"] = "Universal Scanner - Sorting Station";
+    ViewData["Title"] = "Scanner";
     ViewData["ShowHelp"] = true;
-    ViewData["ShowRecentScans"] = true;
     ViewData["Placeholder"] = "Scan part barcode or enter command...";
 }
 
-<partial name="_UniversalScanner" />
+<partial name="_CompactScanner" />
 
 @if (!Model.Any())
 {
