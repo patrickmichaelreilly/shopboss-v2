@@ -23,9 +23,9 @@ public class BackupConfiguration
     public bool EnableCompression { get; set; } = true;
     
     /// <summary>
-    /// Backup directory path (default: Backups folder in app directory)
+    /// Backup directory path (default: External backup directory for beta safety)
     /// </summary>
-    public string BackupDirectoryPath { get; set; } = "Backups";
+    public string BackupDirectoryPath { get; set; } = @"C:\ShopBoss-Backups";
     
     /// <summary>
     /// Enable automatic backups (default: true)

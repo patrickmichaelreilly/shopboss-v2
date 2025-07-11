@@ -45,11 +45,25 @@ dotnet test
 # Run tests with coverage
 dotnet test --collect:"XPlat Code Coverage"
 
-# IMPORTANT: Testing Procedure
+# Quick development testing shortcuts
+.\scripts\test-shortcuts.ps1 build    # Build application
+.\scripts\test-shortcuts.ps1 run      # Run application
+.\scripts\test-shortcuts.ps1 test     # Run tests
+.\scripts\test-shortcuts.ps1 status   # Check system status
+
+# Backup and recovery testing
+.\scripts\test-backup-restore.ps1     # Test backup/restore cycle
+.\scripts\backup-shopboss-beta.ps1    # Create manual backup
+.\scripts\restore-shopboss-beta.ps1   # Restore from backup
+
+# IMPORTANT: Testing Handoff Protocol
 # 1. Claude does the work and builds the application
-# 2. Claude updates the worklog following Collaboration-Guidelines.md
-# 3. Claude tells the user what to test for
-# 4. USER manually runs ./deploy-to-windows.sh to deploy for testing
+# 2. Claude creates/updates test scenarios and validation steps
+# 3. Claude updates the worklog following Collaboration-Guidelines.md
+# 4. Claude provides specific testing instructions to the user
+# 5. USER manually runs ./deploy-to-windows.sh to deploy for testing
+# 6. USER follows the testing instructions provided by Claude
+# 7. USER reports test results back to Claude for any necessary fixes
 # Claude should NEVER run deploy-to-windows.sh - only the user does this
 ```
 
@@ -212,6 +226,50 @@ dotnet test --collect:"XPlat Code Coverage"
 - Audit trail for all administrative actions
 - Role-based access control for admin functions
 
+## Testing Infrastructure (Phase T)
+
+### Data Safety and Backup System
+- **External Backup Directory**: `C:\ShopBoss-Backups` (configured by default)
+- **Backup Scripts**: Automated compression and manifest generation
+- **Incremental Backups**: Strategy for beta patches with minimal downtime
+- **Recovery Procedures**: Documented emergency recovery steps
+
+### Testing Tools and Scripts
+```bash
+# Testing shortcuts
+.\scripts\test-shortcuts.ps1 [command]     # Build, run, test, status, backup, checkpoint, reset
+
+# Backup and recovery
+.\scripts\backup-shopboss-beta.ps1         # Create external backup with compression
+.\scripts\restore-shopboss-beta.ps1        # Restore from backup with validation
+.\scripts\incremental-backup-beta.ps1      # Create incremental backup for patches
+.\scripts\test-backup-restore.ps1          # Test backup/restore cycle
+
+# System maintenance
+.\scripts\clean-sqlite-locks.ps1           # Clean SQLite locks and verify integrity
+```
+
+### Checkpoint System
+- **Checkpoint Directory**: `.\checkpoints\` with versioned snapshots
+- **Fresh Install**: Clean database with default configuration
+- **Known Good States**: Saved at major development milestones
+- **Quick Recovery**: Restore to specific checkpoint states
+
+### Testing Documentation
+- **Testing Runbook**: `docs\TESTING-RUNBOOK.md` - Comprehensive testing procedures
+- **Emergency Recovery**: `docs\EMERGENCY-RECOVERY.md` - Critical failure recovery
+- **Beta Emergency**: `docs\BETA-EMERGENCY.md` - Beta-specific emergency procedures
+
+### Testing Validation Steps
+After implementing Phase T, verify:
+1. **External Backup**: Confirm backups are saved to `C:\ShopBoss-Backups`
+2. **SQLite Cleanup**: Test lock cleanup script resolves database issues
+3. **Checkpoint System**: Verify checkpoint creation and restoration
+4. **Testing Shortcuts**: Confirm all shortcuts work correctly
+5. **Backup/Restore Cycle**: Test complete backup and restore with data verification
+6. **Incremental Backup**: Test patch-based incremental backup strategy
+7. **Emergency Recovery**: Review procedures and validate recovery time objectives
+
 ## Current Development Status
 
 The system is in active development with core infrastructure complete. Recent phases have focused on:
@@ -220,5 +278,6 @@ The system is in active development with core infrastructure complete. Recent ph
 - Sorting station with intelligent rack assignment and visualization
 - Assembly station with product completion workflow
 - Shipping station with final verification and tracking
+- **Phase T Complete**: Testing infrastructure and data safety systems implemented
 
 Current development follows the phased approach outlined in `Phases.md` with detailed progress tracking in `Worklog.md`.

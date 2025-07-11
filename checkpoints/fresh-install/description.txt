@@ -1,0 +1,2 @@
+Fresh ShopBoss installation - clean database with default storage racks configured.
+This checkpoint represents a clean slate for testing import and workflow scenarios.
