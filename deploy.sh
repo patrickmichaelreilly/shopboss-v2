@@ -74,6 +74,11 @@ elif [ ! -d "$WINDOWS_TEST_PATH" ]; then
 else
     echo "🔄 Smart cleaning - preserving data..."
     
+    # Clean SQLite lock files that cause weird states
+    echo "🔧 Cleaning SQLite lock files..."
+    rm -f "$WINDOWS_TEST_PATH"/*.db-wal 2>/dev/null || true
+    rm -f "$WINDOWS_TEST_PATH"/*.db-shm 2>/dev/null || true
+
     # Create backup directory
     mkdir -p "$BACKUP_PATH"
     

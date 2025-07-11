@@ -5,24 +5,30 @@
 }
 
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <div>
-        <h2><i class="fas fa-sort me-2"></i>Sorting Station</h2>
-        @if (!string.IsNullOrEmpty(ViewBag.ActiveWorkOrderName))
-        {
-            <small class="text-muted">
-                <i class="fas fa-star text-warning me-1"></i>
-                Active Work Order: <strong class="text-warning">@ViewBag.ActiveWorkOrderName</strong>
-            </small>
-        }
-        else
-        {
-            <small class="text-danger">
-                <i class="fas fa-exclamation-triangle me-1"></i>
-                No active work order selected
-            </small>
-        }
+    <div class="d-flex align-items-center gap-3">
+        <div>
+            <h2><i class="fas fa-sort me-2"></i>Sorting Station</h2>
+            @if (!string.IsNullOrEmpty(ViewBag.ActiveWorkOrderName))
+            {
+                <small class="text-muted">
+                    <i class="fas fa-star text-warning me-1"></i>
+                    Active Work Order: <strong class="text-warning">@ViewBag.ActiveWorkOrderName</strong>
+                </small>
+            }
+            else
+            {
+                <small class="text-danger">
+                    <i class="fas fa-exclamation-triangle me-1"></i>
+                    No active work order selected
+                </small>
+            }
+        </div>
+        
+        <!-- Header Scanner Button -->
+        <partial name="_CompactScanner" />
     </div>
-    <!-- Old scan buttons removed - using Universal Scanner instead -->
+    
+    <!-- Station Action Buttons -->
     <div class="btn-group" role="group">
         <button type="button" class="btn btn-outline-info" onclick="loadCutParts()" id="cutPartsButton">
             <i class="fas fa-list me-2"></i>Cut Parts (<span id="cutPartsCount">@ViewBag.CutPartsCount</span>)
@@ -49,14 +55,6 @@
 
 <partial name="_BillboardMessage" />
 
-@{
-    ViewData["ContainerId"] = "sorting-scanner";
-    ViewData["Title"] = "Scanner";
-    ViewData["ShowHelp"] = true;
-    ViewData["Placeholder"] = "Scan part barcode or enter command...";
-}
-
-<partial name="_CompactScanner" />
 
 @if (!Model.Any())
 {

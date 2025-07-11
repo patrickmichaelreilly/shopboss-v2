@@ -360,7 +360,14 @@ class UniversalScanner {
                     this.invisibleInput.focus();
                 }
             } else if (this.input) {
-                this.input.focus();
+                // Check if input is in a modal that's currently shown
+                const modal = this.input.closest('.modal');
+                if (modal && modal.classList.contains('show')) {
+                    this.input.focus();
+                } else if (!modal) {
+                    // Not in a modal, focus normally
+                    this.input.focus();
+                }
             }
         }
     }
@@ -393,7 +400,11 @@ class UniversalScanner {
             clearTimeout(focusTimeout);
             focusTimeout = setTimeout(() => {
                 if (!this.isProcessing && document.activeElement !== this.input && !this.isCollapsed()) {
-                    this.focus();
+                    // Check if input is in a modal
+                    const modal = this.input ? this.input.closest('.modal') : null;
+                    if (!modal || (modal && modal.classList.contains('show'))) {
+                        this.focus();
+                    }
                 }
             }, 2000);
         });
@@ -401,7 +412,11 @@ class UniversalScanner {
         // Return focus every 5 seconds if no activity
         setInterval(() => {
             if (!this.isProcessing && document.activeElement !== this.input && !this.isCollapsed()) {
-                this.focus();
+                // Check if input is in a modal
+                const modal = this.input ? this.input.closest('.modal') : null;
+                if (!modal || (modal && modal.classList.contains('show'))) {
+                    this.focus();
+                }
             }
         }, 5000);
         
