@@ -259,4 +259,4 @@ When implementing each phase:
 4. **Prefer elegant solutions** - Take time to implement features properly rather than quick patches
 5. **Document discoveries** - Report what you learn about existing systems for future decisions
 6. **Test incrementally** - Validate each component as you build
-7. **Flag technical debt** - If you must implement a workaround, clearly mark it with TODO
+7. **Flag technical debt** - If you must implement a workaround, clearly mark it with TODOv
