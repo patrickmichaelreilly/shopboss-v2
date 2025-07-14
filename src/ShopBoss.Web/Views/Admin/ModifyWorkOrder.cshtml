@@ -1,0 +1,241 @@
+@model string
+@{
+    ViewData["Title"] = "Modify Work Order";
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/tree-view.css" />
+}
+
+<div class="container-fluid mt-3">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h3 class="card-title mb-0">
+                        <i class="fas fa-edit me-2"></i>Modify Work Order
+                    </h3>
+                    <a asp-action="Index" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Back to Work Orders
+                    </a>
+                </div>
+                <div class="card-body">
+                    <!-- Work Order Information Header -->
+                    <div class="mb-4">
+                        <h5>Work Order Information</h5>
+                        <div class="card">
+                            <div class="card-body">
+                                <div class="row" id="workOrderHeader">
+                                    <div class="col-md-4">
+                                        <strong>Work Order Name:</strong><br>
+                                        <span class="text-muted" id="work-order-name">Loading...</span>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <strong>Work Order ID:</strong><br>
+                                        <span class="text-muted" id="work-order-id">@Model</span>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <strong>Import Date:</strong><br>
+                                        <span class="text-muted" id="work-order-import-date">Loading...</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Statistics Cards -->
+                    <div class="mb-4">
+                        <h5>Status Statistics</h5>
+                        <div class="row" id="statisticsCards">
+                            <div class="col-lg col-md-4 col-6 mb-3">
+                                <div class="card border-primary h-100">
+                                    <div class="card-body text-center">
+                                        <i class="fas fa-boxes fa-2x text-primary mb-2"></i>
+                                        <h4 id="totalProducts" class="mb-1">0</h4>
+                                        <small class="text-muted">Products</small>
+                                        <div class="mt-1 small">
+                                            <div><small class="text-muted" id="products-pending">0 Pending</small></div>
+                                            <div><small class="text-info" id="products-cut">0 Cut</small></div>
+                                            <div><small class="text-warning" id="products-sorted">0 Sorted</small></div>
+                                            <div><small class="text-primary" id="products-assembled">0 Assembled</small></div>
+                                            <div><small class="text-success" id="products-shipped">0 Shipped</small></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-lg col-md-4 col-6 mb-3">
+                                <div class="card border-success h-100">
+                                    <div class="card-body text-center">
+                                        <i class="fas fa-puzzle-piece fa-2x text-success mb-2"></i>
+                                        <h4 id="totalParts" class="mb-1">0</h4>
+                                        <small class="text-muted">Parts</small>
+                                        <div class="mt-1 small">
+                                            <div><small class="text-muted" id="parts-pending">0 Pending</small></div>
+                                            <div><small class="text-info" id="parts-cut">0 Cut</small></div>
+                                            <div><small class="text-warning" id="parts-sorted">0 Sorted</small></div>
+                                            <div><small class="text-primary" id="parts-assembled">0 Assembled</small></div>
+                                            <div><small class="text-success" id="parts-shipped">0 Shipped</small></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-lg col-md-4 col-6 mb-3">
+                                <div class="card border-dark h-100">
+                                    <div class="card-body text-center">
+                                        <i class="fas fa-th-large fa-2x text-dark mb-2"></i>
+                                        <h4 id="totalDetachedProducts" class="mb-1">0</h4>
+                                        <small class="text-muted">Detached Products</small>
+                                        <div class="mt-1 small">
+                                            <div><small class="text-muted" id="detachedProducts-pending">0 Pending</small></div>
+                                            <div><small class="text-info" id="detachedProducts-cut">0 Cut</small></div>
+                                            <div><small class="text-warning" id="detachedProducts-sorted">0 Sorted</small></div>
+                                            <div><small class="text-primary" id="detachedProducts-assembled">0 Assembled</small></div>
+                                            <div><small class="text-success" id="detachedProducts-shipped">0 Shipped</small></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-lg col-md-4 col-6 mb-3">
+                                <div class="card border-info h-100">
+                                    <div class="card-body text-center">
+                                        <i class="fas fa-tools fa-2x text-info mb-2"></i>
+                                        <h4 id="totalHardware" class="mb-1">0</h4>
+                                        <small class="text-muted">Hardware</small>
+                                        <div class="mt-1 small">
+                                            <div><small class="text-muted" id="hardware-pending">0 Pending</small></div>
+                                            <div><small class="text-info" id="hardware-cut">0 Cut</small></div>
+                                            <div><small class="text-warning" id="hardware-sorted">0 Sorted</small></div>
+                                            <div><small class="text-primary" id="hardware-assembled">0 Assembled</small></div>
+                                            <div><small class="text-success" id="hardware-shipped">0 Shipped</small></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-lg col-md-4 col-6 mb-3">
+                                <div class="card border-secondary h-100">
+                                    <div class="card-body text-center">
+                                        <i class="fas fa-cut fa-2x text-secondary mb-2"></i>
+                                        <h4 id="totalNestSheets" class="mb-1">0</h4>
+                                        <small class="text-muted">Nest Sheets</small>
+                                        <div class="mt-1 small">
+                                            <div><small class="text-muted" id="nestSheets-pending">0 Pending</small></div>
+                                            <div><small class="text-success" id="nestSheets-processed">0 Processed</small></div>
+                                            <div><small class="text-muted">N/A Cut</small></div>
+                                            <div><small class="text-muted">N/A Sorted</small></div>
+                                            <div><small class="text-muted">N/A Assembled/Shipped</small></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    @await Html.PartialAsync("_StatusManagementPanel", Model)
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/lib/signalr/dist/browser/signalr.js"></script>
+    <script src="~/js/WorkOrderTreeView.js"></script>
+    <script>
+        // Load work order statistics on page load
+        document.addEventListener('DOMContentLoaded', async function() {
+            const workOrderId = '@Model';
+            
+            try {
+                // Load work order header information and statistics
+                const response = await fetch(`/api/WorkOrderStatistics/${workOrderId}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success) {
+                        updateWorkOrderHeader(data.workOrder);
+                        updateStatisticsCards(data.statistics);
+                    }
+                } else {
+                    console.error('Failed to load work order statistics');
+                }
+            } catch (error) {
+                console.error('Error loading work order statistics:', error);
+            }
+        });
+
+        // Update work order header information
+        function updateWorkOrderHeader(workOrder) {
+            document.getElementById('work-order-name').textContent = workOrder.name || 'Unknown';
+            document.getElementById('work-order-id').textContent = workOrder.id || '@Model';
+            
+            if (workOrder.importDate) {
+                const importDate = new Date(workOrder.importDate);
+                document.getElementById('work-order-import-date').textContent = importDate.toLocaleDateString();
+            } else {
+                document.getElementById('work-order-import-date').textContent = 'Unknown';
+            }
+        }
+
+        // Update statistics cards
+        function updateStatisticsCards(statistics) {
+            // Products - all 5 statuses
+            document.getElementById('totalProducts').textContent = statistics.products.total;
+            document.getElementById('products-pending').textContent = `${statistics.products.pending || 0} Pending`;
+            document.getElementById('products-cut').textContent = `${statistics.products.cut || 0} Cut`;
+            document.getElementById('products-sorted').textContent = `${statistics.products.sorted || 0} Sorted`;
+            document.getElementById('products-assembled').textContent = `${statistics.products.assembled || 0} Assembled`;
+            document.getElementById('products-shipped').textContent = `${statistics.products.shipped || 0} Shipped`;
+
+            // Parts - all 5 statuses
+            document.getElementById('totalParts').textContent = statistics.parts.total;
+            document.getElementById('parts-pending').textContent = `${statistics.parts.pending || 0} Pending`;
+            document.getElementById('parts-cut').textContent = `${statistics.parts.cut || 0} Cut`;
+            document.getElementById('parts-sorted').textContent = `${statistics.parts.sorted || 0} Sorted`;
+            document.getElementById('parts-assembled').textContent = `${statistics.parts.assembled || 0} Assembled`;
+            document.getElementById('parts-shipped').textContent = `${statistics.parts.shipped || 0} Shipped`;
+
+            // Detached Products - all 5 statuses
+            document.getElementById('totalDetachedProducts').textContent = statistics.detachedProducts.total;
+            document.getElementById('detachedProducts-pending').textContent = `${statistics.detachedProducts.pending || 0} Pending`;
+            document.getElementById('detachedProducts-cut').textContent = `${statistics.detachedProducts.cut || 0} Cut`;
+            document.getElementById('detachedProducts-sorted').textContent = `${statistics.detachedProducts.sorted || 0} Sorted`;
+            document.getElementById('detachedProducts-assembled').textContent = `${statistics.detachedProducts.assembled || 0} Assembled`;
+            document.getElementById('detachedProducts-shipped').textContent = `${statistics.detachedProducts.shipped || 0} Shipped`;
+
+            // Hardware - all 5 statuses
+            document.getElementById('totalHardware').textContent = statistics.hardware.total;
+            document.getElementById('hardware-pending').textContent = `${statistics.hardware.pending || 0} Pending`;
+            document.getElementById('hardware-cut').textContent = `${statistics.hardware.cut || 0} Cut`;
+            document.getElementById('hardware-sorted').textContent = `${statistics.hardware.sorted || 0} Sorted`;
+            document.getElementById('hardware-assembled').textContent = `${statistics.hardware.assembled || 0} Assembled`;
+            document.getElementById('hardware-shipped').textContent = `${statistics.hardware.shipped || 0} Shipped`;
+
+            // Nest Sheets - only Pending/Processed (others show as N/A in UI)
+            document.getElementById('totalNestSheets').textContent = statistics.nestSheets.total;
+            document.getElementById('nestSheets-pending').textContent = `${statistics.nestSheets.pending || 0} Pending`;
+            document.getElementById('nestSheets-processed').textContent = `${statistics.nestSheets.processed || 0} Processed`;
+        }
+
+        // SignalR connection for real-time updates
+        const connection = new signalR.HubConnectionBuilder()
+            .withUrl("/hubs/status")
+            .build();
+
+        connection.on("RefreshStatus", function (data) {
+            console.log("Status update received:", data);
+            // Refresh statistics when status changes occur
+            const workOrderId = '@Model';
+            fetch(`/api/WorkOrderStatistics/${workOrderId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        updateStatisticsCards(data.statistics);
+                    }
+                })
+                .catch(error => console.error('Error refreshing statistics:', error));
+        });
+
+        connection.start().catch(function (err) {
+            console.error("SignalR connection error:", err);
+        });
+    </script>
+}

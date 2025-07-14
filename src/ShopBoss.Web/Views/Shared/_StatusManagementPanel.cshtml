@@ -12,8 +12,8 @@
             </h5>
         </div>
         <div class="card-body">
-            <!-- Work Order Tree Display (using existing infrastructure) -->
-            <div id="treeContainer" class="tree-view mb-4">
+            <!-- Work Order Tree Display (using WorkOrderTreeView component) -->
+            <div id="workOrderTree" class="tree-view mb-4" style="min-height: 400px;">
                 <div class="text-center text-muted">
                     <i class="bi bi-info-circle"></i> Loading work order data...
                 </div>
@@ -33,100 +33,29 @@
                 </div>
             </div>
 
-            <!-- Status Action Panel -->
-            <div class="status-action-panel border rounded p-3 bg-light">
-                <h6 class="mb-3">Status Management</h6>
-                
-                <!-- Selection Summary -->
-                <div id="selectionSummary" class="mb-3 text-muted">
-                    <i class="bi bi-info-circle"></i> Select items from the tree above to manage their status
-                </div>
-
-                <!-- Status Change -->
-                <div class="mb-3">
-                    <label class="form-label">Change Status To:</label>
-                    <select id="statusDropdown" class="form-select" disabled>
-                        <option value="">Select status...</option>
-                        <!-- Status options will be populated based on selection -->
-                    </select>
-                    <button id="applyStatusBtn" class="btn btn-warning mt-2 w-100" disabled>
-                        <i class="bi bi-check-circle"></i> Apply Status
-                    </button>
-                </div>
-
-                <!-- Additional Actions -->
-                <div id="additionalActions" class="mt-3">
-                    <!-- Cascade Operations -->
-                    <div id="cascadeActions">
-                        <button id="cascadeChildrenBtn" class="btn btn-info w-100 mb-2" disabled>
-                            <i class="bi bi-arrow-down-circle"></i> Apply to All Children
-                        </button>
-                    </div>
-
-                    <!-- Nest Sheet specific -->
-                    <div id="nestSheetActions" class="d-none">
-                        <button id="unprocessNestBtn" class="btn btn-warning w-100">
-                            <i class="bi bi-arrow-counterclockwise"></i> Un-process Selected Nest Sheets
-                        </button>
-                    </div>
-
-                    <!-- Bin Management -->
-                    <div id="binManagement" class="mt-3">
-                        <button id="showBinManagerBtn" class="btn btn-secondary w-100">
-                            <i class="bi bi-box"></i> Manage Storage Bins
-                        </button>
-                    </div>
-                </div>
+            <!-- Manual Override Status Management Instructions -->
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle"></i> 
+                <strong>Individual Status Management:</strong> Use the dropdown next to each item in the tree above to change its status. Status changes are applied immediately.
             </div>
 
-            <!-- Audit History Panel -->
-            <div id="auditHistoryPanel" class="mt-4 d-none">
+            <!-- Work Order Audit History (Always Visible) -->
+            <div class="mb-4">
+                <h6 class="mb-3">
+                    <i class="bi bi-clock-history"></i> Work Order Audit History
+                </h6>
                 <div class="card">
-                    <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
-                        <h6 class="mb-0">
-                            <i class="bi bi-clock-history"></i> Audit History
-                        </h6>
-                        <button class="btn btn-sm btn-light" id="closeAuditBtn">
-                            <i class="bi bi-x"></i>
-                        </button>
-                    </div>
-                    <div class="card-body">
-                        <div id="auditHistoryContent" style="max-height: 400px; overflow-y: auto;">
-                            <!-- Audit entries will be loaded here -->
+                    <div class="card-body" style="max-height: 400px; overflow-y: auto; border: 1px solid #dee2e6;">
+                        <div id="auditHistoryContent">
+                            <div class="text-center text-muted">
+                                <i class="bi bi-info-circle"></i> Loading audit history...
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Bin Management Modal -->
-            <div id="binManagementPanel" class="mt-4 d-none">
-                <div class="card">
-                    <div class="card-header bg-secondary text-white">
-                        <h6 class="mb-0">
-                            <i class="bi bi-box"></i> Storage Bin Management
-                        </h6>
-                    </div>
-                    <div class="card-body">
-                        <div class="mb-3">
-                            <label class="form-label">Select Rack</label>
-                            <select id="rackSelector" class="form-select">
-                                <option value="">Loading racks...</option>
-                            </select>
-                        </div>
-                        <div id="binGrid" class="mt-3">
-                            <!-- Bin grid will be loaded here -->
-                        </div>
-                        <div class="mt-3">
-                            <button id="clearSelectedBinsBtn" class="btn btn-danger" disabled>
-                                <i class="bi bi-trash"></i> Clear Selected Bins
-                            </button>
-                            <button id="closeBinManagerBtn" class="btn btn-secondary float-end">
-                                Close
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
+
         </div>
     </div>
 </div>
@@ -145,14 +74,45 @@
         background-color: #ffffff;
     }
 
-    .status-action-panel {
-        background-color: #fff8dc !important;
+    /* Tree hierarchy indentation styles */
+    .tree-node {
+        padding: 0.25rem 0;
     }
+    
+    .tree-node.level-0 { margin-left: 0; }
+    .tree-node.level-1 { margin-left: 1.5rem; }
+    .tree-node.level-2 { margin-left: 3rem; }
+    .tree-node.level-3 { margin-left: 4.5rem; }
+    .tree-node.level-4 { margin-left: 6rem; }
+    
+    .tree-toggle {
+        cursor: pointer;
+        user-select: none;
+        color: #6c757d;
+        display: inline-flex !important;
+        align-items: center;
+        justify-content: center;
+        min-width: 16px;
+        height: 16px;
+    }
+    
+    .tree-toggle:hover {
+        color: #495057;
+        background-color: #e9ecef;
+        border-radius: 2px;
+    }
+    
+    .tree-toggle i {
+        font-size: 12px !important;
+        line-height: 1;
+    }
+    
 
     .audit-entry {
-        padding: 0.75rem;
+        padding: 0.25rem 0.5rem;
         border-bottom: 1px solid #e9ecef;
-        font-size: 0.875rem;
+        font-size: 0.8rem;
+        line-height: 1.2;
     }
 
     .audit-entry:last-child {
@@ -161,11 +121,12 @@
 
     .audit-timestamp {
         color: #6c757d;
-        font-size: 0.8rem;
+        font-size: 0.75rem;
     }
 
     .audit-details {
-        margin-top: 0.25rem;
+        margin-top: 0.1rem;
+        font-size: 0.75rem;
     }
 
     .old-value {
@@ -178,36 +139,6 @@
         font-weight: 500;
     }
 
-    .bin-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-        gap: 0.5rem;
-        max-height: 300px;
-        overflow-y: auto;
-    }
-
-    .bin-item {
-        border: 1px solid #dee2e6;
-        border-radius: 0.25rem;
-        padding: 0.5rem;
-        text-align: center;
-        cursor: pointer;
-        transition: all 0.2s;
-    }
-
-    .bin-item:hover {
-        background-color: #f8f9fa;
-    }
-
-    .bin-item.selected {
-        background-color: #ffc107;
-        border-color: #ffc107;
-    }
-
-    .bin-item.occupied {
-        background-color: #e3f2fd;
-        border-color: #2196f3;
-    }
 
     .filter-btn.active {
         background-color: #0d6efd;
@@ -220,186 +151,102 @@
     // Integrates with existing tree infrastructure, no validation yet!
     document.addEventListener('DOMContentLoaded', function() {
         const workOrderId = '@Model'; // Model contains the work order ID
-        const treeContainer = document.getElementById('treeContainer');
-        const statusDropdown = document.getElementById('statusDropdown');
-        const applyStatusBtn = document.getElementById('applyStatusBtn');
-        const selectionSummary = document.getElementById('selectionSummary');
-        const auditHistoryPanel = document.getElementById('auditHistoryPanel');
         const auditHistoryContent = document.getElementById('auditHistoryContent');
-        const binManagementPanel = document.getElementById('binManagementPanel');
         
-        let treeData = null;
-        let selectedItems = new Map(); // Map of id -> {type, name, status}
+        let treeView = null;
         let currentFilter = 'all';
 
-        // All possible statuses by entity type (Phase M1: everything possible!)
-        const statusOptions = {
-            part: ['Pending', 'Cut', 'Sorted', 'Assembled', 'Shipped'],
-            product: ['Pending', 'Cut', 'Sorted', 'Assembled', 'Shipped'],
-            subassembly: ['Pending', 'Cut', 'Sorted', 'Assembled', 'Shipped'],
-            detached_product: ['Pending', 'Cut', 'Sorted', 'Assembled', 'Shipped'],
-            nestsheet: ['Pending', 'Processed'],
-            hardware: ['Pending', 'Sorted', 'Assembled']
-        };
-
-        // Load tree data using existing API
-        async function loadTreeData() {
+        // Initialize WorkOrderTreeView component
+        function initializeTreeView() {
             try {
-                const response = await fetch(`/api/workordertreeapi/${workOrderId}?includeStatus=true`);
-                if (!response.ok) throw new Error('Failed to load tree data');
-                
-                treeData = await response.json();
-                renderTree();
+                treeView = new WorkOrderTreeView('workOrderTree', {
+                    mode: 'modify',
+                    apiUrl: '/api/WorkOrderTreeApi',
+                    workOrderId: workOrderId,
+                    onStatusChange: handleStatusChange,
+                    onDataLoaded: handleDataLoaded
+                });
             } catch (error) {
-                console.error('Error loading tree data:', error);
-                treeContainer.innerHTML = '<div class="alert alert-danger">Failed to load work order data</div>';
+                console.error('Error initializing tree view:', error);
+                document.getElementById('workOrderTree').innerHTML = '<div class="alert alert-danger">Failed to initialize tree view</div>';
             }
         }
 
-        // Render tree with checkboxes for selection
-        function renderTree() {
-            treeContainer.innerHTML = '';
-            
-            if (!treeData || !treeData.items) {
-                treeContainer.innerHTML = '<div class="text-muted">No data available</div>';
-                return;
-            }
-
-            const treeElement = document.createElement('div');
-            treeElement.className = 'tree-nodes';
-            
-            treeData.items.forEach(item => {
-                renderTreeNode(item, treeElement, 0);
-            });
-            
-            treeContainer.appendChild(treeElement);
+        // Handle tree data loaded event
+        function handleDataLoaded(data) {
+            console.log('Tree data loaded:', data);
+            // Load audit history when tree is ready
+            loadAuditHistoryForWorkOrder();
         }
 
-        // Render individual tree node
-        function renderTreeNode(node, container, level) {
-            // Apply filter
-            if (currentFilter !== 'all' && !nodeMatchesFilter(node, currentFilter)) {
-                return;
-            }
 
-            const nodeDiv = document.createElement('div');
-            nodeDiv.className = `tree-node level-${level}`;
-            nodeDiv.style.marginLeft = `${level * 1.5}rem`;
-            
-            // Skip checkboxes for categories
-            if (node.type !== 'category') {
-                const checkbox = document.createElement('input');
-                checkbox.type = 'checkbox';
-                checkbox.className = 'form-check-input me-2';
-                checkbox.id = `node_${node.id}`;
-                checkbox.addEventListener('change', () => handleSelectionChange(node, checkbox.checked));
-                nodeDiv.appendChild(checkbox);
-            }
-
-            const label = document.createElement('label');
-            label.htmlFor = node.type !== 'category' ? `node_${node.id}` : '';
-            label.style.cursor = node.type !== 'category' ? 'pointer' : 'default';
-            label.innerHTML = `
-                <strong>${node.name}</strong>
-                ${node.quantity > 1 ? `<span class="text-muted ms-1">(${node.quantity})</span>` : ''}
-                ${node.status ? `<span class="badge bg-secondary ms-2">${node.status}</span>` : ''}
-            `;
-            
-            // Click label to show audit history
-            if (node.type !== 'category') {
-                label.addEventListener('click', (e) => {
-                    if (e.target.tagName !== 'INPUT') {
-                        loadAuditHistory(node.type, node.id);
-                    }
-                });
-            }
-            
-            nodeDiv.appendChild(label);
-            container.appendChild(nodeDiv);
-
-            // Render children
-            if (node.children && node.children.length > 0) {
-                node.children.forEach(child => {
-                    renderTreeNode(child, container, level + 1);
-                });
-            }
-        }
-
-        // Check if node matches filter
-        function nodeMatchesFilter(node, filter) {
-            if (node.type === filter) return true;
-            if (node.children) {
-                return node.children.some(child => nodeMatchesFilter(child, filter));
-            }
-            return false;
-        }
-
-        // Handle selection changes
-        function handleSelectionChange(node, isSelected) {
-            if (isSelected) {
-                selectedItems.set(node.id, {
-                    type: node.type,
-                    name: node.name,
-                    status: node.status
-                });
-            } else {
-                selectedItems.delete(node.id);
-            }
-            
-            updateUI();
-        }
-
-        // Update UI based on selection
-        function updateUI() {
-            const hasSelection = selectedItems.size > 0;
-            
-            // Update selection summary
-            if (hasSelection) {
-                const types = new Set(Array.from(selectedItems.values()).map(item => item.type));
-                selectionSummary.innerHTML = `
-                    <i class="bi bi-check-circle text-success"></i> 
-                    ${selectedItems.size} item(s) selected
-                    ${types.size === 1 ? `(${Array.from(types)[0]}s)` : ''}
-                `;
-            } else {
-                selectionSummary.innerHTML = '<i class="bi bi-info-circle"></i> Select items from the tree above to manage their status';
-            }
-
-            // Update status dropdown
-            statusDropdown.disabled = !hasSelection;
-            applyStatusBtn.disabled = !hasSelection;
-            document.getElementById('cascadeChildrenBtn').disabled = !hasSelection;
-            
-            if (hasSelection) {
-                populateStatusDropdown();
+        // Handle individual status changes (copied from ModifyWorkOrderUnified)
+        async function handleStatusChange(nodeId, newStatus, itemType) {
+            try {
+                console.log(`Status change: ${nodeId} -> ${newStatus} (${itemType})`);
                 
-                // Show/hide entity-specific actions
-                const types = new Set(Array.from(selectedItems.values()).map(item => item.type));
-                document.getElementById('nestSheetActions').classList.toggle('d-none', !types.has('nestsheet'));
+                // Map frontend item types to backend expectations
+                let backendItemType = itemType;
+                if (itemType === 'detached_product') {
+                    backendItemType = 'detachedproduct';
+                }
+                
+                // Enable cascading for products to update child parts
+                const shouldCascade = itemType === 'product';
+                
+                // Call the existing UpdateStatus endpoint
+                const response = await fetch('/Admin/UpdateStatus', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: new URLSearchParams({
+                        itemId: nodeId,
+                        itemType: backendItemType,
+                        newStatus: newStatus,
+                        workOrderId: workOrderId,
+                        cascadeToChildren: shouldCascade
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showSuccess(`${itemType} status updated to ${newStatus}`);
+                    
+                    // Refresh statistics and audit history immediately after successful status change
+                    refreshStatistics();
+                    refreshAuditHistory();
+                    
+                    // Only refresh if cascading was enabled (for products)
+                    // This ensures child part status updates are reflected
+                    if (shouldCascade) {
+                        setTimeout(() => {
+                            if (treeView && treeView.refresh) {
+                                treeView.refresh();
+                            }
+                            // Refresh statistics and audit history again after cascading updates
+                            refreshStatistics();
+                            refreshAuditHistory();
+                        }, 750); // Increased delay to ensure DB commit
+                    }
+                } else {
+                    showError(`Failed to update status: ${result.message}`);
+                    // Refresh tree to revert changes
+                    if (treeView && treeView.refresh) {
+                        treeView.refresh();
+                    }
+                }
+            } catch (error) {
+                console.error('Error updating status:', error);
+                showError('Error updating status');
+                if (treeView && treeView.refresh) {
+                    treeView.refresh();
+                }
             }
         }
 
-        // Populate status dropdown based on selection
-        function populateStatusDropdown() {
-            statusDropdown.innerHTML = '<option value="">Select status...</option>';
-            
-            // Get all unique types in selection
-            const types = new Set(Array.from(selectedItems.values()).map(item => item.type));
-            
-            // Phase M1: Show ALL statuses for ALL types (no validation)
-            const allStatuses = new Set();
-            types.forEach(type => {
-                const statuses = statusOptions[type] || [];
-                statuses.forEach(status => allStatuses.add(status));
-            });
-            
-            Array.from(allStatuses).sort().forEach(status => {
-                const option = document.createElement('option');
-                option.value = status;
-                option.textContent = status;
-                statusDropdown.appendChild(option);
-            });
-        }
+
 
         // Filter buttons
         document.querySelectorAll('.filter-btn').forEach(btn => {
@@ -407,185 +254,42 @@
                 document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
                 this.classList.add('active');
                 currentFilter = this.dataset.filter;
-                renderTree();
-                selectedItems.clear();
-                updateUI();
-            });
-        });
-
-        // Apply status button
-        applyStatusBtn.addEventListener('click', async function() {
-            if (selectedItems.size === 0 || !statusDropdown.value) return;
-            
-            const itemsByType = {};
-            selectedItems.forEach((item, id) => {
-                if (!itemsByType[item.type]) itemsByType[item.type] = [];
-                itemsByType[item.type].push(id);
-            });
-            
-            const confirmMsg = `Change status of ${selectedItems.size} item(s) to "${statusDropdown.value}"?`;
-            if (!confirm(confirmMsg)) return;
-
-            try {
-                // Process each entity type separately
-                for (const [entityType, entityIds] of Object.entries(itemsByType)) {
-                    const response = await fetch('/admin/api/updatestatus', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            entityType: entityType,
-                            entityIds: entityIds,
-                            newStatus: statusDropdown.value
-                        })
-                    });
-
-                    if (!response.ok) {
-                        const error = await response.text();
-                        throw new Error(error);
-                    }
-                }
                 
-                alert('Status updated successfully');
-                
-                // Reload tree
-                await loadTreeData();
-                selectedItems.clear();
-                updateUI();
-            } catch (error) {
-                console.error('Error updating status:', error);
-                alert('Failed to update status: ' + error.message);
-            }
-        });
-
-        // Cascade to children button
-        document.getElementById('cascadeChildrenBtn').addEventListener('click', function() {
-            alert('Cascade functionality will be implemented in Phase M2 with proper validation');
-        });
-
-        // Bin management
-        document.getElementById('showBinManagerBtn').addEventListener('click', async function() {
-            binManagementPanel.classList.remove('d-none');
-            await loadRacks();
-        });
-
-        document.getElementById('closeBinManagerBtn').addEventListener('click', function() {
-            binManagementPanel.classList.add('d-none');
-        });
-
-        // Load storage racks
-        async function loadRacks() {
-            try {
-                const response = await fetch('/admin/api/racks');
-                if (!response.ok) throw new Error('Failed to load racks');
-                
-                const racks = await response.json();
-                const rackSelector = document.getElementById('rackSelector');
-                
-                rackSelector.innerHTML = '<option value="">Select a rack...</option>';
-                racks.forEach(rack => {
-                    const option = document.createElement('option');
-                    option.value = rack.id;
-                    option.textContent = rack.name;
-                    rackSelector.appendChild(option);
-                });
-                
-                rackSelector.addEventListener('change', () => loadBins(rackSelector.value));
-            } catch (error) {
-                console.error('Error loading racks:', error);
-            }
-        }
-
-        // Load bins for a rack
-        async function loadBins(rackId) {
-            if (!rackId) {
-                document.getElementById('binGrid').innerHTML = '';
-                return;
-            }
-
-            try {
-                const response = await fetch(`/admin/api/racks/${rackId}/bins`);
-                if (!response.ok) throw new Error('Failed to load bins');
-                
-                const bins = await response.json();
-                renderBinGrid(bins);
-            } catch (error) {
-                console.error('Error loading bins:', error);
-            }
-        }
-
-        // Render bin grid
-        function renderBinGrid(bins) {
-            const binGrid = document.getElementById('binGrid');
-            binGrid.innerHTML = '';
-            binGrid.className = 'bin-grid';
-            
-            const selectedBins = new Set();
-            
-            bins.forEach(bin => {
-                const binDiv = document.createElement('div');
-                binDiv.className = `bin-item ${bin.partId ? 'occupied' : ''}`;
-                binDiv.dataset.binId = bin.id;
-                binDiv.innerHTML = `
-                    <div>${bin.label}</div>
-                    <small>${bin.partId ? 'Occupied' : 'Empty'}</small>
-                `;
-                
-                binDiv.addEventListener('click', function() {
-                    if (selectedBins.has(bin.id)) {
-                        selectedBins.delete(bin.id);
-                        binDiv.classList.remove('selected');
+                // Apply filter using TreeView's search functionality
+                if (treeView) {
+                    if (currentFilter === 'all') {
+                        treeView.filterTree('');
                     } else {
-                        selectedBins.add(bin.id);
-                        binDiv.classList.add('selected');
+                        // Filter by type - this will show items of the selected type
+                        treeView.filterTree(currentFilter);
                     }
-                    
-                    document.getElementById('clearSelectedBinsBtn').disabled = selectedBins.size === 0;
-                });
-                
-                binGrid.appendChild(binDiv);
-            });
-            
-            // Clear bins button
-            document.getElementById('clearSelectedBinsBtn').onclick = async function() {
-                if (selectedBins.size === 0) return;
-                
-                if (!confirm(`Clear ${selectedBins.size} bin(s)?`)) return;
-                
-                try {
-                    const response = await fetch('/admin/api/clearbins', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            binIds: Array.from(selectedBins)
-                        })
-                    });
-                    
-                    if (!response.ok) throw new Error('Failed to clear bins');
-                    
-                    alert('Bins cleared successfully');
-                    loadBins(document.getElementById('rackSelector').value);
-                } catch (error) {
-                    console.error('Error clearing bins:', error);
-                    alert('Failed to clear bins: ' + error.message);
                 }
-            };
-        }
+            });
+        });
 
-        // Load audit history
-        async function loadAuditHistory(entityType, entityId) {
-            auditHistoryPanel.classList.remove('d-none');
+        // Load audit history for the entire work order
+        async function loadAuditHistoryForWorkOrder() {
             auditHistoryContent.innerHTML = '<div class="text-center"><span class="spinner-border spinner-border-sm"></span> Loading...</div>';
 
             try {
-                const response = await fetch(`/admin/api/audithistory/${entityType}/${entityId}`);
+                const response = await fetch(`/api/WorkOrderStatistics/${workOrderId}/audit`);
                 if (!response.ok) throw new Error('Failed to load audit history');
                 
-                const auditEntries = await response.json();
-                renderAuditHistory(auditEntries);
+                const data = await response.json();
+                if (data.success) {
+                    renderAuditHistory(data.auditEntries);
+                } else {
+                    throw new Error(data.message);
+                }
             } catch (error) {
                 console.error('Error loading audit history:', error);
                 auditHistoryContent.innerHTML = '<div class="alert alert-danger">Failed to load audit history</div>';
             }
+        }
+
+        // Refresh audit history after status changes
+        function refreshAuditHistory() {
+            loadAuditHistoryForWorkOrder();
         }
 
         // Render audit history
@@ -595,19 +299,26 @@
                 return;
             }
 
-            auditHistoryContent.innerHTML = entries.map(entry => `
-                <div class="audit-entry">
-                    <div class="d-flex justify-content-between">
-                        <strong>${entry.action}</strong>
-                        <span class="audit-timestamp">${new Date(entry.timestamp).toLocaleString()}</span>
+            auditHistoryContent.innerHTML = entries.map(entry => {
+                const entityInfo = entry.entityType && entry.entityId ? 
+                    ` ${entry.entityType} ${entry.entityId.substring(0, 8)}...` : '';
+                const timestamp = new Date(entry.timestamp).toLocaleString();
+                const station = entry.station || 'System';
+                const valueChange = entry.oldValue && entry.newValue ? renderValueChange(entry.oldValue, entry.newValue) : '';
+                
+                return `
+                    <div class="audit-entry">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <strong>${entry.action}</strong>${entityInfo} 
+                                <span class="text-muted">at ${station}</span>
+                                ${valueChange}
+                            </div>
+                            <span class="audit-timestamp">${timestamp}</span>
+                        </div>
                     </div>
-                    <div class="audit-details">
-                        ${entry.details}
-                        ${entry.oldValue && entry.newValue ? renderValueChange(entry.oldValue, entry.newValue) : ''}
-                    </div>
-                    <small class="text-muted">Station: ${entry.station}</small>
-                </div>
-            `).join('');
+                `;
+            }).join('');
         }
 
         // Render old/new value changes
@@ -616,24 +327,63 @@
                 const oldObj = JSON.parse(oldValue);
                 const newObj = JSON.parse(newValue);
                 
-                return `
-                    <div class="mt-2">
-                        <span class="old-value">${oldObj.Status || 'N/A'}</span>
-                        <i class="bi bi-arrow-right mx-2"></i>
-                        <span class="new-value">${newObj.Status || 'N/A'}</span>
-                    </div>
-                `;
+                return `(<span class="old-value">${oldObj.Status || 'N/A'}</span>→<span class="new-value">${newObj.Status || 'N/A'}</span>)`;
             } catch {
                 return '';
             }
         }
 
-        // Close audit history
-        document.getElementById('closeAuditBtn').addEventListener('click', function() {
-            auditHistoryPanel.classList.add('d-none');
-        });
+
+        // Utility functions for user feedback (copied from ModifyWorkOrderUnified)
+        function showLoading(show) {
+            // For now, just log - could add loading overlay later
+            console.log('Loading:', show);
+        }
+
+        function showSuccess(message) {
+            showAlert(message, 'success');
+        }
+
+        function showError(message) {
+            showAlert(message, 'danger');
+        }
+
+        function showAlert(message, type) {
+            // Create alert element
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+            alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 1050; max-width: 400px;';
+            alertDiv.innerHTML = `
+                <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-triangle'} me-2"></i>
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            
+            document.body.appendChild(alertDiv);
+            
+            // Auto-remove after 5 seconds
+            setTimeout(() => {
+                if (alertDiv.parentNode) {
+                    alertDiv.remove();
+                }
+            }, 5000);
+        }
+
+        // Function to refresh statistics (called from parent page)
+        function refreshStatistics() {
+            if (typeof updateStatisticsCards === 'function') {
+                fetch(`/api/WorkOrderStatistics/${workOrderId}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            updateStatisticsCards(data.statistics);
+                        }
+                    })
+                    .catch(error => console.error('Error refreshing statistics:', error));
+            }
+        }
 
         // Initialize
-        loadTreeData();
+        initializeTreeView();
     });
 </script>

@@ -443,8 +443,13 @@ public class AdminController : Controller
     // Modify Work Order Methods
     public IActionResult ModifyWorkOrder(string id)
     {
-        // Redirect to unified interface
-        return RedirectToAction(nameof(ModifyWorkOrderUnified), new { id = id });
+        if (string.IsNullOrEmpty(id))
+        {
+            TempData["ErrorMessage"] = "Work order ID is required to modify work order.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        return View((object)id);
     }
 
     [HttpPost]
@@ -1036,36 +1041,6 @@ public class AdminController : Controller
         return RedirectToAction(nameof(BackupManagement));
     }
 
-    // Unified Modify Work Order Interface (Phase 6C)
-    public async Task<IActionResult> ModifyWorkOrderUnified(string id)
-    {
-        if (string.IsNullOrEmpty(id))
-        {
-            TempData["ErrorMessage"] = "Work order ID is required to modify work order.";
-            return RedirectToAction(nameof(Index));
-        }
-
-        try
-        {
-            // Load work order data using WorkOrderService
-            var workOrderData = await _workOrderService.GetWorkOrderManagementDataAsync(id);
-            
-            if (workOrderData.WorkOrder == null)
-            {
-                TempData["ErrorMessage"] = "Work order not found.";
-                return RedirectToAction(nameof(Index));
-            }
-
-            // Pass the work order data to the unified view
-            return View(workOrderData);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error loading unified modify work order interface for work order {WorkOrderId}", id);
-            TempData["ErrorMessage"] = "An error occurred while loading the modify work order interface.";
-            return RedirectToAction(nameof(Index));
-        }
-    }
 
     public async Task<IActionResult> HealthDashboard()
     {
@@ -1171,17 +1146,6 @@ public class AdminController : Controller
         return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
     }
 
-    // Status Management Page (Phase M1)
-    public IActionResult StatusManagement(string workOrderId)
-    {
-        if (string.IsNullOrEmpty(workOrderId))
-        {
-            TempData["ErrorMessage"] = "Please select a work order first.";
-            return RedirectToAction(nameof(Index));
-        }
-
-        return View((object)workOrderId);
-    }
 
     #region API Endpoints for Status Management Panel
 

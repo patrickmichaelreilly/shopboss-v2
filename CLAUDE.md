@@ -8,19 +8,10 @@ ShopBoss v2 is a modern shop floor tracking system that replaces the discontinue
 
 ## Development Commands
 
-### Build and Run
+### Build
 ```bash
 # Build the application
 dotnet build src/ShopBoss.Web/ShopBoss.Web.csproj
-
-# Run the application (development: localhost only)
-dotnet run --project src/ShopBoss.Web/ShopBoss.Web.csproj
-
-# Run with watch for development (localhost only)
-dotnet watch --project src/ShopBoss.Web/ShopBoss.Web.csproj
-
-# Run for LAN access during development (if needed)
-dotnet run --project src/ShopBoss.Web/ShopBoss.Web.csproj --launch-profile http-lan
 
 # Published applications automatically bind to all interfaces (0.0.0.0:5000)
 ```
@@ -61,10 +52,10 @@ dotnet test --collect:"XPlat Code Coverage"
 # 2. Claude creates/updates test scenarios and validation steps
 # 3. Claude updates the worklog following Collaboration-Guidelines.md
 # 4. Claude provides specific testing instructions to the user
-# 5. USER manually runs ./deploy-to-windows.sh to deploy for testing
+# 5. USER manually runs ./deploy.sh to deploy for testing
 # 6. USER follows the testing instructions provided by Claude
 # 7. USER reports test results back to Claude for any necessary fixes
-# Claude should NEVER run deploy-to-windows.sh - only the user does this
+# Claude should NEVER run deploy.sh - only the user does this
 ```
 
 ## Architecture Overview
