@@ -6,6 +6,7 @@ public class SelectionRequest
     public string WorkOrderName { get; set; } = string.Empty;
     public List<string> SelectedItemIds { get; set; } = new();
     public Dictionary<string, SelectionItemInfo> SelectionDetails { get; set; } = new();
+    public bool AllowDuplicates { get; set; } = false;
 }
 
 public class SelectionItemInfo
@@ -24,6 +25,18 @@ public class ImportConversionResult
     public ConversionStatistics Statistics { get; set; } = new();
     public List<string> Errors { get; set; } = new();
     public List<string> Warnings { get; set; } = new();
+    public DuplicateDetectionResult? DuplicateInfo { get; set; }
+}
+
+public class DuplicateDetectionResult
+{
+    public bool HasDuplicates { get; set; }
+    public string? DuplicateWorkOrderId { get; set; }
+    public string? DuplicateWorkOrderName { get; set; }
+    public DateTime? ExistingImportDate { get; set; }
+    public string SuggestedNewId { get; set; } = string.Empty;
+    public string SuggestedNewName { get; set; } = string.Empty;
+    public List<string> ConflictMessages { get; set; } = new();
 }
 
 public class ConversionStatistics

@@ -364,8 +364,8 @@ public class ShippingController : Controller
             }
 
             // Mark hardware as shipped
-            hardware.IsShipped = true;
-            hardware.ShippedDate = DateTime.UtcNow;
+            hardware.Status = PartStatus.Shipped;
+            hardware.StatusUpdatedDate = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
 
@@ -461,8 +461,8 @@ public class ShippingController : Controller
             }
 
             // Mark detached product as shipped
-            detachedProduct.IsShipped = true;
-            detachedProduct.ShippedDate = DateTime.UtcNow;
+            detachedProduct.Status = PartStatus.Shipped;
+            detachedProduct.StatusUpdatedDate = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
 
@@ -538,14 +538,14 @@ public class ShippingController : Controller
 
             var dashboardData = await _shippingService.GetShippingDashboardDataAsync(activeWorkOrderId);
             
-            var shippedProducts = dashboardData.Products.Count(p => p.IsShipped);
+            var shippedProducts = dashboardData.Products.Count(p => p.Product.Status == PartStatus.Shipped);
             var totalProducts = dashboardData.Products.Count;
             
             // Count actually shipped hardware and detached products
-            var shippedHardware = dashboardData.Hardware.Count(h => h.IsShipped);
+            var shippedHardware = dashboardData.Hardware.Count(h => h.Hardware.Status == PartStatus.Shipped);
             var totalHardware = dashboardData.Hardware.Count;
             
-            var shippedDetachedProducts = dashboardData.DetachedProducts.Count(d => d.IsShipped);
+            var shippedDetachedProducts = dashboardData.DetachedProducts.Count(d => d.DetachedProduct.Status == PartStatus.Shipped);
             var totalDetachedProducts = dashboardData.DetachedProducts.Count;
 
             return Json(new
@@ -588,8 +588,8 @@ public class ShippingController : Controller
                 p.Parts.Any() && p.Parts.All(part => part.Status == PartStatus.Shipped));
 
             // Check if all hardware and detached products are shipped
-            var allHardwareShipped = workOrder.Hardware.All(h => h.IsShipped);
-            var allDetachedProductsShipped = workOrder.DetachedProducts.All(d => d.IsShipped);
+            var allHardwareShipped = workOrder.Hardware.All(h => h.Status == PartStatus.Shipped);
+            var allDetachedProductsShipped = workOrder.DetachedProducts.All(d => d.Status == PartStatus.Shipped);
 
             return allProductsShipped && allHardwareShipped && allDetachedProductsShipped;
         }
@@ -724,8 +724,8 @@ public class ShippingController : Controller
             id = h.Id,
             name = h.Name,
             quantity = h.Qty,
-            isShipped = h.IsShipped,
-            shippedDate = h.ShippedDate
+            isShipped = h.Status == PartStatus.Shipped,
+            shippedDate = h.StatusUpdatedDate
         }).ToList();
 
         var detachedProductStats = workOrder.DetachedProducts.Select(d => new
@@ -733,8 +733,8 @@ public class ShippingController : Controller
             id = d.Id,
             name = d.Name,
             quantity = d.Qty,
-            isShipped = d.IsShipped,
-            shippedDate = d.ShippedDate
+            isShipped = d.Status == PartStatus.Shipped,
+            shippedDate = d.StatusUpdatedDate
         }).ToList();
 
         return new

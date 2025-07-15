@@ -35,9 +35,7 @@ public class DetachedProduct
     
     public PartStatus Status { get; set; } = PartStatus.Pending;
     
-    public bool IsShipped { get; set; } = false;
-    
-    public DateTime? ShippedDate { get; set; }
+    public DateTime? StatusUpdatedDate { get; set; }
     
     public WorkOrder WorkOrder { get; set; } = null!;
 }

@@ -30,6 +30,10 @@ builder.Services.AddDbContext<ShopBossDbContext>(options =>
     var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? "Data Source=shopboss.db;Cache=Shared;Foreign Keys=False";
     options.UseSqlite(connectionString);
     
+    // Suppress pending model changes warning during status migration
+    options.ConfigureWarnings(warnings =>
+        warnings.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
+    
     // Enable sensitive data logging for debugging Entity Framework conflicts
     if (builder.Environment.IsDevelopment())
     {

@@ -131,7 +131,7 @@
             <div class="col">
                 <div class="card border-info text-center">
                     <div class="card-body py-2">
-                        <h5 class="card-title text-info mb-0">@Model.Products.Count(p => p.IsCompleted)</h5>
+                        <h5 class="card-title text-info mb-0">@Model.Products.Count(p => p.Product.Status == PartStatus.Shipped)</h5>
                         <small class="text-muted">Completed</small>
                     </div>
                 </div>
@@ -196,7 +196,7 @@
                 {
                     @foreach (var product in Model.Products)
                     {
-                        var cardClass = product.IsCompleted ? "completed" : 
+                        var cardClass = product.Product.Status == PartStatus.Shipped ? "completed" : 
                                        product.IsReadyForAssembly ? "ready" : 
                                        product.CompletionPercentage > 0 ? "in-progress" : "waiting";
                         
@@ -214,7 +214,7 @@
                                 <div class="row align-items-center">
                                     <div class="col-auto">
                                         <div class="progress-circle @progressClass">
-                                            @if (product.IsCompleted)
+                                            @if (product.Product.Status == PartStatus.Shipped)
                                             {
                                                 <i class="fas fa-check"></i>
                                             }
@@ -255,7 +255,7 @@
                                         }
                                     </div>
                                     <div class="col-auto">
-                                        @if (product.IsCompleted)
+                                        @if (product.Product.Status == PartStatus.Shipped)
                                         {
                                             <span class="badge bg-primary fs-6">
                                                 <i class="fas fa-check-circle me-1"></i>Completed

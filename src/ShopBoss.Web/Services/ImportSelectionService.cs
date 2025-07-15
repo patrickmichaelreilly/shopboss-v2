@@ -36,23 +36,25 @@ public class ImportSelectionService
                 return result;
             }
 
-            // Check for duplicate work order
+            // Check for duplicate work order and handle gracefully
             var duplicateCheck = await CheckForDuplicateWorkOrder(importData.Id, selection.WorkOrderName);
-            if (!duplicateCheck.IsValid)
+            if (!duplicateCheck.IsValid && !selection.AllowDuplicates)
             {
+                // Return duplicate info for user decision
+                result.DuplicateInfo = duplicateCheck.DuplicateInfo;
                 result.Errors.AddRange(duplicateCheck.Errors);
                 return result;
             }
 
-            // Create the work order entity
-            var workOrder = CreateWorkOrderEntity(importData, selection);
+            // Create the work order entity (with unique ID if allowing duplicates)
+            var workOrder = CreateWorkOrderEntity(importData, selection, duplicateCheck.DuplicateInfo);
             
             // Process nest sheets first (they're needed for parts)
             ProcessSelectedNestSheets(importData, selection, workOrder, result);
             
             // Process selected items
-            ProcessSelectedProducts(importData, selection, workOrder, result);
-            ProcessSelectedDetachedProducts(importData, selection, workOrder, result);
+            await ProcessSelectedProductsAsync(importData, selection, workOrder, result);
+            await ProcessSelectedDetachedProductsAsync(importData, selection, workOrder, result);
 
             // Save to database
             _context.WorkOrders.Add(workOrder);
@@ -88,21 +90,70 @@ public class ImportSelectionService
 
         // Check for duplicate Microvellum ID
         var existingById = await _context.WorkOrders.FirstOrDefaultAsync(w => w.Id == workOrderId);
-        if (existingById != null)
-        {
-            result.Errors.Add($"Work order with Microvellum ID '{workOrderId}' already exists (imported as '{existingById.Name}' on {existingById.ImportedDate:yyyy-MM-dd})");
-            result.IsValid = false;
-        }
-
-        // Check for duplicate name
         var existingByName = await _context.WorkOrders.FirstOrDefaultAsync(w => w.Name == workOrderName);
-        if (existingByName != null)
+
+        if (existingById != null || existingByName != null)
         {
-            result.Errors.Add($"Work order with name '{workOrderName}' already exists (Microvellum ID: {existingByName.Id}, imported on {existingByName.ImportedDate:yyyy-MM-dd})");
             result.IsValid = false;
+            
+            // Generate unique suggestions
+            var suggestedId = await GenerateUniqueWorkOrderId(workOrderId);
+            var suggestedName = await GenerateUniqueWorkOrderName(workOrderName);
+            
+            result.DuplicateInfo = new DuplicateDetectionResult
+            {
+                HasDuplicates = true,
+                DuplicateWorkOrderId = existingById?.Id,
+                DuplicateWorkOrderName = existingByName?.Name,
+                ExistingImportDate = existingById?.ImportedDate ?? existingByName?.ImportedDate,
+                SuggestedNewId = suggestedId,
+                SuggestedNewName = suggestedName
+            };
+
+            if (existingById != null)
+            {
+                result.Errors.Add($"Work order with Microvellum ID '{workOrderId}' already exists (imported as '{existingById.Name}' on {existingById.ImportedDate:yyyy-MM-dd})");
+                result.DuplicateInfo.ConflictMessages.Add($"ID conflict: '{workOrderId}' exists");
+            }
+
+            if (existingByName != null)
+            {
+                result.Errors.Add($"Work order with name '{workOrderName}' already exists (Microvellum ID: {existingByName.Id}, imported on {existingByName.ImportedDate:yyyy-MM-dd})");
+                result.DuplicateInfo.ConflictMessages.Add($"Name conflict: '{workOrderName}' exists");
+            }
         }
 
         return result;
+    }
+
+    private async Task<string> GenerateUniqueWorkOrderId(string baseId)
+    {
+        var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+        var suggestedId = $"{baseId}_{timestamp}";
+        
+        // Ensure it's truly unique
+        var existing = await _context.WorkOrders.FirstOrDefaultAsync(w => w.Id == suggestedId);
+        if (existing != null)
+        {
+            suggestedId = $"{baseId}_{timestamp}_{Guid.NewGuid().ToString("N")[..6]}";
+        }
+        
+        return suggestedId;
+    }
+
+    private async Task<string> GenerateUniqueWorkOrderName(string baseName)
+    {
+        var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+        var suggestedName = $"{baseName} (Reimported {timestamp})";
+        
+        // Ensure it's truly unique
+        var existing = await _context.WorkOrders.FirstOrDefaultAsync(w => w.Name == suggestedName);
+        if (existing != null)
+        {
+            suggestedName = $"{baseName} (Reimported {timestamp} - {Guid.NewGuid().ToString("N")[..6]})";
+        }
+        
+        return suggestedName;
     }
 
     private SelectionValidationResult ValidateSelection(ImportWorkOrder importData, SelectionRequest selection)
@@ -195,24 +246,37 @@ public class ImportSelectionService
         }
     }
 
-    private WorkOrder CreateWorkOrderEntity(ImportWorkOrder importData, SelectionRequest selection)
+    private WorkOrder CreateWorkOrderEntity(ImportWorkOrder importData, SelectionRequest selection, DuplicateDetectionResult? duplicateInfo = null)
     {
+        // Use suggested unique values if allowing duplicates
+        var workOrderId = importData.Id;
+        var workOrderName = selection.WorkOrderName;
+        
+        if (selection.AllowDuplicates && duplicateInfo?.HasDuplicates == true)
+        {
+            workOrderId = duplicateInfo.SuggestedNewId;
+            workOrderName = duplicateInfo.SuggestedNewName;
+            
+            _logger.LogInformation("Creating work order with unique identifiers due to duplicates: ID '{OriginalId}' -> '{NewId}', Name '{OriginalName}' -> '{NewName}'",
+                importData.Id, workOrderId, selection.WorkOrderName, workOrderName);
+        }
+        
         return new WorkOrder
         {
-            Id = importData.Id, // Preserve Microvellum ID
-            Name = selection.WorkOrderName,
+            Id = workOrderId,
+            Name = workOrderName,
             ImportedDate = DateTime.Now
         };
     }
 
-    private void ProcessSelectedProducts(
+    private async Task ProcessSelectedProductsAsync(
         ImportWorkOrder importData, 
         SelectionRequest selection, 
         WorkOrder workOrder, 
         ImportConversionResult result)
     {
         // Phase 1: Normalize products into individual instances
-        var normalizedProducts = NormalizeProductQuantities(importData, selection, workOrder);
+        var normalizedProducts = await NormalizeProductQuantitiesAsync(importData, selection, workOrder);
         
         // Phase 2: Process content for each individual product
         foreach (var product in normalizedProducts)
@@ -233,7 +297,7 @@ public class ImportSelectionService
         }
     }
 
-    private List<Product> NormalizeProductQuantities(
+    private async Task<List<Product>> NormalizeProductQuantitiesAsync(
         ImportWorkOrder importData, 
         SelectionRequest selection, 
         WorkOrder workOrder)
@@ -261,12 +325,12 @@ public class ImportSelectionService
             for (int i = 1; i <= productQuantity; i++)
             {
                 // Create individual product instance with Qty = 1
-                var product = ConvertToProductEntity(importProduct, workOrder.Id);
+                var product = await ConvertToProductEntityAsync(importProduct, workOrder.Id);
                 
                 // Make each product instance unique if quantity > 1
                 if (productQuantity > 1)
                 {
-                    product.Id = $"{importProduct.Id}_{i}";
+                    product.Id = $"{product.Id}_{i}"; // Use the already unique ID as base
                     product.Name = $"{importProduct.Name} (Instance {i})";
                 }
                 product.Qty = 1; // Each instance is quantity 1
@@ -470,7 +534,7 @@ public class ImportSelectionService
     }
 
 
-    private void ProcessSelectedDetachedProducts(
+    private async Task ProcessSelectedDetachedProductsAsync(
         ImportWorkOrder importData,
         SelectionRequest selection,
         WorkOrder workOrder,
@@ -484,12 +548,12 @@ public class ImportSelectionService
         foreach (var importDetached in importData.DetachedProducts.Where(d => selectedDetachedIds.Contains(d.Id)))
         {
             // Create DetachedProduct entity (existing functionality)
-            var detached = ConvertToDetachedProductEntity(importDetached, workOrder.Id);
+            var detached = await ConvertToDetachedProductEntityAsync(importDetached, workOrder.Id);
             workOrder.DetachedProducts.Add(detached);
             result.Statistics.ConvertedDetachedProducts++;
             
             // ALSO create Part entity for DetachedProduct so it can go through CNC → Sorting workflow
-            var detachedPart = CreateDetachedProductPart(importDetached, detached, workOrder);
+            var detachedPart = await CreateDetachedProductPartAsync(importDetached, detached, workOrder);
             _context.Parts.Add(detachedPart);
             result.Statistics.ConvertedParts++;
             
@@ -504,17 +568,46 @@ public class ImportSelectionService
         }
     }
 
-    private Product ConvertToProductEntity(ImportProduct importProduct, string workOrderId)
+    private async Task<Product> ConvertToProductEntityAsync(ImportProduct importProduct, string workOrderId)
     {
+        var uniqueId = await EnsureUniqueIdAsync("Products", importProduct.Id);
+        
         return new Product
         {
-            Id = importProduct.Id, // Preserve Microvellum ID
+            Id = uniqueId, // Use unique ID (_1, _2, _3, etc. if duplicates exist)
             ProductNumber = importProduct.ProductNumber,
             Name = importProduct.Name,
             Qty = importProduct.Quantity,
             Length = importProduct.Height, // Height maps to Length
             Width = importProduct.Width,
             WorkOrderId = workOrderId
+        };
+    }
+
+    private async Task<string> EnsureUniqueIdAsync(string tableName, string originalId)
+    {
+        var counter = 1;
+        var testId = originalId;
+        
+        while (await IdExistsInDatabaseAsync(tableName, testId))
+        {
+            testId = $"{originalId}_{counter}";
+            counter++;
+        }
+        
+        return testId;
+    }
+
+    private async Task<bool> IdExistsInDatabaseAsync(string tableName, string id)
+    {
+        return tableName switch
+        {
+            "Products" => await _context.Products.AnyAsync(p => p.Id == id),
+            "Parts" => await _context.Parts.AnyAsync(p => p.Id == id),
+            "Subassemblies" => await _context.Subassemblies.AnyAsync(s => s.Id == id),
+            "DetachedProducts" => await _context.DetachedProducts.AnyAsync(d => d.Id == id),
+            "NestSheets" => await _context.NestSheets.AnyAsync(n => n.Id == id),
+            _ => false
         };
     }
 
@@ -599,11 +692,13 @@ public class ImportSelectionService
         };
     }
 
-    private DetachedProduct ConvertToDetachedProductEntity(ImportDetachedProduct importDetached, string workOrderId)
+    private async Task<DetachedProduct> ConvertToDetachedProductEntityAsync(ImportDetachedProduct importDetached, string workOrderId)
     {
+        var uniqueId = await EnsureUniqueIdAsync("DetachedProducts", importDetached.Id);
+        
         return new DetachedProduct
         {
-            Id = importDetached.Id, // Preserve Microvellum ID
+            Id = uniqueId, // Use unique ID (_1, _2, _3, etc. if duplicates exist)
             ProductNumber = importDetached.Name, // ImportDetachedProduct doesn't have ProductNumber, use Name
             Name = importDetached.Name,
             Qty = importDetached.Quantity,
@@ -651,7 +746,7 @@ public class ImportSelectionService
             Barcode = importNestSheet.Barcode ?? importNestSheet.Name,
             WorkOrderId = workOrderId,
             CreatedDate = DateTime.UtcNow,
-            IsProcessed = false
+            StatusString = "Pending"
         };
     }
 
@@ -690,20 +785,20 @@ public class ImportSelectionService
             Barcode = "DEFAULT",
             WorkOrderId = workOrder.Id,
             CreatedDate = DateTime.UtcNow,
-            IsProcessed = false
+            StatusString = "Pending"
         };
 
         workOrder.NestSheets.Add(defaultNestSheet);
         return defaultNestSheet;
     }
 
-    private Part CreateDetachedProductPart(ImportDetachedProduct importDetached, DetachedProduct detachedProduct, WorkOrder workOrder)
+    private async Task<Part> CreateDetachedProductPartAsync(ImportDetachedProduct importDetached, DetachedProduct detachedProduct, WorkOrder workOrder)
     {
         // Create a Part entity for the DetachedProduct so it can go through CNC → Sorting workflow
         // Use the original part ID from the SDF data for barcode scanning compatibility
         
         // Use OriginalPartId which contains the correct Part LinkID (barcode) from SDF data
-        var partId = importDetached.OriginalPartId;
+        var partId = await EnsureUniqueIdAsync("Parts", importDetached.OriginalPartId);
         
         // Find the nest sheet for this DetachedProduct part (same logic as regular parts)
         var nestSheet = FindNestSheetForDetachedProduct(importDetached, workOrder);
@@ -769,4 +864,5 @@ public class SelectionValidationResult
 {
     public bool IsValid { get; set; }
     public List<string> Errors { get; set; } = new();
+    public DuplicateDetectionResult? DuplicateInfo { get; set; }
 }

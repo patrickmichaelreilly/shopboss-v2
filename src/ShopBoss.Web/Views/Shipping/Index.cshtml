@@ -195,14 +195,14 @@
                 <div class="shipping-section-header">
                     <h4 class="mb-0">
                         <i class="fas fa-cube text-primary me-2"></i>
-                        Products (@Model.Products.Count(p => p.IsShipped)/@Model.Products.Count shipped)
+                        Products (@Model.Products.Count(p => p.Product.Status == PartStatus.Shipped)/@Model.Products.Count shipped)
                     </h4>
                 </div>
                 @if (Model.Products.Any())
                 {
                     @foreach (var product in Model.Products)
                     {
-                        <div class="shipping-item @(product.IsShipped ? "shipped" : product.IsReadyForShipping ? "ready" : "not-ready")">
+                        <div class="shipping-item @(product.Product.Status == PartStatus.Shipped ? "shipped" : product.IsReadyForShipping ? "ready" : "not-ready")">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
                                     <h6 class="mb-1">@product.Product.Name</h6>
@@ -216,14 +216,14 @@
                                     <div class="me-3">
                                         <small class="text-muted">Parts: @product.ShippedPartsCount/@product.TotalPartsCount</small>
                                     </div>
-                                    @if (!product.IsShipped && product.IsReadyForShipping)
+                                    @if (product.Product.Status != PartStatus.Shipped && product.IsReadyForShipping)
                                     {
                                         <button class="btn btn-success btn-sm me-2" onclick="shipProduct('@product.Product.Id')">
                                             <i class="fas fa-shipping-fast me-1"></i>Ship
                                         </button>
                                     }
-                                    <span class="status-badge @(product.IsShipped ? "shipped" : product.IsReadyForShipping ? "ready" : "not-ready")">
-                                        @if (product.IsShipped)
+                                    <span class="status-badge @(product.Product.Status == PartStatus.Shipped ? "shipped" : product.IsReadyForShipping ? "ready" : "not-ready")">
+                                        @if (product.Product.Status == PartStatus.Shipped)
                                         {
                                             <i class="fas fa-check me-1"></i><text>Shipped</text>
                                         }
@@ -254,14 +254,14 @@
                 <div class="shipping-section-header">
                     <h4 class="mb-0">
                         <i class="fas fa-wrench text-purple me-2"></i>
-                        Hardware (@Model.Hardware.Count(h => h.IsShipped)/@Model.Hardware.Count shipped)
+                        Hardware (@Model.Hardware.Count(h => h.Hardware.Status == PartStatus.Shipped)/@Model.Hardware.Count shipped)
                     </h4>
                 </div>
                 @if (Model.Hardware.Any())
                 {
                     @foreach (var hardware in Model.Hardware)
                     {
-                        <div class="shipping-item @(hardware.IsShipped ? "shipped" : "ready")">
+                        <div class="shipping-item @(hardware.Hardware.Status == PartStatus.Shipped ? "shipped" : "ready")">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
                                     <h6 class="mb-1">@hardware.Hardware.Name</h6>
@@ -271,14 +271,14 @@
                                     <div class="me-3">
                                         <small class="text-muted">Qty: @hardware.Hardware.Qty</small>
                                     </div>
-                                    @if (!hardware.IsShipped)
+                                    @if (hardware.Hardware.Status != PartStatus.Shipped)
                                     {
                                         <button class="btn btn-success btn-sm me-2" onclick="shipHardware('@hardware.Hardware.Id')">
                                             <i class="fas fa-shipping-fast me-1"></i>Ship
                                         </button>
                                     }
-                                    <span class="status-badge @(hardware.IsShipped ? "shipped" : "ready")">
-                                        @if (hardware.IsShipped)
+                                    <span class="status-badge @(hardware.Hardware.Status == PartStatus.Shipped ? "shipped" : "ready")">
+                                        @if (hardware.Hardware.Status == PartStatus.Shipped)
                                         {
                                             <i class="fas fa-check me-1"></i><text>Shipped</text>
                                         }
@@ -305,14 +305,14 @@
                 <div class="shipping-section-header">
                     <h4 class="mb-0">
                         <i class="fas fa-box text-warning me-2"></i>
-                        Detached Products (@Model.DetachedProducts.Count(d => d.IsShipped)/@Model.DetachedProducts.Count shipped)
+                        Detached Products (@Model.DetachedProducts.Count(d => d.DetachedProduct.Status == PartStatus.Shipped)/@Model.DetachedProducts.Count shipped)
                     </h4>
                 </div>
                 @if (Model.DetachedProducts.Any())
                 {
                     @foreach (var detached in Model.DetachedProducts)
                     {
-                        <div class="shipping-item @(detached.IsShipped ? "shipped" : "ready")">
+                        <div class="shipping-item @(detached.DetachedProduct.Status == PartStatus.Shipped ? "shipped" : "ready")">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
                                     <h6 class="mb-1">@detached.DetachedProduct.Name</h6>
@@ -326,14 +326,14 @@
                                     <div class="me-3">
                                         <small class="text-muted">Qty: @detached.DetachedProduct.Qty</small>
                                     </div>
-                                    @if (!detached.IsShipped)
+                                    @if (detached.DetachedProduct.Status != PartStatus.Shipped)
                                     {
                                         <button class="btn btn-success btn-sm me-2" onclick="shipDetachedProduct('@detached.DetachedProduct.Id')">
                                             <i class="fas fa-shipping-fast me-1"></i>Ship
                                         </button>
                                     }
-                                    <span class="status-badge @(detached.IsShipped ? "shipped" : "ready")">
-                                        @if (detached.IsShipped)
+                                    <span class="status-badge @(detached.DetachedProduct.Status == PartStatus.Shipped ? "shipped" : "ready")">
+                                        @if (detached.DetachedProduct.Status == PartStatus.Shipped)
                                         {
                                             <i class="fas fa-check me-1"></i><text>Shipped</text>
                                         }

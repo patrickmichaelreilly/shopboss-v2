@@ -23,6 +23,8 @@ public class Product
     
     public PartStatus Status { get; set; } = PartStatus.Pending;
     
+    public DateTime? StatusUpdatedDate { get; set; }
+    
     public WorkOrder WorkOrder { get; set; } = null!;
     
     public List<Part> Parts { get; set; } = new();

@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using ShopBoss.Web.Models;
 using ShopBoss.Web.Models.Api;
 using ShopBoss.Web.Services;
 
@@ -195,7 +196,7 @@ public class WorkOrderTreeApiController : ControllerBase
                         Name = detachedProduct.Name,
                         Type = "detached_product",
                         Quantity = detachedProduct.Qty,
-                        Status = includeStatus ? (detachedProduct.IsShipped ? "Shipped" : "Pending") : null,
+                        Status = includeStatus ? (detachedProduct.Status == PartStatus.Shipped ? "Shipped" : "Pending") : null,
                         Children = new List<TreeItem>()
                     });
                 }
@@ -224,7 +225,7 @@ public class WorkOrderTreeApiController : ControllerBase
                         Name = nestSheet.Name,
                         Type = "nestsheet",
                         Quantity = 1,
-                        Status = includeStatus ? (nestSheet.IsProcessed ? "Processed" : "Pending") : null,
+                        Status = includeStatus ? (nestSheet.StatusString == "Processed" ? "Processed" : "Pending") : null,
                         Children = new List<TreeItem>()
                     };
 

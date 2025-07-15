@@ -261,6 +261,13 @@ namespace ShopBoss.Web.Migrations
                     b.Property<DateTime?>("ShippedDate")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("StatusString")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("StatusUpdatedDate")
+                        .HasColumnType("TEXT");
+
                     b.Property<decimal?>("Thickness")
                         .HasColumnType("TEXT");
 
@@ -306,6 +313,13 @@ namespace ShopBoss.Web.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("StatusString")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("StatusUpdatedDate")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("WorkOrderId")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -346,6 +360,13 @@ namespace ShopBoss.Web.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("ProcessedDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("StatusString")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("StatusUpdatedDate")
                         .HasColumnType("TEXT");
 
                     b.Property<decimal?>("Thickness")
@@ -459,6 +480,9 @@ namespace ShopBoss.Web.Migrations
 
                     b.Property<int>("Status")
                         .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("StatusUpdatedDate")
+                        .HasColumnType("TEXT");
 
                     b.Property<decimal?>("Width")
                         .HasColumnType("TEXT");

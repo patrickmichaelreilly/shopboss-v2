@@ -492,7 +492,7 @@ public class AdminController : Controller
                     var hardware = await _context.Hardware.FirstOrDefaultAsync(h => h.Id == itemId);
                     if (hardware != null)
                     {
-                        oldValue = hardware.IsShipped ? "Shipped" : "Pending";
+                        oldValue = hardware.Status == PartStatus.Shipped ? "Shipped" : "Pending";
                         success = await _shippingService.UpdateHardwareStatusAsync(itemId, newStatus == PartStatus.Shipped);
                         newValue = newStatus == PartStatus.Shipped ? "Shipped" : "Pending";
                     }
@@ -502,7 +502,7 @@ public class AdminController : Controller
                     var detachedProduct = await _context.DetachedProducts.FirstOrDefaultAsync(d => d.Id == itemId);
                     if (detachedProduct != null)
                     {
-                        oldValue = detachedProduct.IsShipped ? "Shipped" : "Pending";
+                        oldValue = detachedProduct.Status == PartStatus.Shipped ? "Shipped" : "Pending";
                         success = await _shippingService.UpdateDetachedProductStatusAsync(itemId, newStatus == PartStatus.Shipped);
                         newValue = newStatus == PartStatus.Shipped ? "Shipped" : "Pending";
                     }
@@ -1200,13 +1200,13 @@ public class AdminController : Controller
                         var nestSheet = await _context.NestSheets.FindAsync(entityId);
                         if (nestSheet != null)
                         {
-                            var oldProcessed = nestSheet.IsProcessed;
-                            nestSheet.IsProcessed = request.NewStatus == "Processed";
-                            nestSheet.ProcessedDate = nestSheet.IsProcessed ? DateTime.UtcNow : null;
+                            var oldStatus = nestSheet.StatusString;
+                            nestSheet.StatusString = request.NewStatus;
+                            nestSheet.StatusUpdatedDate = DateTime.UtcNow;
                             
                             await _auditTrailService.LogAsync("StatusChange", "NestSheet", nestSheet.Id,
-                                new { IsProcessed = oldProcessed, ProcessedDate = nestSheet.ProcessedDate },
-                                new { IsProcessed = nestSheet.IsProcessed, ProcessedDate = nestSheet.ProcessedDate },
+                                new { Status = oldStatus, StatusUpdatedDate = nestSheet.StatusUpdatedDate },
+                                new { Status = nestSheet.StatusString, StatusUpdatedDate = nestSheet.StatusUpdatedDate },
                                 station: "Admin", workOrderId: activeWorkOrderId,
                                 details: $"Manual status change to {request.NewStatus}");
                             
@@ -1219,15 +1219,14 @@ public class AdminController : Controller
                         if (detachedProduct != null && Enum.TryParse<PartStatus>(request.NewStatus, out var detachedStatus))
                         {
                             var oldStatus = detachedProduct.Status;
-                            var oldShipped = detachedProduct.IsShipped;
                             
-                            // Update both fields for compatibility
+                            // Update status and timestamp
                             detachedProduct.Status = detachedStatus;
-                            detachedProduct.IsShipped = (detachedStatus == PartStatus.Shipped);
+                            detachedProduct.StatusUpdatedDate = DateTime.UtcNow;
                             
                             await _auditTrailService.LogAsync("StatusChange", "DetachedProduct", detachedProduct.Id,
-                                new { Status = oldStatus.ToString(), IsShipped = oldShipped },
-                                new { Status = detachedProduct.Status.ToString(), IsShipped = detachedProduct.IsShipped },
+                                new { Status = oldStatus.ToString() },
+                                new { Status = detachedProduct.Status.ToString() },
                                 station: "Admin", workOrderId: activeWorkOrderId,
                                 details: $"Manual status change from {oldStatus} to {detachedProduct.Status}");
                             
@@ -1240,15 +1239,14 @@ public class AdminController : Controller
                         if (hardware != null && Enum.TryParse<PartStatus>(request.NewStatus, out var hwStatus))
                         {
                             var oldStatus = hardware.Status;
-                            var oldShipped = hardware.IsShipped;
                             
-                            // Update both fields for compatibility
+                            // Update status and timestamp
                             hardware.Status = hwStatus;
-                            hardware.IsShipped = (hwStatus == PartStatus.Shipped);
+                            hardware.StatusUpdatedDate = DateTime.UtcNow;
                             
                             await _auditTrailService.LogAsync("StatusChange", "Hardware", hardware.Id,
-                                new { Status = oldStatus.ToString(), IsShipped = oldShipped },
-                                new { Status = hardware.Status.ToString(), IsShipped = hardware.IsShipped },
+                                new { Status = oldStatus.ToString() },
+                                new { Status = hardware.Status.ToString() },
                                 station: "Admin", workOrderId: activeWorkOrderId,
                                 details: $"Manual status change from {oldStatus} to {hardware.Status}");
                             

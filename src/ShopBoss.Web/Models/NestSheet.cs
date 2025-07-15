@@ -25,9 +25,9 @@ public class NestSheet
     
     public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
     
-    public bool IsProcessed { get; set; } = false;
+    public string StatusString { get; set; } = "Pending";
     
-    public DateTime? ProcessedDate { get; set; }
+    public DateTime? StatusUpdatedDate { get; set; }
     
     public WorkOrder WorkOrder { get; set; } = null!;
     

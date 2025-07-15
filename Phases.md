@@ -48,143 +48,139 @@
 - ✅ Clean naming: "Modify Work Order" throughout (not "Status Management")
 - ✅ Foundation ready for M2 business logic and future undo
 
-### **M1.5: Database Migration for Status Unification (1 hour)**
+### **Context: Import System Alignment Crisis**
+After successfully completing Phase M1 (Status Management/ModifyWorkOrder interface), we attempted to proceed with the M1.x phases for Status field unification. However, a critical issue emerged: The Import Preview system was still using the old view patterns and wasn't aligned with the new Status-based architecture implemented in ModifyWorkOrder. When Claude Code noticed this discrepancy, it attempted to fix the mismatch by modifying the AdminController to handle mixed states between old and new patterns. This was the WRONG approach - it created more complexity instead of systematically migrating components.
+
+**Key Lesson:** When you encounter resistance or complexity that seems disproportionate to the task, STOP. This is a signal that either:
+1. You're working outside the intended boundaries of the phase
+2. There's a prerequisite task that needs completion first
+3. The approach needs reconsideration
+
+### **M1.5: Fix Import System FIRST (1 hour)**
+**Fix the Import process to work with current Status implementation**
+
+**CRITICAL:** This phase must be completed BEFORE any database migrations. The Import system must be able to create entities with proper Status fields.
+
+**Tasks:**
+1. **Fix ImportSelectionService Entity Creation**
+   - Ensure Product entities set `Status = PartStatus.Pending` and `StatusUpdatedDate = DateTime.UtcNow`
+   - Ensure Hardware entities set `Status = PartStatus.Pending` and `StatusUpdatedDate = DateTime.UtcNow`
+   - Ensure DetachedProduct entities set `Status = PartStatus.Pending` and `StatusUpdatedDate = DateTime.UtcNow`
+   - Ensure Part entities already properly set Status (verify)
+   - For NestSheets, use `StatusString = "Pending"` (it uses string Status, not enum)
+
+2. **DO NOT TOUCH:**
+   - AdminController (except ImportController methods)
+   - Import.cshtml view (leave the old tree implementation for now)
+   - Any attempt to unify Import Preview with ModifyWorkOrder UI
+   - Any database migrations
+
+**Success Criteria:**
+- Can successfully import a work order without errors
+- All imported entities have proper Status values
+- No null StatusUpdatedDate errors
+
+### **M1.6: Database Migration for Status Unification (1 hour)**
 **Add Status fields to all entities, migrate data, but keep old properties temporarily**
 
-**Context:** First step of status unification - database preparation without breaking existing code.
+**Prerequisites:** M1.5 must be complete - imports must work!
 
 **Tasks:**
-1. **Database Migration Only**
-   - Add Status and StatusUpdatedDate columns to Hardware, DetachedProducts, NestSheets
+1. **Create Migration: AddStatusToAllEntities**
+   - Add Status (enum) and StatusUpdatedDate to Hardware, DetachedProducts
+   - Add Status (enum) and StatusUpdatedDate to NestSheets (replacing StatusString)
    - Add StatusUpdatedDate to Products (already has Status)
    - Migrate existing data:
-     - Hardware/DetachedProducts: IsShipped → Status
-     - Products: IsCompleted → Status (ensure consistency)
-     - NestSheets: IsProcessed → Status
-   - Keep all old columns for now (IsShipped, IsCompleted, IsProcessed)
-
-2. **Model Updates**
-   - Add Status properties to models but keep old properties
-   - Add computed properties for transition:
-     ```csharp
-     public string Status { get; set; } = "Pending";
-     public bool IsShipped => Status == "Shipped"; // Keep for compatibility
+     ```
+     Hardware/DetachedProducts: IsShipped=true → Status="Shipped", else "Pending"
+     NestSheets: StatusString → Status enum conversion
+     Products: Ensure Status is set, add StatusUpdatedDate
      ```
 
-**Deliverables:**
-- ✅ Database ready with Status columns for all entities
-- ✅ Data migrated to new Status fields
-- ✅ Old code continues to work via computed properties
-- ✅ Foundation ready for station-by-station migration
+2. **Update Models (but maintain compatibility)**
+   ```csharp
+   // Hardware.cs and DetachedProduct.cs
+   public PartStatus Status { get; set; } = PartStatus.Pending;
+   public DateTime? StatusUpdatedDate { get; set; }
+   public bool IsShipped => Status == PartStatus.Shipped; // Computed for compatibility
+   
+   // NestSheet.cs  
+   public PartStatus Status { get; set; } = PartStatus.Pending;
+   public DateTime? StatusUpdatedDate { get; set; }
+   public bool IsProcessed => Status == PartStatus.Cut; // Computed for compatibility
+   ```
 
-### **M1.6: CNC Station Status Migration (1 hour)**
+3. **DO NOT:**
+   - Remove any old columns yet
+   - Update any controllers or views
+   - Touch Import system (should already work from M1.5)
+
+### **M1.7: CNC Station Status Migration (1 hour)**
 **Migrate CNC station from IsProcessed to Status**
 
-**Claude Code Instructions:** Search entire CNC station codebase for ALL occurrences of IsProcessed and ProcessedDate
+**Boundaries:** ONLY touch CNC-related files
 
-**Known Locations to Update:**
-1. **CncController.cs**
-   - Line ~150: `nestSheet.IsProcessed = true;`
-   - Line ~151: `nestSheet.ProcessedDate = DateTime.UtcNow;`
-   - ValidateBarcode method checking `IsProcessed`
-   - Change to: `nestSheet.Status = "Processed";`
+**Files to Update:**
+1. `CncController.cs` - Replace ALL `IsProcessed` usage with `Status` checks
+2. `Views/Cnc/Index.cshtml` - Update any IsProcessed displays
+3. `Views/Cnc/_NestSheetModal.cshtml` (if exists)
 
-2. **Views/Cnc/Index.cshtml**
-   - Check for any `Model.NestSheets` displaying IsProcessed
-   - Update progress calculations
+**DO NOT TOUCH:**
+- Any other controllers
+- Import system
+- Database (migration already done)
 
-3. **Views/Cnc/_NestSheetModal.cshtml** (if exists)
-   - Update any IsProcessed displays
+### **M1.8: Assembly Station Status Migration (1.5 hours)**
+**Migrate Assembly station from IsCompleted to Status**
 
-**Testing Checklist:**
-- [ ] Scan nest sheet marks Status as "Processed"
-- [ ] Already processed sheets show correct message
-- [ ] Nest sheet list displays correct status
-- [ ] Parts on sheet marked as "Cut"
+**Boundaries:** ONLY touch Assembly-related files
 
-### **M1.7: Assembly Station Status Migration (1.5 hours)**
-**Migrate Assembly station from IsCompleted to Status for both Products and DetachedProducts**
+**Files to Update:**
+1. `AssemblyController.cs` - Replace ALL `IsCompleted` with Status checks
+2. `Views/Assembly/Index.cshtml` - Update UI
+3. SignalR hub methods if they send IsCompleted
 
-**Claude Code Instructions:** Search ENTIRE Assembly station for IsCompleted, also check DetachedProduct handling
+**IMPORTANT:** DetachedProducts should NOT be processed in Assembly station - they skip directly to Shipping
 
-**Known Locations to Update:**
-1. **AssemblyController.cs**
-   - StartAssembly method: `product.IsCompleted = true;`
-   - ScanPartForAssembly: Sets IsCompleted
-   - GetProductDetails: Returns IsCompleted
-   - Any progress calculations using IsCompleted
-   - Change to check: `product.Status == "Shipped"`
-   - Ensure DetachedProducts are NOT processed in Assembly (they skip this station)
+**DO NOT TOUCH:**
+- Any other stations
+- Import system
+- Work order management
 
-2. **Views/Assembly/Index.cshtml**
-   - Product cards showing completion status
-   - JavaScript updating IsCompleted after scan
-   - Progress calculations
-   - Verify DetachedProducts don't appear
+### **M1.9: Shipping Station Status Migration (2 hours)**
+**Migrate Shipping station from IsShipped to Status**
 
-3. **SignalR Notifications**
-   - ProductAssembledByScan sends IsCompleted
-   - Update to send Status instead
+**Boundaries:** ONLY touch Shipping-related files
 
-**Testing Checklist:**
-- [ ] Product assembly sets Status to "Shipped"
-- [ ] DetachedProducts remain unaffected by Assembly
-- [ ] UI shows correct completion status
-- [ ] SignalR updates work correctly
-- [ ] Progress calculations accurate
+**Files to Update:**
+1. `ShippingController.cs` - All shipping methods
+2. `ShippingService.cs` - Update all Status methods
+3. `Views/Shipping/Index.cshtml` - Update all UI
 
-### **M1.8: Shipping Station Status Migration (2 hours)**
-**Migrate Shipping station from IsShipped to Status - most complex**
+**DO NOT TOUCH:**
+- Other stations
+- Import system
+- Don't try to "improve" anything - just migrate
 
-**Claude Code Instructions:** Search for IsShipped, ShippedDate - this station has the most updates needed
-
-**Known Locations to Update:**
-1. **ShippingController.cs**
-   - ScanProduct: Product shipping logic
-   - ScanHardware: `hardware.IsShipped = true;`
-   - ScanDetachedProduct: `detachedProduct.IsShipped = true;`
-   - ScanPart: May check product completion
-   - ShipProduct/ShipHardware/ShipDetachedProduct methods
-
-2. **ShippingService.cs**
-   - UpdateHardwareStatusAsync(bool isShipped)
-   - UpdateDetachedProductStatusAsync(bool isShipped)
-   - GetShippingStatusAsync checking IsShipped
-   - Status classes with IsShipped properties
-
-3. **Views/Shipping/Index.cshtml**
-   - All `@if (item.IsShipped)` checks
-   - JavaScript checking shipped status
-   - Progress calculations
-
-**Testing Checklist:**
-- [ ] All scan methods update Status correctly
-- [ ] UI displays shipped/ready status properly
-- [ ] Progress circle shows accurate counts
-- [ ] Manual ship buttons work
-
-### **M1.9: Final Cleanup and Old Property Removal (1 hour)**
+### **M1.10: Final Cleanup and Old Property Removal (1 hour)**
 **Remove all obsolete properties after all stations migrated**
 
+**Prerequisites:** M1.7, M1.8, M1.9 must be complete and tested
+
 **Tasks:**
-1. **Final Database Migration**
-   - Drop columns: IsShipped, ShippedDate, IsCompleted, IsProcessed, ProcessedDate
-   - Remove computed properties from models
+1. Create final migration to drop old columns
+2. Remove computed properties from models
+3. Global search to ensure no references remain
 
-2. **Global Search and Verify**
-   - Search entire codebase for removed properties
-   - Ensure no references remain
-   - Update any missed locations
+**Testing Checklist:**
+- [ ] Import a new work order
+- [ ] Process through CNC
+- [ ] Sort parts
+- [ ] Complete assembly
+- [ ] Ship items
+- [ ] Modify work order statuses
 
-3. **Comprehensive Testing**
-   - Test complete workflow: Import → CNC → Sorting → Assembly → Shipping
-   - Verify WorkOrderStatistics API
-   - Check ModifyWorkOrder status dropdowns
-
-**Deliverables:**
-- ✅ All boolean status properties removed
-- ✅ Clean Status-based architecture
-- ✅ All stations fully migrated and tested
+**Success = All workflows function with Status enum only**
 
 ### **M2: Status Management Business Logic (2 hours)**
 **Add validation and cascading logic to Status Management Panel**

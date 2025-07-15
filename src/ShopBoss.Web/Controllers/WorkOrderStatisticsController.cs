@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ShopBoss.Web.Data;
+using ShopBoss.Web.Models;
 using ShopBoss.Web.Services;
 
 namespace ShopBoss.Web.Controllers
@@ -113,7 +114,7 @@ namespace ShopBoss.Web.Controllers
             foreach (var detachedProduct in data.DetachedProducts)
             {
                 detachedProductsStats["total"]++;
-                if (detachedProduct.IsShipped)
+                if (detachedProduct.Status == PartStatus.Shipped)
                 {
                     detachedProductsStats["shipped"]++;
                 }
@@ -129,7 +130,7 @@ namespace ShopBoss.Web.Controllers
                 foreach (var hardware in data.WorkOrder.Hardware)
                 {
                     hardwareStats["total"]++;
-                    if (hardware.IsShipped)
+                    if (hardware.Status == PartStatus.Shipped)
                     {
                         hardwareStats["shipped"]++;
                     }
@@ -144,7 +145,7 @@ namespace ShopBoss.Web.Controllers
             foreach (var nestSheet in data.NestSheets)
             {
                 nestSheetsStats["total"]++;
-                IncrementNestSheetStatusCount(nestSheetsStats, nestSheet.IsProcessed ? "processed" : "pending");
+                IncrementNestSheetStatusCount(nestSheetsStats, nestSheet.StatusString == "Processed" ? "processed" : "pending");
             }
 
             return new

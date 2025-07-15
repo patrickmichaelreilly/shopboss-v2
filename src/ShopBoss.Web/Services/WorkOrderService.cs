@@ -71,8 +71,8 @@ public class WorkOrderService
             var nestSheetSummary = new NestSheetSummary
             {
                 TotalNestSheets = nestSheets.Count,
-                ProcessedNestSheets = nestSheets.Count(n => n.IsProcessed),
-                PendingNestSheets = nestSheets.Count(n => !n.IsProcessed),
+                ProcessedNestSheets = nestSheets.Count(n => n.StatusString == "Processed"),
+                PendingNestSheets = nestSheets.Count(n => n.StatusString != "Processed"),
                 TotalPartsOnNestSheets = nestSheetParts.Count
             };
 
@@ -417,7 +417,7 @@ public class WorkOrderService
                 .AnyAsync();
 
             var hasActiveDetachedProducts = await _context.DetachedProducts
-                .Where(d => d.WorkOrderId == workOrderId && !d.IsShipped)
+                .Where(d => d.WorkOrderId == workOrderId && d.Status != PartStatus.Shipped)
                 .AnyAsync();
 
             return hasActiveParts || hasActiveDetachedProducts;

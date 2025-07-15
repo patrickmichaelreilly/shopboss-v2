@@ -108,7 +108,7 @@ public class ShippingService
             {
                 Product = p,
                 IsReadyForShipping = readyProductIds.Contains(p.Id),
-                IsShipped = isShipped,
+                IsShipped = p.Status == PartStatus.Shipped,
                 AssembledPartsCount = assembledParts,
                 ShippedPartsCount = shippedParts,
                 TotalPartsCount = totalParts
@@ -138,12 +138,12 @@ public class ShippingService
                 Hardware = shippingStationData.Hardware.Select(h => new HardwareShippingStatus
                 {
                     Hardware = h,
-                    IsShipped = h.IsShipped
+                    IsShipped = h.Status == PartStatus.Shipped
                 }).ToList(),
                 DetachedProducts = shippingStationData.DetachedProducts.Select(d => new DetachedProductShippingStatus
                 {
                     DetachedProduct = d,
-                    IsShipped = d.IsShipped
+                    IsShipped = d.Status == PartStatus.Shipped
                 }).ToList()
             };
         }
@@ -305,7 +305,8 @@ public class ShippingService
                 return false;
             }
 
-            hardware.IsShipped = isShipped;
+            hardware.Status = isShipped ? PartStatus.Shipped : PartStatus.Pending;
+            hardware.StatusUpdatedDate = DateTime.UtcNow;
             await _context.SaveChangesAsync();
 
             _logger.LogInformation("Hardware {HardwareId} shipped status updated to {IsShipped}", 
@@ -330,7 +331,8 @@ public class ShippingService
                 return false;
             }
 
-            detachedProduct.IsShipped = isShipped;
+            detachedProduct.Status = isShipped ? PartStatus.Shipped : PartStatus.Pending;
+            detachedProduct.StatusUpdatedDate = DateTime.UtcNow;
             await _context.SaveChangesAsync();
 
             _logger.LogInformation("Detached product {DetachedProductId} shipped status updated to {IsShipped}", 
@@ -418,7 +420,7 @@ public class ProductShippingStatus
 {
     public Product Product { get; set; } = null!;
     public bool IsReadyForShipping { get; set; }
-    public bool IsShipped { get; set; }
+    public bool IsShipped { get; set; } // Computed from Status for UI compatibility
     public int AssembledPartsCount { get; set; }
     public int ShippedPartsCount { get; set; }
     public int TotalPartsCount { get; set; }
@@ -427,13 +429,13 @@ public class ProductShippingStatus
 public class HardwareShippingStatus
 {
     public Hardware Hardware { get; set; } = null!;
-    public bool IsShipped { get; set; }
+    public bool IsShipped { get; set; } // Computed from Status for UI compatibility
 }
 
 public class DetachedProductShippingStatus
 {
     public DetachedProduct DetachedProduct { get; set; } = null!;
-    public bool IsShipped { get; set; }
+    public bool IsShipped { get; set; } // Computed from Status for UI compatibility
 }
 
 

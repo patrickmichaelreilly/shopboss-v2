@@ -235,8 +235,32 @@ public class ImportController : Controller
                 _logger.LogWarning("Selection processing failed for session {SessionId}. Errors: {Errors}", 
                     request.SessionId, string.Join(", ", conversionResult.Errors));
                 
+                // Check if it's a duplicate detection issue (user can resolve this)
+                if (conversionResult.DuplicateInfo?.HasDuplicates == true)
+                {
+                    return Ok(new 
+                    { 
+                        success = false,
+                        duplicateDetected = true,
+                        duplicateInfo = new 
+                        {
+                            hasConflicts = true,
+                            existingWorkOrderId = conversionResult.DuplicateInfo.DuplicateWorkOrderId,
+                            existingWorkOrderName = conversionResult.DuplicateInfo.DuplicateWorkOrderName,
+                            existingImportDate = conversionResult.DuplicateInfo.ExistingImportDate,
+                            suggestedNewId = conversionResult.DuplicateInfo.SuggestedNewId,
+                            suggestedNewName = conversionResult.DuplicateInfo.SuggestedNewName,
+                            conflictMessages = conversionResult.DuplicateInfo.ConflictMessages
+                        },
+                        message = "Duplicate work order detected. Please choose to import anyway with unique identifiers or cancel.",
+                        errors = conversionResult.Errors
+                    });
+                }
+                
+                // Other errors
                 return BadRequest(new 
                 { 
+                    success = false,
                     error = "Selection processing failed", 
                     details = conversionResult.Errors,
                     warnings = conversionResult.Warnings

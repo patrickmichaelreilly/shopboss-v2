@@ -95,7 +95,7 @@ public class AssemblyController : Controller
             var totalFilteredParts = filteredParts.Count;
             
             var isReady = readyProductIds.Contains(product.Id);
-            var isCompleted = carcassParts.All(p => p.Status == PartStatus.Assembled) && carcassParts.Any();
+            var isCompleted = product.Status == PartStatus.Shipped;
 
             // Get simplified rack locations - just carcass bin and doors/fronts bin
             var carcassLocation = carcassParts
@@ -191,7 +191,7 @@ public class AssemblyController : Controller
             var totalFilteredParts = filteredParts.Count;
             
             var isReady = readyProductIds.Contains(product.Id);
-            var isCompleted = carcassParts.All(p => p.Status == PartStatus.Assembled) && carcassParts.Any();
+            var isCompleted = product.Status == PartStatus.Shipped;
 
             // Get simplified rack locations - just carcass bin and doors/fronts bin
             var carcassLocation = carcassParts
@@ -493,6 +493,23 @@ public class AssemblyController : Controller
                 }
             }
             
+            // Mark product as shipped (assembled and ready for shipping)
+            product.Status = PartStatus.Shipped;
+            product.StatusUpdatedDate = DateTime.UtcNow;
+            
+            // Log product status change
+            await _auditTrailService.LogAsync(
+                action: "ProductAssembled",
+                entityType: "Product",
+                entityId: product.Id,
+                oldValue: "Pending",
+                newValue: "Shipped", 
+                station: "Assembly",
+                workOrderId: activeWorkOrderId,
+                details: $"Product {product.Name} completed assembly via barcode scan (scanned: {barcode})",
+                sessionId: HttpContext.Session.Id
+            );
+
             // Empty the bins that contained the assembled parts
             foreach (var binLocation in binsToEmpty)
             {
@@ -564,7 +581,7 @@ public class AssemblyController : Controller
                 FilteredPartsCount = filteredPartsGuidance.Count,
                 WorkOrderId = activeWorkOrderId,
                 Timestamp = DateTime.UtcNow,
-                Status = "Assembled",
+                Status = "Shipped",
                 IsReadyForShipping = true,
                 ReadyForShippingProducts = readyForShippingProducts,
                 IsWorkOrderReadyForShipping = isWorkOrderReadyForShipping,
@@ -705,6 +722,23 @@ public class AssemblyController : Controller
                 }
             }
             
+            // Mark product as shipped (assembled and ready for shipping)
+            product.Status = PartStatus.Shipped;
+            product.StatusUpdatedDate = DateTime.UtcNow;
+            
+            // Log product status change
+            await _auditTrailService.LogAsync(
+                action: "ProductAssembled",
+                entityType: "Product",
+                entityId: product.Id,
+                oldValue: "Pending",
+                newValue: "Shipped",
+                station: "Assembly", 
+                workOrderId: activeWorkOrderId,
+                details: $"Product {product.Name} completed assembly manually",
+                sessionId: HttpContext.Session.Id
+            );
+
             // Empty the bins that contained the assembled parts
             foreach (var binLocation in binsToEmpty)
             {
@@ -773,7 +807,7 @@ public class AssemblyController : Controller
                 PartsAssembled = updatedParts,
                 WorkOrderId = activeWorkOrderId,
                 Timestamp = DateTime.UtcNow,
-                Status = "Assembled",
+                Status = "Shipped",
                 IsReadyForShipping = true,
                 ReadyForShippingProducts = readyForShippingProducts,
                 IsWorkOrderReadyForShipping = isWorkOrderReadyForShipping,
@@ -875,7 +909,7 @@ public class ProductAssemblyStatus
     public int FilteredPartsCount { get; set; }
     public int SortedFilteredPartsCount { get; set; }
     public bool IsReadyForAssembly { get; set; }
-    public bool IsCompleted { get; set; }
+    public bool IsCompleted { get; set; } // Computed from Product.Status == "Shipped"
     public int CompletionPercentage { get; set; }
     public List<PartLocation> PartLocations { get; set; } = new();
 }
