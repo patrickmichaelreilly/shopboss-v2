@@ -453,7 +453,7 @@ public class AdminController : Controller
     }
 
     [HttpPost]
-    public async Task<IActionResult> UpdateStatus(string itemId, string itemType, PartStatus newStatus, bool cascadeToChildren = false, string workOrderId = "")
+    public async Task<IActionResult> UpdateStatus(string itemId, string itemType, PartStatus newStatus, bool cascadeToChildren = true, string workOrderId = "")
     {
         try
         {
@@ -474,7 +474,10 @@ public class AdminController : Controller
                     if (part != null)
                     {
                         oldValue = part.Status.ToString();
-                        success = await _shippingService.UpdatePartStatusAsync(itemId, newStatus, "Manual");
+                        part.Status = newStatus;
+                        part.StatusUpdatedDate = DateTime.UtcNow;
+                        await _context.SaveChangesAsync();
+                        success = true;
                     }
                     break;
                     
@@ -482,9 +485,48 @@ public class AdminController : Controller
                     var product = await _context.Products.FirstOrDefaultAsync(p => p.Id == itemId);
                     if (product != null)
                     {
-                        // For products, the old value is the effective status of their parts
-                        oldValue = "Mixed"; // Simplified for now
-                        success = await _shippingService.UpdateProductStatusAsync(itemId, newStatus, cascadeToChildren);
+                        oldValue = product.Status.ToString();
+                        product.Status = newStatus;
+                        product.StatusUpdatedDate = DateTime.UtcNow;
+
+                        if (cascadeToChildren)
+                        {
+                            // Update all direct parts for this product
+                            var productParts = await _context.Parts
+                                .Where(p => p.ProductId == itemId)
+                                .ToListAsync();
+
+                            foreach (var productPart in productParts)
+                            {
+                                productPart.Status = newStatus;
+                                productPart.StatusUpdatedDate = DateTime.UtcNow;
+                            }
+
+                            // Update all subassembly parts (including nested subassemblies)
+                            var subassemblyParts = await _context.Parts
+                                .Where(p => p.Subassembly.ProductId == itemId)
+                                .ToListAsync();
+
+                            foreach (var subPart in subassemblyParts)
+                            {
+                                subPart.Status = newStatus;
+                                subPart.StatusUpdatedDate = DateTime.UtcNow;
+                            }
+
+                            // Update all hardware for this product
+                            var productHardware = await _context.Hardware
+                                .Where(h => h.ProductId == itemId)
+                                .ToListAsync();
+
+                            foreach (var productHardwareItem in productHardware)
+                            {
+                                productHardwareItem.Status = newStatus;
+                                productHardwareItem.StatusUpdatedDate = DateTime.UtcNow;
+                            }
+                        }
+
+                        await _context.SaveChangesAsync();
+                        success = true;
                     }
                     break;
                     
@@ -492,9 +534,11 @@ public class AdminController : Controller
                     var hardware = await _context.Hardware.FirstOrDefaultAsync(h => h.Id == itemId);
                     if (hardware != null)
                     {
-                        oldValue = hardware.Status == PartStatus.Shipped ? "Shipped" : "Pending";
-                        success = await _shippingService.UpdateHardwareStatusAsync(itemId, newStatus == PartStatus.Shipped);
-                        newValue = newStatus == PartStatus.Shipped ? "Shipped" : "Pending";
+                        oldValue = hardware.Status.ToString();
+                        hardware.Status = newStatus;
+                        hardware.StatusUpdatedDate = DateTime.UtcNow;
+                        await _context.SaveChangesAsync();
+                        success = true;
                     }
                     break;
                     
@@ -502,9 +546,38 @@ public class AdminController : Controller
                     var detachedProduct = await _context.DetachedProducts.FirstOrDefaultAsync(d => d.Id == itemId);
                     if (detachedProduct != null)
                     {
-                        oldValue = detachedProduct.Status == PartStatus.Shipped ? "Shipped" : "Pending";
-                        success = await _shippingService.UpdateDetachedProductStatusAsync(itemId, newStatus == PartStatus.Shipped);
-                        newValue = newStatus == PartStatus.Shipped ? "Shipped" : "Pending";
+                        oldValue = detachedProduct.Status.ToString();
+                        detachedProduct.Status = newStatus;
+                        detachedProduct.StatusUpdatedDate = DateTime.UtcNow;
+                        await _context.SaveChangesAsync();
+                        success = true;
+                    }
+                    break;
+
+                case "nestsheet":
+                    var nestSheet = await _context.NestSheets.FirstOrDefaultAsync(n => n.Id == itemId);
+                    if (nestSheet != null)
+                    {
+                        oldValue = nestSheet.Status.ToString();
+                        nestSheet.Status = newStatus;
+                        nestSheet.StatusUpdatedDate = DateTime.UtcNow;
+
+                        if (cascadeToChildren)
+                        {
+                            // Update all associated parts for this nest sheet
+                            var nestSheetParts = await _context.Parts
+                                .Where(p => p.NestSheetId == itemId)
+                                .ToListAsync();
+
+                            foreach (var nestPart in nestSheetParts)
+                            {
+                                nestPart.Status = newStatus;
+                                nestPart.StatusUpdatedDate = DateTime.UtcNow;
+                            }
+                        }
+
+                        await _context.SaveChangesAsync();
+                        success = true;
                     }
                     break;
             }
@@ -1149,129 +1222,6 @@ public class AdminController : Controller
 
     #region API Endpoints for Status Management Panel
 
-    [HttpPost("admin/api/updatestatus")]
-    public async Task<IActionResult> UpdateEntityStatus([FromBody] UpdateStatusRequest request)
-    {
-        try
-        {
-            int updatedCount = 0;
-            var activeWorkOrderId = HttpContext.Session.GetString("ActiveWorkOrderId");
-
-            foreach (var entityId in request.EntityIds)
-            {
-                switch (request.EntityType.ToLower())
-                {
-                    case "part":
-                        var part = await _context.Parts.FindAsync(entityId);
-                        if (part != null && Enum.TryParse<PartStatus>(request.NewStatus, out var partStatus))
-                        {
-                            var oldStatus = part.Status;
-                            part.Status = partStatus;
-                            part.StatusUpdatedDate = DateTime.UtcNow;
-                            
-                            await _auditTrailService.LogAsync("StatusChange", "Part", part.Id,
-                                new { Status = oldStatus.ToString(), StatusUpdatedDate = part.StatusUpdatedDate },
-                                new { Status = part.Status.ToString(), StatusUpdatedDate = part.StatusUpdatedDate },
-                                station: "Admin", workOrderId: activeWorkOrderId,
-                                details: $"Manual status change from {oldStatus} to {part.Status}");
-                            
-                            updatedCount++;
-                        }
-                        break;
-
-                    case "product":
-                        var product = await _context.Products.FindAsync(entityId);
-                        if (product != null && Enum.TryParse<PartStatus>(request.NewStatus, out var productStatus))
-                        {
-                            var oldStatus = product.Status;
-                            product.Status = productStatus;
-                            
-                            await _auditTrailService.LogAsync("StatusChange", "Product", product.Id,
-                                new { Status = oldStatus.ToString() },
-                                new { Status = product.Status.ToString() },
-                                station: "Admin", workOrderId: activeWorkOrderId,
-                                details: $"Manual status change from {oldStatus} to {product.Status}");
-                            
-                            updatedCount++;
-                        }
-                        break;
-
-                    case "nestsheet":
-                        var nestSheet = await _context.NestSheets.FindAsync(entityId);
-                        if (nestSheet != null)
-                        {
-                            var oldStatus = nestSheet.Status;
-                            nestSheet.Status = Enum.Parse<PartStatus>(request.NewStatus);
-                            nestSheet.StatusUpdatedDate = DateTime.UtcNow;
-                            
-                            await _auditTrailService.LogAsync("StatusChange", "NestSheet", nestSheet.Id,
-                                new { Status = oldStatus, StatusUpdatedDate = nestSheet.StatusUpdatedDate },
-                                new { Status = nestSheet.Status, StatusUpdatedDate = nestSheet.StatusUpdatedDate },
-                                station: "Admin", workOrderId: activeWorkOrderId,
-                                details: $"Manual status change to {request.NewStatus}");
-                            
-                            updatedCount++;
-                        }
-                        break;
-
-                    case "detached_product":
-                        var detachedProduct = await _context.DetachedProducts.FindAsync(entityId);
-                        if (detachedProduct != null && Enum.TryParse<PartStatus>(request.NewStatus, out var detachedStatus))
-                        {
-                            var oldStatus = detachedProduct.Status;
-                            
-                            // Update status and timestamp
-                            detachedProduct.Status = detachedStatus;
-                            detachedProduct.StatusUpdatedDate = DateTime.UtcNow;
-                            
-                            await _auditTrailService.LogAsync("StatusChange", "DetachedProduct", detachedProduct.Id,
-                                new { Status = oldStatus.ToString() },
-                                new { Status = detachedProduct.Status.ToString() },
-                                station: "Admin", workOrderId: activeWorkOrderId,
-                                details: $"Manual status change from {oldStatus} to {detachedProduct.Status}");
-                            
-                            updatedCount++;
-                        }
-                        break;
-
-                    case "hardware":
-                        var hardware = await _context.Hardware.FindAsync(entityId);
-                        if (hardware != null && Enum.TryParse<PartStatus>(request.NewStatus, out var hwStatus))
-                        {
-                            var oldStatus = hardware.Status;
-                            
-                            // Update status and timestamp
-                            hardware.Status = hwStatus;
-                            hardware.StatusUpdatedDate = DateTime.UtcNow;
-                            
-                            await _auditTrailService.LogAsync("StatusChange", "Hardware", hardware.Id,
-                                new { Status = oldStatus.ToString() },
-                                new { Status = hardware.Status.ToString() },
-                                station: "Admin", workOrderId: activeWorkOrderId,
-                                details: $"Manual status change from {oldStatus} to {hardware.Status}");
-                            
-                            updatedCount++;
-                        }
-                        break;
-                }
-            }
-
-            await _context.SaveChangesAsync();
-
-            // Send SignalR update
-            await _hubContext.Clients.All.SendAsync("RefreshStatus", new { 
-                workOrderId = activeWorkOrderId,
-                message = $"Status updated for {updatedCount} items"
-            });
-
-            return Ok(new { updatedCount });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error updating entity status");
-            return StatusCode(500, "An error occurred while updating status");
-        }
-    }
 
     [HttpGet("admin/api/audithistory/{entityType}/{entityId}")]
     public async Task<IActionResult> GetAuditHistory(string entityType, string entityId)
@@ -1402,12 +1352,6 @@ public class AdminController : Controller
 
     #region Request Models
 
-    public class UpdateStatusRequest
-    {
-        public string EntityType { get; set; } = string.Empty;
-        public List<string> EntityIds { get; set; } = new();
-        public string NewStatus { get; set; } = string.Empty;
-    }
 
     public class ClearBinsRequest
     {

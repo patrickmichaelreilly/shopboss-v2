@@ -11,227 +11,51 @@
 ### **M1: Complete ModifyWorkOrder Interface with TreeViewApi (2-3 hours)**
 **Replace old ModifyWorkOrder with the current StatusManagement panel (renamed to ModifyWorkOrder)**
 
-**Context:** The work-in-progress StatusManagement panel will become the new ModifyWorkOrder interface. This involves renaming StatusManagement to ModifyWorkOrder while completing its implementation with TreeViewApi, proper UI, and audit visualization.
-
-**Tasks:**
-1. **Complete TreeViewApi Integration**
-   - Keep Claude Code's TreeViewApi integration (no modifications to TreeViewApi)
-   - Ensure individual status dropdowns work on each tree item
-   - Remove any lingering checkbox-related code
-   - Remove the entire yellow bulk operations block
-
-2. **Migrate UI from Old ModifyWorkOrder**
-   - Add Work Order header section (Name, ID, Import Date, total counts)
-   - Bring over Statistics Cards (Products, Parts, Hardware, Detached Products, Nest Sheets)
-   - Match styling and layout from current Modify Work Order interface
-   - Create new WorkOrderStatisticsController API to reduce AdminController bloat
-
-3. **Implement Audit Trail Visualization**
-   - Replace bulk operations block with "Audit History" section
-   - Display ALL audit records for current work order
-   - Show: Timestamp, Entity name/type, Property changed, Old→New values, User/Station
-   - Format JSON values into human-readable display
-   - Structure for future undo capability (but no undo implementation yet)
-
-4. **Clean Integration with Preferred Naming**
-   - Rename StatusManagement.cshtml → ModifyWorkOrder.cshtml
-   - Keep ModifyWorkOrder action name in AdminController
-   - Maintain familiar /Admin/ModifyWorkOrder/{id} URLs
-   - Remove old ModifyWorkOrder implementation completely
-   - Update ModifyWorkOrderUnified redirect to point to new ModifyWorkOrder action
-
-**Deliverables:**
-- ✅ ModifyWorkOrder interface with full UI (header, stats cards, tree, audit history)
-- ✅ Working individual status management via TreeViewApi
-- ✅ Comprehensive audit trail visualization
-- ✅ New WorkOrderStatisticsController reducing AdminController size
-- ✅ Clean naming: "Modify Work Order" throughout (not "Status Management")
-- ✅ Foundation ready for M2 business logic and future undo
-
 ### **Context: Import System Alignment Crisis**
 After successfully completing Phase M1 (Status Management/ModifyWorkOrder interface), we attempted to proceed with the M1.x phases for Status field unification. However, a critical issue emerged: The Import Preview system was still using the old view patterns and wasn't aligned with the new Status-based architecture implemented in ModifyWorkOrder. When Claude Code noticed this discrepancy, it attempted to fix the mismatch by modifying the AdminController to handle mixed states between old and new patterns. This was the WRONG approach - it created more complexity instead of systematically migrating components.
-
-**Key Lesson:** When you encounter resistance or complexity that seems disproportionate to the task, STOP. This is a signal that either:
-1. You're working outside the intended boundaries of the phase
-2. There's a prerequisite task that needs completion first
-3. The approach needs reconsideration
 
 ### **M1.5: Fix Import System FIRST (1 hour)**
 **Fix the Import process to work with current Status implementation**
 
 **CRITICAL:** This phase must be completed BEFORE any database migrations. The Import system must be able to create entities with proper Status fields.
 
-**Tasks:**
-1. **Fix ImportSelectionService Entity Creation**
-   - Ensure Product entities set `Status = PartStatus.Pending` and `StatusUpdatedDate = DateTime.UtcNow`
-   - Ensure Hardware entities set `Status = PartStatus.Pending` and `StatusUpdatedDate = DateTime.UtcNow`
-   - Ensure DetachedProduct entities set `Status = PartStatus.Pending` and `StatusUpdatedDate = DateTime.UtcNow`
-   - Ensure Part entities already properly set Status (verify)
-   - For NestSheets, use `StatusString = "Pending"` (it uses string Status, not enum)
-
-2. **DO NOT TOUCH:**
-   - AdminController (except ImportController methods)
-   - Import.cshtml view (leave the old tree implementation for now)
-   - Any attempt to unify Import Preview with ModifyWorkOrder UI
-   - Any database migrations
-
-**Success Criteria:**
-- Can successfully import a work order without errors
-- All imported entities have proper Status values
-- No null StatusUpdatedDate errors
-
 ### **M1.6: Database Migration for Status Unification (1 hour)**
 **Add Status fields to all entities, migrate data, but keep old properties temporarily**
-
-**Prerequisites:** M1.5 must be complete - imports must work!
-
-**Tasks:**
-1. **Create Migration: AddStatusToAllEntities**
-   - Add Status (enum) and StatusUpdatedDate to Hardware, DetachedProducts
-   - Add Status (enum) and StatusUpdatedDate to NestSheets (replacing StatusString)
-   - Add StatusUpdatedDate to Products (already has Status)
-   - Migrate existing data:
-     ```
-     Hardware/DetachedProducts: IsShipped=true → Status="Shipped", else "Pending"
-     NestSheets: StatusString → Status enum conversion
-     Products: Ensure Status is set, add StatusUpdatedDate
-     ```
-
-2. **Update Models (but maintain compatibility)**
-   ```csharp
-   // Hardware.cs and DetachedProduct.cs
-   public PartStatus Status { get; set; } = PartStatus.Pending;
-   public DateTime? StatusUpdatedDate { get; set; }
-   public bool IsShipped => Status == PartStatus.Shipped; // Computed for compatibility
-   
-   // NestSheet.cs  
-   public PartStatus Status { get; set; } = PartStatus.Pending;
-   public DateTime? StatusUpdatedDate { get; set; }
-   public bool IsProcessed => Status == PartStatus.Cut; // Computed for compatibility
-   ```
-
-3. **DO NOT:**
-   - Remove any old columns yet
-   - Update any controllers or views
-   - Touch Import system (should already work from M1.5)
 
 ### **M1.7: CNC Station Status Migration (1 hour)**
 **Migrate CNC station from IsProcessed to Status**
 
-**Boundaries:** ONLY touch CNC-related files
-
-**Files to Update:**
-1. `CncController.cs` - Replace ALL `IsProcessed` usage with `Status` checks
-2. `Views/Cnc/Index.cshtml` - Update any IsProcessed displays
-3. `Views/Cnc/_NestSheetModal.cshtml` (if exists)
-
-**DO NOT TOUCH:**
-- Any other controllers
-- Import system
-- Database (migration already done)
-
 ### **M1.8: Assembly Station Status Migration (1.5 hours)**
 **Migrate Assembly station from IsCompleted to Status**
-
-**Boundaries:** ONLY touch Assembly-related files
-
-**Files to Update:**
-1. `AssemblyController.cs` - Replace ALL `IsCompleted` with Status checks
-2. `Views/Assembly/Index.cshtml` - Update UI
-3. SignalR hub methods if they send IsCompleted
-
-**IMPORTANT:** DetachedProducts should NOT be processed in Assembly station - they skip directly to Shipping
-
-**DO NOT TOUCH:**
-- Any other stations
-- Import system
-- Work order management
 
 ### **M1.9: Shipping Station Status Migration (2 hours)**
 **Migrate Shipping station from IsShipped to Status**
 
-**Boundaries:** ONLY touch Shipping-related files
-
-**Files to Update:**
-1. `ShippingController.cs` - All shipping methods
-2. `ShippingService.cs` - Update all Status methods
-3. `Views/Shipping/Index.cshtml` - Update all UI
-
-**DO NOT TOUCH:**
-- Other stations
-- Import system
-- Don't try to "improve" anything - just migrate
-
 ### **M1.10: Final Cleanup and Old Property Removal (1 hour)**
 **Remove all obsolete properties after all stations migrated**
-
-**Prerequisites:** M1.7, M1.8, M1.9 must be complete and tested
-
-**Tasks:**
-1. Create final migration to drop old columns
-2. Remove computed properties from models
-3. Global search to ensure no references remain
-
-**Testing Checklist:**
-- [ ] Import a new work order
-- [ ] Process through CNC
-- [ ] Sort parts
-- [ ] Complete assembly
-- [ ] Ship items
-- [ ] Modify work order statuses
 
 **Success = All workflows function with Status enum only**
 
 ### **M1.x-EMERGENCY: Migration Consolidation Crisis (PRIORITY)**
 **CRITICAL ISSUE:** 2 days wasted on migration failures, token consumption crisis threatening entire project
 
-**Current State:**
-- 25+ migrations creating conflicting schema changes
-- Import system broken: "table NestSheets has no column named Status"
-- Multiple failed attempts at migration fixes
-- Phases M1.x falsely marked complete when basic import doesn't work
-- Token consumption at unsustainable rate
+### **M2: Status Management Cascade Logic (2 hours)**
+**Add comprehensive cascading logic for shop foreman override capabilities**
 
-**Root Cause Analysis:**
-- NestSheets table created with IsProcessed/ProcessedDate in early migration
-- Later migrations try to add Status column but fail
-- Even later migrations try to drop non-existent StatusString column
-- Multiple table recreations with inconsistent schemas
-- Migration edits applied to already-executed migrations (ineffective)
-
-**Solution: Controlled Migration Consolidation**
-1. **Extract Phase:** Copy all Up() methods from all 25+ migration files
-2. **Organize Phase:** Group operations by table (NestSheets, Products, Parts, etc.)
-3. **Eliminate Phase:** Remove operation pairs that cancel out:
-   - ADD column X then DROP column X
-   - CREATE table then DROP/RECREATE same table
-   - ADD index then DROP same index
-4. **Verify Phase:** Ensure final migration creates exact schema matching DbContext
-5. **Test Phase:** Single import test to verify success before any other work
-
-**Success Criteria:**
-- ONE clean InitialCreate migration that matches DbContext exactly
-- Import system works: can successfully import SDF file
-- All entities created with proper Status fields
-- No more migration errors or schema mismatches
-
-**CRITICAL:** No other work until import system is functional
-
-### **M2: Status Management Business Logic (2 hours)**
-**Add validation and cascading logic to Status Management Panel**
+**Objective:** Grant shop foreman complete control over all entity statuses with intelligent cascade operations across hierarchical structures.
 
 **Tasks:**
-1. Implement status transition validation rules
-2. Add cascade operations (un-process nest → revert parts)
-3. Add confirmation dialogs for destructive operations
-4. Test SignalR updates across all stations
-5. Polish UI with proper icons and tooltips
+1. Remove unused `UpdateEntityStatus()` method and `UpdateStatusRequest` class
+2. Implement comprehensive cascade operations for hierarchical status changes
+3. Add cascade UI controls to ModifyWorkOrder interface
+4. Enhance existing cascade logic to support all directions (up/down hierarchy)
+5. Test cascading operations across all entity types
 
 **Deliverables:**
-- ✅ Smart status management with validation
-- ✅ Data integrity protection
-- ✅ Professional user experience
-- ✅ Real-time updates working
+- ✅ Complete status override capabilities (any entity to any status)
+- ✅ Intelligent cascade operations across work order hierarchy
+- ✅ Clean AdminController with unused methods removed
+- ✅ Enhanced ModifyWorkOrder interface with cascade controls
 
 ### **M3: Integration Testing (1 hour)**
 **Ensure Manual Override system is production ready**

@@ -198,3 +198,43 @@
 **Status:** ✅ COMPLETED - Application now starts successfully, import system works, all Phase M1.x deliverables tested and functional.
 
 ---
+
+## Phase M2: Status Management Cascade Logic - COMPLETED (2025-07-15)
+
+**Objective:** Add comprehensive cascading logic for shop foreman override capabilities in the ModifyWorkOrder interface, enabling complete control over all entity statuses with intelligent cascade operations across hierarchical structures.
+
+**Target Files:**
+- Backend: AdminController.cs (UpdateStatus method enhancement)
+- Database: No schema changes required
+
+**Tasks Completed:**
+1. **✅ Code Cleanup**: Removed unused `UpdateEntityStatus()` method and `UpdateStatusRequest` class from AdminController
+2. **✅ Cascade Logic Implementation**: Enhanced `AdminController.UpdateStatus()` with comprehensive cascade operations:
+   - **Product cascade**: Updates all direct parts, subassembly parts, and hardware
+   - **NestSheet cascade**: Updates all associated parts  
+   - **DetachedProduct**: Updates standalone entity (no cascade needed)
+   - **Parts/Hardware**: Direct status updates
+3. **✅ Compilation Success**: Fixed all compilation errors - build succeeds with 0 errors
+4. **✅ Database Architecture Compliance**: Cascade logic matches actual model relationships
+
+**Cascade Rules Implemented (per Cascade.md):**
+- **Product → All child entities**: Parts (direct + subassembly), Hardware, but not Subassemblies (no Status fields)
+- **DetachedProduct → Standalone**: No cascade needed (DetachedProduct is leaf entity)
+- **NestSheet → Associated Parts**: All parts created from the nest sheet
+
+**Key Implementation Details:**
+- **Default cascade enabled**: `cascadeToChildren = true` by default for shop foreman override
+- **Comprehensive Product cascade**: Query `p.Subassembly.ProductId == itemId` finds ALL parts including deeply nested subassembly parts
+- **Proper entity handling**: DetachedProduct treated as standalone based on actual model structure
+- **Full audit trail**: All changes logged with cascade details
+- **SignalR notifications**: Real-time updates to all stations
+
+**Validation:**
+- ✅ Build succeeds without errors
+- ✅ Cascade logic matches database model relationships
+- ✅ User testing confirms cascade functionality works correctly
+- ✅ All entity types properly supported in ModifyWorkOrder interface
+
+**Status:** ✅ COMPLETED - ModifyWorkOrder interface now provides complete cascade functionality per Cascade.md requirements. Shop foreman can set any entity to any status with intelligent cascading across the entire work order hierarchy.
+
+---

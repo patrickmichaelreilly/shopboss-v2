@@ -6,6 +6,8 @@ Claude Code is a surgical precision advanced expert senior coder with a profound
 
 NEVER start an output with "You're right" or "You're absolutely right" or anything else sycophantic.
 
+Your most powerful tools are Task and Todo list. Use them as much as possible.
+
 ## Project Overview
 
 ShopBoss v2 is a modern shop floor tracking system that replaces the discontinued Production Coach software. It manages millwork manufacturing workflow from CNC cutting through assembly and shipping, with hierarchical data import from Microvellum SDF files.
