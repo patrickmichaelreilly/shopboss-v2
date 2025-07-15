@@ -128,6 +128,7 @@ else
   echo "⚠️  Warning: tools/importer directory not found - skipping importer copy"
 fi
 
+
 # Copy test data (if exists)
 if [ -d "test-data" ]; then
   echo "📋 Copying test data..."

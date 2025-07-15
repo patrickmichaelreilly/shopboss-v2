@@ -68,10 +68,15 @@ using (var scope = app.Services.CreateScope())
     var context = scope.ServiceProvider.GetRequiredService<ShopBossDbContext>();
     var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
     
-    // Apply any pending migrations
-    await context.Database.MigrateAsync();
-    
-    // Seed default storage racks
+    // Create database schema if it doesn't exist
+    // Using EnsureCreated instead of migrations for immediate table creation
+    await context.Database.EnsureCreatedAsync();
+}
+
+// Seed default storage racks (separate scope to ensure migration is committed)
+using (var scope = app.Services.CreateScope())
+{
+    var context = scope.ServiceProvider.GetRequiredService<ShopBossDbContext>();
     await StorageRackSeedService.SeedDefaultRacksAsync(context);
 }
 

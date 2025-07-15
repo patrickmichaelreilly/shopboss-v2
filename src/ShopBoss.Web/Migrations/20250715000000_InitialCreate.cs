@@ -11,7 +11,36 @@ namespace ShopBoss.Web.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            // Core Tables - WorkOrders first (no dependencies)
+            // =================================
+            // PHASE 1: CREATE ALL TABLES (PRIMARY KEYS ONLY)
+            // =================================
+            
+            // StorageRacks - CREATE FIRST
+            migrationBuilder.CreateTable(
+                name: "StorageRacks",
+                columns: table => new
+                {
+                    Id = table.Column<string>(type: "TEXT", nullable: false),
+                    Name = table.Column<string>(type: "TEXT", maxLength: 100, nullable: false),
+                    Type = table.Column<int>(type: "INTEGER", nullable: false),
+                    Description = table.Column<string>(type: "TEXT", nullable: false),
+                    Rows = table.Column<int>(type: "INTEGER", nullable: false),
+                    Columns = table.Column<int>(type: "INTEGER", nullable: false),
+                    Length = table.Column<decimal>(type: "TEXT", nullable: true),
+                    Width = table.Column<decimal>(type: "TEXT", nullable: true),
+                    Height = table.Column<decimal>(type: "TEXT", nullable: true),
+                    Location = table.Column<string>(type: "TEXT", nullable: false),
+                    IsActive = table.Column<bool>(type: "INTEGER", nullable: false),
+                    IsPortable = table.Column<bool>(type: "INTEGER", nullable: false),
+                    CreatedDate = table.Column<DateTime>(type: "TEXT", nullable: false),
+                    LastModifiedDate = table.Column<DateTime>(type: "TEXT", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_StorageRacks", x => x.Id);
+                });
+
+            // WorkOrders
             migrationBuilder.CreateTable(
                 name: "WorkOrders",
                 columns: table => new
@@ -27,7 +56,7 @@ namespace ShopBoss.Web.Migrations
                     table.PrimaryKey("PK_WorkOrders", x => x.Id);
                 });
 
-            // Products (depends on WorkOrders)
+            // Products
             migrationBuilder.CreateTable(
                 name: "Products",
                 columns: table => new
@@ -45,15 +74,9 @@ namespace ShopBoss.Web.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Products", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_Products_WorkOrders_WorkOrderId",
-                        column: x => x.WorkOrderId,
-                        principalTable: "WorkOrders",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
                 });
 
-            // DetachedProducts (depends on WorkOrders)
+            // DetachedProducts
             migrationBuilder.CreateTable(
                 name: "DetachedProducts",
                 columns: table => new
@@ -77,15 +100,9 @@ namespace ShopBoss.Web.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_DetachedProducts", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_DetachedProducts_WorkOrders_WorkOrderId",
-                        column: x => x.WorkOrderId,
-                        principalTable: "WorkOrders",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
                 });
 
-            // Hardware (depends on WorkOrders and Products)
+            // Hardware
             migrationBuilder.CreateTable(
                 name: "Hardware",
                 columns: table => new
@@ -102,21 +119,9 @@ namespace ShopBoss.Web.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Hardware", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_Hardware_WorkOrders_WorkOrderId",
-                        column: x => x.WorkOrderId,
-                        principalTable: "WorkOrders",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_Hardware_Products_ProductId",
-                        column: x => x.ProductId,
-                        principalTable: "Products",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
                 });
 
-            // NestSheets (depends on WorkOrders)
+            // NestSheets
             migrationBuilder.CreateTable(
                 name: "NestSheets",
                 columns: table => new
@@ -136,15 +141,9 @@ namespace ShopBoss.Web.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_NestSheets", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_NestSheets_WorkOrders_WorkOrderId",
-                        column: x => x.WorkOrderId,
-                        principalTable: "WorkOrders",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
                 });
 
-            // Subassemblies (depends on Products, self-referential)
+            // Subassemblies
             migrationBuilder.CreateTable(
                 name: "Subassemblies",
                 columns: table => new
@@ -160,21 +159,9 @@ namespace ShopBoss.Web.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Subassemblies", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_Subassemblies_Products_ProductId",
-                        column: x => x.ProductId,
-                        principalTable: "Products",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_Subassemblies_Subassemblies_ParentSubassemblyId",
-                        column: x => x.ParentSubassemblyId,
-                        principalTable: "Subassemblies",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
                 });
 
-            // Parts (depends on Products, Subassemblies, NestSheets)
+            // Parts
             migrationBuilder.CreateTable(
                 name: "Parts",
                 columns: table => new
@@ -200,47 +187,10 @@ namespace ShopBoss.Web.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Parts", x => x.Id);
-                    // No foreign key constraint for ProductId (can reference DetachedProduct)
-                    table.ForeignKey(
-                        name: "FK_Parts_Subassemblies_SubassemblyId",
-                        column: x => x.SubassemblyId,
-                        principalTable: "Subassemblies",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_Parts_NestSheets_NestSheetId",
-                        column: x => x.NestSheetId,
-                        principalTable: "NestSheets",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
                 });
 
-            // Storage Management Tables
-            migrationBuilder.CreateTable(
-                name: "StorageRacks",
-                columns: table => new
-                {
-                    Id = table.Column<string>(type: "TEXT", nullable: false),
-                    Name = table.Column<string>(type: "TEXT", maxLength: 100, nullable: false),
-                    Type = table.Column<int>(type: "INTEGER", nullable: false),
-                    Description = table.Column<string>(type: "TEXT", nullable: false),
-                    Rows = table.Column<int>(type: "INTEGER", nullable: false),
-                    Columns = table.Column<int>(type: "INTEGER", nullable: false),
-                    Length = table.Column<decimal>(type: "TEXT", nullable: true),
-                    Width = table.Column<decimal>(type: "TEXT", nullable: true),
-                    Height = table.Column<decimal>(type: "TEXT", nullable: true),
-                    Location = table.Column<string>(type: "TEXT", nullable: false),
-                    IsActive = table.Column<bool>(type: "INTEGER", nullable: false),
-                    IsPortable = table.Column<bool>(type: "INTEGER", nullable: false),
-                    CreatedDate = table.Column<DateTime>(type: "TEXT", nullable: false),
-                    LastModifiedDate = table.Column<DateTime>(type: "TEXT", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_StorageRacks", x => x.Id);
-                });
 
-            // Bins (depends on StorageRacks, Parts, Products, WorkOrders)
+            // Bins
             migrationBuilder.CreateTable(
                 name: "Bins",
                 columns: table => new
@@ -263,33 +213,9 @@ namespace ShopBoss.Web.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Bins", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_Bins_StorageRacks_StorageRackId",
-                        column: x => x.StorageRackId,
-                        principalTable: "StorageRacks",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_Bins_Parts_PartId",
-                        column: x => x.PartId,
-                        principalTable: "Parts",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.SetNull);
-                    table.ForeignKey(
-                        name: "FK_Bins_Products_ProductId",
-                        column: x => x.ProductId,
-                        principalTable: "Products",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.SetNull);
-                    table.ForeignKey(
-                        name: "FK_Bins_WorkOrders_WorkOrderId",
-                        column: x => x.WorkOrderId,
-                        principalTable: "WorkOrders",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.SetNull);
                 });
 
-            // Audit and History Tables
+            // AuditLogs
             migrationBuilder.CreateTable(
                 name: "AuditLogs",
                 columns: table => new
@@ -313,6 +239,7 @@ namespace ShopBoss.Web.Migrations
                     table.PrimaryKey("PK_AuditLogs", x => x.Id);
                 });
 
+            // ScanHistory
             migrationBuilder.CreateTable(
                 name: "ScanHistory",
                 columns: table => new
@@ -333,21 +260,9 @@ namespace ShopBoss.Web.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_ScanHistory", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_ScanHistory_NestSheets_NestSheetId",
-                        column: x => x.NestSheetId,
-                        principalTable: "NestSheets",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.SetNull);
-                    table.ForeignKey(
-                        name: "FK_ScanHistory_WorkOrders_WorkOrderId",
-                        column: x => x.WorkOrderId,
-                        principalTable: "WorkOrders",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.SetNull);
                 });
 
-            // System Management Tables
+            // BackupConfigurations
             migrationBuilder.CreateTable(
                 name: "BackupConfigurations",
                 columns: table => new
@@ -366,6 +281,7 @@ namespace ShopBoss.Web.Migrations
                     table.PrimaryKey("PK_BackupConfigurations", x => x.Id);
                 });
 
+            // BackupStatuses
             migrationBuilder.CreateTable(
                 name: "BackupStatuses",
                 columns: table => new
@@ -386,6 +302,7 @@ namespace ShopBoss.Web.Migrations
                     table.PrimaryKey("PK_BackupStatuses", x => x.Id);
                 });
 
+            // SystemHealthStatus
             migrationBuilder.CreateTable(
                 name: "SystemHealthStatus",
                 columns: table => new
@@ -411,7 +328,149 @@ namespace ShopBoss.Web.Migrations
                     table.PrimaryKey("PK_SystemHealthStatus", x => x.Id);
                 });
 
-            // Create all indexes
+            // =================================
+            // PHASE 2: ADD ALL FOREIGN KEY CONSTRAINTS
+            // =================================
+
+            // Products → WorkOrders
+            migrationBuilder.AddForeignKey(
+                name: "FK_Products_WorkOrders_WorkOrderId",
+                table: "Products",
+                column: "WorkOrderId",
+                principalTable: "WorkOrders",
+                principalColumn: "Id",
+                onDelete: ReferentialAction.Cascade);
+
+            // DetachedProducts → WorkOrders
+            migrationBuilder.AddForeignKey(
+                name: "FK_DetachedProducts_WorkOrders_WorkOrderId",
+                table: "DetachedProducts",
+                column: "WorkOrderId",
+                principalTable: "WorkOrders",
+                principalColumn: "Id",
+                onDelete: ReferentialAction.Cascade);
+
+            // Hardware → WorkOrders
+            migrationBuilder.AddForeignKey(
+                name: "FK_Hardware_WorkOrders_WorkOrderId",
+                table: "Hardware",
+                column: "WorkOrderId",
+                principalTable: "WorkOrders",
+                principalColumn: "Id",
+                onDelete: ReferentialAction.Cascade);
+
+            // Hardware → Products
+            migrationBuilder.AddForeignKey(
+                name: "FK_Hardware_Products_ProductId",
+                table: "Hardware",
+                column: "ProductId",
+                principalTable: "Products",
+                principalColumn: "Id",
+                onDelete: ReferentialAction.Cascade);
+
+            // NestSheets → WorkOrders
+            migrationBuilder.AddForeignKey(
+                name: "FK_NestSheets_WorkOrders_WorkOrderId",
+                table: "NestSheets",
+                column: "WorkOrderId",
+                principalTable: "WorkOrders",
+                principalColumn: "Id",
+                onDelete: ReferentialAction.Cascade);
+
+            // Subassemblies → Products
+            migrationBuilder.AddForeignKey(
+                name: "FK_Subassemblies_Products_ProductId",
+                table: "Subassemblies",
+                column: "ProductId",
+                principalTable: "Products",
+                principalColumn: "Id",
+                onDelete: ReferentialAction.Cascade);
+
+            // Subassemblies → Subassemblies (self-reference)
+            migrationBuilder.AddForeignKey(
+                name: "FK_Subassemblies_Subassemblies_ParentSubassemblyId",
+                table: "Subassemblies",
+                column: "ParentSubassemblyId",
+                principalTable: "Subassemblies",
+                principalColumn: "Id",
+                onDelete: ReferentialAction.Restrict);
+
+            // Parts → Subassemblies
+            migrationBuilder.AddForeignKey(
+                name: "FK_Parts_Subassemblies_SubassemblyId",
+                table: "Parts",
+                column: "SubassemblyId",
+                principalTable: "Subassemblies",
+                principalColumn: "Id",
+                onDelete: ReferentialAction.Cascade);
+
+            // Parts → NestSheets
+            migrationBuilder.AddForeignKey(
+                name: "FK_Parts_NestSheets_NestSheetId",
+                table: "Parts",
+                column: "NestSheetId",
+                principalTable: "NestSheets",
+                principalColumn: "Id",
+                onDelete: ReferentialAction.Cascade);
+
+            // Bins → StorageRacks
+            migrationBuilder.AddForeignKey(
+                name: "FK_Bins_StorageRacks_StorageRackId",
+                table: "Bins",
+                column: "StorageRackId",
+                principalTable: "StorageRacks",
+                principalColumn: "Id",
+                onDelete: ReferentialAction.Cascade);
+
+            // Bins → Parts
+            migrationBuilder.AddForeignKey(
+                name: "FK_Bins_Parts_PartId",
+                table: "Bins",
+                column: "PartId",
+                principalTable: "Parts",
+                principalColumn: "Id",
+                onDelete: ReferentialAction.SetNull);
+
+            // Bins → Products
+            migrationBuilder.AddForeignKey(
+                name: "FK_Bins_Products_ProductId",
+                table: "Bins",
+                column: "ProductId",
+                principalTable: "Products",
+                principalColumn: "Id",
+                onDelete: ReferentialAction.SetNull);
+
+            // Bins → WorkOrders
+            migrationBuilder.AddForeignKey(
+                name: "FK_Bins_WorkOrders_WorkOrderId",
+                table: "Bins",
+                column: "WorkOrderId",
+                principalTable: "WorkOrders",
+                principalColumn: "Id",
+                onDelete: ReferentialAction.SetNull);
+
+            // ScanHistory → NestSheets
+            migrationBuilder.AddForeignKey(
+                name: "FK_ScanHistory_NestSheets_NestSheetId",
+                table: "ScanHistory",
+                column: "NestSheetId",
+                principalTable: "NestSheets",
+                principalColumn: "Id",
+                onDelete: ReferentialAction.SetNull);
+
+            // ScanHistory → WorkOrders
+            migrationBuilder.AddForeignKey(
+                name: "FK_ScanHistory_WorkOrders_WorkOrderId",
+                table: "ScanHistory",
+                column: "WorkOrderId",
+                principalTable: "WorkOrders",
+                principalColumn: "Id",
+                onDelete: ReferentialAction.SetNull);
+
+            // =================================
+            // PHASE 3: CREATE ALL INDEXES
+            // =================================
+
             migrationBuilder.CreateIndex(
                 name: "IX_Products_WorkOrderId",
                 table: "Products",
