@@ -238,3 +238,58 @@
 **Status:** ✅ COMPLETED - ModifyWorkOrder interface now provides complete cascade functionality per Cascade.md requirements. Shop foreman can set any entity to any status with intelligent cascading across the entire work order hierarchy.
 
 ---
+
+## Phase M3: Integration Testing & Bug Fixes - COMPLETED (2025-07-15)
+
+**Objective:** Ensure Manual Override system is production ready by fixing audit history display, resolving NestSheet status persistence issues, and cleaning up unused UI components.
+
+**Target Files:**
+- Backend: AdminController.cs, WorkOrderTreeApiController.cs, WorkOrderStatisticsController.cs
+- Frontend: ModifyWorkOrder.cshtml, _StatusManagementPanel.cshtml
+
+**Tasks Completed:**
+1. **✅ Audit History Fix**: Fixed ManualStatusChange events showing (N/A→N/A) instead of actual status transitions
+   - **Root Cause**: AdminController stored raw string values, frontend expected JSON objects
+   - **Solution**: Changed audit logging to store objects: `new { Status = status.ToString() }`
+   - **Files**: `AdminController.cs:467-561` - Updated all entity types (Parts, Products, Hardware, DetachedProducts, NestSheets)
+
+2. **✅ NestSheet Status Persistence Fix**: Resolved manual status changes not displaying in TreeView
+   - **Root Cause**: SignalR event mismatch - controller sent "StatusManuallyChanged", view listened for "RefreshStatus"
+   - **Solution**: Aligned event names - changed view to listen for "StatusManuallyChanged"
+   - **Files**: `ModifyWorkOrder.cshtml:223` - Fixed SignalR event listener
+
+3. **✅ Quick Filter Removal**: Cleanly removed unused Quick Filter components
+   - **Scope**: All Quick Filter HTML, CSS, and JavaScript from `_StatusManagementPanel.cshtml`
+   - **Files**: Removed lines 22-34 (HTML), 143-147 (CSS), 157 (JS variable), 251-268 (JS handlers)
+   - **Safety**: Preserved tree search functionality - only removed filter buttons
+
+4. **✅ DetachedProduct Parts Cascade Fix**: Fixed cascade logic gap for DetachedProduct parts
+   - **Root Cause**: DetachedProduct parts weren't being updated when NestSheet status changed
+   - **Solution**: Added Entity Framework change tracking refresh and enhanced cascade logic
+   - **Files**: `AdminController.cs:565-581` - Enhanced NestSheet cascade with `ChangeTracker.DetectChanges()`
+
+**Additional Improvements:**
+- **TreeView Status Display**: Fixed hardcoded status mappings that prevented accurate dropdown display
+  - **NestSheets**: Changed from hardcoded "Processed"/"Pending" to actual status values
+  - **DetachedProducts**: Changed from hardcoded "Shipped"/"Pending" to actual status values
+  - **Files**: `WorkOrderTreeApiController.cs:228, 199` - Now returns `status.ToString()` instead of hardcoded values
+
+- **Statistics Card Consistency**: Updated NestSheets statistics to match other entities
+  - **Eliminated "Processed" terminology**: Changed to standard "Cut" status
+  - **Added all 5 statuses**: Now shows Pending, Cut, Sorted, Assembled, Shipped (no more N/As)
+  - **Files**: `WorkOrderStatisticsController.cs:80, 148` - Updated statistics calculation
+  - **Files**: `ModifyWorkOrder.cshtml:120-126, 212-218` - Updated UI display and JavaScript
+
+**Build Status:** ✅ Success (22 warnings, 0 errors - no new issues introduced)
+
+**Validation:**
+- ✅ Audit history now displays actual status transitions (e.g., "Pending→Cut")
+- ✅ NestSheet status changes persist and update statistics immediately
+- ✅ DetachedProduct parts cascade correctly with NestSheet changes
+- ✅ TreeView dropdowns show accurate current status for all entities
+- ✅ NestSheets statistics card matches other entities with all 5 statuses
+- ✅ Quick Filter removal doesn't break tree functionality
+
+**Status:** ✅ COMPLETED - Manual Override system is now production ready with accurate audit trails, reliable status persistence, consistent UI behavior, and complete cascade functionality across all entity types.
+
+---

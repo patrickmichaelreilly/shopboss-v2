@@ -77,7 +77,7 @@ namespace ShopBoss.Web.Controllers
             var partsStats = new Dictionary<string, int> { ["total"] = 0, ["pending"] = 0, ["cut"] = 0, ["sorted"] = 0, ["assembled"] = 0, ["shipped"] = 0 };
             var hardwareStats = new Dictionary<string, int> { ["total"] = 0, ["pending"] = 0, ["sorted"] = 0, ["assembled"] = 0, ["shipped"] = 0 };
             var detachedProductsStats = new Dictionary<string, int> { ["total"] = 0, ["pending"] = 0, ["cut"] = 0, ["sorted"] = 0, ["assembled"] = 0, ["shipped"] = 0 };
-            var nestSheetsStats = new Dictionary<string, int> { ["total"] = 0, ["pending"] = 0, ["processed"] = 0 };
+            var nestSheetsStats = new Dictionary<string, int> { ["total"] = 0, ["pending"] = 0, ["cut"] = 0, ["sorted"] = 0, ["assembled"] = 0, ["shipped"] = 0 };
 
             // Count products (shipped = all parts are shipped)
             foreach (var productNode in data.ProductNodes)
@@ -145,7 +145,7 @@ namespace ShopBoss.Web.Controllers
             foreach (var nestSheet in data.NestSheets)
             {
                 nestSheetsStats["total"]++;
-                IncrementNestSheetStatusCount(nestSheetsStats, nestSheet.Status == PartStatus.Cut ? "processed" : "pending");
+                IncrementStatusCount(nestSheetsStats, nestSheet.Status.ToString());
             }
 
             return new
@@ -220,13 +220,5 @@ namespace ShopBoss.Web.Controllers
             }
         }
 
-        private void IncrementNestSheetStatusCount(Dictionary<string, int> statusDict, string status)
-        {
-            var statusKey = status?.ToLower();
-            if (statusDict.ContainsKey(statusKey))
-            {
-                statusDict[statusKey]++;
-            }
-        }
     }
 }

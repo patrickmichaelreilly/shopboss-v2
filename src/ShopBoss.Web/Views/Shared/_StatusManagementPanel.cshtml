@@ -19,19 +19,6 @@
                 </div>
             </div>
 
-            <!-- Quick Filter by Entity Type -->
-            <div class="mb-3">
-                <label class="form-label fw-bold">Quick Filter</label>
-                <div class="btn-group" role="group">
-                    <button type="button" class="btn btn-outline-primary filter-btn active" data-filter="all">All</button>
-                    <button type="button" class="btn btn-outline-primary filter-btn" data-filter="part">Parts</button>
-                    <button type="button" class="btn btn-outline-primary filter-btn" data-filter="product">Products</button>
-                    <button type="button" class="btn btn-outline-primary filter-btn" data-filter="subassembly">Subassemblies</button>
-                    <button type="button" class="btn btn-outline-primary filter-btn" data-filter="detached_product">Detached</button>
-                    <button type="button" class="btn btn-outline-primary filter-btn" data-filter="nestsheet">Nest Sheets</button>
-                    <button type="button" class="btn btn-outline-primary filter-btn" data-filter="hardware">Hardware</button>
-                </div>
-            </div>
 
             <!-- Manual Override Status Management Instructions -->
             <div class="alert alert-info">
@@ -140,10 +127,6 @@
     }
 
 
-    .filter-btn.active {
-        background-color: #0d6efd;
-        color: white;
-    }
 </style>
 
 <script>
@@ -154,7 +137,6 @@
         const auditHistoryContent = document.getElementById('auditHistoryContent');
         
         let treeView = null;
-        let currentFilter = 'all';
 
         // Initialize WorkOrderTreeView component
         function initializeTreeView() {
@@ -248,24 +230,6 @@
 
 
 
-        // Filter buttons
-        document.querySelectorAll('.filter-btn').forEach(btn => {
-            btn.addEventListener('click', function() {
-                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-                this.classList.add('active');
-                currentFilter = this.dataset.filter;
-                
-                // Apply filter using TreeView's search functionality
-                if (treeView) {
-                    if (currentFilter === 'all') {
-                        treeView.filterTree('');
-                    } else {
-                        // Filter by type - this will show items of the selected type
-                        treeView.filterTree(currentFilter);
-                    }
-                }
-            });
-        });
 
         // Load audit history for the entire work order
         async function loadAuditHistoryForWorkOrder() {

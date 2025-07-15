@@ -196,7 +196,7 @@ public class WorkOrderTreeApiController : ControllerBase
                         Name = detachedProduct.Name,
                         Type = "detached_product",
                         Quantity = detachedProduct.Qty,
-                        Status = includeStatus ? (detachedProduct.Status == PartStatus.Shipped ? "Shipped" : "Pending") : null,
+                        Status = includeStatus ? detachedProduct.Status.ToString() : null,
                         Children = new List<TreeItem>()
                     });
                 }
@@ -225,7 +225,7 @@ public class WorkOrderTreeApiController : ControllerBase
                         Name = nestSheet.Name,
                         Type = "nestsheet",
                         Quantity = 1,
-                        Status = includeStatus ? (nestSheet.Status == PartStatus.Cut ? "Processed" : "Pending") : null,
+                        Status = includeStatus ? nestSheet.Status.ToString() : null,
                         Children = new List<TreeItem>()
                     };
 

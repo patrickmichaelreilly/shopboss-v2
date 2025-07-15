@@ -464,8 +464,8 @@ public class AdminController : Controller
 
             bool success = false;
             string entityType = itemType;
-            var oldValue = "";
-            var newValue = newStatus.ToString();
+            object oldValue = null;
+            object newValue = new { Status = newStatus.ToString() };
 
             switch (itemType.ToLower())
             {
@@ -473,7 +473,7 @@ public class AdminController : Controller
                     var part = await _context.Parts.FirstOrDefaultAsync(p => p.Id == itemId);
                     if (part != null)
                     {
-                        oldValue = part.Status.ToString();
+                        oldValue = new { Status = part.Status.ToString() };
                         part.Status = newStatus;
                         part.StatusUpdatedDate = DateTime.UtcNow;
                         await _context.SaveChangesAsync();
@@ -485,7 +485,7 @@ public class AdminController : Controller
                     var product = await _context.Products.FirstOrDefaultAsync(p => p.Id == itemId);
                     if (product != null)
                     {
-                        oldValue = product.Status.ToString();
+                        oldValue = new { Status = product.Status.ToString() };
                         product.Status = newStatus;
                         product.StatusUpdatedDate = DateTime.UtcNow;
 
@@ -534,7 +534,7 @@ public class AdminController : Controller
                     var hardware = await _context.Hardware.FirstOrDefaultAsync(h => h.Id == itemId);
                     if (hardware != null)
                     {
-                        oldValue = hardware.Status.ToString();
+                        oldValue = new { Status = hardware.Status.ToString() };
                         hardware.Status = newStatus;
                         hardware.StatusUpdatedDate = DateTime.UtcNow;
                         await _context.SaveChangesAsync();
@@ -546,7 +546,7 @@ public class AdminController : Controller
                     var detachedProduct = await _context.DetachedProducts.FirstOrDefaultAsync(d => d.Id == itemId);
                     if (detachedProduct != null)
                     {
-                        oldValue = detachedProduct.Status.ToString();
+                        oldValue = new { Status = detachedProduct.Status.ToString() };
                         detachedProduct.Status = newStatus;
                         detachedProduct.StatusUpdatedDate = DateTime.UtcNow;
                         await _context.SaveChangesAsync();
@@ -558,13 +558,14 @@ public class AdminController : Controller
                     var nestSheet = await _context.NestSheets.FirstOrDefaultAsync(n => n.Id == itemId);
                     if (nestSheet != null)
                     {
-                        oldValue = nestSheet.Status.ToString();
+                        oldValue = new { Status = nestSheet.Status.ToString() };
                         nestSheet.Status = newStatus;
                         nestSheet.StatusUpdatedDate = DateTime.UtcNow;
 
                         if (cascadeToChildren)
                         {
                             // Update all associated parts for this nest sheet
+                            // This should find ALL parts linked to this nest sheet regardless of Product vs DetachedProduct
                             var nestSheetParts = await _context.Parts
                                 .Where(p => p.NestSheetId == itemId)
                                 .ToListAsync();
@@ -574,6 +575,9 @@ public class AdminController : Controller
                                 nestPart.Status = newStatus;
                                 nestPart.StatusUpdatedDate = DateTime.UtcNow;
                             }
+                            
+                            // Additional safety net: Force refresh of entity tracking to ensure all changes are captured
+                            _context.ChangeTracker.DetectChanges();
                         }
 
                         await _context.SaveChangesAsync();

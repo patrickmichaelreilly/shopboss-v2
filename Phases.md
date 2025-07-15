@@ -42,30 +42,14 @@ After successfully completing Phase M1 (Status Management/ModifyWorkOrder interf
 ### **M2: Status Management Cascade Logic (2 hours)**
 **Add comprehensive cascading logic for shop foreman override capabilities**
 
-**Objective:** Grant shop foreman complete control over all entity statuses with intelligent cascade operations across hierarchical structures.
-
-**Tasks:**
-1. Remove unused `UpdateEntityStatus()` method and `UpdateStatusRequest` class
-2. Implement comprehensive cascade operations for hierarchical status changes
-3. Add cascade UI controls to ModifyWorkOrder interface
-4. Enhance existing cascade logic to support all directions (up/down hierarchy)
-5. Test cascading operations across all entity types
-
-**Deliverables:**
-- ✅ Complete status override capabilities (any entity to any status)
-- ✅ Intelligent cascade operations across work order hierarchy
-- ✅ Clean AdminController with unused methods removed
-- ✅ Enhanced ModifyWorkOrder interface with cascade controls
 
 ### **M3: Integration Testing (1 hour)**
 **Ensure Manual Override system is production ready**
 
 **Tasks:**
-1. Test status changes cascade properly
-2. Verify audit trail captures all changes
-3. Test undo functionality (if implemented)
-4. Ensure SignalR updates work across stations
-5. Document any limitations or known issues
+1. Work Order Audit History is not correctly rendering ManualStatusChange events -- they all say (N/A→N/A)
+2. Work Order Statistics partial is listing "Processed" as the second status to count for the entity Nest Sheets. This reveals that Nest Sheets are the only entity using "processed" instead of "Cut". We want to analzye this deeply and surgically change this to "Cut". We need to check throughout the codebase for other things that might be affected - especially the CNC Station. If I use Modify Work Order and manually change the status of a Nest Sheet in the tree to "Cut" or anything else, I get a success popup but when I refresh the page the changes aren't persistent and there is no affect in the Statistics card for Nest Sheets.
+3. Remove the "Quick Filter" bar and buttons below the Tree View in Modify Work Order. Be sure to remove all their functional components too -- they will never be reused.
 
 **Deliverables:**
 - ✅ Manual override fully functional

@@ -119,10 +119,10 @@
                                         <small class="text-muted">Nest Sheets</small>
                                         <div class="mt-1 small">
                                             <div><small class="text-muted" id="nestSheets-pending">0 Pending</small></div>
-                                            <div><small class="text-success" id="nestSheets-processed">0 Processed</small></div>
-                                            <div><small class="text-muted">N/A Cut</small></div>
-                                            <div><small class="text-muted">N/A Sorted</small></div>
-                                            <div><small class="text-muted">N/A Assembled/Shipped</small></div>
+                                            <div><small class="text-success" id="nestSheets-cut">0 Cut</small></div>
+                                            <div><small class="text-info" id="nestSheets-sorted">0 Sorted</small></div>
+                                            <div><small class="text-warning" id="nestSheets-assembled">0 Assembled</small></div>
+                                            <div><small class="text-success" id="nestSheets-shipped">0 Shipped</small></div>
                                         </div>
                                     </div>
                                 </div>
@@ -209,10 +209,13 @@
             document.getElementById('hardware-assembled').textContent = `${statistics.hardware.assembled || 0} Assembled`;
             document.getElementById('hardware-shipped').textContent = `${statistics.hardware.shipped || 0} Shipped`;
 
-            // Nest Sheets - only Pending/Processed (others show as N/A in UI)
+            // Nest Sheets - all 5 statuses (now matches other entities)
             document.getElementById('totalNestSheets').textContent = statistics.nestSheets.total;
             document.getElementById('nestSheets-pending').textContent = `${statistics.nestSheets.pending || 0} Pending`;
-            document.getElementById('nestSheets-processed').textContent = `${statistics.nestSheets.processed || 0} Processed`;
+            document.getElementById('nestSheets-cut').textContent = `${statistics.nestSheets.cut || 0} Cut`;
+            document.getElementById('nestSheets-sorted').textContent = `${statistics.nestSheets.sorted || 0} Sorted`;
+            document.getElementById('nestSheets-assembled').textContent = `${statistics.nestSheets.assembled || 0} Assembled`;
+            document.getElementById('nestSheets-shipped').textContent = `${statistics.nestSheets.shipped || 0} Shipped`;
         }
 
         // SignalR connection for real-time updates
@@ -220,7 +223,7 @@
             .withUrl("/hubs/status")
             .build();
 
-        connection.on("RefreshStatus", function (data) {
+        connection.on("StatusManuallyChanged", function (data) {
             console.log("Status update received:", data);
             // Refresh statistics when status changes occur
             const workOrderId = '@Model';
