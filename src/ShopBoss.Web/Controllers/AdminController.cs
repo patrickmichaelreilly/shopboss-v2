@@ -1200,13 +1200,13 @@ public class AdminController : Controller
                         var nestSheet = await _context.NestSheets.FindAsync(entityId);
                         if (nestSheet != null)
                         {
-                            var oldStatus = nestSheet.StatusString;
-                            nestSheet.StatusString = request.NewStatus;
+                            var oldStatus = nestSheet.Status;
+                            nestSheet.Status = Enum.Parse<PartStatus>(request.NewStatus);
                             nestSheet.StatusUpdatedDate = DateTime.UtcNow;
                             
                             await _auditTrailService.LogAsync("StatusChange", "NestSheet", nestSheet.Id,
                                 new { Status = oldStatus, StatusUpdatedDate = nestSheet.StatusUpdatedDate },
-                                new { Status = nestSheet.StatusString, StatusUpdatedDate = nestSheet.StatusUpdatedDate },
+                                new { Status = nestSheet.Status, StatusUpdatedDate = nestSheet.StatusUpdatedDate },
                                 station: "Admin", workOrderId: activeWorkOrderId,
                                 details: $"Manual status change to {request.NewStatus}");
                             

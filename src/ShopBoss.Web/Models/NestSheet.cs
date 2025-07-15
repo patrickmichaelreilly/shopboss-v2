@@ -25,7 +25,7 @@ public class NestSheet
     
     public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
     
-    public string StatusString { get; set; } = "Pending";
+    public PartStatus Status { get; set; } = PartStatus.Pending;
     
     public DateTime? StatusUpdatedDate { get; set; }
     

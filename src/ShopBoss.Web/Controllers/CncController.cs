@@ -127,7 +127,7 @@ public class CncController : Controller
                 });
             }
 
-            if (nestSheet.StatusString == "Processed")
+            if (nestSheet.Status == PartStatus.Cut)
             {
                 await _auditTrail.LogScanAsync(cleanBarcode, station, false, 
                     "Nest sheet already processed", nestSheet.Id, activeWorkOrderId, 
@@ -143,12 +143,12 @@ public class CncController : Controller
             }
 
             // Store original values for audit trail
-            var originalNestSheet = new { nestSheet.StatusString, nestSheet.StatusUpdatedDate };
+            var originalNestSheet = new { nestSheet.Status, nestSheet.StatusUpdatedDate };
             var originalParts = nestSheet.Parts.Where(p => p.Status == PartStatus.Pending)
                 .Select(p => new { p.Id, p.Status, p.StatusUpdatedDate }).ToList();
 
             // Mark nest sheet as processed
-            nestSheet.StatusString = "Processed";
+            nestSheet.Status = PartStatus.Cut;
             nestSheet.StatusUpdatedDate = DateTime.UtcNow;
 
             // Mark all parts on this nest sheet as Cut
@@ -169,7 +169,7 @@ public class CncController : Controller
 
             // Log audit trail for nest sheet processing
             await _auditTrail.LogAsync("ProcessNestSheet", "NestSheet", nestSheet.Id, 
-                originalNestSheet, new { nestSheet.StatusString, nestSheet.StatusUpdatedDate },
+                originalNestSheet, new { nestSheet.Status, nestSheet.StatusUpdatedDate },
                 station: station, workOrderId: activeWorkOrderId, 
                 details: $"Scanned barcode '{cleanBarcode}' - {partsToUpdate.Count} parts marked as Cut",
                 sessionId: sessionId, ipAddress: ipAddress);
@@ -372,7 +372,7 @@ public class CncController : Controller
                     width = nestSheet.Width,
                     thickness = nestSheet.Thickness,
                     barcode = nestSheet.Barcode,
-                    isProcessed = nestSheet.StatusString == "Processed",
+                    isProcessed = nestSheet.Status == PartStatus.Cut,
                     processedDate = nestSheet.StatusUpdatedDate?.ToString("yyyy-MM-dd HH:mm"),
                     createdDate = nestSheet.CreatedDate.ToString("yyyy-MM-dd HH:mm"),
                     partCount = nestSheet.Parts.Count,
@@ -448,7 +448,7 @@ public class CncController : Controller
             var nestSheet = await _context.NestSheets
                 .Where(n => n.WorkOrderId == activeWorkOrderId && 
                            (n.Barcode == cleanBarcode || n.Name == cleanBarcode))
-                .Select(n => new { n.Id, n.Name, n.StatusString, n.StatusUpdatedDate })
+                .Select(n => new { n.Id, n.Name, n.Status, n.StatusUpdatedDate })
                 .FirstOrDefaultAsync();
 
             if (nestSheet == null)
@@ -462,7 +462,7 @@ public class CncController : Controller
                 });
             }
 
-            if (nestSheet.StatusString == "Processed")
+            if (nestSheet.Status == PartStatus.Cut)
             {
                 return Json(new { 
                     success = false, 

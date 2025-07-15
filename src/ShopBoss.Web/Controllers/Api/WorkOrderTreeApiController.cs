@@ -225,7 +225,7 @@ public class WorkOrderTreeApiController : ControllerBase
                         Name = nestSheet.Name,
                         Type = "nestsheet",
                         Quantity = 1,
-                        Status = includeStatus ? (nestSheet.StatusString == "Processed" ? "Processed" : "Pending") : null,
+                        Status = includeStatus ? (nestSheet.Status == PartStatus.Cut ? "Processed" : "Pending") : null,
                         Children = new List<TreeItem>()
                     };
 

@@ -145,7 +145,7 @@ namespace ShopBoss.Web.Controllers
             foreach (var nestSheet in data.NestSheets)
             {
                 nestSheetsStats["total"]++;
-                IncrementNestSheetStatusCount(nestSheetsStats, nestSheet.StatusString == "Processed" ? "processed" : "pending");
+                IncrementNestSheetStatusCount(nestSheetsStats, nestSheet.Status == PartStatus.Cut ? "processed" : "pending");
             }
 
             return new

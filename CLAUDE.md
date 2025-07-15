@@ -1,10 +1,50 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code when working with code in this repository.
+Claude Code is a surgical precision advanced expert senior coder with a profound sense for elegance and adherance to architectural principles.
 
 ## Project Overview
 
 ShopBoss v2 is a modern shop floor tracking system that replaces the discontinued Production Coach software. It manages millwork manufacturing workflow from CNC cutting through assembly and shipping, with hierarchical data import from Microvellum SDF files.
+
+## Development vs Deployment Environment Separation
+
+### CRITICAL: Two Separate Environments
+**Claude Code runs in DEVELOPMENT environment (Linux/macOS)**  
+**User testing happens in WINDOWS DEPLOYMENT environment**
+
+### When User Shows Console Output/Errors:
+- **ERROR OUTPUT IS FROM WINDOWS DEPLOYMENT** - NOT from Claude Code's development environment
+- **DO NOT modify development code based on Windows deployment errors**  
+- **DO NOT run deploy.sh or attempt to test deployment** - only user does this
+- **ASK USER for clarification**: "Is this error from your Windows deployment or development?"
+
+### Development Environment (Claude Code):
+- Location: Current working directory
+- OS: Linux/macOS  
+- Database: May be different state than Windows deployment
+- Purpose: Code development and building only
+- Claude Code can: Build, test compilation, create migrations
+
+### Windows Deployment Environment (User Testing):
+- Location: C:\ShopBoss-Testing (Windows)
+- OS: Windows
+- Database: Separate from development 
+- Purpose: User testing of completed features
+- Only user can: Deploy via deploy.sh, run tests, see runtime errors
+
+### Error Troubleshooting Protocol:
+1. **User reports error from Windows console**
+2. **Claude asks: "Is this from Windows deployment testing?"** 
+3. **Claude NEVER assumes error is from current development environment**
+4. **Claude provides Windows-specific guidance, not dev environment changes**
+5. **If database/migration issue: Guide user through Windows database fixes**
+
+### Migration Issues in Windows Deployment:
+- User may need to delete shopboss.db in Windows deployment
+- User may need to run database reset commands in Windows
+- DO NOT modify Program.cs or migrations based on Windows deployment errors
+- Guide user through Windows-specific database recovery steps
 
 ## Development Commands
 
@@ -21,33 +61,20 @@ dotnet build src/ShopBoss.Web/ShopBoss.Web.csproj
 # Create a new migration
 dotnet ef migrations add [MigrationName] --project src/ShopBoss.Web
 
-# Update database
+# IMPORTANT: Verify these 3 files are created/updated:
+# - Migrations/TIMESTAMP_MigrationName.cs
+# - Migrations/TIMESTAMP_MigrationName.Designer.cs  
+# - Migrations/ShopBossDbContextModelSnapshot.cs
+
+# Update database (development only)
 dotnet ef database update --project src/ShopBoss.Web
 
 # Drop database (development only)
 dotnet ef database drop --project src/ShopBoss.Web
 ```
 
-### Testing
+### Testing Handoff Protocol
 ```bash
-# Run all tests
-dotnet test
-
-# Run tests with coverage
-dotnet test --collect:"XPlat Code Coverage"
-
-# Quick development testing shortcuts
-.\scripts\test-shortcuts.ps1 build    # Build application
-.\scripts\test-shortcuts.ps1 run      # Run application
-.\scripts\test-shortcuts.ps1 test     # Run tests
-.\scripts\test-shortcuts.ps1 status   # Check system status
-
-# Backup and recovery testing
-.\scripts\test-backup-restore.ps1     # Test backup/restore cycle
-.\scripts\backup-shopboss-beta.ps1    # Create manual backup
-.\scripts\restore-shopboss-beta.ps1   # Restore from backup
-
-# IMPORTANT: Testing Handoff Protocol
 # 1. Claude does the work and builds the application
 # 2. Claude creates/updates test scenarios and validation steps
 # 3. Claude updates the worklog following Collaboration-Guidelines.md
@@ -58,257 +85,127 @@ dotnet test --collect:"XPlat Code Coverage"
 # Claude should NEVER run deploy.sh - only the user does this
 ```
 
-## Architecture Overview
+## Phase Specification Format
 
-### Technology Stack
+### Required Phase Structure
+```
+## Phase [ID]: [Title] - [Duration Estimate]
+
+**Objective:** [Single line, measurable outcome]
+
+**Target Files:**
+- Backend: [Specific .cs files]
+- Frontend: [Specific .cshtml/.js/.css files]  
+- Database: [Migration files if applicable]
+- Config: [Any configuration changes]
+
+**Tasks:**
+1. [Specific, ordered action with file reference]
+2. [Next action with file reference]
+3. [Final action with file reference]
+
+**Validation:**
+- [ ] Build succeeds without errors
+- [ ] [Specific runtime validation]
+- [ ] [User testing criteria]
+
+**Dependencies:** [What must be complete first]
+```
+
+### Target File Categories
+- **Backend:** Controllers, Services, Models, Migrations, Program.cs
+- **Frontend:** Views (.cshtml), JavaScript, CSS, Partials
+- **Database:** Migration files, DbContext changes
+- **Config:** appsettings.json, documentation files
+
+## Technology Stack
+
+### Core Framework
 - **Framework**: ASP.NET Core 8.0 MVC
 - **Database**: Entity Framework Core 9.0.0 with SQLite (development)
 - **Real-time**: SignalR for progress updates and status notifications
 - **Frontend**: Bootstrap 5 with vanilla JavaScript
 - **Import Processing**: External x86 process execution for SDF file conversion
 
-### Core Components
-
-#### Data Models
+### Data Architecture
 - **Hierarchical Structure**: WorkOrder → Products → Parts/Subassemblies → Parts
 - **Status Tracking**: Pending → Cut → Sorted → Assembled → Shipped
 - **Storage Management**: StorageRack → Bins with capacity tracking
 - **Audit System**: Complete audit trail for all operations
 
-#### Key Services
-- `ImporterService`: Handles SDF file processing and data transformation
-- `SortingRuleService`: Manages intelligent part placement in storage racks
-- `PartFilteringService`: Routes doors/drawer fronts to specialized racks
-- `AuditTrailService`: Tracks all system operations and status changes
+## Critical Development Rules
 
-#### Controllers and Views
-- **AdminController**: Work order management and system configuration
-- **CncController**: Nest sheet scanning and batch part marking
-- **SortingController**: Rack visualization and part placement
-- **AssemblyController**: Product completion and component guidance
-- **HomeController**: Main dashboard and navigation
+### Database Migration Rules
+- **Current Strategy**: Program.cs uses `context.Database.EnsureCreated()` 
+- **DO NOT change to Migrate()** without explicit user approval
+- **Always verify Designer.cs and ModelSnapshot.cs files are created**
+- **Migration failures in Windows deployment require Windows-specific fixes**
 
-### Database Schema
+### Code Architecture Patterns
+- **Universal Components**: Reuse existing services and controllers
+- **Event-Driven Frontend**: SignalR and DOM events for loose coupling
+- **Service Layer**: Keep controllers thin, logic in services
+- **Audit Everything**: All status changes must be audited
 
-#### Core Entities
-- `WorkOrder`: Top-level container for manufacturing jobs
-- `Product`: Individual products within a work order
-- `Part`: Individual components with status tracking
-- `Subassembly`: Nested component groupings (2 levels max)
-- `Hardware`: Non-manufactured items (hinges, screws, etc.)
-- `DetachedProduct`: Standalone products not part of main hierarchy
-- `NestSheet`: CNC cutting sheets with barcode tracking
+### File Modification Guidelines
+- **Never modify ShopBossDbContextModelSnapshot.cs manually**
+- **Always preserve Microvellum ID fields when refactoring**
+- **Maintain backward compatibility during status refactoring**
+- **Test build after every significant change**
 
-#### Support Entities
-- `StorageRack`: Physical storage locations with configurable dimensions
-- `Bin`: Individual storage compartments within racks
-- `AuditLog`: Complete audit trail with timestamps and details
-- `ScanHistory`: Barcode scan operations and results
+## Quality Standards
 
-### Import Architecture
+### Build Requirements
+- **Zero compilation errors**
+- **Zero new warnings**
+- **All Entity Framework relationships intact**
+- **SignalR hub registration maintained**
 
-#### SDF Processing Pipeline
-1. **File Upload**: Drag-and-drop interface with validation
-2. **Process Execution**: x86 importer tool runs as separate process
-3. **Data Extraction**: Hierarchical data parsed from SQLite output
-4. **Tree Visualization**: Interactive expandable tree display
-5. **Selective Import**: Admin chooses specific items to import
-6. **Database Persistence**: Transaction-based import with rollback
+### Testing Requirements
+- **Successful dotnet build**
+- **Database schema validation**
+- **User provides deployment testing results**
+- **No regression in existing functionality**
 
-#### Progress Tracking
-- Real-time updates via SignalR (`/importProgress` hub)
-- Multi-stage progress: SDF conversion → SQL cleanup → JSON generation
-- Cancellation support with proper cleanup
-- Detailed error reporting and recovery suggestions
+### Documentation Requirements
+- **Update Worklog.md for all changes**
+- **Include specific testing instructions**
+- **Document any breaking changes**
+- **Maintain architectural decision records**
 
-### Shop Floor Workflow
+## Work Execution Guidelines
 
-#### Station Types
-1. **CNC Station**: Nest sheet scanning, batch part marking as "Cut"
-2. **Sorting Station**: Intelligent rack assignment, part placement guidance
-3. **Assembly Station**: Product completion tracking, component location guidance
-4. **Shipping Station**: Final verification, work order completion
+### Maximum Work Chunk Strategy
+- **Target full vertical slices** (database → service → controller → view)
+- **Handle multiple related components** with clear dependencies
+- **Maintain architectural consistency** throughout changes
+- **Validate at each layer** before proceeding
 
-#### Status Transitions
-- **Pending**: Initial state after import
-- **Cut**: Marked when nest sheet is scanned at CNC station
-- **Sorted**: Updated when part is placed in storage rack
-- **Assembled**: Set when product assembly is completed
-- **Shipped**: Final state when loaded for shipping
+### Context Management
+- **Use precise file references** in all communications
+- **Maintain clear task boundaries** within phases
+- **Separate architectural decisions** from implementation details
+- **Document assumptions** and dependencies clearly
 
-### Real-time Updates
+### Error Resolution Protocol
+- **Distinguish development vs deployment errors**
+- **Provide Windows-specific guidance** for deployment issues
+- **Never modify architecture** based on deployment-only problems
+- **Ask for clarification** when error source is unclear
 
-#### SignalR Hubs
-- `/importProgress`: Import operation progress and status
-- `/hubs/status`: Cross-station status updates and notifications
+### ⚠️ EMERGENCY: Migration Crisis (2025-07-15)
 
-#### Update Patterns
-- Status changes broadcast to all connected clients
-- Assembly readiness notifications to assembly station
-- Inventory updates to sorting station displays
-- Active work order changes reflected across all stations
+**CRITICAL ISSUE:** Import system is broken due to migration conflicts. Phase M1.x marked as complete but ZERO testing completed.
 
-## Development Patterns
+**Current Error:** `table NestSheets has no column named Status`
 
-### Coding Standards
-- Use async/await patterns for all database operations
-- Implement proper error handling with user-friendly messages
-- Follow existing naming conventions and project structure
-- Maintain responsive design optimized for shop floor tablets
-- Ensure all scan operations are properly audited
+**Root Cause:** 25+ migrations create conflicting schema changes - NestSheets table created with IsProcessed/ProcessedDate but later migrations try to add Status column and fail.
 
-### Service Integration
-- All database operations go through `ShopBossDbContext`
-- Status changes must be logged via `AuditTrailService`
-- Real-time updates sent through appropriate SignalR hubs
-- Active work order context maintained across all operations
+**Solution:** Controlled migration consolidation (see Phases.md M1.x-EMERGENCY):
+1. Extract all Up() methods from migrations
+2. Organize by table 
+3. Eliminate cancelling operations
+4. Create single InitialCreate migration matching DbContext
+5. Test import before any other work
 
-### UI Patterns
-- Bootstrap 5 components with custom CSS for shop floor optimization
-- Responsive design with tablet-first approach
-- Clear visual feedback for all user actions
-- Consistent navigation header across all station interfaces
-
-## Key Business Rules
-
-### Data Integrity
-- Preserve exact Microvellum identifiers throughout system
-- Maintain parent-child relationships in hierarchical data
-- Prevent orphaned selections during import process
-- Ensure all status transitions are properly audited
-
-### Smart Sorting Logic
-- Doors, drawer fronts, and adjustable shelves route to specialized racks
-- Carcass parts grouped by product for assembly efficiency
-- Automatic bin assignment based on capacity and product grouping
-- Assembly readiness calculated excluding filtered parts
-
-### Import Validation
-- Duplicate work order detection and rejection
-- Complete hierarchy validation before import
-- Business rule enforcement for incomplete selections
-- Graceful handling of corrupted or invalid SDF files
-
-## Testing Approach
-
-### Integration Testing
-- End-to-end workflow validation (CNC → Sorting → Assembly → Shipping)
-- Real-time update verification across all stations
-- Active work order consistency testing
-- Database integrity validation
-
-### Performance Testing
-- Large hierarchy rendering (1000+ items)
-- Concurrent user operations
-- Import processing for large SDF files
-- Real-time update performance under load
-
-## Deployment Notes
-
-### Environment Configuration
-- Development: SQLite database with auto-migration
-- Production: SQL Server with manual migration management
-- Process isolation for x86 importer tool execution
-- Secure temporary file handling with automatic cleanup
-
-### Security Considerations
-- Input validation for all file uploads
-- Process isolation for external tool execution
-- Audit trail for all administrative actions
-- Role-based access control for admin functions
-
-## Testing Infrastructure (Phase T)
-
-### Data Safety and Backup System
-- **External Backup Directory**: `C:\ShopBoss-Backups` (configured by default)
-- **Backup Scripts**: Automated compression and manifest generation
-- **Incremental Backups**: Strategy for beta patches with minimal downtime
-- **Recovery Procedures**: Documented emergency recovery steps
-
-### Testing Tools and Scripts
-```bash
-# Testing shortcuts
-.\scripts\test-shortcuts.ps1 [command]     # Build, run, test, status, backup, checkpoint, reset
-
-# Backup and recovery
-.\scripts\backup-shopboss-beta.ps1         # Create external backup with compression
-.\scripts\restore-shopboss-beta.ps1        # Restore from backup with validation
-.\scripts\incremental-backup-beta.ps1      # Create incremental backup for patches
-.\scripts\test-backup-restore.ps1          # Test backup/restore cycle
-
-# System maintenance
-.\scripts\clean-sqlite-locks.ps1           # Clean SQLite locks and verify integrity
-```
-
-### Checkpoint System
-- **Checkpoint Directory**: `.\checkpoints\` with versioned snapshots
-- **Fresh Install**: Clean database with default configuration
-- **Known Good States**: Saved at major development milestones
-- **Quick Recovery**: Restore to specific checkpoint states
-
-### Testing Documentation
-- **Testing Runbook**: `docs\TESTING-RUNBOOK.md` - Comprehensive testing procedures
-- **Emergency Recovery**: `docs\EMERGENCY-RECOVERY.md` - Critical failure recovery
-- **Beta Emergency**: `docs\BETA-EMERGENCY.md` - Beta-specific emergency procedures
-
-### Testing Validation Steps
-After implementing Phase T, verify:
-1. **External Backup**: Confirm backups are saved to `C:\ShopBoss-Backups`
-2. **SQLite Cleanup**: Test lock cleanup script resolves database issues
-3. **Checkpoint System**: Verify checkpoint creation and restoration
-4. **Testing Shortcuts**: Confirm all shortcuts work correctly
-5. **Backup/Restore Cycle**: Test complete backup and restore with data verification
-6. **Incremental Backup**: Test patch-based incremental backup strategy
-7. **Emergency Recovery**: Review procedures and validate recovery time objectives
-
-## Current Development Status
-
-The system is in active development with core infrastructure complete. Recent phases have focused on:
-- Complete admin station with work order management
-- CNC station with nest sheet scanning and batch operations
-- Sorting station with intelligent rack assignment and visualization
-- Assembly station with product completion workflow
-- Shipping station with final verification and tracking
-- **Phase T Complete**: Testing infrastructure and data safety systems implemented
-
-## Core Development Philosophy
-
-### ALWAYS Think Architecturally
-Before implementing ANY feature, ask:
-1. Can I achieve this by removing/consolidating code rather than adding?
-2. Is there an existing pattern/component I can extend rather than create new?
-3. Will this make the system simpler or more complex?
-4. Can I solve multiple problems with one architectural change?
-
-### Code Reduction > Code Addition
-- **Adding features should make the codebase SMALLER** through:
-  - Consolidating duplicate patterns
-  - Creating reusable components
-  - Removing special cases with general solutions
-  - Eliminating redundant code paths
-
-### Examples:
-- **Good**: "Let's make the scanner universal, eliminating 3 separate implementations"
-- **Bad**: "Let's add a scanner for each station type"
-- **Good**: "This new feature reveals we can consolidate 5 controllers into 1"
-- **Bad**: "Let's add another controller for this new feature"
-
-### Red Flags to Avoid:
-- Copy-pasting code blocks
-- Creating station-specific versions of components
-- Adding parameters to handle special cases
-- "It works" without considering "it's maintainable"
-
-## ShopBoss Architectural Principles
-
-1. **Universal Components**: One scanner, one billboard, one tree view
-2. **Event-Driven**: Components emit events, pages handle them
-3. **No Special Cases**: If Sorting needs X, consider if ALL stations need X
-4. **Cascade Simplification**: Adding a feature should simplify related code
-
-## Before Writing Code, Ask:
-- "What can I delete to make room for this?"
-- "What pattern already exists that I can leverage?"
-- "How can this feature make the system simpler?"
-
-Current development follows the phased approach outlined in `Phases.md` with detailed progress tracking in `Worklog.md`.
+**Priority:** Must resolve before any other development work. Token consumption crisis threatens project completion.

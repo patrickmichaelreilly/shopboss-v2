@@ -182,6 +182,41 @@ After successfully completing Phase M1 (Status Management/ModifyWorkOrder interf
 
 **Success = All workflows function with Status enum only**
 
+### **M1.x-EMERGENCY: Migration Consolidation Crisis (PRIORITY)**
+**CRITICAL ISSUE:** 2 days wasted on migration failures, token consumption crisis threatening entire project
+
+**Current State:**
+- 25+ migrations creating conflicting schema changes
+- Import system broken: "table NestSheets has no column named Status"
+- Multiple failed attempts at migration fixes
+- Phases M1.x falsely marked complete when basic import doesn't work
+- Token consumption at unsustainable rate
+
+**Root Cause Analysis:**
+- NestSheets table created with IsProcessed/ProcessedDate in early migration
+- Later migrations try to add Status column but fail
+- Even later migrations try to drop non-existent StatusString column
+- Multiple table recreations with inconsistent schemas
+- Migration edits applied to already-executed migrations (ineffective)
+
+**Solution: Controlled Migration Consolidation**
+1. **Extract Phase:** Copy all Up() methods from all 25+ migration files
+2. **Organize Phase:** Group operations by table (NestSheets, Products, Parts, etc.)
+3. **Eliminate Phase:** Remove operation pairs that cancel out:
+   - ADD column X then DROP column X
+   - CREATE table then DROP/RECREATE same table
+   - ADD index then DROP same index
+4. **Verify Phase:** Ensure final migration creates exact schema matching DbContext
+5. **Test Phase:** Single import test to verify success before any other work
+
+**Success Criteria:**
+- ONE clean InitialCreate migration that matches DbContext exactly
+- Import system works: can successfully import SDF file
+- All entities created with proper Status fields
+- No more migration errors or schema mismatches
+
+**CRITICAL:** No other work until import system is functional
+
 ### **M2: Status Management Business Logic (2 hours)**
 **Add validation and cascading logic to Status Management Panel**
 

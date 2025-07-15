@@ -95,7 +95,7 @@ public class AssemblyController : Controller
             var totalFilteredParts = filteredParts.Count;
             
             var isReady = readyProductIds.Contains(product.Id);
-            var isCompleted = product.Status == PartStatus.Shipped;
+            var isCompleted = product.Status == PartStatus.Assembled;
 
             // Get simplified rack locations - just carcass bin and doors/fronts bin
             var carcassLocation = carcassParts
@@ -191,7 +191,7 @@ public class AssemblyController : Controller
             var totalFilteredParts = filteredParts.Count;
             
             var isReady = readyProductIds.Contains(product.Id);
-            var isCompleted = product.Status == PartStatus.Shipped;
+            var isCompleted = product.Status == PartStatus.Assembled;
 
             // Get simplified rack locations - just carcass bin and doors/fronts bin
             var carcassLocation = carcassParts
@@ -493,8 +493,8 @@ public class AssemblyController : Controller
                 }
             }
             
-            // Mark product as shipped (assembled and ready for shipping)
-            product.Status = PartStatus.Shipped;
+            // Mark product as assembled (ready for shipping)
+            product.Status = PartStatus.Assembled;
             product.StatusUpdatedDate = DateTime.UtcNow;
             
             // Log product status change
@@ -581,12 +581,12 @@ public class AssemblyController : Controller
                 FilteredPartsCount = filteredPartsGuidance.Count,
                 WorkOrderId = activeWorkOrderId,
                 Timestamp = DateTime.UtcNow,
-                Status = "Shipped",
-                IsReadyForShipping = true,
+                Status = "Assembled",
+                IsReadyForShipping = false,
                 ReadyForShippingProducts = readyForShippingProducts,
                 IsWorkOrderReadyForShipping = isWorkOrderReadyForShipping,
                 Station = "Assembly",
-                Message = $"Product '{product.Name}' has been assembled and is ready for shipping"
+                Message = $"Product '{product.Name}' has been assembled"
             };
 
             // Send a single notification to all stations to avoid duplicates
@@ -722,8 +722,8 @@ public class AssemblyController : Controller
                 }
             }
             
-            // Mark product as shipped (assembled and ready for shipping)
-            product.Status = PartStatus.Shipped;
+            // Mark product as assembled (ready for shipping)
+            product.Status = PartStatus.Assembled;
             product.StatusUpdatedDate = DateTime.UtcNow;
             
             // Log product status change
@@ -807,12 +807,12 @@ public class AssemblyController : Controller
                 PartsAssembled = updatedParts,
                 WorkOrderId = activeWorkOrderId,
                 Timestamp = DateTime.UtcNow,
-                Status = "Shipped",
-                IsReadyForShipping = true,
+                Status = "Assembled",
+                IsReadyForShipping = false,
                 ReadyForShippingProducts = readyForShippingProducts,
                 IsWorkOrderReadyForShipping = isWorkOrderReadyForShipping,
                 Station = "Assembly",
-                Message = $"Product '{product.Name}' has been assembled and is ready for shipping"
+                Message = $"Product '{product.Name}' has been assembled"
             };
 
             // Send a single notification to all stations to avoid duplicates
@@ -909,7 +909,7 @@ public class ProductAssemblyStatus
     public int FilteredPartsCount { get; set; }
     public int SortedFilteredPartsCount { get; set; }
     public bool IsReadyForAssembly { get; set; }
-    public bool IsCompleted { get; set; } // Computed from Product.Status == "Shipped"
+    public bool IsCompleted { get; set; } // Computed from Product.Status == "Assembled"
     public int CompletionPercentage { get; set; }
     public List<PartLocation> PartLocations { get; set; } = new();
 }

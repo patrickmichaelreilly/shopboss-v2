@@ -33,12 +33,7 @@ namespace ShopBoss.Web.Migrations
                 type: "TEXT",
                 nullable: true);
 
-            // Add StatusUpdatedDate to NestSheets 
-            migrationBuilder.AddColumn<DateTime>(
-                name: "StatusUpdatedDate",
-                table: "NestSheets",
-                type: "TEXT",
-                nullable: true);
+            // Status and StatusUpdatedDate already exist in NestSheets from creation
 
             // Remove old boolean columns that have been replaced with unified Status system
             
@@ -50,6 +45,7 @@ namespace ShopBoss.Web.Migrations
             migrationBuilder.DropColumn(
                 name: "ProcessedDate",
                 table: "NestSheets");
+
 
             // Remove IsShipped and ShippedDate from Hardware
             migrationBuilder.DropColumn(
@@ -88,6 +84,7 @@ namespace ShopBoss.Web.Migrations
                 table: "NestSheets",
                 type: "TEXT",
                 nullable: true);
+
 
             // Add IsShipped and ShippedDate to Hardware
             migrationBuilder.AddColumn<bool>(
@@ -130,9 +127,7 @@ namespace ShopBoss.Web.Migrations
                 name: "StatusUpdatedDate",
                 table: "DetachedProducts");
 
-            migrationBuilder.DropColumn(
-                name: "StatusUpdatedDate",
-                table: "NestSheets");
+            // Status and StatusUpdatedDate remain in NestSheets (were created during table creation)
         }
     }
 }

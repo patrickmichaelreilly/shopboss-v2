@@ -127,7 +127,7 @@ public class ShopBossDbContext : DbContext
             entity.Property(e => e.Material).IsRequired();
             entity.Property(e => e.Barcode).IsRequired();
             entity.Property(e => e.CreatedDate).IsRequired();
-            entity.Property(e => e.StatusString).IsRequired();
+            entity.Property(e => e.Status).IsRequired();
             
             entity.HasOne(e => e.WorkOrder)
                 .WithMany(w => w.NestSheets)

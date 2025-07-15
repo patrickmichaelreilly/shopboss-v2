@@ -43,6 +43,8 @@ namespace ShopBoss.Web.Migrations
                     Thickness = table.Column<decimal>(type: "TEXT", nullable: true),
                     Barcode = table.Column<string>(type: "TEXT", nullable: false),
                     CreatedDate = table.Column<DateTime>(type: "TEXT", nullable: false),
+                    Status = table.Column<int>(type: "INTEGER", nullable: false, defaultValue: 0),
+                    StatusUpdatedDate = table.Column<DateTime>(type: "TEXT", nullable: true),
                     IsProcessed = table.Column<bool>(type: "INTEGER", nullable: false),
                     ProcessedDate = table.Column<DateTime>(type: "TEXT", nullable: true)
                 },

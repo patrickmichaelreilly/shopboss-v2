@@ -460,7 +460,9 @@ public class ImportSelectionService
                 Name = importHardware.Name,
                 Qty = importHardware.Quantity, // Original quantity per product
                 WorkOrderId = product.WorkOrderId,
-                ProductId = product.Id
+                ProductId = product.Id,
+                Status = PartStatus.Pending,
+                StatusUpdatedDate = DateTime.UtcNow
             };
             
             product.Hardware.Add(hardware);
@@ -525,7 +527,9 @@ public class ImportSelectionService
                 MicrovellumId = importHardware.Id,
                 Name = importHardware.Name,
                 Qty = importHardware.Quantity, // Original quantity per subassembly instance
-                WorkOrderId = subassembly.ProductId
+                WorkOrderId = subassembly.ProductId,
+                Status = PartStatus.Pending,
+                StatusUpdatedDate = DateTime.UtcNow
             };
             
             workOrder.Hardware.Add(hardware);
@@ -580,7 +584,9 @@ public class ImportSelectionService
             Qty = importProduct.Quantity,
             Length = importProduct.Height, // Height maps to Length
             Width = importProduct.Width,
-            WorkOrderId = workOrderId
+            WorkOrderId = workOrderId,
+            Status = PartStatus.Pending,
+            StatusUpdatedDate = DateTime.UtcNow
         };
     }
 
@@ -688,7 +694,9 @@ public class ImportSelectionService
             MicrovellumId = importHardware.Id, // Preserve Microvellum ID
             Name = importHardware.Name,
             Qty = importHardware.Quantity,
-            WorkOrderId = workOrderId
+            WorkOrderId = workOrderId,
+            Status = PartStatus.Pending,
+            StatusUpdatedDate = DateTime.UtcNow
         };
     }
 
@@ -710,7 +718,9 @@ public class ImportSelectionService
             EdgebandingBottom = importDetached.EdgeBanding?.Contains("Bottom") == true ? "Yes" : string.Empty,
             EdgebandingLeft = importDetached.EdgeBanding?.Contains("Left") == true ? "Yes" : string.Empty,
             EdgebandingRight = importDetached.EdgeBanding?.Contains("Right") == true ? "Yes" : string.Empty,
-            WorkOrderId = workOrderId
+            WorkOrderId = workOrderId,
+            Status = PartStatus.Pending,
+            StatusUpdatedDate = DateTime.UtcNow
         };
     }
 
@@ -746,7 +756,8 @@ public class ImportSelectionService
             Barcode = importNestSheet.Barcode ?? importNestSheet.Name,
             WorkOrderId = workOrderId,
             CreatedDate = DateTime.UtcNow,
-            StatusString = "Pending"
+            Status = PartStatus.Pending,
+            StatusUpdatedDate = DateTime.UtcNow
         };
     }
 
@@ -785,7 +796,8 @@ public class ImportSelectionService
             Barcode = "DEFAULT",
             WorkOrderId = workOrder.Id,
             CreatedDate = DateTime.UtcNow,
-            StatusString = "Pending"
+            Status = PartStatus.Pending,
+            StatusUpdatedDate = DateTime.UtcNow
         };
 
         workOrder.NestSheets.Add(defaultNestSheet);

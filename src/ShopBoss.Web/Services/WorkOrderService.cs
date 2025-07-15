@@ -71,8 +71,8 @@ public class WorkOrderService
             var nestSheetSummary = new NestSheetSummary
             {
                 TotalNestSheets = nestSheets.Count,
-                ProcessedNestSheets = nestSheets.Count(n => n.StatusString == "Processed"),
-                PendingNestSheets = nestSheets.Count(n => n.StatusString != "Processed"),
+                ProcessedNestSheets = nestSheets.Count(n => n.Status == PartStatus.Cut),
+                PendingNestSheets = nestSheets.Count(n => n.Status != PartStatus.Cut),
                 TotalPartsOnNestSheets = nestSheetParts.Count
             };
 
