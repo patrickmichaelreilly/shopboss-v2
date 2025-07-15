@@ -47,13 +47,6 @@
     </div>
 }
 
-@{
-    ViewData["ContainerId"] = "sorting-billboard";
-    ViewData["InitialMessage"] = "";
-    ViewData["InitialType"] = "info";
-}
-
-<partial name="_BillboardMessage" />
 
 
 @if (!Model.Any())
@@ -723,6 +716,7 @@ else
             connection.on("PartSorted", function (data) {
                 console.log("PartSorted event received:", data);
                 showToast(`Part '${data.partName}' sorted to ${data.binLabel}`, 'success');
+                showBillboard('sorting-billboard', `Part '${data.partName}' sorted to ${data.binLabel}`, 'success', 'Part Sorted');
                 
                 // Always refresh current rack to ensure consistency
                 if (currentRackId) {
@@ -774,17 +768,20 @@ else
             connection.onclose(function () {
                 console.log("SignalR Connection Closed");
                 showToast("Connection lost - attempting to reconnect...", 'warning');
+                showBillboard('sorting-billboard', "Connection lost - attempting to reconnect...", 'warning', 'Connection Status');
             });
 
             // Reconnection handlers
             connection.onreconnecting(function () {
                 console.log("SignalR Reconnecting...");
                 showToast("Reconnecting to server...", 'info');
+                showBillboard('sorting-billboard', "Reconnecting to server...", 'info', 'Connection Status');
             });
 
             connection.onreconnected(function () {
                 console.log("SignalR Reconnected");
                 showToast("Reconnected to server", 'success');
+                showBillboard('sorting-billboard', "Reconnected to server", 'success', 'Connection Status');
                 
                 // Rejoin groups after reconnection
                 connection.invoke("JoinGroup", "sorting-station").catch(err => console.error(err));
@@ -909,12 +906,15 @@ else
         }
 
         function showAssemblyReadyNotification(data) {
+            // Show billboard message for assembly readiness
+            showBillboard('sorting-billboard', `Product ${data.productName} (${data.productNumber || data.productId}) is ready for assembly!`, 'success', 'Ready for Assembly');
+            
             // Create special assembly ready notification with enhanced content
             const toastContainer = document.getElementById('toast-container') || createToastContainer();
             const toast = document.createElement('div');
             toast.className = 'toast align-items-center text-white bg-success border-0';
             toast.setAttribute('role', 'alert');
-            toast.setAttribute('data-bs-autohide', 'false'); // Keep visible until manually dismissed
+            toast.setAttribute('data-bs-autohide', 'false'); // Keep error toasts visible until manually dismissed
             toast.innerHTML = `
                 <div class="d-flex">
                     <div class="toast-body">
@@ -1112,9 +1112,6 @@ else
         }
 
         function removePartFromBin(partId, partName) {
-            if (!confirm(`Are you sure you want to remove part "${partName}" from this bin?\n\nThis will change the part status back to "Cut" and it will need to be sorted again.`)) {
-                return;
-            }
             
             fetch('/Sorting/RemovePartFromBin', {
                 method: 'POST',
@@ -1127,6 +1124,7 @@ else
             .then(data => {
                 if (data.success) {
                     showToast(`Part "${partName}" removed from bin successfully`, 'success');
+                    showBillboard('sorting-billboard', `Part "${partName}" removed from bin successfully`, 'success', 'Part Removed');
                     
                     // Check if bin is now empty and close modal, otherwise refresh
                     if (data.updatedCutPartsCount !== undefined) {
@@ -1150,11 +1148,13 @@ else
                     }
                 } else {
                     showToast(`Failed to remove part: ${data.message}`, 'error');
+                    showBillboard('sorting-billboard', `Failed to remove part: ${data.message}`, 'danger', 'Remove Error');
                 }
             })
             .catch(error => {
                 console.error('Error removing part from bin:', error);
                 showToast('An error occurred while removing the part', 'error');
+                showBillboard('sorting-billboard', 'An error occurred while removing the part', 'danger', 'Network Error');
             });
         }
 
@@ -1347,10 +1347,7 @@ else
             const partCount = currentBinDetails.parts ? currentBinDetails.parts.length : 0;
             if (partCount === 0) {
                 showToast('Bin is already empty', 'info');
-                return;
-            }
-            
-            if (!confirm(`Are you sure you want to clear bin "${currentBinDetails.label}"?\n\nThis will remove all ${partCount} parts and change their status back to "Cut". They will need to be sorted again.`)) {
+                showBillboard('sorting-billboard', 'Bin is already empty', 'info', 'Bin Status');
                 return;
             }
             
@@ -1365,6 +1362,7 @@ else
             .then(data => {
                 if (data.success) {
                     showToast(`Bin "${currentBinDetails.label}" cleared successfully. ${data.partsRemoved} parts removed.`, 'success');
+                    showBillboard('sorting-billboard', `Bin "${currentBinDetails.label}" cleared successfully. ${data.partsRemoved} parts removed.`, 'success', 'Bin Cleared');
                     
                     // Close the modal and ensure backdrop is removed
                     const modal = bootstrap.Modal.getInstance(document.getElementById('binDetailModal'));
@@ -1389,11 +1387,13 @@ else
                     }
                 } else {
                     showToast(`Failed to clear bin: ${data.message}`, 'error');
+                    showBillboard('sorting-billboard', `Failed to clear bin: ${data.message}`, 'danger', 'Clear Error');
                 }
             })
             .catch(error => {
                 console.error('Error clearing bin:', error);
                 showToast('An error occurred while clearing the bin', 'error');
+                showBillboard('sorting-billboard', 'An error occurred while clearing the bin', 'danger', 'Network Error');
             });
         }
     </script>
@@ -1562,4 +1562,11 @@ else
         }
     </style>
 }
+
+<!-- Billboard Message at Bottom -->
+@{
+    ViewData["ContainerId"] = "sorting-billboard";
+}
+
+<partial name="_BillboardMessage" />
 

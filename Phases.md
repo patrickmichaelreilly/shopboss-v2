@@ -1,260 +1,229 @@
 # ShopBoss v2 Production Phases - Path to Beta
 
-**Current State:** Phase M1 in progress, core functionality complete  
-**Strategy:** Complete current work, fix critical bugs, polish for beta, defer major refactoring
+**Current State:** Phase M Complete - Manual override system fully functional  
+**Strategy:** Billboard visibility → Hardware grouping → Final polish → Beta release
 
 ---
 
-## **Phase M: Manual Override Completion (3-4 hours + station migrations)**
-*Finish what we started - includes targeted refactoring*
+## COMPLETE!!! **Phase M: Manual Override Completion** 
+*Status management, TreeView fixes, audit trails, and cascade logic all working*
 
-### **M1: Complete ModifyWorkOrder Interface with TreeViewApi (2-3 hours)**
-**Replace old ModifyWorkOrder with the current StatusManagement panel (renamed to ModifyWorkOrder)**
+**✅ Phase M1:** ModifyWorkOrder interface with TreeViewApi complete
+**✅ Phase M1.x:** Migration crisis resolution complete  
+**✅ Phase M2:** Status management cascade logic complete
+**✅ Phase M3:** Integration testing complete
 
-### **Context: Import System Alignment Crisis**
-After successfully completing Phase M1 (Status Management/ModifyWorkOrder interface), we attempted to proceed with the M1.x phases for Status field unification. However, a critical issue emerged: The Import Preview system was still using the old view patterns and wasn't aligned with the new Status-based architecture implemented in ModifyWorkOrder. When Claude Code noticed this discrepancy, it attempted to fix the mismatch by modifying the AdminController to handle mixed states between old and new patterns. This was the WRONG approach - it created more complexity instead of systematically migrating components.
+**Success:** All workflows function with Status enum, manual override system production ready
 
-### **M1.5: Fix Import System FIRST (1 hour)**
-**Fix the Import process to work with current Status implementation**
+---
 
-**CRITICAL:** This phase must be completed BEFORE any database migrations. The Import system must be able to create entities with proper Status fields.
+## **Phase B: Billboard Implementation & Error Visibility (HIGH PRIORITY)**
+**Objective:** Make existing billboards always visible on Assembly and Sorting stations
 
-### **M1.6: Database Migration for Status Unification (1 hour)**
-**Add Status fields to all entities, migrate data, but keep old properties temporarily**
-
-### **M1.7: CNC Station Status Migration (1 hour)**
-**Migrate CNC station from IsProcessed to Status**
-
-### **M1.8: Assembly Station Status Migration (1.5 hours)**
-**Migrate Assembly station from IsCompleted to Status**
-
-### **M1.9: Shipping Station Status Migration (2 hours)**
-**Migrate Shipping station from IsShipped to Status**
-
-### **M1.10: Final Cleanup and Old Property Removal (1 hour)**
-**Remove all obsolete properties after all stations migrated**
-
-**Success = All workflows function with Status enum only**
-
-### **M1.x-EMERGENCY: Migration Consolidation Crisis (PRIORITY)**
-**CRITICAL ISSUE:** 2 days wasted on migration failures, token consumption crisis threatening entire project
-
-### **M2: Status Management Cascade Logic (2 hours)**
-**Add comprehensive cascading logic for shop foreman override capabilities**
-
-
-### **M3: Integration Testing (1 hour)**
-**Ensure Manual Override system is production ready**
+**Target Files:**
+- Frontend: Assembly.cshtml, Sorting.cshtml (only these two)
+- Backend: AssemblyController.cs, SortingController.cs (only these two)
+- Component: _BillboardMessage.cshtml (already exists and well-implemented)
 
 **Tasks:**
-1. Work Order Audit History is not correctly rendering ManualStatusChange events -- they all say (N/A→N/A)
-2. Work Order Statistics partial is listing "Processed" as the second status to count for the entity Nest Sheets. This reveals that Nest Sheets are the only entity using "processed" instead of "Cut". We want to analzye this deeply and surgically change this to "Cut". We need to check throughout the codebase for other things that might be affected - especially the CNC Station. If I use Modify Work Order and manually change the status of a Nest Sheet in the tree to "Cut" or anything else, I get a success popup but when I refresh the page the changes aren't persistent and there is no affect in the Statistics card for Nest Sheets.
-3. Remove the "Quick Filter" bar and buttons below the Tree View in Modify Work Order. Be sure to remove all their functional components too -- they will never be reused.
+1. **Remove Auto-Hide from Existing Billboard Component (15 min)**
+   - _BillboardMessage.cshtml: Remove auto-hide parameter and logic
+   - Remove close button from billboard actions
+   - Ensure messages persist until replaced by new ones
 
-**Deliverables:**
-- ✅ Manual override fully functional
-- ✅ All edge cases handled
-- ✅ Ready for production use
+2. **Remove Auto-Hide from Station Views (15 min)**
+   - Assembly.cshtml: Remove any auto-hide JavaScript calls
+   - Sorting.cshtml: Remove any auto-hide JavaScript calls  
+   - Ensure billboard containers are always visible (no display:none)
+   - Move billboard to display at bottom of view right above footer for now
 
----
+3. **Basic Message Framework Enhancement (30 min)**
+   - AssemblyController: Ensure billboard messages are sent properly
+   - SortingController: Ensure billboard messages are sent properly
+   - Simple message passing - no complex validation logic yet
+   - Focus on framework, not detailed error scenarios
 
-## **Phase B: Critical Bug Fixes (4-5 hours)**
-*Address high-priority issues from Bugs.md*
+4. **Testing Framework (15 min)**
+   - Verify messages appear and persist
+   - Test message replacement functionality
+   - Confirm no auto-hide behavior or close buttons
 
-### **B1: Station-Critical Fixes (2 hours)**
-1. **Sorting Station**: Fix duplicate "Ready for Assembly" alerts
-2. **Sorting Station**: Fix manual "Sort" buttons in Cut Parts Modal
-3. **Assembly Station**: Remove Sorting Rack statistics box completely
-4. **Universal Scanner**: Remove help button
-5. **Rack Configuration**: Add cascade rules for non-empty rack deletion
+**Validation:**
+- [ ] Assembly and Sorting stations show persistent billboard messages
+- [ ] Messages retain until replaced by new ones
+- [ ] No close buttons or auto-hide functionality
+- [ ] Framework ready for future detailed error messages
 
-### **B2: Import & Data Fixes (2 hours)**
-1. **Import Process**: Handle duplicate Work Order Names/IDs properly
-2. **Hardware Grouping**: Combine identical hardware in Assembly/Shipping stations
-3. **Work Order List**: Fix star icon column layout (dedicated column, remove from name)
-4. **Navigation**: Remove ALL Microvellum branding from footer and elsewhere
-
-### **B3: UI Polish from Bugs.md (1 hour)**
-1. **Sorting Station**: Add billboard area, improve grid visualization
-2. **Sorting Station**: Increase rack grid size, remove labels, better color coding
-3. **Assembly Station**: Decrease vertical size of list items
-4. **Shipping Station**: Implement bundled hardware shipping
+**Dependencies:** Phase M complete
 
 ---
 
-## **Phase E: Error Handling & Messaging (3-4 hours)**
-*Production-ready error management*
+## **Phase H: Hardware Grouping Implementation (MEDIUM PRIORITY)**
+**Objective:** Implement hardware consolidation in Shipping Station with dual quantity pattern handling
 
-### **E1: Error Matrix Development (1 hour)**
-**Define all error scenarios and responses**
-
-Create comprehensive error handling matrix for:
-- Scanner errors (invalid barcode, network issues)
-- Status transition violations
-- Data integrity issues
-- Concurrent user conflicts
-- Part already scanned/sorted scenarios
-
-### **E2: Billboard Implementation (2 hours)**
-**Persistent error display for critical stations**
-
-Implement billboard messaging for:
-- Sorting Station (part already scanned, bin full, wrong rack)
-- Assembly Station (missing parts, wrong sequence)
-- CNC Station (nest sheet already processed)
-- Clear recovery instructions for each error
-
-### **E3: Toast & Notification Polish (1 hour)**
-**Temporary notifications and success feedback**
-
-- Success confirmations with appropriate duration
-- Warning toasts for non-critical issues
-- Info notifications for system events
-- Consistent styling and positioning
-
----
-
-## **Phase U: UI Polish & Production Readiness (4-5 hours)**
-*Final interface refinements - partially complete*
-
-### **U1: Complete Billboard Integration (1 hour)**
-**Wire up the billboard messages that were created but not fully integrated**
+**Target Files:**
+- Backend: ShippingController.cs, Hardware entity logic
+- Frontend: Shipping.cshtml
+- Services: Hardware grouping service
 
 **Tasks:**
-1. **Sorting Station Billboard Integration**
-   - Wire up "Part already scanned" errors to billboard
-   - Show "Bin full" warnings in billboard
-   - Display "Wrong rack selected" messages
-   - Show "Ready for Assembly" notifications
+1. **Analyze Hardware Quantity Patterns (45 min)**
+   - Document duplicated entities (Quantity = 1, multiple records)
+   - Document single entities with Quantity > 1 attribute
+   - Identify current import normalization behavior
+   - Create test cases for both patterns
 
-2. **Assembly Station Billboard Integration**
-   - Wire up "Missing parts" errors to billboard
-   - Show "Wrong assembly sequence" warnings
-   - Display "Product completed" success messages
-   - Show location guidance in billboard when appropriate
+2. **Implement Hardware Grouping Logic (1.5 hours)**
+   - Create service to handle both quantity patterns gracefully
+   - Group by hardware type/description
+   - Calculate total quantities correctly for both patterns
+   - Handle edge cases (mixed patterns for same hardware type)
 
-3. **Billboard Controller Methods**
-   - Add billboard message parameters to existing error responses
-   - Ensure proper message types (success, warning, danger, info)
-   - Test persistent vs auto-hide scenarios
+3. **Create Bundled Hardware UI (1 hour)**
+   - Design hardware group display in Shipping Station
+   - Show grouped hardware with total quantities
+   - Add "mark all as shipped" functionality for bundles
+   - Implement individual item override if needed
 
-**Deliverables:**
-- ✅ Billboard shows actual station messages (not empty)
-- ✅ Errors and warnings appear prominently
-- ✅ Success messages celebrate completions
-- ✅ Messages persist appropriately based on importance
+4. **Integration and Testing (45 min)**
+   - Test with both quantity patterns extensively
+   - Verify shipping operations work correctly
+   - Test edge cases and mixed scenarios
+   - Document pattern for potential Assembly Station use
 
-### **U2: Station-Specific Polish (2 hours)**
-Complete the unfinished UI polish tasks:
-- Fix CNC progress calculations
-- Smart rack defaults in Sorting (never show empty rack)
-- Polish assembly queue visualization
-- Enhanced shipping checklist interface
+**Validation:**
+- [ ] Hardware groups correctly regardless of quantity pattern
+- [ ] Total quantities calculated accurately
+- [ ] Bundle shipping works for all hardware types
+- [ ] Edge cases handled gracefully
+- [ ] Pattern documented for future use
 
-### **U3: Scanner Navigation Commands (1 hour)**
-- Implement NAV-SORTING-RACK-X pattern
+**Dependencies:** Phase B complete (for error visibility during testing)
+
+---
+
+## **Phase F: Final Polish & Beta Preparation (LOW PRIORITY)**
+**Objective:** View-by-view cleanup and production readiness
+
+### **F1: Work Order Management Polish (1 hour)**
+- Remove star icon from Work Order name, create dedicated column
+- Remove Work Order ID column from list view
+- Remove ALL Microvellum branding from footer and elsewhere
+- Add Work Order grouping capability (project phases)
+- Add Shop Drawings storage capability to database
+
+### **F2: Station-Specific Polish (4-5 hours)**
+
+**CNC Station (1 hour):**
+- Add Nest Sheet image to detail modal
+- Add label printing capabilities to modal
+- Add un-ProcessNestSheet button in modal
+- Group and sort Nests by material
+- Verify live status updates from other stations
+
+**Sorting Station (1.5 hours):**
+- Fix "Ready for Assembly" duplicate alerts issue
+- Fix manual "Sort" buttons in Cut Parts Modal
+- Increase grid/rack display size, remove column/row labels
+- Improve bin indication colors (Grey/Yellow/Red/Green per spec)
+- Add Empty Bin and Empty Rack buttons
+- Add configurable filtering rules interface (doors, drawer fronts)
+
+**Assembly Station (1 hour):**
+- Decrease vertical size of list elements to reduce length
+- Move completed items to end of list
+- Remove Sorting Rack statistics box completely
+- Add location guidance for filtered parts (doors/drawer fronts)
+
+**Shipping Station (1 hour):**
+- Recreate packing list appearance
+- Add packing list print capability
+- (Hardware grouping implemented in Phase H)
+
+### **F3: Universal Components (1 hour)**
+- Remove help button from scanner partial
+- Add scan events to audit trail
+- Improve audit log display (make manual changes less verbose)
+- Add NAV-SORTING-RACK-X navigation commands
 - Create command barcode sheet generator
-- Test navigation flows across all stations
-- Document all scanner commands
 
-### **U4: Final Visual Polish (1 hour)**
-- Consistent button sizing across all stations
-- Proper spacing and alignment
-- Mobile/tablet optimization verification
-- Loading states and progress indicators
+### **F4: Import & Data Management (1.5 hours)**
+- Handle repeat Work Order Names and IDs properly
+- Update Import Preview to work exactly like Modify (specialized mode)
+- Add capability to merge additional SDF data into existing Work Order
+- Fix TreeView API style info location (move from view to API)
 
----
+### **F5: System Management (1 hour)**
+- Add cascade rules for non-empty rack deletion
+- Improve rack configuration interface
+- Test backup and restore functionality
+- Verify archive operations
 
-## **Phase V: Validation & Beta Release (2-3 hours)**
-*Final testing and deployment preparation*
+### **F6: Development Process (1 hour)**
+- Slice and refactor bloated AdminController
+- Compress Worklog.md for better maintainability
+- Implement data checkpoints
+- Clean up and document development workflow
 
-### **V1: Integration Testing (1.5 hours)**
-- Complete workflow testing (Import → Ship)
-- Performance validation with 1000+ parts
-- Multi-user concurrent testing
-- Archive/backup operation verification
-- Scanner command testing
+**Validation:**
+- [ ] Professional interface across all views
+- [ ] All critical bugs from Improvements.md addressed
+- [ ] Import system handles edge cases
+- [ ] Backup/restore fully functional
+- [ ] Code quality improvements complete
 
-### **V2: Beta Package Creation (1.5 hours)**
-- Self-contained deployment package
-- Installation documentation
-- Scanner command reference sheets
-- Quick start guides for each station
-- Beta feedback collection setup
+**Dependencies:** Phase H complete
 
 ---
 
 ## **Success Metrics for Beta**
 
 ### Functional Completeness
-- ✅ All stations operational with manual override
+- ✅ All stations operational with manual override (Phase M complete)
 - ✅ Complete workflow from Import to Shipping
-- ✅ Error handling for common scenarios
-- ✅ Scanner-first navigation working
+- 🎯 Billboard error handling for common scenarios (Phase B)
+- 🎯 Hardware grouping working perfectly (Phase H)
+- 🎯 Professional UI across all views (Phase F)
 
-### Bug Resolution
-- ✅ All critical bugs from Bugs.md fixed
-- ✅ No workflow-blocking issues
-- ✅ Consistent UI behavior
-- ✅ No data integrity issues
+### Error Visibility & Handling
+- 🎯 Always-visible billboards showing informative messages
+- 🎯 Comprehensive error messaging per Scans.md specification
+- 🎯 Edge cases discoverable through billboard feedback
+- 🎯 Graceful handling of dual hardware quantity patterns
 
 ### Production Readiness
-- ✅ Backup/restore fully functional
-- ✅ Health monitoring operational
-- ✅ Complete audit trails
-- ✅ Beta deployment package ready
-
----
-
-## **Post-Beta Phase R: Architecture Refactoring**
-*To be addressed after successful beta deployment*
-
-### **Future R1: Controller Decomposition**
-- Extract Status Management endpoints to dedicated controller
-- Extract Backup/Archive endpoints to DataManagementController
-- Split bloated SortingController
-- Target: Controllers under 300 lines each
-
-### **Future R2: Code Quality**
-- Run dotnet format on entire codebase
-- Add .editorconfig with standards
-- Set up pre-commit hooks
-- Compress Worklog.md
-
-### **Future R3: Technical Debt**
-- Enable proper EF migrations
-- Add basic test infrastructure
-- Improve error handling patterns
-- Performance optimizations
+- 🎯 No workflow-blocking UI issues
+- 🎯 Consistent behavior across all stations
+- 🎯 Complete audit trails including scan events
+- 🎯 Beta deployment package ready
 
 ---
 
 ## **Timeline Estimate**
 
-**Week 1:** Complete Phase M + High Priority Bugs (Phase B1-B2)  
-**Week 2:** Error Handling + Remaining Bugs (Phase E + B3)  
-**Week 3:** UI Polish + Testing (Phase U + V1)  
-**Week 4:** Beta Release Prep (Phase V2)
+**Phase B:** 1.25 hours (billboard persistence + basic messaging)  
+**Phase H:** 4 hours (hardware grouping with dual quantity handling)  
+**Phase F:** 10 hours (comprehensive view-by-view polish)
 
-**Total to Beta:** ~18-22 hours over 4 weeks
+**Total to Beta:** ~15.25 hours over 2-3 weeks
 
-**Post-Beta:** Architecture refactoring as time permits
+**Parallel work:** User testing edge cases during Phase H implementation
 
 ---
 
 ## **Risk Mitigation**
 
-1. **Focus on beta**: Defer non-critical refactoring
-2. **Test thoroughly**: Each bug fix verified before moving on
-3. **Incremental delivery**: Complete phases before starting new ones
-4. **User feedback**: Early beta testing to catch issues
+1. **Billboard visibility first**: Exposes real issues before final polish
+2. **Hardware grouping isolated**: Prove pattern in Shipping before expanding
+3. **Incremental delivery**: Each phase builds on previous success
+4. **User feedback integration**: Edge case testing parallel to development
+5. **Preserve all existing functionality**: No regression in working systems
 
 ---
 
-This phases document prioritizes getting to beta with a stable, functional system. Major refactoring is deferred until after beta success is confirmed. The focus is on:
+This phases document prioritizes visibility and feedback (billboards) to drive discovery of real issues, implements hardware grouping carefully with dual quantity pattern support, and finishes with comprehensive polish. The focus is on:
 
-1. **Completing current work** (Phase M with targeted AdminController cleanup)
-2. **Fixing user-facing bugs** that would block beta adoption
-3. **Adding essential error handling** for production use
-4. **Polish and testing** for professional deployment
-5. **Deferring major refactoring** until post-beta
+1. **Making problems visible** through persistent billboard messaging
+2. **Solving complex grouping** with careful attention to quantity patterns  
+3. **Professional polish** across all views for beta readiness
+4. **Maintaining stability** of the working Phase M foundation

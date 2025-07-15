@@ -354,21 +354,33 @@ class UniversalScanner {
     }
     
     focus() {
+        console.log(`[Scanner-${this.containerId}] focus() called:`, {
+            isProcessing: this.isProcessing,
+            currentActiveElement: document.activeElement?.tagName + (document.activeElement?.id ? `#${document.activeElement.id}` : ''),
+            hasModalInput: !!this.input,
+            isCollapsed: this.isCollapsed()
+        });
+        
         if (!this.isProcessing) {
             if (this.isCollapsed()) {
-                if (this.invisibleInput) {
-                    this.invisibleInput.focus();
-                }
+                console.log(`[Scanner-${this.containerId}] Scanner collapsed - using document-level listener, no focus needed`);
             } else if (this.input) {
+                console.log(`[Scanner-${this.containerId}] Attempting to focus modal input`);
                 // Check if input is in a modal that's currently shown
                 const modal = this.input.closest('.modal');
                 if (modal && modal.classList.contains('show')) {
                     this.input.focus();
+                    console.log(`[Scanner-${this.containerId}] Modal input focused. New active element:`, document.activeElement?.tagName + (document.activeElement?.id ? `#${document.activeElement.id}` : ''));
                 } else if (!modal) {
                     // Not in a modal, focus normally
                     this.input.focus();
+                    console.log(`[Scanner-${this.containerId}] Non-modal input focused. New active element:`, document.activeElement?.tagName + (document.activeElement?.id ? `#${document.activeElement.id}` : ''));
+                } else {
+                    console.log(`[Scanner-${this.containerId}] Modal not shown, skipping focus`);
                 }
             }
+        } else {
+            console.log(`[Scanner-${this.containerId}] Skipping focus - scanner is processing`);
         }
     }
     
@@ -399,78 +411,76 @@ class UniversalScanner {
         document.addEventListener('click', () => {
             clearTimeout(focusTimeout);
             focusTimeout = setTimeout(() => {
-                if (!this.isProcessing && document.activeElement !== this.input && !this.isCollapsed()) {
-                    // Check if input is in a modal
-                    const modal = this.input ? this.input.closest('.modal') : null;
-                    if (!modal || (modal && modal.classList.contains('show'))) {
-                        this.focus();
+                if (!this.isProcessing && !this.isCollapsed()) {
+                    // When not collapsed (modal open), focus modal input
+                    if (document.activeElement !== this.input) {
+                        const modal = this.input ? this.input.closest('.modal') : null;
+                        if (!modal || (modal && modal.classList.contains('show'))) {
+                            this.focus();
+                        }
                     }
                 }
             }, 2000);
         });
         
-        // Return focus every 5 seconds if no activity
-        setInterval(() => {
-            if (!this.isProcessing && document.activeElement !== this.input && !this.isCollapsed()) {
-                // Check if input is in a modal
-                const modal = this.input ? this.input.closest('.modal') : null;
-                if (!modal || (modal && modal.classList.contains('show'))) {
-                    this.focus();
-                }
-            }
-        }, 5000);
-        
-        // Set up invisible input for collapsed state
-        this.setupInvisibleInput();
+        // Set up document-level key listener for collapsed state
+        this.setupDocumentKeyListener();
     }
     
-    setupInvisibleInput() {
-        // Create invisible input for when scanner is collapsed
-        this.invisibleInput = document.createElement('input');
-        this.invisibleInput.type = 'text';
-        this.invisibleInput.style.position = 'fixed';
-        this.invisibleInput.style.left = '-9999px';
-        this.invisibleInput.style.top = '0';
-        this.invisibleInput.style.opacity = '0';
-        this.invisibleInput.style.zIndex = '-1';
-        this.invisibleInput.autocomplete = 'off';
-        this.invisibleInput.spellcheck = false;
-        document.body.appendChild(this.invisibleInput);
+    setupDocumentKeyListener() {
+        // Initialize barcode accumulation
+        this.barcodeBuffer = '';
+        this.barcodeTimeout = null;
         
-        // Set up event listeners for invisible input
-        this.invisibleInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && this.isCollapsed()) {
+        // Document-level keydown listener for collapsed state
+        this.documentKeyHandler = (e) => {
+            // Only handle when scanner is collapsed and not processing
+            if (!this.isCollapsed() || this.isProcessing) {
+                return;
+            }
+            
+            // Handle Enter key - process accumulated barcode
+            if (e.key === 'Enter') {
                 e.preventDefault();
-                this.processScanFromInvisible();
-            }
-        });
-        
-        this.invisibleInput.addEventListener('input', (e) => {
-            if (this.isCollapsed()) {
-                const value = e.target.value.trim();
-                if (value.length > 8 && this.looksLikeBarcode(value)) {
-                    setTimeout(() => {
-                        if (this.invisibleInput.value === value) {
-                            this.processScanFromInvisible();
-                        }
-                    }, 100);
+                if (this.barcodeBuffer.trim()) {
+                    this.processScanFromDocument();
                 }
+                return;
+            }
+            
+            // Skip special keys, only accumulate printable characters
+            if (e.key.length === 1) {
+                this.barcodeBuffer += e.key;
+                
+                // Reset timeout on each keystroke
+                clearTimeout(this.barcodeTimeout);
+                this.barcodeTimeout = setTimeout(() => {
+                    // Clear buffer after 2 seconds of inactivity
+                    this.barcodeBuffer = '';
+                }, 2000);
+            }
+        };
+        
+        // Add the document listener
+        document.addEventListener('keydown', this.documentKeyHandler);
+        
+        // Clean up on page unload
+        window.addEventListener('beforeunload', () => {
+            if (this.documentKeyHandler) {
+                document.removeEventListener('keydown', this.documentKeyHandler);
+            }
+            if (this.barcodeTimeout) {
+                clearTimeout(this.barcodeTimeout);
             }
         });
-        
-        // Focus invisible input when collapsed
-        setInterval(() => {
-            if (this.isCollapsed() && !this.isProcessing && document.activeElement !== this.invisibleInput) {
-                this.invisibleInput.focus();
-            }
-        }, 1000);
     }
     
-    async processScanFromInvisible() {
+    async processScanFromDocument() {
         if (!this.isCollapsed()) return;
         
-        const barcode = this.invisibleInput.value.trim();
-        this.invisibleInput.value = '';
+        const barcode = this.barcodeBuffer.trim();
+        this.barcodeBuffer = '';
+        clearTimeout(this.barcodeTimeout);
         
         if (!barcode) return;
         
@@ -519,11 +529,7 @@ class UniversalScanner {
             this.updateStatusIndicator('error', 'Error processing scan.');
         } finally {
             this.isProcessing = false;
-            setTimeout(() => {
-                if (this.isCollapsed()) {
-                    this.invisibleInput.focus();
-                }
-            }, 100);
+            // No focus management needed for document-level listener
         }
     }
     
@@ -593,7 +599,21 @@ class UniversalScanner {
     }
     
     isCollapsed() {
-        return this.bodyElement && !this.bodyElement.classList.contains('show');
+        // Universal Scanner is modal-based, "collapsed" means modal is not shown
+        const modal = this.input ? this.input.closest('.modal') : null;
+        const isCollapsed = modal ? !modal.classList.contains('show') : true;
+        
+        // Reduce debugging frequency - only log occasionally
+        if (Math.random() < 0.01) { // Only log 1% of the time
+            console.log(`[Scanner-${this.containerId}] isCollapsed() called:`, {
+                hasModal: !!modal,
+                modalClasses: modal ? Array.from(modal.classList) : null,
+                hasShowClass: modal ? modal.classList.contains('show') : false,
+                isCollapsed: isCollapsed
+            });
+        }
+        
+        return isCollapsed;
     }
     
     // Health indicator management for compact mode
@@ -677,6 +697,8 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     });
+    
+    console.log('Universal scanners initialized:', Object.keys(window.universalScanners));
 });
 
 // Global toggle function for scanner collapse

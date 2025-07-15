@@ -148,13 +148,6 @@
     </div>
 </div>
 
-@{
-    ViewData["ContainerId"] = "assembly-billboard";
-    ViewData["InitialMessage"] = "";
-    ViewData["InitialType"] = "info";
-}
-
-<partial name="_BillboardMessage" />
 
 
 <!-- Inline Location Guidance -->
@@ -449,6 +442,13 @@
 <!-- Toast Container for Notifications -->
 <div class="toast-container"></div>
 
+<!-- Billboard Message at Bottom -->
+@{
+    ViewData["ContainerId"] = "assembly-billboard";
+}
+
+<partial name="_BillboardMessage" />
+
 @section Scripts {
     <script src="~/lib/signalr/dist/browser/signalr.js"></script>
     <script src="~/js/universal-scanner.js"></script>
@@ -481,6 +481,7 @@
         connection.on("ProductAssembled", function (data) {
             console.log("ProductAssembled event received:", data);
             showToast(`Product "${data.ProductName}" has been assembled!`, 'success');
+            showBillboard('assembly-billboard', `Product "${data.ProductName}" has been assembled!`, 'success', 'Assembly Complete');
             updateProductStatus(data.ProductId, 'completed');
             updateShippingReadinessStatus(data);
         });
@@ -489,6 +490,7 @@
         connection.on("ProductAssembledByScan", function (data) {
             console.log("ProductAssembledByScan event received:", data);
             showToast(`🔧 Product "${data.ProductName}" assembled via scan!`, 'success');
+            showBillboard('assembly-billboard', `Product "${data.ProductName}" assembled via scan!`, 'success', 'Scan Assembly Complete');
             updateProductStatus(data.ProductId, 'completed');
             updateShippingReadinessStatus(data);
             
@@ -502,6 +504,7 @@
         connection.on("ProductReadyForAssembly", function (data) {
             console.log("ProductReadyForAssembly event received:", data);
             showToast(`Product "${data.productName}" is now ready for assembly!`, 'info');
+            showBillboard('assembly-billboard', `Product "${data.productName}" is now ready for assembly!`, 'info', 'Ready for Assembly');
             updateProductStatus(data.productId, 'ready');
         });
 
@@ -509,6 +512,7 @@
         connection.on("ProductAssembledManually", function (data) {
             console.log("ProductAssembledManually event received:", data);
             showToast(`Product "${data.ProductName}" assembled successfully!`, 'success');
+            showBillboard('assembly-billboard', `Product "${data.ProductName}" assembled successfully!`, 'success', 'Manual Assembly Complete');
             updateProductStatus(data.ProductId, 'completed');
             updateShippingReadinessStatus(data);
             
@@ -580,6 +584,7 @@
         function updateShippingReadinessStatus(data) {
             if (data.IsWorkOrderReadyForShipping) {
                 showToast(`🚛 Work Order is now ready for shipping! (${data.ReadyForShippingProducts?.length || 0} products ready)`, 'info');
+                showBillboard('assembly-billboard', `Work Order is now ready for shipping! (${data.ReadyForShippingProducts?.length || 0} products ready)`, 'info', 'Shipping Ready');
                 
                 // Add shipping readiness indicator
                 const headerDiv = document.querySelector('h2').parentElement;
@@ -634,9 +639,6 @@
 
         // Assembly functions
         function startAssembly(productId, productName) {
-            if (!confirm(`Start assembly for "${productName}"? This will mark all carcass parts as assembled.`)) {
-                return;
-            }
 
             const button = event.target.closest('button');
             const originalHtml = button.innerHTML;
@@ -656,11 +658,13 @@
             .then(data => {
                 if (data.success) {
                     showToast(data.message, 'success');
+                    showBillboard('assembly-billboard', data.message, 'success', 'Assembly Started');
                     setTimeout(() => {
                         location.reload();
                     }, 2000);
                 } else {
                     showToast(data.message, 'error');
+                    showBillboard('assembly-billboard', data.message, 'danger', 'Assembly Error');
                     button.disabled = false;
                     button.innerHTML = originalHtml;
                 }
@@ -668,6 +672,7 @@
             .catch(error => {
                 console.error('Error starting assembly:', error);
                 showToast('An error occurred while starting assembly', 'error');
+                showBillboard('assembly-billboard', 'An error occurred while starting assembly', 'danger', 'Network Error');
                 button.disabled = false;
                 button.innerHTML = originalHtml;
             });

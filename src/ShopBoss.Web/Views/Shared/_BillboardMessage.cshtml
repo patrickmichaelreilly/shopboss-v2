@@ -1,10 +1,8 @@
 @{
     string containerId = ViewData["ContainerId"]?.ToString() ?? "billboard-message";
-    string initialMessage = ViewData["InitialMessage"]?.ToString() ?? "";
-    string initialType = ViewData["InitialType"]?.ToString() ?? "info";
 }
 
-<div id="@containerId" class="billboard-message-container mb-4" style="@(string.IsNullOrEmpty(initialMessage) ? "display: none;" : "")">
+<div id="@containerId" class="billboard-message-container mb-4">
     <div class="billboard-message">
         <div class="billboard-content">
             <div class="billboard-icon">
@@ -12,12 +10,7 @@
             </div>
             <div class="billboard-text">
                 <div class="billboard-title">Status</div>
-                <div class="billboard-message-text">@initialMessage</div>
-            </div>
-            <div class="billboard-actions">
-                <button type="button" class="btn btn-sm btn-outline-light" onclick="hideBillboard('@containerId')">
-                    <i class="fas fa-times"></i>
-                </button>
+                <div class="billboard-message-text"></div>
             </div>
         </div>
     </div>
@@ -130,7 +123,7 @@
 
 <script>
 // Billboard message management functions
-window.showBillboard = function(containerId, message, type = 'info', title = 'Status', autoHide = false) {
+window.showBillboard = function(containerId, message, type = 'info', title = 'Status') {
     const container = document.getElementById(containerId);
     if (!container) return;
     
@@ -158,13 +151,6 @@ window.showBillboard = function(containerId, message, type = 'info', title = 'St
     
     // Show container
     container.style.display = 'block';
-    
-    // Auto-hide if requested
-    if (autoHide) {
-        setTimeout(() => {
-            hideBillboard(containerId);
-        }, 5000);
-    }
 };
 
 window.hideBillboard = function(containerId) {
@@ -173,6 +159,7 @@ window.hideBillboard = function(containerId) {
         container.style.display = 'none';
     }
 };
+
 
 window.updateBillboard = function(containerId, message, type = null, title = null) {
     const container = document.getElementById(containerId);
