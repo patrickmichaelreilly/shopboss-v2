@@ -51,6 +51,7 @@ builder.Services.AddScoped<AuditTrailService>();
 builder.Services.AddScoped<SortingRuleService>();
 builder.Services.AddScoped<PartFilteringService>();
 builder.Services.AddScoped<ShippingService>();
+builder.Services.AddScoped<HardwareGroupingService>();
 builder.Services.AddScoped<WorkOrderService>();
 builder.Services.AddScoped<BackupService>();
 builder.Services.AddScoped<SystemHealthMonitor>();

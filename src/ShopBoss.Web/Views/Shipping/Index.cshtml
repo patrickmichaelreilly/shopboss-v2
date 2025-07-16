@@ -254,31 +254,43 @@
                 <div class="shipping-section-header">
                     <h4 class="mb-0">
                         <i class="fas fa-wrench text-purple me-2"></i>
-                        Hardware (@Model.Hardware.Count(h => h.Hardware.Status == PartStatus.Shipped)/@Model.Hardware.Count shipped)
+                        Hardware (@Model.GroupedHardware.Count(g => g.Status == PartStatus.Shipped)/@Model.GroupedHardware.Count groups)
                     </h4>
                 </div>
-                @if (Model.Hardware.Any())
+                @if (Model.GroupedHardware.Any())
                 {
-                    @foreach (var hardware in Model.Hardware)
+                    @foreach (var hardwareGroup in Model.GroupedHardware)
                     {
-                        <div class="shipping-item @(hardware.Hardware.Status == PartStatus.Shipped ? "shipped" : "ready")">
+                        <div class="shipping-item @(hardwareGroup.Status == PartStatus.Shipped ? "shipped" : "ready")">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
-                                    <h6 class="mb-1">@hardware.Hardware.Name</h6>
-                                    <small class="text-muted">ID: @hardware.Hardware.Id</small>
+                                    <h6 class="mb-1">
+                                        @hardwareGroup.Name
+                                        @if (hardwareGroup.HasMultipleItems)
+                                        {
+                                            <small class="text-muted">(@hardwareGroup.IndividualItems.Count items)</small>
+                                        }
+                                    </h6>
+                                    <small class="text-muted">Total Qty: @hardwareGroup.TotalQuantity</small>
                                 </div>
                                 <div class="d-flex align-items-center">
-                                    <div class="me-3">
-                                        <small class="text-muted">Qty: @hardware.Hardware.Qty</small>
-                                    </div>
-                                    @if (hardware.Hardware.Status != PartStatus.Shipped)
+                                    @if (hardwareGroup.Status != PartStatus.Shipped)
                                     {
-                                        <button class="btn btn-success btn-sm me-2" onclick="shipHardware('@hardware.Hardware.Id')">
-                                            <i class="fas fa-shipping-fast me-1"></i>Ship
-                                        </button>
+                                        @if (hardwareGroup.HasMultipleItems)
+                                        {
+                                            <button class="btn btn-success btn-sm me-2" onclick="shipHardwareGroup('@hardwareGroup.Name', '@string.Join(",", hardwareGroup.AllHardwareIds)')">
+                                                <i class="fas fa-shipping-fast me-1"></i>Ship All (@hardwareGroup.TotalQuantity)
+                                            </button>
+                                        }
+                                        else
+                                        {
+                                            <button class="btn btn-success btn-sm me-2" onclick="shipHardware('@hardwareGroup.PrimaryItem.Id')">
+                                                <i class="fas fa-shipping-fast me-1"></i>Ship
+                                            </button>
+                                        }
                                     }
-                                    <span class="status-badge @(hardware.Hardware.Status == PartStatus.Shipped ? "shipped" : "ready")">
-                                        @if (hardware.Hardware.Status == PartStatus.Shipped)
+                                    <span class="status-badge @(hardwareGroup.Status == PartStatus.Shipped ? "shipped" : "ready")">
+                                        @if (hardwareGroup.Status == PartStatus.Shipped)
                                         {
                                             <i class="fas fa-check me-1"></i><text>Shipped</text>
                                         }
@@ -535,6 +547,41 @@
                 })
                 .fail(function() {
                     showAlert('Error shipping detached product', 'danger');
+                });
+            };
+
+            window.shipHardwareGroup = function(groupName, hardwareIds) {
+                if (!confirm(`Are you sure you want to ship all hardware items in group "${groupName}"?`)) {
+                    return;
+                }
+                
+                const ids = hardwareIds.split(',');
+                let completedCount = 0;
+                let totalCount = ids.length;
+                
+                showAlert(`🔄 Shipping ${totalCount} hardware items in group "${groupName}"...`, 'info');
+                
+                // Ship each hardware item in the group
+                ids.forEach(function(hardwareId) {
+                    $.ajax({
+                        url: '/Shipping/ScanHardware',
+                        method: 'POST',
+                        data: { barcode: hardwareId },
+                        dataType: 'json'
+                    })
+                    .done(function(response) {
+                        completedCount++;
+                        if (completedCount === totalCount) {
+                            // All items shipped successfully
+                            showAlert(`✅ Hardware group "${groupName}" shipped successfully! (${totalCount} items)`, 'success');
+                            updateOverallProgress();
+                            // Refresh the page to show updated grouping
+                            setTimeout(() => location.reload(), 1500);
+                        }
+                    })
+                    .fail(function() {
+                        showAlert(`❌ Error shipping hardware group "${groupName}"`, 'danger');
+                    });
                 });
             };
 

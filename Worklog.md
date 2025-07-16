@@ -383,3 +383,67 @@ setupDocumentKeyListener() {
 **Status:** ✅ COMPLETED - Universal Scanner focus management crisis resolved. Scanner now provides 100% reliable barcode processing across all stations using document-level keydown listeners, eliminating focus-dependent failures. System is production-ready for scanner-only terminals.
 
 ---
+
+## Phase H: Hardware Grouping Implementation - COMPLETED (2025-07-16)
+
+**Objective:** Implement hardware consolidation in Shipping Station with dual quantity pattern handling, enabling grouped hardware display and bundle shipping operations.
+
+**Target Files:**
+- Backend: HardwareGroupingService.cs (new), ShippingService.cs, Program.cs
+- Frontend: Shipping/Index.cshtml
+- Services: Pure data transformation service with no controller coupling
+
+**Tasks Completed:**
+
+1. **✅ Hardware Quantity Pattern Analysis**: Identified and documented dual quantity patterns
+   - **Duplicated Entities Pattern**: Multiple records with Qty=1 each (5 "Hinge" records)
+   - **Single Entity Pattern**: Single record with Qty>1 (1 "Handle" record with Qty=5)
+
+2. **✅ Standalone HardwareGroupingService**: Created pure data API service
+   - **Files**: `HardwareGroupingService.cs` - Zero coupling to controllers or views
+   - **Grouping Logic**: Simple `GroupBy(h => h.Name)` - easily modifiable for business iteration
+   - **Status Pattern**: Uses `PartStatus` enum consistently with all other entities
+   - **Data Structure**: `HardwareGroup` with consolidated quantities and atomic shipping status
+
+3. **✅ ShippingService Integration**: Enhanced dashboard data with grouped hardware
+   - **Files**: `ShippingService.cs:13, 133-136` - Added HardwareGroupingService dependency
+   - **Data Flow**: Raw hardware → HardwareGroupingService → Grouped data → UI
+   - **Preservation**: Individual hardware items still available for existing functionality
+
+4. **✅ Shipping UI Enhancement**: Updated interface for grouped hardware display
+   - **Files**: `Shipping/Index.cshtml:253-323` - Replaced individual hardware list with grouped view
+   - **User Interface**: Shows consolidated quantities, item counts, and "Ship All" buttons
+   - **Visual States**: Clean shipped/ready states using existing CSS patterns
+   - **Atomic Groups**: No partial shipping complexity - groups are all-or-nothing
+
+5. **✅ JavaScript Bundle Shipping**: Added `shipHardwareGroup()` function
+   - **Files**: `Shipping/Index.cshtml:553-586` - Bulk shipping implementation
+   - **Approach**: Calls existing `/Shipping/ScanHardware` endpoint for each item in group
+   - **User Experience**: Progress feedback, confirmation dialogs, automatic page refresh
+   - **Error Handling**: Graceful failure handling with user feedback
+
+6. **✅ Dependency Injection**: Registered HardwareGroupingService in DI container
+   - **Files**: `Program.cs:54` - Added service registration
+   - **Scope**: Scoped service lifecycle matching other business services
+
+**Key Implementation Details:**
+- **Surgical Implementation**: Zero changes to existing hardware scanning functionality
+- **Configurable Grouping**: Single line change to modify grouping criteria during testing
+- **Clean Architecture**: HardwareGroupingService is pure data transformation
+- **Atomic Operations**: Hardware groups ship as complete units, no partial states
+- **Status Consistency**: Follows established `PartStatus` enum pattern
+
+**Build Status:** ✅ Success (0 errors, 22 warnings - no new issues introduced)
+
+**Validation:**
+- ✅ Application builds and starts successfully
+- ✅ Shipping Station displays grouped hardware with consolidated quantities
+- ✅ "Ship All" buttons work for multi-item groups
+- ✅ Single-item groups use regular "Ship" button
+- ✅ Individual hardware scanning still works via Universal Scanner
+- ✅ Existing hardware endpoints unchanged and functional
+- ✅ Hardware groups show correct shipped/ready states
+
+**Status:** ✅ COMPLETED - Hardware grouping system implemented with dual quantity pattern support. Shipping Station now provides consolidated hardware view with bundle shipping capabilities. System ready for testing and business logic iteration on grouping criteria.
+
+---

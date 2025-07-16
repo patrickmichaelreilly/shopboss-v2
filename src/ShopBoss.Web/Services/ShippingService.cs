@@ -8,12 +8,14 @@ public class ShippingService
 {
     private readonly ShopBossDbContext _context;
     private readonly WorkOrderService _workOrderService;
+    private readonly HardwareGroupingService _hardwareGroupingService;
     private readonly ILogger<ShippingService> _logger;
 
-    public ShippingService(ShopBossDbContext context, WorkOrderService workOrderService, ILogger<ShippingService> logger)
+    public ShippingService(ShopBossDbContext context, WorkOrderService workOrderService, HardwareGroupingService hardwareGroupingService, ILogger<ShippingService> logger)
     {
         _context = context;
         _workOrderService = workOrderService;
+        _hardwareGroupingService = hardwareGroupingService;
         _logger = logger;
     }
 
@@ -130,6 +132,9 @@ public class ShippingService
 
             var readyProductIds = await GetProductsReadyForShippingOptimizedAsync(shippingStationData);
 
+            // Get grouped hardware data from standalone service
+            var groupedHardware = _hardwareGroupingService.GroupHardwareByName(shippingStationData.Hardware);
+
             return new ShippingDashboardData
             {
                 WorkOrder = shippingStationData.WorkOrder,
@@ -140,6 +145,7 @@ public class ShippingService
                     Hardware = h,
                     IsShipped = h.Status == PartStatus.Shipped
                 }).ToList(),
+                GroupedHardware = groupedHardware,
                 DetachedProducts = shippingStationData.DetachedProducts.Select(d => new DetachedProductShippingStatus
                 {
                     DetachedProduct = d,
@@ -413,6 +419,7 @@ public class ShippingDashboardData
     public List<string> ReadyProductIds { get; set; } = new();
     public List<ProductShippingStatus> Products { get; set; } = new();
     public List<HardwareShippingStatus> Hardware { get; set; } = new();
+    public List<HardwareGroup> GroupedHardware { get; set; } = new();
     public List<DetachedProductShippingStatus> DetachedProducts { get; set; } = new();
 }
 
