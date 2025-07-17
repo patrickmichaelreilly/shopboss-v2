@@ -5,16 +5,16 @@
     - Add capablity of storing Shop Drawings in DB attached to Work Orders
 
 # Modify Work Order
-    - Improve audit log display. Manual changes are less verbose than typical ones. Need Scan events in audit log.
-    - Integrate new Modify partial, replacing old one. Remove old one.
+    - Not all scan events in audit log.
     - Add capability to merge additional SDF data into existing Work Order. Handle part re-cuts, supplementary Nest Sheets, etc.
-    - Need to group and count identical Hardware items.
+    - Delete entities from work order.
 
 # Import Process
     - Handle repeat Work Order Names and Work Order IDs
     - Fully update Import Preview to work exactly like Modify. Specialized mode.
     - Tree View Api -- why is style info in the View as opposed to within the TreeViewApi?
     - Need to group and count identical Hardware items.
+    - Handle repeat NestSheet names.
 
 # CNC Station
     - Improve Nest Sheet detail modal to include Nest Sheet image.
@@ -26,15 +26,17 @@
 # Sorting Station
     - Getting a "Ready for Assembly" alert twice for Product with filtered parts (doors/drawer fronts). Once after Carcass again after Door. Just need 1 when Carcass is ready.
     - Cut Parts Modal - manual "Sort" buttons don't work
-    - Need to add billboard area
-    - Increase size of grid/rack display. Remove column and row labels. 
+    - Style billboard area
+    - Increase size of grid/rack display. Remove column and row labels.
     - Improve bin indication colors and visuals - Grey for empty, Yellow for partial, Red for indicating immediate location (matching billboard text), Green for ready to Assemble
     - Add Empty Bin and Empty Rack buttons even when it thinks it's already empty.
     - Add interface for configuring filtering rules (instead of hardcoding) for Doors, Drawer Fronts, etc. Should be extensible for arbitrary rules.
+    - Show bins occupied by other work orders as Blocked
 
 # Universal Scanner Partial
     - Remove help button
     - Add scan even to audit trail
+    - Transform to all caps
 
 # Assembly Station
     - Improve list appearance. Decrease vertical size of each element to reduce length of list. Move completed items to end of list.
@@ -43,9 +45,9 @@
     - Improve list appearance. Decrease vertical size of each element to reduce length of list. Move completed items to end of list.
 
 # Shipping Station
-    - Combine Hardware items and give totals. Manually clicking Shipped on a "bundle" of like Hardware components marks them all as Shipped.
     - Recreate look of a packing list.
     - Packing list print capability.
+    - Products not correctly showing "Shipped"
 
 # Rack Configuration view
     - Deleting a rack must deal with parts if it is not empty. Need cascade rules.

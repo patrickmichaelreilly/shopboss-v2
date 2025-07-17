@@ -18,7 +18,7 @@ class UniversalScanner {
         
         this.isProcessing = false;
         this.lastScanTime = 0;
-        this.scanCooldown = 1000; // 1 second cooldown between scans
+        this.scanCooldown = 100; // 1 second cooldown between scans
         
         this.init();
     }
