@@ -49,15 +49,6 @@ public class PartFilteringService
         _logger = logger;
     }
 
-    /// <summary>
-    /// Determines if a part should be filtered to specialized racks (Doors & Fronts or Adjustable Shelves).
-    /// Returns true if part should be diverted from standard carcass processing.
-    /// </summary>
-    public bool ShouldFilterPart(Part part)
-    {
-        var category = ClassifyPart(part);
-        return category == PartCategory.DoorsAndDrawerFronts || category == PartCategory.AdjustableShelves;
-    }
 
     /// <summary>
     /// Classifies a part into its appropriate category based on configurable keyword rules.
@@ -111,111 +102,14 @@ public class PartFilteringService
             return PartCategory.Hardware;
         }
 
-        // Default to carcass parts (sides, backs, tops, bottoms, etc.)
-        _logger.LogDebug("Part '{PartName}' classified as Carcass (default)", partName);
-        return PartCategory.Carcass;
+        // Default to standard parts (sides, backs, tops, bottoms, etc.)
+        _logger.LogDebug("Part '{PartName}' classified as Standard (default)", partName);
+        return PartCategory.Standard;
     }
 
-    /// <summary>
-    /// Gets the preferred rack type for a given part category.
-    /// </summary>
-    public RackType GetPreferredRackType(PartCategory category)
-    {
-        var rackType = category switch
-        {
-            PartCategory.DoorsAndDrawerFronts => RackType.DoorsAndDrawerFronts,
-            PartCategory.AdjustableShelves => RackType.AdjustableShelves,
-            PartCategory.Hardware => RackType.Hardware,
-            PartCategory.Carcass => RackType.Standard,
-            _ => RackType.Standard
-        };
-        
-        _logger.LogDebug("Part category {Category} mapped to rack type {RackType}", category, rackType);
-        return rackType;
-    }
 
-    /// <summary>
-    /// Filters a list of parts to only include carcass parts (excludes filtered parts for assembly readiness).
-    /// Used for calculating assembly readiness - only carcass parts determine if a product is ready.
-    /// </summary>
-    public List<Part> GetCarcassPartsOnly(IEnumerable<Part> parts)
-    {
-        return parts.Where(part => !ShouldFilterPart(part)).ToList();
-    }
 
-    /// <summary>
-    /// Gets parts that should be routed to specialized racks (doors, drawer fronts, adjustable shelves).
-    /// </summary>
-    public List<Part> GetFilteredParts(IEnumerable<Part> parts)
-    {
-        return parts.Where(ShouldFilterPart).ToList();
-    }
-
-    /// <summary>
-    /// Gets detailed filtering information for a part including category and routing destination.
-    /// </summary>
-    public PartFilterInfo GetPartFilterInfo(Part part)
-    {
-        var category = ClassifyPart(part);
-        var rackType = GetPreferredRackType(category);
-        var isFiltered = ShouldFilterPart(part);
-
-        return new PartFilterInfo
-        {
-            PartId = part.Id,
-            PartName = part.Name,
-            Category = category,
-            PreferredRackType = rackType,
-            IsFiltered = isFiltered,
-            ProcessingStream = isFiltered ? "Specialized" : "Standard Carcass"
-        };
-    }
-
-    /// <summary>
-    /// Future extension point: Add new filtering keywords programmatically.
-    /// Can be enhanced to persist to database or configuration files.
-    /// </summary>
-    public void AddCategoryKeyword(PartCategory category, string keyword)
-    {
-        if (!_categoryKeywords.ContainsKey(category))
-        {
-            _categoryKeywords[category] = new List<string>();
-        }
-        
-        if (!_categoryKeywords[category].Contains(keyword.ToLowerInvariant()))
-        {
-            _categoryKeywords[category].Add(keyword.ToLowerInvariant());
-            _logger.LogInformation("Added keyword '{Keyword}' to category {Category}", keyword, category);
-        }
-    }
-
-    /// <summary>
-    /// Future extension point: Remove filtering keywords.
-    /// </summary>
-    public bool RemoveCategoryKeyword(PartCategory category, string keyword)
-    {
-        if (_categoryKeywords.ContainsKey(category))
-        {
-            var removed = _categoryKeywords[category].Remove(keyword.ToLowerInvariant());
-            if (removed)
-            {
-                _logger.LogInformation("Removed keyword '{Keyword}' from category {Category}", keyword, category);
-            }
-            return removed;
-        }
-        return false;
-    }
-
-    /// <summary>
-    /// Gets all configured keywords for a category (for future admin interface).
-    /// </summary>
-    public List<string> GetCategoryKeywords(PartCategory category)
-    {
-        return _categoryKeywords.ContainsKey(category) 
-            ? new List<string>(_categoryKeywords[category]) 
-            : new List<string>();
-    }
-
+    
     private bool ContainsKeywords(string text, List<string> keywords)
     {
         return keywords.Any(keyword => text.Contains(keyword, StringComparison.OrdinalIgnoreCase));

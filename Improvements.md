@@ -25,8 +25,8 @@
 
 # Sorting Station
     - Getting a "Ready for Assembly" alert twice for Product with filtered parts (doors/drawer fronts). Once after Carcass again after Door. Just need 1 when Carcass is ready.
-    - Cut Parts Modal - manual "Sort" buttons don't work
     - Style billboard area
+    - Kill toast messages
     - Increase size of grid/rack display. Remove column and row labels.
     - Improve bin indication colors and visuals - Grey for empty, Yellow for partial, Red for indicating immediate location (matching billboard text), Green for ready to Assemble
     - Add Empty Bin and Empty Rack buttons even when it thinks it's already empty.

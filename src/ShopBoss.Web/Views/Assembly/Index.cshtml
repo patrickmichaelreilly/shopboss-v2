@@ -223,7 +223,7 @@
                                         </h6>
                                         <div class="text-muted small mb-2">
                                             <i class="fas fa-cube me-1"></i>
-                                            @product.SortedCarcassPartsCount/@product.CarcassPartsCount carcass parts sorted
+                                            @product.SortedStandardPartsCount/@product.StandardPartsCount standard parts sorted
                                             @if (product.FilteredPartsCount > 0)
                                             {
                                                 <span class="ms-2">
@@ -337,7 +337,7 @@
         </h5>
         <p class="mb-3">
             <small class="text-muted">
-                These components are processed separately and will need to be collected from specialized racks after carcass assembly.
+                These components are processed separately and will need to be collected from specialized racks after standard assembly.
             </small>
         </p>
         
@@ -704,7 +704,7 @@
             let html = `
                 <h6>${product.ProductNumber} - ${product.ProductName}</h6>
                 
-                <h6 class="mt-3">Carcass Parts</h6>
+                <h6 class="mt-3">Standard Parts</h6>
                 <div class="table-responsive">
                     <table class="table table-sm">
                         <thead>
@@ -719,7 +719,7 @@
                         <tbody>
             `;
 
-            product.CarcassParts.forEach(part => {
+            product.StandardParts.forEach(part => {
                 const statusBadge = part.Status === 'Sorted' ? 'bg-success' : 
                                   part.Status === 'Assembled' ? 'bg-primary' : 'bg-secondary';
                 html += `
@@ -834,8 +834,8 @@
             
             let html = `
                 <div class="alert alert-success mb-3">
-                    <h6><i class="fas fa-check-circle me-2"></i>Carcass Assembly Complete!</h6>
-                    <p class="mb-0">Product "<strong>${productName}</strong>" carcass is assembled. Now collect these finishing components:</p>
+                    <h6><i class="fas fa-check-circle me-2"></i>Standard Assembly Complete!</h6>
+                    <p class="mb-0">Product "<strong>${productName}</strong>" standard assembly is complete. Now collect these finishing components:</p>
                 </div>
             `;
             
@@ -898,8 +898,8 @@
             
             let html = `
                 <div class="alert alert-success mb-3">
-                    <h6><i class="fas fa-check-circle me-2"></i>Carcass Assembly Complete!</h6>
-                    <p class="mb-0">Product "<strong>${productName}</strong>" carcass is assembled. Now collect these finishing components:</p>
+                    <h6><i class="fas fa-check-circle me-2"></i>Standard Assembly Complete!</h6>
+                    <p class="mb-0">Product "<strong>${productName}</strong>" standard assembly is complete. Now collect these finishing components:</p>
                 </div>
             `;
 

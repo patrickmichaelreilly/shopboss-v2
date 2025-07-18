@@ -15,17 +15,15 @@ public class SortingController : Controller
     private readonly IHubContext<StatusHub> _hubContext;
     private readonly AuditTrailService _auditTrail;
     private readonly SortingRuleService _sortingRules;
-    private readonly PartFilteringService _partFilteringService;
 
     public SortingController(ShopBossDbContext context, ILogger<SortingController> logger, 
-        IHubContext<StatusHub> hubContext, AuditTrailService auditTrail, SortingRuleService sortingRules, PartFilteringService partFilteringService)
+        IHubContext<StatusHub> hubContext, AuditTrailService auditTrail, SortingRuleService sortingRules)
     {
         _context = context;
         _logger = logger;
         _hubContext = hubContext;
         _auditTrail = auditTrail;
         _sortingRules = sortingRules;
-        _partFilteringService = partFilteringService;
     }
 
     public async Task<IActionResult> Index()
@@ -286,8 +284,8 @@ public class SortingController : Controller
             }
 
             // Log part classification for debugging
-            var partCategory = _partFilteringService.ClassifyPart(part);
-            var preferredRackType = _partFilteringService.GetPreferredRackType(partCategory);
+            var partCategory = part.Category;
+            var preferredRackType = (RackType)partCategory;
             _logger.LogInformation("SCAN DEBUG: Part '{PartName}' classified as {Category} -> preferred rack type {RackType}", 
                 part.Name, partCategory, preferredRackType);
 
@@ -1072,9 +1070,10 @@ public class SortingController : Controller
         }
     }
 
+
     /// <summary>
     /// Calculates enhanced progress information for a bin based on rack type and appropriate part filtering.
-    /// - Standard racks: Shows carcass parts progress for assembly readiness
+    /// - Standard racks: Shows standard parts progress for assembly readiness
     /// - Doors & Fronts racks: Shows doors/drawer fronts progress for that product
     /// - Adjustable Shelves racks: Shows adjustable shelf progress for that product
     /// </summary>
@@ -1114,7 +1113,7 @@ public class SortingController : Controller
                 case RackType.DoorsAndDrawerFronts:
                     // For doors & fronts racks, track progress of doors and drawer fronts for this product
                     relevantParts = product.Parts
-                        .Where(p => _partFilteringService.ClassifyPart(p) == PartCategory.DoorsAndDrawerFronts)
+                        .Where(p => p.Category == PartCategory.DoorsAndDrawerFronts)
                         .ToList();
                     progressType = "doors/drawer fronts";
                     break;
@@ -1122,7 +1121,7 @@ public class SortingController : Controller
                 case RackType.AdjustableShelves:
                     // For adjustable shelves racks, track progress of adjustable shelves for this product
                     relevantParts = product.Parts
-                        .Where(p => _partFilteringService.ClassifyPart(p) == PartCategory.AdjustableShelves)
+                        .Where(p => p.Category == PartCategory.AdjustableShelves)
                         .ToList();
                     progressType = "adjustable shelves";
                     break;
@@ -1130,7 +1129,7 @@ public class SortingController : Controller
                 case RackType.Hardware:
                     // For hardware racks, track progress of hardware parts for this product
                     relevantParts = product.Parts
-                        .Where(p => _partFilteringService.ClassifyPart(p) == PartCategory.Hardware)
+                        .Where(p => p.Category == PartCategory.Hardware)
                         .ToList();
                     progressType = "hardware";
                     break;
@@ -1138,9 +1137,9 @@ public class SortingController : Controller
                 case RackType.Standard:
                 case RackType.Cart:
                 default:
-                    // For standard racks and carts, track carcass parts for assembly readiness
-                    relevantParts = _partFilteringService.GetCarcassPartsOnly(product.Parts);
-                    progressType = "carcass parts";
+                    // For standard racks and carts, track standard parts for assembly readiness
+                    relevantParts = product.Parts.Where(p => p.Category == PartCategory.Standard).ToList();
+                    progressType = "standard parts";
                     break;
             }
             

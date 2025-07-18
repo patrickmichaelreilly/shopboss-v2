@@ -14,7 +14,6 @@ public class AssemblyController : Controller
     private readonly ShopBossDbContext _context;
     private readonly WorkOrderService _workOrderService;
     private readonly SortingRuleService _sortingRuleService;
-    private readonly PartFilteringService _partFilteringService;
     private readonly AuditTrailService _auditTrailService;
     private readonly ShippingService _shippingService;
     private readonly IHubContext<StatusHub> _hubContext;
@@ -24,7 +23,6 @@ public class AssemblyController : Controller
         ShopBossDbContext context,
         WorkOrderService workOrderService,
         SortingRuleService sortingRuleService,
-        PartFilteringService partFilteringService,
         AuditTrailService auditTrailService,
         ShippingService shippingService,
         IHubContext<StatusHub> hubContext,
@@ -33,7 +31,6 @@ public class AssemblyController : Controller
         _context = context;
         _workOrderService = workOrderService;
         _sortingRuleService = sortingRuleService;
-        _partFilteringService = partFilteringService;
         _auditTrailService = auditTrailService;
         _shippingService = shippingService;
         _hubContext = hubContext;
@@ -86,19 +83,19 @@ public class AssemblyController : Controller
 
         foreach (var product in products)
         {
-            var carcassParts = _partFilteringService.GetCarcassPartsOnly(product.Parts);
-            var filteredParts = _partFilteringService.GetFilteredParts(product.Parts);
+            var standardParts = product.Parts.Where(p => p.Category == PartCategory.Standard).ToList();
+            var filteredParts = product.Parts.Where(p => p.Category != PartCategory.Standard).ToList();
             
-            var sortedCarcassParts = carcassParts.Count(p => p.Status == PartStatus.Sorted);
-            var totalCarcassParts = carcassParts.Count;
+            var sortedStandardParts = standardParts.Count(p => p.Status == PartStatus.Sorted);
+            var totalStandardParts = standardParts.Count;
             var sortedFilteredParts = filteredParts.Count(p => p.Status == PartStatus.Sorted);
             var totalFilteredParts = filteredParts.Count;
             
             var isReady = readyProductIds.Contains(product.Id);
             var isCompleted = product.Status == PartStatus.Assembled;
 
-            // Get simplified rack locations - just carcass bin and doors/fronts bin
-            var carcassLocation = carcassParts
+            // Get simplified rack locations - just standard bin and doors/fronts bin
+            var standardLocation = standardParts
                 .Where(p => p.Status == PartStatus.Sorted && !string.IsNullOrEmpty(p.Location))
                 .Select(p => p.Location)
                 .FirstOrDefault();
@@ -109,13 +106,13 @@ public class AssemblyController : Controller
                 .FirstOrDefault();
 
             var partLocations = new List<PartLocation>();
-            if (!string.IsNullOrEmpty(carcassLocation))
+            if (!string.IsNullOrEmpty(standardLocation))
             {
                 partLocations.Add(new PartLocation
                 {
-                    PartName = "Carcass Parts",
-                    Location = carcassLocation,
-                    Quantity = sortedCarcassParts
+                    PartName = "Standard Parts",
+                    Location = standardLocation,
+                    Quantity = sortedStandardParts
                 });
             }
             if (!string.IsNullOrEmpty(doorsLocation))
@@ -140,13 +137,13 @@ public class AssemblyController : Controller
             result.Add(new ProductAssemblyStatus
             {
                 Product = product,
-                CarcassPartsCount = totalCarcassParts,
-                SortedCarcassPartsCount = sortedCarcassParts,
+                StandardPartsCount = totalStandardParts,
+                SortedStandardPartsCount = sortedStandardParts,
                 FilteredPartsCount = totalFilteredParts,
                 SortedFilteredPartsCount = sortedFilteredParts,
                 IsReadyForAssembly = isReady,
                 IsCompleted = isCompleted,
-                CompletionPercentage = totalCarcassParts > 0 ? (int)((double)sortedCarcassParts / totalCarcassParts * 100) : 0,
+                CompletionPercentage = totalStandardParts > 0 ? (int)((double)sortedStandardParts / totalStandardParts * 100) : 0,
                 PartLocations = partLocations
             });
         }
@@ -179,22 +176,23 @@ public class AssemblyController : Controller
                 Length = ps.Length,
                 Width = ps.Width,
                 Thickness = ps.Thickness,
-                Material = ps.Material
+                Material = ps.Material,
+                Category = ps.Category
             }).ToList();
 
-            var carcassParts = _partFilteringService.GetCarcassPartsOnly(convertedParts);
-            var filteredParts = _partFilteringService.GetFilteredParts(convertedParts);
+            var standardParts = convertedParts.Where(p => p.Category == PartCategory.Standard).ToList();
+            var filteredParts = convertedParts.Where(p => p.Category != PartCategory.Standard).ToList();
             
-            var sortedCarcassParts = carcassParts.Count(p => p.Status == PartStatus.Sorted);
-            var totalCarcassParts = carcassParts.Count;
+            var sortedStandardParts = standardParts.Count(p => p.Status == PartStatus.Sorted);
+            var totalStandardParts = standardParts.Count;
             var sortedFilteredParts = filteredParts.Count(p => p.Status == PartStatus.Sorted);
             var totalFilteredParts = filteredParts.Count;
             
             var isReady = readyProductIds.Contains(product.Id);
             var isCompleted = product.Status == PartStatus.Assembled;
 
-            // Get simplified rack locations - just carcass bin and doors/fronts bin
-            var carcassLocation = carcassParts
+            // Get simplified rack locations - just standard bin and doors/fronts bin
+            var standardLocation = standardParts
                 .Where(p => p.Status == PartStatus.Sorted && !string.IsNullOrEmpty(p.Location))
                 .Select(p => p.Location)
                 .FirstOrDefault();
@@ -205,13 +203,13 @@ public class AssemblyController : Controller
                 .FirstOrDefault();
 
             var partLocations = new List<PartLocation>();
-            if (!string.IsNullOrEmpty(carcassLocation))
+            if (!string.IsNullOrEmpty(standardLocation))
             {
                 partLocations.Add(new PartLocation
                 {
-                    PartName = "Carcass Parts",
-                    Location = carcassLocation,
-                    Quantity = sortedCarcassParts
+                    PartName = "Standard Parts",
+                    Location = standardLocation,
+                    Quantity = sortedStandardParts
                 });
             }
             if (!string.IsNullOrEmpty(doorsLocation))
@@ -236,13 +234,13 @@ public class AssemblyController : Controller
             result.Add(new ProductAssemblyStatus
             {
                 Product = product,
-                CarcassPartsCount = totalCarcassParts,
-                SortedCarcassPartsCount = sortedCarcassParts,
+                StandardPartsCount = totalStandardParts,
+                SortedStandardPartsCount = sortedStandardParts,
                 FilteredPartsCount = totalFilteredParts,
                 SortedFilteredPartsCount = sortedFilteredParts,
                 IsReadyForAssembly = isReady,
                 IsCompleted = isCompleted,
-                CompletionPercentage = totalCarcassParts > 0 ? (int)((double)sortedCarcassParts / totalCarcassParts * 100) : 0,
+                CompletionPercentage = totalStandardParts > 0 ? (int)((double)sortedStandardParts / totalStandardParts * 100) : 0,
                 PartLocations = partLocations
             });
         }
@@ -258,11 +256,11 @@ public class AssemblyController : Controller
 
         foreach (var product in products)
         {
-            var filteredParts = _partFilteringService.GetFilteredParts(product.Parts);
+            var filteredParts = product.Parts.Where(p => p.Category != PartCategory.Standard).ToList();
             
             foreach (var part in filteredParts)
             {
-                var category = _partFilteringService.ClassifyPart(part);
+                var category = part.Category;
                 var location = !string.IsNullOrEmpty(part.Location) ? part.Location : "Not Sorted";
                 
                 result.Add(new FilteredPartLocation
@@ -306,14 +304,15 @@ public class AssemblyController : Controller
                 Length = ps.Length,
                 Width = ps.Width,
                 Thickness = ps.Thickness,
-                Material = ps.Material
+                Material = ps.Material,
+                Category = ps.Category
             }).ToList();
 
-            var filteredParts = _partFilteringService.GetFilteredParts(convertedParts);
+            var filteredParts = convertedParts.Where(p => p.Category != PartCategory.Standard).ToList();
             
             foreach (var part in filteredParts)
             {
-                var category = _partFilteringService.ClassifyPart(part);
+                var category = part.Category;
                 var location = !string.IsNullOrEmpty(part.Location) ? part.Location : "Not Sorted";
                 
                 result.Add(new FilteredPartLocation
@@ -391,21 +390,21 @@ public class AssemblyController : Controller
                 return Json(new { success = false, message = "Product not found" });
             }
             
-            var carcassParts = _partFilteringService.GetCarcassPartsOnly(product.Parts);
-            var allCarcassPartsSorted = carcassParts.All(p => p.Status == PartStatus.Sorted);
+            var standardParts = product.Parts.Where(p => p.Category == PartCategory.Standard).ToList();
+            var allStandardPartsSorted = standardParts.All(p => p.Status == PartStatus.Sorted);
             
 
-            if (!allCarcassPartsSorted)
+            if (!allStandardPartsSorted)
             {
-                var sortedCount = carcassParts.Count(p => p.Status == PartStatus.Sorted);
+                var sortedCount = standardParts.Count(p => p.Status == PartStatus.Sorted);
                 return Json(new { 
                     success = false, 
-                    message = $"Product '{product.Name}' is not ready for assembly. Only {sortedCount}/{carcassParts.Count} carcass parts are sorted." 
+                    message = $"Product '{product.Name}' is not ready for assembly. Only {sortedCount}/{standardParts.Count} standard parts are sorted." 
                 });
             }
 
             // Check if product is already assembled
-            var alreadyAssembled = carcassParts.All(p => p.Status == PartStatus.Assembled);
+            var alreadyAssembled = standardParts.All(p => p.Status == PartStatus.Assembled);
             if (alreadyAssembled)
             {
                 return Json(new { 
@@ -414,30 +413,30 @@ public class AssemblyController : Controller
                 });
             }
 
-            // Mark all carcass parts as assembled and empty their bins
+            // Mark all standard parts as assembled and empty their bins
             var assembledParts = 0;
             var binsToEmpty = new HashSet<string>();
             
-            foreach (var carcassPart in carcassParts)
+            foreach (var standardPart in standardParts)
             {
-                if (carcassPart.Status == PartStatus.Sorted)
+                if (standardPart.Status == PartStatus.Sorted)
                 {
                     // Track bin location for emptying
-                    if (!string.IsNullOrEmpty(carcassPart.Location))
+                    if (!string.IsNullOrEmpty(standardPart.Location))
                     {
-                        binsToEmpty.Add(carcassPart.Location);
+                        binsToEmpty.Add(standardPart.Location);
                     }
                     
-                    carcassPart.Status = PartStatus.Assembled;
-                    carcassPart.StatusUpdatedDate = DateTime.UtcNow;
-                    carcassPart.Location = null; // Clear location since part is no longer in bin
+                    standardPart.Status = PartStatus.Assembled;
+                    standardPart.StatusUpdatedDate = DateTime.UtcNow;
+                    standardPart.Location = null; // Clear location since part is no longer in bin
                     assembledParts++;
 
                     // Log the status change
                     await _auditTrailService.LogAsync(
                         action: "PartScannedForAssembly",
                         entityType: "Part",
-                        entityId: carcassPart.Id,
+                        entityId: standardPart.Id,
                         oldValue: "Sorted",
                         newValue: "Assembled",
                         station: "Assembly",
@@ -449,20 +448,20 @@ public class AssemblyController : Controller
             }
 
             // Get filtered parts locations for guidance BEFORE marking them as assembled
-            var filteredPartsForGuidance = _partFilteringService.GetFilteredParts(product.Parts);
+            var filteredPartsForGuidance = product.Parts.Where(p => p.Category != PartCategory.Standard).ToList();
             var filteredPartsGuidance = filteredPartsForGuidance
                 .Where(fp => fp.Status == PartStatus.Sorted)
                 .Select(fp => new
                 {
                     Name = fp.Name,
-                    Category = _partFilteringService.ClassifyPart(fp).ToString(),
+                    Category = fp.Category.ToString(),
                     Location = fp.Location ?? "Unknown Location",
                     Quantity = fp.Qty
                 })
                 .ToList();
 
             // Mark filtered parts as assembled and track their bins for emptying
-            var filteredParts = _partFilteringService.GetFilteredParts(product.Parts);
+            var filteredParts = product.Parts.Where(p => p.Category != PartCategory.Standard).ToList();
             foreach (var filteredPart in filteredParts)
             {
                 if (filteredPart.Status == PartStatus.Sorted)
@@ -604,7 +603,7 @@ public class AssemblyController : Controller
                 details: $"Assembly completed for product '{product.Name}' - {assembledParts} parts marked as Assembled"
             );
 
-            _logger.LogInformation("Product {ProductId} ({ProductName}) assembled via barcode scan '{Barcode}' - {AssembledParts} carcass parts marked as Assembled",
+            _logger.LogInformation("Product {ProductId} ({ProductName}) assembled via barcode scan '{Barcode}' - {AssembledParts} standard parts marked as Assembled",
                 product.Id, product.Name, barcode, assembledParts);
 
             return Json(new { 
@@ -645,22 +644,22 @@ public class AssemblyController : Controller
             }
 
             // Verify product is ready for assembly
-            var carcassParts = _partFilteringService.GetCarcassPartsOnly(product.Parts);
-            var allCarcassPartsSorted = carcassParts.All(p => p.Status == PartStatus.Sorted);
+            var standardParts = product.Parts.Where(p => p.Category == PartCategory.Standard).ToList();
+            var allStandardPartsSorted = standardParts.All(p => p.Status == PartStatus.Sorted);
 
-            if (!allCarcassPartsSorted)
+            if (!allStandardPartsSorted)
             {
                 return Json(new { 
                     success = false, 
-                    message = "Not all carcass parts are sorted. Cannot start assembly." 
+                    message = "Not all standard parts are sorted. Cannot start assembly." 
                 });
             }
 
-            // Mark all carcass parts as "Assembled" and empty their bins
+            // Mark all standard parts as "Assembled" and empty their bins
             var updatedParts = 0;
             var binsToEmpty = new HashSet<string>();
             
-            foreach (var part in carcassParts)
+            foreach (var part in standardParts)
             {
                 if (part.Status == PartStatus.Sorted)
                 {
@@ -691,7 +690,7 @@ public class AssemblyController : Controller
             }
 
             // Mark filtered parts as assembled and track their bins for emptying
-            var filteredParts = _partFilteringService.GetFilteredParts(product.Parts);
+            var filteredParts = product.Parts.Where(p => p.Category != PartCategory.Standard).ToList();
             foreach (var filteredPart in filteredParts)
             {
                 if (filteredPart.Status == PartStatus.Sorted)
@@ -855,15 +854,15 @@ public class AssemblyController : Controller
                 return Json(new { success = false, message = "Product not found" });
             }
 
-            var carcassParts = _partFilteringService.GetCarcassPartsOnly(product.Parts);
-            var filteredParts = _partFilteringService.GetFilteredParts(product.Parts);
+            var standardParts = product.Parts.Where(p => p.Category == PartCategory.Standard).ToList();
+            var filteredParts = product.Parts.Where(p => p.Category != PartCategory.Standard).ToList();
 
             var details = new
             {
                 ProductId = product.Id,
                 ProductName = product.Name,
                 ProductNumber = product.ProductNumber,
-                CarcassParts = carcassParts.Select(p => new
+                StandardParts = standardParts.Select(p => new
                 {
                     Name = p.Name,
                     Status = p.Status.ToString(),
@@ -874,7 +873,7 @@ public class AssemblyController : Controller
                 FilteredParts = filteredParts.Select(p => new
                 {
                     Name = p.Name,
-                    Category = _partFilteringService.ClassifyPart(p).ToString(),
+                    Category = p.Category.ToString(),
                     Status = p.Status.ToString(),
                     Location = p.Location ?? "Unknown",
                     Quantity = p.Qty
@@ -904,8 +903,8 @@ public class AssemblyDashboardData
 public class ProductAssemblyStatus
 {
     public Product Product { get; set; } = null!;
-    public int CarcassPartsCount { get; set; }
-    public int SortedCarcassPartsCount { get; set; }
+    public int StandardPartsCount { get; set; }
+    public int SortedStandardPartsCount { get; set; }
     public int FilteredPartsCount { get; set; }
     public int SortedFilteredPartsCount { get; set; }
     public bool IsReadyForAssembly { get; set; }

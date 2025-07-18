@@ -223,7 +223,8 @@ public class WorkOrderService
                     Length = p.Length,
                     Width = p.Width,
                     Thickness = p.Thickness,
-                    Material = p.Material
+                    Material = p.Material,
+                    Category = p.Category
                 })
                 .ToListAsync();
 
@@ -548,6 +549,7 @@ public class PartSummary
     public decimal? Width { get; set; }
     public decimal? Thickness { get; set; }
     public string Material { get; set; } = string.Empty;
+    public PartCategory Category { get; set; } = PartCategory.Standard;
 }
 
 public class ShippingStationData

@@ -9,11 +9,13 @@ public class ImportSelectionService
 {
     private readonly ShopBossDbContext _context;
     private readonly ILogger<ImportSelectionService> _logger;
+    private readonly PartFilteringService _partFilteringService;
 
-    public ImportSelectionService(ShopBossDbContext context, ILogger<ImportSelectionService> logger)
+    public ImportSelectionService(ShopBossDbContext context, ILogger<ImportSelectionService> logger, PartFilteringService partFilteringService)
     {
         _context = context;
         _logger = logger;
+        _partFilteringService = partFilteringService;
     }
 
     public async Task<ImportConversionResult> ConvertSelectedItemsAsync(
@@ -633,7 +635,7 @@ public class ImportSelectionService
             partId = $"{importPart.Id}{instanceSuffix}";
         }
         
-        return new Part
+        var part = new Part
         {
             Id = partId, // Use unique part ID for product instances
             Name = importPart.Name,
@@ -652,6 +654,11 @@ public class ImportSelectionService
             Status = PartStatus.Pending, // Set initial status
             StatusUpdatedDate = DateTime.UtcNow // Fix NOT NULL constraint
         };
+
+        // Classify part and store category during import
+        part.Category = _partFilteringService.ClassifyPart(part);
+        
+        return part;
     }
 
     private Subassembly ConvertToSubassemblyEntity(ImportSubassembly importSubassembly, string? productId, string? parentSubassemblyId, string? productInstanceId = null)
@@ -832,7 +839,7 @@ public class ImportSelectionService
             }
         }
 
-        return new Part
+        var part = new Part
         {
             Id = partId,
             Name = detachedProduct.Name,
@@ -851,6 +858,11 @@ public class ImportSelectionService
             Status = PartStatus.Pending, // Set initial status
             StatusUpdatedDate = DateTime.UtcNow // Fix NOT NULL constraint
         };
+
+        // Classify part and store category during import
+        part.Category = _partFilteringService.ClassifyPart(part);
+        
+        return part;
     }
 
     private NestSheet? FindNestSheetForDetachedProduct(ImportDetachedProduct importDetached, WorkOrder workOrder)

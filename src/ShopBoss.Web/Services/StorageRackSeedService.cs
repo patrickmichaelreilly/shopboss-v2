@@ -20,7 +20,7 @@ public static class StorageRackSeedService
             {
                 Name = "Standard Rack A",
                 Type = RackType.Standard,
-                Description = "Main storage for carcass parts",
+                Description = "Main storage for standard parts",
                 Rows = 4,
                 Columns = 8,
                 Location = "East Wall",
@@ -31,7 +31,7 @@ public static class StorageRackSeedService
             {
                 Name = "Standard Rack B",
                 Type = RackType.Standard,
-                Description = "Secondary storage for carcass parts",
+                Description = "Secondary storage for standard parts",
                 Rows = 4,
                 Columns = 8,
                 Location = "East Wall",

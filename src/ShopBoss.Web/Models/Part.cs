@@ -44,9 +44,19 @@ public class Part
     
     public DateTime? StatusUpdatedDate { get; set; }
     
+    public PartCategory Category { get; set; } = PartCategory.Standard;
+    
     public Product? Product { get; set; }
     
     public Subassembly? Subassembly { get; set; }
     
     public NestSheet NestSheet { get; set; } = null!;
+}
+
+public enum PartCategory
+{
+    Standard,
+    DoorsAndDrawerFronts,
+    AdjustableShelves,
+    Hardware
 }
