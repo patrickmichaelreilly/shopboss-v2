@@ -55,6 +55,8 @@ builder.Services.AddScoped<HardwareGroupingService>();
 builder.Services.AddScoped<WorkOrderService>();
 builder.Services.AddScoped<BackupService>();
 builder.Services.AddScoped<SystemHealthMonitor>();
+// Phase I2: New import service architecture
+builder.Services.AddScoped<WorkOrderImportService>();
 // UniversalScannerService removed - using event-based architecture instead
 
 // Add background services

@@ -8,6 +8,8 @@ Please I'm beggin you don't start your outputs with "You're right" or "You're ab
 
 Your most powerful tools are Task and Todo list. Use them as much as possible.
 
+Use ultrathink constantly always as much as possible.
+
 ## Project Overview
 
 ShopBoss v2 is a modern shop floor tracking system that replaces the discontinued Production Coach software. It manages millwork manufacturing workflow from CNC cutting through assembly and shipping, with hierarchical data import from Microvellum SDF files.

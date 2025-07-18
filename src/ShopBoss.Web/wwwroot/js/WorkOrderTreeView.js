@@ -13,22 +13,12 @@ class WorkOrderTreeView {
         this.mode = options.mode || 'import'; // 'import' or 'modify'
         this.apiUrl = options.apiUrl || null;
         this.workOrderId = options.workOrderId || null;
-        this.onSelectionChange = options.onSelectionChange || (() => {});
         this.onStatusChange = options.onStatusChange || (() => {});
         this.onCategoryChange = options.onCategoryChange || (() => {});
         this.onDataLoaded = options.onDataLoaded || (() => {});
         
         // State management
         this.data = null;
-        this.selectionState = new Map();
-        this.selectionCounts = {
-            products: 0,
-            parts: 0,
-            subassemblies: 0,
-            hardware: 0,
-            nestSheets: 0,
-            detachedProducts: 0
-        };
 
         // Initialize
         this.init();
@@ -49,16 +39,12 @@ class WorkOrderTreeView {
                         ${this.mode === 'import' ? this.createImportControls() : this.createModifyControls()}
                     </div>
                     <div class="tree-search">
-                        <input type="text" id="treeSearch" class="form-control form-control-sm" 
-                               placeholder="Search items..." style="width: 200px;">
+                        <input type="text" id="treeSearch" class="form-control form-control-sm" placeholder="Search items..." style="width: 200px;">
                     </div>
                 </div>
-                <div class="tree-view-content">
-                    <div id="treeViewContent" class="tree-view">
-                        <div class="text-center py-4">
-                            <i class="fas fa-spinner fa-spin"></i>
-                            <p class="mt-2 text-muted">Loading tree data...</p>
-                        </div>
+                <div id="treeViewContent" class="tree-view-content">
+                    <div class="text-center text-muted">
+                        <i class="fas fa-spinner fa-spin me-2"></i>Loading...
                     </div>
                 </div>
             </div>
@@ -69,15 +55,6 @@ class WorkOrderTreeView {
 
     createImportControls() {
         return `
-            <button type="button" id="selectAllProducts" class="btn btn-outline-success btn-sm">
-                <i class="fas fa-check-double me-1"></i>Select All Products
-            </button>
-            <button type="button" id="selectAllNestSheets" class="btn btn-outline-secondary btn-sm">
-                <i class="fas fa-check-double me-1"></i>Select All Nest Sheets
-            </button>
-            <button type="button" id="clearAll" class="btn btn-outline-danger btn-sm">
-                <i class="fas fa-times me-1"></i>Clear All
-            </button>
             <button type="button" id="expandAll" class="btn btn-outline-primary btn-sm">
                 <i class="fas fa-expand-alt me-1"></i>Expand All
             </button>
@@ -95,31 +72,19 @@ class WorkOrderTreeView {
             <button type="button" id="collapseAll" class="btn btn-outline-secondary btn-sm">
                 <i class="fas fa-compress-alt me-1"></i>Collapse All
             </button>
-            <button type="button" id="refreshTree" class="btn btn-outline-secondary btn-sm">
-                <i class="fas fa-refresh me-1"></i>Refresh
+            <button type="button" id="refreshTree" class="btn btn-outline-info btn-sm">
+                <i class="fas fa-sync me-1"></i>Refresh
             </button>
         `;
     }
 
     bindEvents() {
         // Control buttons
-        const selectAllProducts = this.container.querySelector('#selectAllProducts');
-        const selectAllNestSheets = this.container.querySelector('#selectAllNestSheets');
-        const clearAll = this.container.querySelector('#clearAll');
         const expandAll = this.container.querySelector('#expandAll');
         const collapseAll = this.container.querySelector('#collapseAll');
         const refreshTree = this.container.querySelector('#refreshTree');
         const searchInput = this.container.querySelector('#treeSearch');
 
-        if (selectAllProducts) {
-            selectAllProducts.addEventListener('click', () => this.selectAllProducts());
-        }
-        if (selectAllNestSheets) {
-            selectAllNestSheets.addEventListener('click', () => this.selectAllNestSheets());
-        }
-        if (clearAll) {
-            clearAll.addEventListener('click', () => this.clearAllSelections());
-        }
         if (expandAll) {
             expandAll.addEventListener('click', () => this.expandAll());
         }
@@ -141,44 +106,40 @@ class WorkOrderTreeView {
         }
 
         try {
-            const includeStatus = this.mode === 'modify';
-            const response = await fetch(`${this.apiUrl}/${this.workOrderId}?includeStatus=${includeStatus}`);
-            
+            const response = await fetch(`${this.apiUrl}/${this.workOrderId}`);
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
-
-            this.data = await response.json();
-            this.renderTree();
-            this.onDataLoaded(this.data);
+            
+            const data = await response.json();
+            this.setData(data);
         } catch (error) {
             console.error('Error loading tree data:', error);
-            this.showError('Failed to load tree data: ' + error.message);
+            this.container.querySelector('#treeViewContent').innerHTML = 
+                '<div class="alert alert-danger">Failed to load tree data</div>';
         }
     }
 
     setData(data) {
         this.data = data;
         this.renderTree();
+        this.onDataLoaded(data);
     }
 
     renderTree() {
         const treeContent = this.container.querySelector('#treeViewContent');
-        if (!this.data || !this.data.items) {
+        
+        if (!this.data || !this.data.items || this.data.items.length === 0) {
             treeContent.innerHTML = '<p class="text-muted">No data available.</p>';
             return;
         }
 
         treeContent.innerHTML = '';
-        this.selectionState.clear();
 
         this.data.items.forEach(item => {
             const itemNode = this.createTreeNode(item, 0);
             treeContent.appendChild(itemNode);
         });
-
-        this.updateSelectionCounts();
-        this.onSelectionChange(this.getSelectionSummary());
     }
 
     createTreeNode(item, level = 0) {
@@ -194,18 +155,6 @@ class WorkOrderTreeView {
         // Top-level categories (level 0 and type "category") should default to expanded
         const shouldDefaultExpand = level === 0 && item.type === 'category';
 
-        // Initialize selection state
-        if (!this.selectionState.has(nodeId)) {
-            this.selectionState.set(nodeId, {
-                selected: this.mode === 'import', // Default selected for import mode
-                type: item.type,
-                itemData: item,
-                parentId: null,
-                childIds: []
-            });
-        }
-
-        const nodeState = this.selectionState.get(nodeId);
         const icon = this.getItemIcon(item.type);
 
         node.innerHTML = `
@@ -216,10 +165,6 @@ class WorkOrderTreeView {
                             <i class="fas fa-chevron-${shouldDefaultExpand ? 'down' : 'right'}" style="font-size: 12px;"></i>
                         </span>` : 
                         '<span class="me-2" style="width: 16px; display: inline-block;"></span>'
-                    }
-                    ${this.mode === 'import' ? 
-                        `<input type="checkbox" class="tree-checkbox form-check-input me-2" ${nodeState.selected ? 'checked' : ''} data-node-id="${nodeId}">` :
-                        ''
                     }
                     <span class="me-2">${icon}</span>
                     <span>${this.formatItemName(item)}</span>
@@ -240,21 +185,10 @@ class WorkOrderTreeView {
             childrenContainer.className = 'tree-content';
             childrenContainer.style.display = shouldDefaultExpand ? 'block' : 'none';
 
-            const childIds = [];
             item.children.forEach(child => {
                 const childNode = this.createTreeNode(child, level + 1);
                 childrenContainer.appendChild(childNode);
-                childIds.push(child.id);
-
-                // Set parent relationship
-                const childState = this.selectionState.get(child.id);
-                if (childState) {
-                    childState.parentId = nodeId;
-                }
             });
-
-            // Update parent with child IDs
-            nodeState.childIds = childIds;
             node.appendChild(childrenContainer);
 
             // Bind toggle event
@@ -267,16 +201,8 @@ class WorkOrderTreeView {
             }
         }
 
-        // Bind selection events
-        if (this.mode === 'import') {
-            const checkbox = node.querySelector('.tree-checkbox');
-            if (checkbox) {
-                checkbox.addEventListener('change', (e) => {
-                    e.stopPropagation();
-                    this.handleNodeSelection(nodeId, checkbox.checked);
-                });
-            }
-        } else {
+        // Bind status dropdown events for modify mode
+        if (this.mode === 'modify') {
             const statusSelect = node.querySelector('.status-dropdown');
             if (statusSelect) {
                 // Remove any existing event listeners to prevent duplicates
@@ -323,11 +249,11 @@ class WorkOrderTreeView {
     }
 
     createCategoryDropdown(item) {
-        const categories = ['Standard', 'DoorsAndDrawerFronts', 'AdjustableShelves', 'Hardware'];
+        const categories = ['Standard', 'Hardware', 'Edgeband', 'Veneer', 'Solid Wood', 'Laminate'];
         const currentCategory = item.category || 'Standard';
         
         return `
-            <select class="category-dropdown form-select form-select-sm" style="width: auto; min-width: 130px;" data-node-id="${item.id}" data-item-type="${item.type}">
+            <select class="category-dropdown form-select form-select-sm" style="width: auto; min-width: 100px;" data-node-id="${item.id}" data-item-type="${item.type}">
                 ${categories.map(category => 
                     `<option value="${category}" ${category === currentCategory ? 'selected' : ''}>${category}</option>`
                 ).join('')}
@@ -335,297 +261,101 @@ class WorkOrderTreeView {
         `;
     }
 
-    getItemIcon(type) {
-        const icons = {
-            'product': '🚪',
-            'subassembly': '📁',
-            'part': '📄',
-            'hardware': '🔧',
-            'nestsheet': '📋',
-            'detached': '📄',
-            'category': '📂'
-        };
-        return icons[type] || '📄';
-    }
-
-    formatItemName(item) {
-        let name = item.name;
-        if (item.quantity && item.quantity > 1) {
-            name += ` - Qty. ${item.quantity}`;
-        }
-        return name;
-    }
-
-    toggleNode(toggle, content) {
-        const isExpanded = toggle.dataset.expanded === 'true';
-        toggle.dataset.expanded = !isExpanded;
-        
-        const icon = toggle.querySelector('i');
-        if (icon) {
-            icon.className = `fas fa-chevron-${!isExpanded ? 'down' : 'right'}`;
-        }
-        
-        content.style.display = !isExpanded ? 'block' : 'none';
-    }
-
-    handleNodeSelection(nodeId, isSelected) {
-        if (this.mode !== 'import') return;
-
-        const nodeState = this.selectionState.get(nodeId);
-        if (!nodeState) return;
-
-        nodeState.selected = isSelected;
-
-        if (isSelected) {
-            this.selectAllChildren(nodeId);
-        } else {
-            this.deselectAllChildren(nodeId);
-        }
-
-        this.updateParentState(nodeState.parentId);
-        this.updateNodeVisualState(nodeId);
-        this.updateSelectionCounts();
-        this.onSelectionChange(this.getSelectionSummary());
-    }
-
     handleStatusChange(nodeId, newStatus, itemType) {
-        if (this.mode !== 'modify') return;
-        
         this.onStatusChange(nodeId, newStatus, itemType);
     }
 
     handleCategoryChange(nodeId, newCategory, itemType) {
-        if (this.mode !== 'modify') return;
-        
         this.onCategoryChange(nodeId, newCategory, itemType);
     }
 
-    selectAllChildren(parentId) {
-        const parentState = this.selectionState.get(parentId);
-        if (!parentState) return;
-
-        parentState.childIds.forEach(childId => {
-            const childState = this.selectionState.get(childId);
-            if (childState && !childState.selected) {
-                childState.selected = true;
-                this.updateNodeVisualState(childId);
-                this.selectAllChildren(childId);
-            }
-        });
+    formatItemName(item) {
+        let name = item.name || 'Unnamed Item';
+        if (item.quantity && item.quantity > 1) {
+            name += ` (${item.quantity})`;
+        }
+        return name;
     }
 
-    deselectAllChildren(parentId) {
-        const parentState = this.selectionState.get(parentId);
-        if (!parentState) return;
-
-        parentState.childIds.forEach(childId => {
-            const childState = this.selectionState.get(childId);
-            if (childState && childState.selected) {
-                childState.selected = false;
-                this.updateNodeVisualState(childId);
-                this.deselectAllChildren(childId);
-            }
-        });
+    getItemIcon(type) {
+        const icons = {
+            'category': '<i class="fas fa-folder text-secondary"></i>',
+            'product': '<i class="fas fa-box text-primary"></i>',
+            'part': '<i class="fas fa-puzzle-piece text-success"></i>',
+            'subassembly': '<i class="fas fa-layer-group text-info"></i>',
+            'hardware': '<i class="fas fa-tools text-warning"></i>',
+            'detached_product': '<i class="fas fa-th-large text-dark"></i>',
+            'nestsheet': '<i class="fas fa-cut text-secondary"></i>'
+        };
+        return icons[type] || '<i class="fas fa-question text-muted"></i>';
     }
 
-    updateParentState(parentId) {
-        if (!parentId) return;
-
-        const parentState = this.selectionState.get(parentId);
-        if (!parentState) return;
-
-        const selectedChildren = parentState.childIds.filter(childId => {
-            const childState = this.selectionState.get(childId);
-            return childState && childState.selected;
-        });
-
-        const allSelected = selectedChildren.length === parentState.childIds.length;
-        const noneSelected = selectedChildren.length === 0;
-
-        if (allSelected) {
-            parentState.selected = true;
-            parentState.partiallySelected = false;
-        } else if (noneSelected) {
-            parentState.selected = false;
-            parentState.partiallySelected = false;
+    toggleNode(toggle, childrenContainer) {
+        const isExpanded = toggle.dataset.expanded === 'true';
+        const icon = toggle.querySelector('i');
+        
+        if (isExpanded) {
+            childrenContainer.style.display = 'none';
+            icon.className = 'fas fa-chevron-right';
+            toggle.dataset.expanded = 'false';
         } else {
-            parentState.selected = false;
-            parentState.partiallySelected = true;
+            childrenContainer.style.display = 'block';
+            icon.className = 'fas fa-chevron-down';
+            toggle.dataset.expanded = 'true';
         }
-
-        this.updateNodeVisualState(parentId);
-        this.updateParentState(parentState.parentId);
-    }
-
-    updateNodeVisualState(nodeId) {
-        const nodeState = this.selectionState.get(nodeId);
-        if (!nodeState) return;
-
-        const nodeElement = this.container.querySelector(`[data-item-id="${nodeId}"]`);
-        if (!nodeElement) return;
-
-        const checkbox = nodeElement.querySelector('.tree-checkbox');
-        if (checkbox) {
-            checkbox.checked = nodeState.selected;
-            checkbox.indeterminate = nodeState.partiallySelected || false;
-            if (nodeState.partiallySelected) {
-                checkbox.classList.add('indeterminate');
-            } else {
-                checkbox.classList.remove('indeterminate');
-            }
-        }
-
-        nodeElement.classList.remove('selected', 'partially-selected');
-        if (nodeState.selected) {
-            nodeElement.classList.add('selected');
-        } else if (nodeState.partiallySelected) {
-            nodeElement.classList.add('partially-selected');
-        }
-    }
-
-    updateSelectionCounts() {
-        this.selectionCounts = {
-            products: 0,
-            parts: 0,
-            subassemblies: 0,
-            hardware: 0,
-            nestSheets: 0,
-            detachedProducts: 0
-        };
-
-        this.selectionState.forEach(state => {
-            if (state.selected) {
-                switch (state.type) {
-                    case 'product':
-                        this.selectionCounts.products++;
-                        break;
-                    case 'part':
-                        this.selectionCounts.parts++;
-                        break;
-                    case 'subassembly':
-                        this.selectionCounts.subassemblies++;
-                        break;
-                    case 'hardware':
-                        this.selectionCounts.hardware++;
-                        break;
-                    case 'nestsheet':
-                        this.selectionCounts.nestSheets++;
-                        break;
-                    case 'detached_product':
-                        this.selectionCounts.detachedProducts++;
-                        break;
-                }
-            }
-        });
-    }
-
-    getSelectionSummary() {
-        return {
-            counts: { ...this.selectionCounts },
-            selectedItems: Array.from(this.selectionState.entries())
-                .filter(([_, state]) => state.selected)
-                .map(([id, state]) => ({ id, type: state.type, data: state.itemData }))
-        };
     }
 
     // Control methods
-    selectAllProducts() {
-        this.selectionState.forEach((state, nodeId) => {
-            if ((state.type === 'product' || state.type === 'hardware' || state.type === 'detached') && !state.selected) {
-                state.selected = true;
-                this.updateNodeVisualState(nodeId);
-                this.selectAllChildren(nodeId);
-            }
-        });
-        this.updateSelectionCounts();
-        this.onSelectionChange(this.getSelectionSummary());
-    }
-
-    selectAllNestSheets() {
-        this.selectionState.forEach((state, nodeId) => {
-            if (state.type === 'nestsheet' && !state.selected) {
-                state.selected = true;
-                this.updateNodeVisualState(nodeId);
-                this.selectAllChildren(nodeId);
-            }
-        });
-        this.updateSelectionCounts();
-        this.onSelectionChange(this.getSelectionSummary());
-    }
-
-    clearAllSelections() {
-        this.selectionState.forEach((state, nodeId) => {
-            if (state.selected) {
-                state.selected = false;
-                state.partiallySelected = false;
-                this.updateNodeVisualState(nodeId);
-            }
-        });
-        this.updateSelectionCounts();
-        this.onSelectionChange(this.getSelectionSummary());
-    }
-
     expandAll() {
-        const toggles = this.container.querySelectorAll('.tree-toggle');
-        toggles.forEach(toggle => {
-            toggle.dataset.expanded = 'true';
-            toggle.querySelector('i').className = 'fas fa-chevron-down';
-            const content = toggle.closest('.tree-node').querySelector('.tree-content');
-            if (content) content.style.display = 'block';
+        const allToggles = this.container.querySelectorAll('.tree-toggle');
+        allToggles.forEach(toggle => {
+            const childrenContainer = toggle.closest('.tree-node').querySelector('.tree-content');
+            if (childrenContainer) {
+                childrenContainer.style.display = 'block';
+                toggle.querySelector('i').className = 'fas fa-chevron-down';
+                toggle.dataset.expanded = 'true';
+            }
         });
     }
 
     collapseAll() {
-        const toggles = this.container.querySelectorAll('.tree-toggle');
-        toggles.forEach(toggle => {
-            toggle.dataset.expanded = 'false';
-            toggle.querySelector('i').className = 'fas fa-chevron-right';
-            const content = toggle.closest('.tree-node').querySelector('.tree-content');
-            if (content) content.style.display = 'none';
+        const allToggles = this.container.querySelectorAll('.tree-toggle');
+        allToggles.forEach(toggle => {
+            const childrenContainer = toggle.closest('.tree-node').querySelector('.tree-content');
+            if (childrenContainer) {
+                childrenContainer.style.display = 'none';
+                toggle.querySelector('i').className = 'fas fa-chevron-right';
+                toggle.dataset.expanded = 'false';
+            }
         });
     }
 
     filterTree(searchTerm) {
-        const nodes = this.container.querySelectorAll('.tree-node');
+        const allNodes = this.container.querySelectorAll('.tree-node');
         const lowerSearchTerm = searchTerm.toLowerCase();
         
-        nodes.forEach(node => {
-            const text = node.textContent.toLowerCase();
-            const shouldShow = searchTerm === '' || text.includes(lowerSearchTerm);
+        if (!searchTerm) {
+            allNodes.forEach(node => {
+                node.style.display = 'block';
+            });
+            return;
+        }
+
+        allNodes.forEach(node => {
+            const itemText = node.textContent.toLowerCase();
+            const shouldShow = itemText.includes(lowerSearchTerm);
             node.style.display = shouldShow ? 'block' : 'none';
         });
     }
 
-    showError(message) {
-        const treeContent = this.container.querySelector('#treeViewContent');
-        treeContent.innerHTML = `
-            <div class="alert alert-danger">
-                <i class="fas fa-exclamation-triangle me-2"></i>
-                ${message}
-            </div>
-        `;
-    }
-
-    // Public API methods
-    getSelectedItems() {
-        return Array.from(this.selectionState.entries())
-            .filter(([_, state]) => state.selected)
-            .map(([id, state]) => ({ id, type: state.type, data: state.itemData }));
-    }
-
-    setMode(mode) {
-        this.mode = mode;
-        this.createTreeContainer();
-        if (this.data) {
-            this.renderTree();
-        }
-    }
-
     refresh() {
-        if (this.mode === 'modify' && this.apiUrl && this.workOrderId) {
+        if (this.mode === 'modify') {
             this.loadData();
-        } else if (this.data) {
+        } else {
             this.renderTree();
         }
     }
 }
+
+// Make it available globally
+window.WorkOrderTreeView = WorkOrderTreeView;

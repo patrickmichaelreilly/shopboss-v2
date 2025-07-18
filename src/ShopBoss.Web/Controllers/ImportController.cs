@@ -768,6 +768,9 @@ public class ImportSession
     public bool CancellationRequested { get; set; }
     public ImportWorkOrder? ImportWorkOrder { get; set; }
     public ImportData? RawImportData { get; set; }
+    
+    // Phase I2: Support for WorkOrder entities in parallel system
+    public ShopBoss.Web.Models.WorkOrder? WorkOrderEntities { get; set; }
 }
 
 public enum ImportStatus

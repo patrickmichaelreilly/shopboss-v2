@@ -1,0 +1,493 @@
+@{
+    ViewData["Title"] = "New Import System - Phase I2";
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/tree-view.css" />
+    <style>
+        .progress-container {
+            background: #f8f9fa;
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            border: 1px solid #dee2e6;
+        }
+        
+        .stage-indicator {
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            background-color: #e9ecef;
+            border: 1px solid #ced4da;
+            font-weight: 500;
+        }
+        
+        .stage-indicator.active {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+    </style>
+}
+
+<div class="container-fluid mt-3">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h3 class="card-title mb-0">
+                        <i class="fas fa-upload me-2"></i>New Import System - Phase I2
+                    </h3>
+                    <div>
+                        <a asp-action="Index" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left me-2"></i>Back to Work Orders
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Phase I2:</strong> New import system using Work Order entities directly. This runs parallel to the existing import system.
+                    </div>
+
+                    <!-- Step 1: File Upload -->
+                    <div id="uploadStep" class="step-content">
+                        <div class="mb-4">
+                            <h5>Select SDF File</h5>
+                            <div class="mb-3">
+                                <div id="dropZone" class="border border-2 border-dashed rounded p-4 text-center bg-light" style="min-height: 150px; cursor: pointer;">
+                                    <div class="d-flex flex-column align-items-center justify-content-center h-100">
+                                        <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
+                                        <p class="mb-2"><strong>Drop your SDF file here</strong></p>
+                                        <p class="text-muted mb-0">or click to browse</p>
+                                    </div>
+                                </div>
+                                <input type="file" id="sdfFile" accept=".sdf" class="d-none" required>
+                                <div id="fileInfo" class="mt-2 d-none">
+                                    <div class="alert alert-success">
+                                        <i class="fas fa-file-database me-2"></i>
+                                        <span id="fileName"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="button" id="startImportBtn" class="btn btn-primary btn-lg" disabled>
+                                <i class="fas fa-play me-2"></i>Start Import Process
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Step 2: Import Progress -->
+                    <div id="progressStep" class="step-content d-none">
+                        <div class="mb-4">
+                            <h5>Import Progress</h5>
+                            <div class="progress-container">
+                                <div class="mb-3">
+                                    <div class="progress" style="height: 25px;">
+                                        <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" 
+                                             role="progressbar" style="width: 0%;">0%</div>
+                                    </div>
+                                </div>
+                                <div class="row text-center">
+                                    <div class="col-md-6">
+                                        <small class="text-muted">Current Stage</small>
+                                        <div id="currentStage" class="stage-indicator active">Initializing...</div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <small class="text-muted">Time Remaining</small>
+                                        <div class="stage-indicator">
+                                            <span id="timeRemaining">Calculating...</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 3: Preview Results -->
+                    <div id="previewStep" class="step-content d-none">
+                        <div class="mb-4">
+                            <h5>Import Information</h5>
+                            <div class="card">
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <strong>Work Order Name:</strong><br>
+                                            <span id="finalWorkOrderName" class="text-muted">Loading...</span>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <strong>Import Session:</strong><br>
+                                            <span id="sessionId" class="text-muted">Loading...</span>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <strong>Import Date:</strong><br>
+                                            <span class="text-muted" id="preview-date">Loading...</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Statistics Cards -->
+                        <div class="mb-4">
+                            <h5>Import Statistics</h5>
+                            <div class="row">
+                                <div class="col-lg col-md-4 col-6 mb-3">
+                                    <div class="card border-primary h-100">
+                                        <div class="card-body text-center">
+                                            <i class="fas fa-boxes fa-2x text-primary mb-2"></i>
+                                            <h4 class="mb-1" id="totalProducts">0</h4>
+                                            <small class="text-muted">Products</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-lg col-md-4 col-6 mb-3">
+                                    <div class="card border-success h-100">
+                                        <div class="card-body text-center">
+                                            <i class="fas fa-puzzle-piece fa-2x text-success mb-2"></i>
+                                            <h4 class="mb-1" id="totalParts">0</h4>
+                                            <small class="text-muted">Parts</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-lg col-md-4 col-6 mb-3">
+                                    <div class="card border-dark h-100">
+                                        <div class="card-body text-center">
+                                            <i class="fas fa-th-large fa-2x text-dark mb-2"></i>
+                                            <h4 class="mb-1" id="totalDetachedProducts">0</h4>
+                                            <small class="text-muted">Detached Products</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-lg col-md-4 col-6 mb-3">
+                                    <div class="card border-info h-100">
+                                        <div class="card-body text-center">
+                                            <i class="fas fa-tools fa-2x text-info mb-2"></i>
+                                            <h4 class="mb-1" id="totalHardware">0</h4>
+                                            <small class="text-muted">Hardware</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-lg col-md-4 col-6 mb-3">
+                                    <div class="card border-secondary h-100">
+                                        <div class="card-body text-center">
+                                            <i class="fas fa-cut fa-2x text-secondary mb-2"></i>
+                                            <h4 class="mb-1" id="totalNestSheets">0</h4>
+                                            <small class="text-muted">Nest Sheets</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tree Partial in Import Mode -->
+                        <div class="mb-4">
+                            <h5>Data Preview</h5>
+                            <div id="treeContainer">
+                                <!-- Tree will be initialized after import completes -->
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <button type="button" id="finalImportBtn" class="btn btn-success me-md-2" disabled>
+                                <i class="fas fa-check me-2"></i>Import to Database
+                            </button>
+                            <button type="button" id="startOverBtn" class="btn btn-outline-secondary">
+                                <i class="fas fa-redo me-2"></i>Start Over
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/lib/signalr/dist/browser/signalr.js"></script>
+    <script src="~/js/WorkOrderTreeView.js"></script>
+    <script>
+        // Global variables
+        let currentSessionId = null;
+        let signalRConnection = null;
+        let treeComponent = null;
+        
+        // DOM elements
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('sdfFile');
+        const fileInfo = document.getElementById('fileInfo');
+        const fileName = document.getElementById('fileName');
+        const startImportBtn = document.getElementById('startImportBtn');
+        
+        // Steps
+        const uploadStep = document.getElementById('uploadStep');
+        const progressStep = document.getElementById('progressStep');
+        const previewStep = document.getElementById('previewStep');
+        
+        // Progress elements
+        const progressBar = document.getElementById('progressBar');
+        const currentStage = document.getElementById('currentStage');
+        const timeRemaining = document.getElementById('timeRemaining');
+        
+        // Preview elements
+        const sessionIdSpan = document.getElementById('sessionId');
+        const finalWorkOrderName = document.getElementById('finalWorkOrderName');
+        const totalProducts = document.getElementById('totalProducts');
+        const totalParts = document.getElementById('totalParts');
+        const totalDetachedProducts = document.getElementById('totalDetachedProducts');
+        const totalHardware = document.getElementById('totalHardware');
+        const totalNestSheets = document.getElementById('totalNestSheets');
+        const finalImportBtn = document.getElementById('finalImportBtn');
+        const startOverBtn = document.getElementById('startOverBtn');
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', async function() {
+            await initializeSignalR();
+            initializeFileUpload();
+            
+            // Set current date
+            document.getElementById('preview-date').textContent = new Date().toLocaleString();
+        });
+
+        // Initialize SignalR connection
+        async function initializeSignalR() {
+            signalRConnection = new signalR.HubConnectionBuilder()
+                .withUrl("/importProgress")
+                .build();
+
+            signalRConnection.on("ImportProgress", function (data) {
+                updateProgress(data.percentage, data.stage, data.estimatedTimeRemaining);
+            });
+
+            signalRConnection.on("ImportComplete", function (data) {
+                handleImportComplete(data);
+            });
+
+            signalRConnection.on("ImportError", function (data) {
+                handleImportError(data.error);
+            });
+
+            try {
+                await signalRConnection.start();
+                console.log("SignalR connected");
+            } catch (err) {
+                console.error("SignalR connection failed: " + err);
+            }
+        }
+
+        // Initialize file upload handlers
+        function initializeFileUpload() {
+            dropZone.addEventListener('click', () => fileInput.click());
+            
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('border-primary');
+            });
+
+            dropZone.addEventListener('dragleave', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('border-primary');
+            });
+
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('border-primary');
+                
+                const files = e.dataTransfer.files;
+                if (files.length > 0 && files[0].name.toLowerCase().endsWith('.sdf')) {
+                    fileInput.files = files;
+                    showFileInfo(files[0]);
+                } else {
+                    alert('Please select an SDF file.');
+                }
+            });
+
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files[0]) {
+                    showFileInfo(e.target.files[0]);
+                }
+            });
+        }
+
+        function showFileInfo(file) {
+            fileName.textContent = file.name + ' (' + formatBytes(file.size) + ')';
+            fileInfo.classList.remove('d-none');
+            startImportBtn.disabled = false;
+        }
+
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // Start import process
+        startImportBtn.addEventListener('click', async () => {
+            const file = fileInput.files[0];
+            if (!file) {
+                alert('Please select a file.');
+                return;
+            }
+
+            try {
+                // Upload file to new import endpoint
+                const formData = new FormData();
+                formData.append('file', file);
+
+                const uploadResponse = await fetch('/admin/newimport/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!uploadResponse.ok) {
+                    const error = await uploadResponse.json();
+                    throw new Error(error.error || 'Upload failed');
+                }
+
+                const uploadResult = await uploadResponse.json();
+                currentSessionId = uploadResult.sessionId;
+
+                // Join SignalR group
+                if (signalRConnection) {
+                    await signalRConnection.invoke("JoinImportGroup", currentSessionId);
+                }
+
+                // Show progress step
+                uploadStep.classList.add('d-none');
+                progressStep.classList.remove('d-none');
+
+                // Start import with new endpoint
+                const startResponse = await fetch('/admin/newimport/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sessionId: currentSessionId })
+                });
+
+                if (!startResponse.ok) {
+                    const error = await startResponse.json();
+                    throw new Error(error.error || 'Failed to start import');
+                }
+
+            } catch (error) {
+                console.error('Import error:', error);
+                alert('Error: ' + error.message);
+                resetToUpload();
+            }
+        });
+
+        // Update progress display
+        function updateProgress(percentage, stage, estimatedTime) {
+            progressBar.style.width = percentage + '%';
+            progressBar.textContent = percentage + '%';
+            currentStage.textContent = stage || 'Processing...';
+            
+            if (estimatedTime && estimatedTime > 0) {
+                const minutes = Math.floor(estimatedTime / 60);
+                const seconds = Math.floor(estimatedTime % 60);
+                timeRemaining.textContent = minutes + 'm ' + seconds + 's';
+            } else {
+                timeRemaining.textContent = 'Calculating...';
+            }
+        }
+
+        // Handle import completion
+        async function handleImportComplete(data) {
+            progressStep.classList.add('d-none');
+            previewStep.classList.remove('d-none');
+            
+            // Update statistics
+            if (data.statistics) {
+                totalProducts.textContent = data.statistics.totalProducts || 0;
+                totalParts.textContent = data.statistics.totalParts || 0;
+                totalDetachedProducts.textContent = data.statistics.totalDetachedProducts || 0;
+                totalHardware.textContent = data.statistics.totalHardware || 0;
+                totalNestSheets.textContent = data.statistics.totalNestSheets || 0;
+            }
+            
+            // Get detailed data
+            try {
+                const statusResponse = await fetch('/admin/newimport/status?sessionId=' + currentSessionId);
+                if (statusResponse.ok) {
+                    const statusData = await statusResponse.json();
+                    sessionIdSpan.textContent = statusData.sessionId;
+                    finalWorkOrderName.textContent = statusData.workOrderName || 'New Import Work Order';
+                }
+                
+                // Initialize tree view
+                initializeTreeView();
+            } catch (error) {
+                console.error('Error fetching import details:', error);
+            }
+        }
+
+        // Initialize tree view with imported data
+        async function initializeTreeView() {
+            const treeContainer = document.getElementById('treeContainer');
+            treeContainer.innerHTML = '';
+            
+            // Create tree container
+            const treeHtml = `<div id="importTreeView" class="tree-view mb-4" style="min-height: 400px;"></div>`;
+            treeContainer.innerHTML = treeHtml;
+            
+            // Initialize the tree component in import mode to hide status dropdowns
+            treeComponent = new WorkOrderTreeView('importTreeView', {
+                mode: 'import'  // Use import mode to hide status dropdowns during preview
+            });
+            
+            // Load tree data from the API
+            try {
+                const response = await fetch(`/admin/newimport/tree?sessionId=${currentSessionId}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const treeData = await response.json();
+                treeComponent.setData(treeData);
+                
+                // Enable final import button
+                finalImportBtn.disabled = false;
+            } catch (error) {
+                console.error('Error loading tree data:', error);
+                treeContainer.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Failed to load import data: ${error.message}
+                    </div>`;
+            }
+        }
+
+        // Handle import error
+        function handleImportError(error) {
+            alert('Import failed: ' + error);
+            resetToUpload();
+        }
+
+        // Reset to upload step
+        function resetToUpload() {
+            uploadStep.classList.remove('d-none');
+            progressStep.classList.add('d-none');
+            previewStep.classList.add('d-none');
+            
+            fileInput.value = '';
+            fileInfo.classList.add('d-none');
+            startImportBtn.disabled = true;
+            
+            currentSessionId = null;
+        }
+
+        // Start over button
+        startOverBtn.addEventListener('click', () => {
+            if (confirm('Are you sure you want to start over?')) {
+                resetToUpload();
+            }
+        });
+
+        // Final import button (placeholder for now)
+        finalImportBtn.addEventListener('click', () => {
+            alert('Phase I2: Import to database functionality will be implemented in the next phase.\n\nThe WorkOrder entities have been created in memory and are ready for import.');
+        });
+    </script>
+}

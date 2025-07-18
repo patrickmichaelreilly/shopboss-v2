@@ -130,7 +130,10 @@
                         </div>
                     </div>
                     
-                    @await Html.PartialAsync("_StatusManagementPanel", Model)
+                    @{
+                        var treeOptions = ShopBoss.Web.Models.WorkOrderTreeViewOptions.ForModify(Model, "workOrderTree", true);
+                    }
+                    @await Html.PartialAsync("_WorkOrderTreeView", treeOptions)
                 </div>
             </div>
         </div>

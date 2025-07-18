@@ -1,0 +1,443 @@
+@model ShopBoss.Web.Models.WorkOrderTreeViewOptions
+@* Reusable Work Order Tree View Partial - Phase I1
+   Parameter-driven tree component that works for both Modify and Import scenarios.
+   Extracts common patterns from StatusManagementPanel for universal reuse. *@
+
+<div class="work-order-tree-view">
+    <!-- Tree Display Container -->
+    <div id="@Model.ContainerId" class="tree-view mb-4" style="min-height: 400px;">
+        <div class="text-center text-muted">
+            <i class="bi bi-info-circle"></i> Loading work order data...
+        </div>
+    </div>
+
+    @if (Model.ShowInstructions)
+    {
+        <!-- Instructions Panel -->
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i> 
+            <strong>Tree Navigation:</strong> Use the dropdown next to each item to change its status or category. 
+            @if (Model.Mode == "import")
+            {
+                <text>This preview shows the structure of the imported work order.</text>
+            }
+            else
+            {
+                <text>Status changes are applied immediately.</text>
+            }
+        </div>
+    }
+
+    @if (Model.ShowAuditHistory)
+    {
+        <!-- Audit History Section -->
+        <div class="mb-4">
+            <h6 class="mb-3">
+                <i class="bi bi-clock-history"></i> Audit History
+            </h6>
+            <div class="card">
+                <div class="card-body" style="max-height: 400px; overflow-y: auto; border: 1px solid #dee2e6;">
+                    <div id="@(Model.ContainerId)_auditHistory">
+                        <div class="text-center text-muted">
+                            <i class="bi bi-info-circle"></i> Loading audit history...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .work-order-tree-view {
+        margin-top: 1rem;
+    }
+
+    .tree-view {
+        max-height: 400px;
+        overflow-y: auto;
+        border: 1px solid #dee2e6;
+        border-radius: 0.375rem;
+        padding: 1rem;
+        background-color: #ffffff;
+    }
+
+    /* Tree hierarchy indentation styles */
+    .tree-node {
+        padding: 0.25rem 0;
+    }
+    
+    .tree-node.level-0 { margin-left: 0; }
+    .tree-node.level-1 { margin-left: 1.5rem; }
+    .tree-node.level-2 { margin-left: 3rem; }
+    .tree-node.level-3 { margin-left: 4.5rem; }
+    .tree-node.level-4 { margin-left: 6rem; }
+    
+    .tree-toggle {
+        cursor: pointer;
+        user-select: none;
+        color: #6c757d;
+        display: inline-flex !important;
+        align-items: center;
+        justify-content: center;
+        min-width: 16px;
+        height: 16px;
+    }
+    
+    .tree-toggle:hover {
+        color: #495057;
+        background-color: #e9ecef;
+        border-radius: 2px;
+    }
+    
+    .tree-toggle i {
+        font-size: 12px !important;
+        line-height: 1;
+    }
+
+    .audit-entry {
+        padding: 0.25rem 0.5rem;
+        border-bottom: 1px solid #e9ecef;
+        font-size: 0.8rem;
+        line-height: 1.2;
+    }
+
+    .audit-entry:last-child {
+        border-bottom: none;
+    }
+
+    .audit-timestamp {
+        color: #6c757d;
+        font-size: 0.75rem;
+    }
+
+    .audit-details {
+        margin-top: 0.1rem;
+        font-size: 0.75rem;
+    }
+
+    .old-value {
+        color: #dc3545;
+        text-decoration: line-through;
+    }
+
+    .new-value {
+        color: #28a745;
+        font-weight: 500;
+    }
+</style>
+
+<script>
+    // Work Order Tree View Partial - Phase I1
+    // Parameter-driven initialization for universal reuse
+    document.addEventListener('DOMContentLoaded', function() {
+        // Extract parameters from model
+        const containerId = '@Model.ContainerId';
+        const mode = '@Model.Mode';
+        const apiUrl = '@Model.ApiUrl';
+        const workOrderId = '@Model.WorkOrderId';
+        const sessionId = '@Model.SessionId';
+        const showAuditHistory = @Model.ShowAuditHistory.ToString().ToLower();
+        
+        const auditHistoryContainer = document.getElementById(containerId + '_auditHistory');
+        let treeView = null;
+
+        // Initialize WorkOrderTreeView component
+        function initializeTreeView() {
+            try {
+                const config = {
+                    mode: mode,
+                    apiUrl: apiUrl,
+                    onDataLoaded: handleDataLoaded
+                };
+
+                // Add appropriate ID parameter
+                if (workOrderId) {
+                    config.workOrderId = workOrderId;
+                }
+                if (sessionId) {
+                    config.sessionId = sessionId;
+                }
+
+                // Add mode-specific callbacks
+                if (mode === 'modify') {
+                    config.onStatusChange = handleStatusChange;
+                    config.onCategoryChange = handleCategoryChange;
+                } else if (mode === 'import') {
+                    config.onSelectionChange = handleSelectionChange;
+                }
+
+                treeView = new WorkOrderTreeView(containerId, config);
+            } catch (error) {
+                console.error('Error initializing tree view:', error);
+                document.getElementById(containerId).innerHTML = '<div class="alert alert-danger">Failed to initialize tree view</div>';
+            }
+        }
+
+        // Handle tree data loaded event
+        function handleDataLoaded(data) {
+            console.log('Tree data loaded:', data);
+            
+            // Load audit history if enabled
+            if (showAuditHistory && auditHistoryContainer) {
+                if (workOrderId) {
+                    loadAuditHistoryForWorkOrder();
+                } else {
+                    auditHistoryContainer.innerHTML = '<div class="text-muted">No audit history available for import preview</div>';
+                }
+            }
+        }
+
+        // Handle status changes (modify mode)
+        async function handleStatusChange(nodeId, newStatus, itemType) {
+            if (!workOrderId) {
+                console.error('Status change requires workOrderId');
+                return;
+            }
+
+            try {
+                console.log(`Status change: ${nodeId} -> ${newStatus} (${itemType})`);
+                
+                // Map frontend item types to backend expectations
+                let backendItemType = itemType;
+                if (itemType === 'detached_product') {
+                    backendItemType = 'detachedproduct';
+                }
+                
+                // Enable cascading for products to update child parts
+                const shouldCascade = itemType === 'product';
+                
+                // Call the existing UpdateStatus endpoint
+                const response = await fetch('/Admin/UpdateStatus', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: new URLSearchParams({
+                        itemId: nodeId,
+                        itemType: backendItemType,
+                        newStatus: newStatus,
+                        workOrderId: workOrderId,
+                        cascadeToChildren: shouldCascade
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showSuccess(`${itemType} status updated to ${newStatus}`);
+                    
+                    // Refresh statistics and audit history
+                    refreshStatistics();
+                    refreshAuditHistory();
+                    
+                    // Refresh tree if cascading was enabled
+                    if (shouldCascade) {
+                        setTimeout(() => {
+                            if (treeView && treeView.refresh) {
+                                treeView.refresh();
+                            }
+                            refreshStatistics();
+                            refreshAuditHistory();
+                        }, 750);
+                    }
+                } else {
+                    showError(`Failed to update status: ${result.message}`);
+                    if (treeView && treeView.refresh) {
+                        treeView.refresh();
+                    }
+                }
+            } catch (error) {
+                console.error('Error updating status:', error);
+                showError('Error updating status');
+                if (treeView && treeView.refresh) {
+                    treeView.refresh();
+                }
+            }
+        }
+
+        // Handle category changes (modify mode)
+        async function handleCategoryChange(nodeId, newCategory, itemType) {
+            if (!workOrderId) {
+                console.error('Category change requires workOrderId');
+                return;
+            }
+
+            try {
+                console.log(`Category change: ${nodeId} -> ${newCategory} (${itemType})`);
+                
+                const response = await fetch('/api/WorkOrderTreeApi/updateCategory', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: new URLSearchParams({
+                        partId: nodeId,
+                        category: newCategory,
+                        workOrderId: workOrderId
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showSuccess(`Part category updated to ${newCategory}`);
+                    refreshStatistics();
+                    refreshAuditHistory();
+                } else {
+                    showError(`Failed to update category: ${result.message}`);
+                    if (treeView && treeView.refresh) {
+                        treeView.refresh();
+                    }
+                }
+            } catch (error) {
+                console.error('Error updating category:', error);
+                showError('Error updating category');
+                if (treeView && treeView.refresh) {
+                    treeView.refresh();
+                }
+            }
+        }
+
+        // Handle selection changes (import mode)
+        function handleSelectionChange(summary) {
+            console.log('Selection changed:', summary);
+            
+            // Notify parent page of selection changes
+            if (typeof window.onTreeSelectionChange === 'function') {
+                window.onTreeSelectionChange(summary);
+            }
+        }
+
+        // Load audit history for work order
+        async function loadAuditHistoryForWorkOrder() {
+            if (!auditHistoryContainer || !workOrderId) return;
+
+            auditHistoryContainer.innerHTML = '<div class="text-center"><span class="spinner-border spinner-border-sm"></span> Loading...</div>';
+
+            try {
+                const response = await fetch(`/api/WorkOrderStatistics/${workOrderId}/audit`);
+                if (!response.ok) throw new Error('Failed to load audit history');
+                
+                const data = await response.json();
+                if (data.success) {
+                    renderAuditHistory(data.auditEntries);
+                } else {
+                    throw new Error(data.message);
+                }
+            } catch (error) {
+                console.error('Error loading audit history:', error);
+                auditHistoryContainer.innerHTML = '<div class="alert alert-danger">Failed to load audit history</div>';
+            }
+        }
+
+        // Refresh audit history
+        function refreshAuditHistory() {
+            if (showAuditHistory && workOrderId) {
+                loadAuditHistoryForWorkOrder();
+            }
+        }
+
+        // Render audit history
+        function renderAuditHistory(entries) {
+            if (!auditHistoryContainer) return;
+
+            if (entries.length === 0) {
+                auditHistoryContainer.innerHTML = '<div class="text-muted">No audit history found</div>';
+                return;
+            }
+
+            auditHistoryContainer.innerHTML = entries.map(entry => {
+                const entityInfo = entry.entityType && entry.entityId ? 
+                    ` ${entry.entityType} ${entry.entityId.substring(0, 8)}...` : '';
+                const timestamp = new Date(entry.timestamp).toLocaleString();
+                const station = entry.station || 'System';
+                const valueChange = entry.oldValue && entry.newValue ? renderValueChange(entry.oldValue, entry.newValue) : '';
+                
+                return `
+                    <div class="audit-entry">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <strong>${entry.action}</strong>${entityInfo} 
+                                <span class="text-muted">at ${station}</span>
+                                ${valueChange}
+                            </div>
+                            <span class="audit-timestamp">${timestamp}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Render value changes
+        function renderValueChange(oldValue, newValue) {
+            try {
+                const oldObj = JSON.parse(oldValue);
+                const newObj = JSON.parse(newValue);
+                
+                if (oldObj.Status !== undefined && newObj.Status !== undefined) {
+                    return `(<span class="old-value">${oldObj.Status}</span>→<span class="new-value">${newObj.Status}</span>)`;
+                } else if (oldObj.Category !== undefined && newObj.Category !== undefined) {
+                    return `(<span class="old-value">${oldObj.Category}</span>→<span class="new-value">${newObj.Category}</span>)`;
+                } else {
+                    return '';
+                }
+            } catch (error) {
+                console.error('Error parsing audit values:', error);
+                return '';
+            }
+        }
+
+        // Utility functions
+        function showSuccess(message) {
+            showAlert(message, 'success');
+        }
+
+        function showError(message) {
+            showAlert(message, 'danger');
+        }
+
+        function showAlert(message, type) {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+            alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 1050; max-width: 400px;';
+            alertDiv.innerHTML = `
+                <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-triangle'} me-2"></i>
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            
+            document.body.appendChild(alertDiv);
+            
+            setTimeout(() => {
+                if (alertDiv.parentNode) {
+                    alertDiv.remove();
+                }
+            }, 5000);
+        }
+
+        // Function to refresh statistics (called from parent page)
+        function refreshStatistics() {
+            if (typeof updateStatisticsCards === 'function' && workOrderId) {
+                fetch(`/api/WorkOrderStatistics/${workOrderId}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            updateStatisticsCards(data.statistics);
+                        }
+                    })
+                    .catch(error => console.error('Error refreshing statistics:', error));
+            }
+        }
+
+        // Expose tree view instance for external access
+        window[@Html.Raw($"'{Model.ContainerId}_treeView'")] = {
+            getInstance: () => treeView,
+            refresh: () => treeView?.refresh(),
+            refreshAuditHistory: refreshAuditHistory
+        };
+
+        // Initialize
+        initializeTreeView();
+    });
+</script>
