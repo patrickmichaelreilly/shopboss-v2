@@ -146,6 +146,7 @@
                     apiUrl: '/api/WorkOrderTreeApi',
                     workOrderId: workOrderId,
                     onStatusChange: handleStatusChange,
+                    onCategoryChange: handleCategoryChange,
                     onDataLoaded: handleDataLoaded
                 });
             } catch (error) {
@@ -228,8 +229,47 @@
             }
         }
 
-
-
+        // Handle individual category changes
+        async function handleCategoryChange(nodeId, newCategory, itemType) {
+            try {
+                console.log(`Category change: ${nodeId} -> ${newCategory} (${itemType})`);
+                
+                // Call the new updateCategory endpoint
+                const response = await fetch('/api/WorkOrderTreeApi/updateCategory', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: new URLSearchParams({
+                        partId: nodeId,
+                        category: newCategory,
+                        workOrderId: workOrderId
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showSuccess(`Part category updated to ${newCategory}`);
+                    
+                    // Refresh statistics and audit history immediately after successful category change
+                    refreshStatistics();
+                    refreshAuditHistory();
+                } else {
+                    showError(`Failed to update category: ${result.message}`);
+                    // Refresh tree to revert changes
+                    if (treeView && treeView.refresh) {
+                        treeView.refresh();
+                    }
+                }
+            } catch (error) {
+                console.error('Error updating category:', error);
+                showError('Error updating category');
+                if (treeView && treeView.refresh) {
+                    treeView.refresh();
+                }
+            }
+        }
 
         // Load audit history for the entire work order
         async function loadAuditHistoryForWorkOrder() {
@@ -291,8 +331,19 @@
                 const oldObj = JSON.parse(oldValue);
                 const newObj = JSON.parse(newValue);
                 
-                return `(<span class="old-value">${oldObj.Status || 'N/A'}</span>→<span class="new-value">${newObj.Status || 'N/A'}</span>)`;
-            } catch {
+                // Handle Status changes
+                if (oldObj.Status !== undefined && newObj.Status !== undefined) {
+                    return `(<span class="old-value">${oldObj.Status}</span>→<span class="new-value">${newObj.Status}</span>)`;
+                } 
+                // Handle Category changes
+                else if (oldObj.Category !== undefined && newObj.Category !== undefined) {
+                    return `(<span class="old-value">${oldObj.Category}</span>→<span class="new-value">${newObj.Category}</span>)`;
+                } 
+                else {
+                    return '';
+                }
+            } catch (error) {
+                console.error('Error parsing audit values:', error, 'oldValue:', oldValue, 'newValue:', newValue);
                 return '';
             }
         }

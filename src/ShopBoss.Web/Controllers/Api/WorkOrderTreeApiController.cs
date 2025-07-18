@@ -1,7 +1,10 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using ShopBoss.Web.Data;
 using ShopBoss.Web.Models;
 using ShopBoss.Web.Models.Api;
 using ShopBoss.Web.Services;
+using System.Text.Json;
 
 namespace ShopBoss.Web.Controllers.Api;
 
@@ -11,11 +14,15 @@ public class WorkOrderTreeApiController : ControllerBase
 {
     private readonly WorkOrderService _workOrderService;
     private readonly ILogger<WorkOrderTreeApiController> _logger;
+    private readonly ShopBossDbContext _context;
+    private readonly AuditTrailService _auditTrailService;
 
-    public WorkOrderTreeApiController(WorkOrderService workOrderService, ILogger<WorkOrderTreeApiController> logger)
+    public WorkOrderTreeApiController(WorkOrderService workOrderService, ILogger<WorkOrderTreeApiController> logger, ShopBossDbContext context, AuditTrailService auditTrailService)
     {
         _workOrderService = workOrderService;
         _logger = logger;
+        _context = context;
+        _auditTrailService = auditTrailService;
     }
 
     [HttpGet("{workOrderId}")]
@@ -88,6 +95,7 @@ public class WorkOrderTreeApiController : ControllerBase
                                 Type = "part",
                                 Quantity = part.Qty,
                                 Status = includeStatus ? part.Status.ToString() : null,
+                                Category = includeStatus ? part.Category.ToString() : null,
                                 Children = new List<TreeItem>()
                             });
                         }
@@ -130,6 +138,7 @@ public class WorkOrderTreeApiController : ControllerBase
                                     Type = "part",
                                     Quantity = part.Qty,
                                     Status = includeStatus ? part.Status.ToString() : null,
+                                    Category = includeStatus ? part.Category.ToString() : null,
                                     Children = new List<TreeItem>()
                                 });
                             }
@@ -238,6 +247,7 @@ public class WorkOrderTreeApiController : ControllerBase
                             Type = "part",
                             Quantity = part.Qty,
                             Status = includeStatus ? part.Status.ToString() : null,
+                            Category = includeStatus ? part.Category.ToString() : null,
                             Children = new List<TreeItem>()
                         });
                     }
@@ -274,6 +284,60 @@ public class WorkOrderTreeApiController : ControllerBase
         if (parts.Any(p => p.Status == Models.PartStatus.Sorted)) return Models.PartStatus.Sorted;
         if (parts.Any(p => p.Status == Models.PartStatus.Assembled)) return Models.PartStatus.Assembled;
         return Models.PartStatus.Shipped;
+    }
+
+    [HttpPost("updateCategory")]
+    public async Task<IActionResult> UpdatePartCategory([FromForm] string partId, [FromForm] string category, [FromForm] string workOrderId)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(partId) || string.IsNullOrEmpty(category))
+            {
+                return BadRequest(new { success = false, message = "PartId and category are required" });
+            }
+
+            var part = await _context.Parts.FindAsync(partId);
+            if (part == null)
+            {
+                return NotFound(new { success = false, message = $"Part '{partId}' not found." });
+            }
+
+            // Parse the category string to enum
+            if (!Enum.TryParse<PartCategory>(category, out var categoryEnum))
+            {
+                return BadRequest(new { success = false, message = $"Invalid category value: {category}" });
+            }
+
+            // Store old values for audit trail
+            var oldCategory = part.Category;
+            var oldValue = new { Category = oldCategory.ToString() };
+            var newValue = new { Category = categoryEnum.ToString() };
+
+            // Update the part
+            part.Category = categoryEnum;
+            part.StatusUpdatedDate = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            // Log the category change to audit trail
+            await _auditTrailService.LogAsync(
+                action: "ManualCategoryChange",
+                entityType: "Part",
+                entityId: partId,
+                oldValue: oldValue,
+                newValue: newValue,
+                station: "Manual",
+                workOrderId: workOrderId,
+                details: $"Manual category change via Admin interface. Category: {oldCategory} → {categoryEnum}",
+                sessionId: HttpContext.Session.Id
+            );
+
+            return Ok(new { success = true, message = "Category updated successfully" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating part category for {PartId}", partId);
+            return StatusCode(500, new { success = false, message = "Error updating category" });
+        }
     }
 
 }

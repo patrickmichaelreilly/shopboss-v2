@@ -15,6 +15,7 @@ class WorkOrderTreeView {
         this.workOrderId = options.workOrderId || null;
         this.onSelectionChange = options.onSelectionChange || (() => {});
         this.onStatusChange = options.onStatusChange || (() => {});
+        this.onCategoryChange = options.onCategoryChange || (() => {});
         this.onDataLoaded = options.onDataLoaded || (() => {});
         
         // State management
@@ -224,8 +225,9 @@ class WorkOrderTreeView {
                     <span>${this.formatItemName(item)}</span>
                 </div>
                 ${this.mode === 'modify' && item.type !== 'category' ? 
-                    `<div class="status-dropdown-container">
+                    `<div class="dropdown-container d-flex gap-2">
                         ${this.createStatusDropdown(item)}
+                        ${item.type === 'part' && item.category ? this.createCategoryDropdown(item) : ''}
                     </div>` :
                     ''
                 }
@@ -288,6 +290,20 @@ class WorkOrderTreeView {
                     this.handleStatusChange(targetNodeId, e.target.value, itemType);
                 });
             }
+
+            const categorySelect = node.querySelector('.category-dropdown');
+            if (categorySelect) {
+                // Remove any existing event listeners to prevent duplicates
+                categorySelect.replaceWith(categorySelect.cloneNode(true));
+                const newCategorySelect = node.querySelector('.category-dropdown');
+                
+                newCategorySelect.addEventListener('change', (e) => {
+                    e.stopPropagation();
+                    const itemType = e.target.dataset.itemType;
+                    const targetNodeId = e.target.dataset.nodeId;
+                    this.handleCategoryChange(targetNodeId, e.target.value, itemType);
+                });
+            }
         }
 
         return node;
@@ -301,6 +317,19 @@ class WorkOrderTreeView {
             <select class="status-dropdown form-select form-select-sm" style="width: auto; min-width: 100px;" data-node-id="${item.id}" data-item-type="${item.type}">
                 ${statuses.map(status => 
                     `<option value="${status}" ${status === currentStatus ? 'selected' : ''}>${status}</option>`
+                ).join('')}
+            </select>
+        `;
+    }
+
+    createCategoryDropdown(item) {
+        const categories = ['Standard', 'DoorsAndDrawerFronts', 'AdjustableShelves', 'Hardware'];
+        const currentCategory = item.category || 'Standard';
+        
+        return `
+            <select class="category-dropdown form-select form-select-sm" style="width: auto; min-width: 130px;" data-node-id="${item.id}" data-item-type="${item.type}">
+                ${categories.map(category => 
+                    `<option value="${category}" ${category === currentCategory ? 'selected' : ''}>${category}</option>`
                 ).join('')}
             </select>
         `;
@@ -363,6 +392,12 @@ class WorkOrderTreeView {
         if (this.mode !== 'modify') return;
         
         this.onStatusChange(nodeId, newStatus, itemType);
+    }
+
+    handleCategoryChange(nodeId, newCategory, itemType) {
+        if (this.mode !== 'modify') return;
+        
+        this.onCategoryChange(nodeId, newCategory, itemType);
     }
 
     selectAllChildren(parentId) {
