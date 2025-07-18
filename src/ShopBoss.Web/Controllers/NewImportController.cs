@@ -4,19 +4,22 @@ using ShopBoss.Web.Hubs;
 using ShopBoss.Web.Services;
 using ShopBoss.Web.Models.Import;
 using ShopBoss.Web.Models;
+using ShopBoss.Web.Data;
+using Microsoft.EntityFrameworkCore;
 using System.Collections.Concurrent;
 
 namespace ShopBoss.Web.Controllers;
 
 /// <summary>
 /// Phase I2: New Import Controller - Parallel import system using Work Order entities
-/// Routes: /admin/newimport/* to avoid conflicts with existing import system
+/// Routes: /admin/import/* for the new import system
 /// </summary>
 public class NewImportController : Controller
 {
     private readonly ImporterService _importerService;
     private readonly WorkOrderImportService _workOrderImportService;
-    private readonly ImportSelectionService _selectionService;
+    private readonly ShopBossDbContext _context;
+    private readonly PartFilteringService _partFilteringService;
     private readonly IHubContext<ImportProgressHub> _hubContext;
     private readonly ILogger<NewImportController> _logger;
     private readonly string _tempUploadPath;
@@ -27,14 +30,16 @@ public class NewImportController : Controller
     public NewImportController(
         ImporterService importerService,
         WorkOrderImportService workOrderImportService,
-        ImportSelectionService selectionService,
+        ShopBossDbContext context,
+        PartFilteringService partFilteringService,
         IHubContext<ImportProgressHub> hubContext,
         ILogger<NewImportController> logger,
         IWebHostEnvironment environment)
     {
         _importerService = importerService;
         _workOrderImportService = workOrderImportService;
-        _selectionService = selectionService;
+        _context = context;
+        _partFilteringService = partFilteringService;
         _hubContext = hubContext;
         _logger = logger;
         _tempUploadPath = Path.Combine(environment.ContentRootPath, "temp", "uploads");
@@ -45,9 +50,9 @@ public class NewImportController : Controller
 
     /// <summary>
     /// Phase I2: New import upload endpoint
-    /// Route: /admin/newimport/upload
+    /// Route: /admin/import/upload
     /// </summary>
-    [HttpPost("admin/newimport/upload")]
+    [HttpPost("admin/import/upload")]
     public async Task<IActionResult> UploadFile(IFormFile file)
     {
         if (file == null || file.Length == 0)
@@ -104,9 +109,9 @@ public class NewImportController : Controller
 
     /// <summary>
     /// Phase I2: Start new import process
-    /// Route: /admin/newimport/start
+    /// Route: /admin/import/start
     /// </summary>
-    [HttpPost("admin/newimport/start")]
+    [HttpPost("admin/import/start")]
     public IActionResult StartImport([FromBody] StartImportRequest request)
     {
         if (string.IsNullOrEmpty(request.SessionId))
@@ -148,9 +153,9 @@ public class NewImportController : Controller
 
     /// <summary>
     /// Phase I2: Get import status
-    /// Route: /admin/newimport/status
+    /// Route: /admin/import/status
     /// </summary>
-    [HttpGet("admin/newimport/status")]
+    [HttpGet("admin/import/status")]
     public IActionResult GetImportStatus(string sessionId)
     {
         if (!_importSessions.TryGetValue(sessionId, out var session))
@@ -174,9 +179,9 @@ public class NewImportController : Controller
 
     /// <summary>
     /// Phase I2: Get tree data for new import preview
-    /// Route: /admin/newimport/tree
+    /// Route: /admin/import/tree
     /// </summary>
-    [HttpGet("admin/newimport/tree")]
+    [HttpGet("admin/import/tree")]
     public IActionResult GetNewImportTreeData(string sessionId)
     {
         if (!_importSessions.TryGetValue(sessionId, out var session))
@@ -210,6 +215,69 @@ public class NewImportController : Controller
         {
             _logger.LogError(ex, "Phase I2: Error generating tree data for session {SessionId}", sessionId);
             return StatusCode(500, new { error = "Failed to generate tree data" });
+        }
+    }
+
+    /// <summary>
+    /// Phase I4: Final conversion endpoint - Convert WorkOrder entities to database
+    /// Route: /admin/import/convert
+    /// </summary>
+    [HttpPost("admin/import/convert")]
+    public async Task<IActionResult> ProcessFinalImport([FromBody] FinalImportRequest request)
+    {
+        if (string.IsNullOrEmpty(request.SessionId))
+        {
+            return BadRequest(new { error = "Session ID is required" });
+        }
+
+        if (!_importSessions.TryGetValue(request.SessionId, out var session))
+        {
+            return NotFound(new { error = "Import session not found" });
+        }
+
+        if (session.Status != ImportStatus.Completed || session.WorkOrderEntities == null)
+        {
+            return BadRequest(new { error = "Import not completed or no WorkOrder data available" });
+        }
+
+        try
+        {
+            _logger.LogInformation("Phase I4: Starting final import conversion for session {SessionId}", request.SessionId);
+
+            // Use independent conversion logic - no ImportSelectionService dependency
+            var result = await ConvertWorkOrderToDatabaseAsync(
+                session.WorkOrderEntities, 
+                request.WorkOrderName ?? session.WorkOrderEntities.Name ?? "New Import Work Order");
+
+            if (!result.Success)
+            {
+                _logger.LogWarning("Phase I4: Conversion failed for session {SessionId}: {Errors}", 
+                    request.SessionId, string.Join(", ", result.Errors));
+                return BadRequest(new { 
+                    error = "Import conversion failed", 
+                    details = result.Errors,
+                    duplicateInfo = result.DuplicateInfo
+                });
+            }
+
+            // Mark session as converted
+            session.Status = ImportStatus.Converted;
+            session.CompletedAt = DateTime.Now;
+
+            _logger.LogInformation("Phase I4: Successfully converted WorkOrder {WorkOrderId} to database for session {SessionId}", 
+                result.WorkOrderId, request.SessionId);
+
+            return Ok(new { 
+                success = true, 
+                workOrderId = result.WorkOrderId,
+                message = "Import completed successfully",
+                statistics = result.Statistics
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Phase I4: Error during final import conversion for session {SessionId}", request.SessionId);
+            return StatusCode(500, new { error = "Failed to complete import conversion" });
         }
     }
 
@@ -560,6 +628,342 @@ public class NewImportController : Controller
             response.Items.Add(nestSheetsCategory);
         }
     }
+
+    /// <summary>
+    /// Phase I4: Independent duplicate detection logic (copied from ImportSelectionService)
+    /// </summary>
+    private async Task<SelectionValidationResult> CheckForDuplicateWorkOrderDirect(string workOrderId, string workOrderName)
+    {
+        var result = new SelectionValidationResult { IsValid = true };
+
+        // Check for duplicate Microvellum ID
+        var existingById = await _context.WorkOrders.FirstOrDefaultAsync(w => w.Id == workOrderId);
+        var existingByName = await _context.WorkOrders.FirstOrDefaultAsync(w => w.Name == workOrderName);
+
+        if (existingById != null || existingByName != null)
+        {
+            result.IsValid = false;
+            
+            // Generate unique suggestions
+            var suggestedId = await GenerateUniqueWorkOrderId(workOrderId);
+            var suggestedName = await GenerateUniqueWorkOrderName(workOrderName);
+            
+            result.DuplicateInfo = new DuplicateDetectionResult
+            {
+                HasDuplicates = true,
+                DuplicateWorkOrderId = existingById?.Id,
+                DuplicateWorkOrderName = existingByName?.Name,
+                ExistingImportDate = existingById?.ImportedDate ?? existingByName?.ImportedDate,
+                SuggestedNewId = suggestedId,
+                SuggestedNewName = suggestedName
+            };
+
+            if (existingById != null)
+            {
+                result.Errors.Add($"Work order with Microvellum ID '{workOrderId}' already exists (imported as '{existingById.Name}' on {existingById.ImportedDate:yyyy-MM-dd})");
+                result.DuplicateInfo.ConflictMessages.Add($"ID conflict: '{workOrderId}' exists");
+            }
+
+            if (existingByName != null)
+            {
+                result.Errors.Add($"Work order with name '{workOrderName}' already exists (Microvellum ID: {existingByName.Id}, imported on {existingByName.ImportedDate:yyyy-MM-dd})");
+                result.DuplicateInfo.ConflictMessages.Add($"Name conflict: '{workOrderName}' exists");
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Phase I4: Generate unique WorkOrder ID (copied from ImportSelectionService)
+    /// </summary>
+    private async Task<string> GenerateUniqueWorkOrderId(string baseId)
+    {
+        var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+        var suggestedId = $"{baseId}_{timestamp}";
+        
+        // Ensure it's truly unique
+        var existing = await _context.WorkOrders.FirstOrDefaultAsync(w => w.Id == suggestedId);
+        if (existing != null)
+        {
+            suggestedId = $"{baseId}_{timestamp}_{Guid.NewGuid().ToString("N")[..6]}";
+        }
+        
+        return suggestedId;
+    }
+
+    /// <summary>
+    /// Phase I4: Generate unique WorkOrder name (copied from ImportSelectionService)
+    /// </summary>
+    private async Task<string> GenerateUniqueWorkOrderName(string baseName)
+    {
+        var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+        var suggestedName = $"{baseName} (Reimported {timestamp})";
+        
+        // Ensure it's truly unique
+        var existing = await _context.WorkOrders.FirstOrDefaultAsync(w => w.Name == suggestedName);
+        if (existing != null)
+        {
+            suggestedName = $"{baseName} (Reimported {timestamp} - {Guid.NewGuid().ToString("N")[..6]})";
+        }
+        
+        return suggestedName;
+    }
+
+    /// <summary>
+    /// Phase I4: Ensure unique ID across different entity types (copied from ImportSelectionService)
+    /// </summary>
+    private async Task<string> EnsureUniqueIdAsync(string tableName, string originalId)
+    {
+        var counter = 1;
+        var testId = originalId;
+        
+        while (await IdExistsInDatabaseAsync(tableName, testId))
+        {
+            testId = $"{originalId}_{counter}";
+            counter++;
+        }
+        
+        return testId;
+    }
+
+    /// <summary>
+    /// Phase I4: Check if ID exists in database (copied from ImportSelectionService)
+    /// </summary>
+    private async Task<bool> IdExistsInDatabaseAsync(string tableName, string id)
+    {
+        return tableName switch
+        {
+            "Products" => await _context.Products.AnyAsync(p => p.Id == id),
+            "Parts" => await _context.Parts.AnyAsync(p => p.Id == id),
+            "Subassemblies" => await _context.Subassemblies.AnyAsync(s => s.Id == id),
+            "DetachedProducts" => await _context.DetachedProducts.AnyAsync(d => d.Id == id),
+            "NestSheets" => await _context.NestSheets.AnyAsync(n => n.Id == id),
+            "Hardware" => await _context.Hardware.AnyAsync(h => h.Id == id),
+            _ => false
+        };
+    }
+
+/// <summary>
+/// Phase I4: Independent WorkOrder to database conversion (adapted from ImportSelectionService)
+/// </summary>
+    private async Task<ImportConversionResult> ConvertWorkOrderToDatabaseAsync(
+        WorkOrder workOrder, 
+        string workOrderName)
+    {
+        var result = new ImportConversionResult();
+        
+        using var transaction = await _context.Database.BeginTransactionAsync();
+        
+        try
+        {
+            _logger.LogInformation("Phase I4: Starting independent conversion of WorkOrder entities to database: {WorkOrderName}", workOrderName);
+
+            // Check for duplicate work order and automatically handle with unique identifiers
+            var duplicateCheck = await CheckForDuplicateWorkOrderDirect(workOrder.Id, workOrderName);
+            
+            // Always automatically resolve duplicates - no user interaction needed
+            if (duplicateCheck.DuplicateInfo?.HasDuplicates == true)
+            {
+                UpdateWorkOrderForDuplicates(workOrder, workOrderName, duplicateCheck.DuplicateInfo);
+            }
+            else
+            {
+                // Just update the name if no duplicates
+                workOrder.Name = workOrderName;
+            }
+
+            // Set import date
+            workOrder.ImportedDate = DateTime.Now;
+
+            // Process all entities in the WorkOrder
+            await ProcessWorkOrderEntitiesAsync(workOrder, result);
+
+            // Save to database
+            _context.WorkOrders.Add(workOrder);
+            await _context.SaveChangesAsync();
+            
+            // Commit transaction
+            await transaction.CommitAsync();
+
+            result.Success = true;
+            result.WorkOrderId = workOrder.Id;
+            
+            _logger.LogInformation("Phase I4: Successfully saved WorkOrder {WorkOrderId} with {ProductCount} products, {PartCount} parts, {SubassemblyCount} subassemblies, {HardwareCount} hardware items",
+                workOrder.Id,
+                result.Statistics.ConvertedProducts,
+                result.Statistics.ConvertedParts,
+                result.Statistics.ConvertedSubassemblies,
+                result.Statistics.ConvertedHardware);
+
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Phase I4: Error converting WorkOrder entities to database. Rolling back transaction.");
+            await transaction.RollbackAsync();
+            result.Errors.Add($"Import error: {ex.Message}");
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Phase I4: Update WorkOrder identifiers for duplicates (copied from ImportSelectionService)
+    /// </summary>
+    private void UpdateWorkOrderForDuplicates(WorkOrder workOrder, string workOrderName, DuplicateDetectionResult duplicateInfo)
+    {
+        var originalId = workOrder.Id;
+        var originalName = workOrder.Name;
+        
+        // Update work order identifiers
+        workOrder.Id = duplicateInfo.SuggestedNewId;
+        workOrder.Name = duplicateInfo.SuggestedNewName;
+        
+        _logger.LogInformation("Phase I4: Updated WorkOrder identifiers due to duplicates: ID '{OriginalId}' -> '{NewId}', Name '{OriginalName}' -> '{NewName}'",
+            originalId, workOrder.Id, originalName, workOrder.Name);
+
+        // Update all related entity IDs that reference the work order
+        UpdateRelatedEntityIds(workOrder, originalId, workOrder.Id);
+    }
+
+    /// <summary>
+    /// Phase I4: Update related entity IDs when WorkOrder ID changes (copied from ImportSelectionService)
+    /// </summary>
+    private void UpdateRelatedEntityIds(WorkOrder workOrder, string oldWorkOrderId, string newWorkOrderId)
+    {
+        // Update all Product WorkOrderIds
+        foreach (var product in workOrder.Products)
+        {
+            product.WorkOrderId = newWorkOrderId;
+            
+            // Update all Part WorkOrderIds through navigation
+            foreach (var part in product.Parts)
+            {
+                // Parts don't have WorkOrderId, they're linked through ProductId
+            }
+        }
+
+        // Update DetachedProduct WorkOrderIds
+        foreach (var detachedProduct in workOrder.DetachedProducts)
+        {
+            detachedProduct.WorkOrderId = newWorkOrderId;
+        }
+
+        // Update Hardware WorkOrderIds
+        foreach (var hardware in workOrder.Hardware)
+        {
+            hardware.WorkOrderId = newWorkOrderId;
+        }
+
+        // Update NestSheet WorkOrderIds
+        foreach (var nestSheet in workOrder.NestSheets)
+        {
+            nestSheet.WorkOrderId = newWorkOrderId;
+        }
+    }
+
+    /// <summary>
+    /// Phase I4: Process all entities in the WorkOrder for database persistence (copied from ImportSelectionService)
+    /// </summary>
+    private async Task ProcessWorkOrderEntitiesAsync(WorkOrder workOrder, ImportConversionResult result)
+    {
+        // Process Products
+        foreach (var product in workOrder.Products)
+        {
+            // Ensure unique product ID
+            product.Id = await EnsureUniqueIdAsync("Products", product.Id);
+            
+            // Process Parts within Product
+            foreach (var part in product.Parts)
+            {
+                part.Id = await EnsureUniqueIdAsync("Parts", part.Id);
+                part.ProductId = product.Id; // Update reference
+                
+                // Classify part if not already classified
+                if (part.Category == 0)
+                {
+                    part.Category = _partFilteringService.ClassifyPart(part);
+                }
+            }
+
+            // Process Subassemblies within Product
+            foreach (var subassembly in product.Subassemblies)
+            {
+                subassembly.Id = await EnsureUniqueIdAsync("Subassemblies", subassembly.Id);
+                subassembly.ProductId = product.Id; // Update reference
+                
+                // Process Parts within Subassembly
+                foreach (var part in subassembly.Parts)
+                {
+                    part.Id = await EnsureUniqueIdAsync("Parts", part.Id);
+                    part.ProductId = product.Id; // Update reference
+                    part.SubassemblyId = subassembly.Id; // Update reference
+                    
+                    // Classify part if not already classified
+                    if (part.Category == 0)
+                    {
+                        part.Category = _partFilteringService.ClassifyPart(part);
+                    }
+                }
+            }
+
+            // Process Hardware within Product - FIX: Use Guid.NewGuid() for unique IDs
+            foreach (var hardware in product.Hardware)
+            {
+                hardware.Id = Guid.NewGuid().ToString(); // Generate unique GUID instead of using Microvellum ID
+                hardware.ProductId = product.Id; // Update reference
+                hardware.WorkOrderId = workOrder.Id; // Update reference
+            }
+            
+            result.Statistics.ConvertedProducts++;
+        }
+
+        // Process DetachedProducts
+        foreach (var detachedProduct in workOrder.DetachedProducts)
+        {
+            detachedProduct.Id = await EnsureUniqueIdAsync("DetachedProducts", detachedProduct.Id);
+            detachedProduct.WorkOrderId = workOrder.Id; // Update reference
+            
+            result.Statistics.ConvertedDetachedProducts++;
+        }
+
+        // Process Hardware (standalone) - FIX: Use Guid.NewGuid() for unique IDs
+        foreach (var hardware in workOrder.Hardware)
+        {
+            hardware.Id = Guid.NewGuid().ToString(); // Generate unique GUID instead of using Microvellum ID
+            hardware.WorkOrderId = workOrder.Id; // Update reference
+            result.Statistics.ConvertedHardware++;
+        }
+
+        // Process NestSheets
+        foreach (var nestSheet in workOrder.NestSheets)
+        {
+            nestSheet.Id = await EnsureUniqueIdAsync("NestSheets", nestSheet.Id);
+            nestSheet.WorkOrderId = workOrder.Id; // Update reference
+            
+            // Process Parts within NestSheet
+            foreach (var part in nestSheet.Parts)
+            {
+                part.Id = await EnsureUniqueIdAsync("Parts", part.Id);
+                part.NestSheetId = nestSheet.Id; // Update reference
+                
+                // Classify part if not already classified
+                if (part.Category == 0)
+                {
+                    part.Category = _partFilteringService.ClassifyPart(part);
+                }
+            }
+            
+            result.Statistics.ConvertedNestSheets++;
+        }
+
+        // Count total parts and subassemblies
+        result.Statistics.ConvertedParts = workOrder.Products.SelectMany(p => p.Parts).Count() +
+                                          workOrder.Products.SelectMany(p => p.Subassemblies).SelectMany(s => s.Parts).Count() +
+                                          workOrder.NestSheets.SelectMany(n => n.Parts).Count();
+        
+        result.Statistics.ConvertedSubassemblies = workOrder.Products.SelectMany(p => p.Subassemblies).Count();
+    }
 }
 
 /// <summary>
@@ -579,4 +983,14 @@ public static class WorkOrderExtensions
             totalNestSheets = workOrder.NestSheets.Count
         };
     }
+}
+
+/// <summary>
+/// Phase I4: Selection validation result (copied from ImportSelectionService)
+/// </summary>
+public class SelectionValidationResult
+{
+    public bool IsValid { get; set; }
+    public List<string> Errors { get; set; } = new();
+    public DuplicateDetectionResult? DuplicateInfo { get; set; }
 }

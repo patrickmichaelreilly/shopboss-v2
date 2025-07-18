@@ -779,11 +779,19 @@ public enum ImportStatus
     Processing,
     Completed,
     Failed,
-    Cancelled
+    Cancelled,
+    Converted  // Phase I4: Added for NewImport final conversion
 }
 
 public class StartImportRequest
 {
     public string SessionId { get; set; } = string.Empty;
     public string WorkOrderName { get; set; } = string.Empty;
+}
+
+// Phase I4: Request model for final import conversion
+public class FinalImportRequest
+{
+    public string SessionId { get; set; } = string.Empty;
+    public string? WorkOrderName { get; set; }
 }

@@ -352,6 +352,7 @@ public class WorkOrderImportService
                 Length = _columnMapping.GetDecimalValue(nestSheetData, "PLACEDSHEETS", "Length"),
                 Width = _columnMapping.GetDecimalValue(nestSheetData, "PLACEDSHEETS", "Width"),
                 Thickness = _columnMapping.GetDecimalValue(nestSheetData, "PLACEDSHEETS", "Thickness"),
+                Barcode = _columnMapping.GetStringValue(nestSheetData, "PLACEDSHEETS", "FileName"),
                 WorkOrderId = workOrder.Id,
                 Status = PartStatus.Pending,
                 StatusUpdatedDate = DateTime.Now,

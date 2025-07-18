@@ -86,11 +86,11 @@ Transform the Import Preview interface by eliminating Import entities and using 
 
 ---
 
-## Phase I3: Auto-Categorization Integration - 2-3 hours
+## Phase I3: Auto-Categorization Integration - 2-3 hours ✅ COMPLETE
 
 **Objective:** Apply PartFilteringService.ClassifyPart() during Work Order entity creation AND update tree view to show category dropdowns in import mode.
 
-**Status:** ⏳ NEXT - Ready to implement (Phase I2 complete)
+**Status:** ✅ COMPLETE
 
 **Target Files:**
 - Backend: `Services/WorkOrderImportService.cs`
@@ -106,22 +106,92 @@ Transform the Import Preview interface by eliminating Import entities and using 
 6. **TEST**: New import preview shows categorized parts with editable category dropdowns
 
 **Validation:**
-- [ ] Parts show correct categories in new import preview
-- [ ] Auto-categorization rules work consistently
-- [ ] Category dropdowns visible and functional in import mode
-- [ ] Status dropdowns hidden in import mode (only category dropdowns visible)
-- [ ] Existing import system categorization unchanged
-- [ ] No performance impact during preview generation
+- [x] Parts show correct categories in new import preview
+- [x] Auto-categorization rules work consistently
+- [x] Category dropdowns visible and functional in import mode
+- [x] Status dropdowns hidden in import mode (only category dropdowns visible)
+- [x] Existing import system categorization unchanged
+- [x] No performance impact during preview generation
 
 **Dependencies:** Phase I2
 
 ---
 
-## Phase I4: Universal Delete System Implementation - 5-6 hours
+## Phase I4: Import Conversion Service - 3-4 hours
 
-**Objective:** Create universal delete system that works for both new import and modify scenarios.
+**Objective:** Complete NewImport system with database conversion and duplicate detection, recycling existing patterns.
 
-**Status:** ⏳ PENDING - Depends on Phase I3 completion
+**Status:** ⏳ NEXT - Ready to implement (Phase I3 complete)
+
+**Target Files:**
+- Backend: `Controllers/NewImportController.cs` (add conversion methods)
+- Backend: `Services/ImportSelectionService.cs` (reference for patterns)
+- Backend: `Controllers/AdminController.cs` (reference for existing import patterns)
+
+**Tasks:**
+1. Add final import conversion method to `NewImportController` (recycle `AdminController.ProcessImport` patterns)
+2. Implement duplicate detection during conversion (recycle `ImportSelectionService.GetUniqueWorkOrderName` patterns)
+3. Convert in-memory WorkOrder entities to database entities with proper ID assignment
+4. Handle duplicate resolution with suffix strategy ("WorkOrder_001", "WorkOrder_002")
+5. **Remove allowDuplicates feature** - Always automatically resolve duplicates without user intervention
+6. **Fix all route endpoints** - Update JavaScript from `/admin/newimport/*` to `/admin/import/*`
+7. **CRITICAL: Remove ImportSelectionService dependency** - NewImportController should not use deprecated ImportSelectionService
+8. **CRITICAL: Implement independent conversion logic** - Move conversion logic directly into NewImportController
+9. **Fix Hardware entity duplicate tracking** - Ensure Hardware entities get unique IDs to prevent Entity Framework conflicts
+10. Preserve all entity relationships and categories during conversion
+11. **TEST**: Complete NewImport flow from SDF upload to database persistence
+12. **VALIDATE**: NewImport system works end-to-end, ready to replace old system
+
+**Validation:**
+- [ ] Final import conversion works correctly with WorkOrder entities
+- [ ] Duplicate detection prevents conflicts with clear resolution strategy
+- [ ] All entity relationships and categories preserved during conversion
+- [ ] Imported WorkOrders match expected database schema
+- [ ] Complete flow: SDF → Parse → Preview → Categorize → Convert → Database
+- [ ] NewImport system ready to replace existing import system
+
+**Dependencies:** Phase I3
+
+---
+
+## Phase I5: Migration and System Replacement - 2-3 hours
+
+**Objective:** Replace existing import system with completed NewImport system.
+
+**Status:** ⏳ PENDING - Depends on Phase I4 completion
+
+**Target Files:**
+- Backend: `Controllers/AdminController.cs` (import methods)
+- Frontend: `Views/Admin/Import.cshtml` (replace with NewImport version)
+- Backend: Remove old import components
+- Config: Update routing
+
+**Tasks:**
+1. **COMPREHENSIVE TESTING**: Validate NewImport system works perfectly end-to-end
+2. Update routing: `/admin/newimport/*` → `/admin/import/*`
+3. **Rename NewImportController → ImportController** for semantic clarity
+4. Replace existing import controller methods with NewImport controller methods
+5. Replace `Import.cshtml` with `NewImportPreview.cshtml` content
+6. Remove old import entity models and services (ImportSelectionService, etc.)
+7. Update documentation and create migration guide
+8. **TEST**: New import system works as primary import interface
+
+**Validation:**
+- [ ] NewImport system works as primary import interface
+- [ ] All import functionality working without regressions
+- [ ] No old import code remains in codebase
+- [ ] Both import and modify use identical tree view interface
+- [ ] Complete flow: Upload → Preview → Categorize → Import → Database
+
+**Dependencies:** Phase I4
+
+---
+
+## Phase I6: Universal Delete System Implementation - 5-6 hours (POSTPONED)
+
+**Objective:** Create universal delete system that works for both import and modify scenarios.
+
+**Status:** 🔄 POSTPONED - Can be added to both systems simultaneously after core import is complete
 
 **Target Files:**
 - Frontend: `wwwroot/js/WorkOrderTreeView.js`
@@ -137,25 +207,26 @@ Transform the Import Preview interface by eliminating Import entities and using 
 5. Implement optimistic UI updates for delete operations
 6. Add audit trail integration for all delete operations
 7. Handle both temporary (preview) and real entity deletions
-8. **TEST**: Delete buttons work in both Modify and New Import
+8. **Fix WorkOrder Name display issue** - Use actual SDF WorkOrder name instead of placeholder
+9. **TEST**: Delete buttons work in both Modify and Import
 
 **Validation:**
-- [ ] Delete buttons appear for all entity types in both Modify and New Import
+- [ ] Delete buttons appear for all entity types in both Modify and Import
 - [ ] Confirmation dialogs show cascade impact correctly
 - [ ] Delete operations work correctly for preview and real entities
 - [ ] Audit trail captures all deletions
 - [ ] Tree updates immediately after deletion
 - [ ] Existing Modify functionality preserved
 
-**Dependencies:** Phase I3
+**Dependencies:** Phase I5 (can be added to both systems once import replacement is complete)
 
 ---
 
-## Phase I5: Import Statistics Partial - 2-3 hours
+## Phase I7: Enhanced Import Statistics - 2-3 hours (POSTPONED)
 
-**Objective:** Create import-specific statistics component using Work Order entity data.
+**Objective:** Create enhanced import-specific statistics component using Work Order entity data.
 
-**Status:** ⏳ PENDING - Depends on Phase I4 completion
+**Status:** 🔄 POSTPONED - Current basic statistics are sufficient for core functionality
 
 **Target Files:**
 - Frontend: `Views/Shared/_ImportStatistics.cshtml`
@@ -168,7 +239,7 @@ Transform the Import Preview interface by eliminating Import entities and using 
 3. Create `ImportStatisticsModels` with category-based breakdowns
 4. Include counts by type (Products, Parts, Hardware, etc.) and category
 5. Add responsive design matching work order statistics exactly
-6. **TEST**: Statistics display correctly in New Import preview
+6. **TEST**: Statistics display correctly in Import preview
 
 **Validation:**
 - [ ] Statistics display correctly for preview Work Order entities
@@ -176,99 +247,7 @@ Transform the Import Preview interface by eliminating Import entities and using 
 - [ ] Responsive design matches work order statistics
 - [ ] Statistics update when entities are deleted via delete buttons
 
-**Dependencies:** Phase I4
-
----
-
-## Phase I6: New Import Preview Interface Complete - 3-4 hours
-
-**Objective:** Complete the new import preview interface with all components integrated.
-
-**Status:** ⏳ PENDING - Depends on Phase I5 completion
-
-**Target Files:**
-- Frontend: `Views/Admin/NewImportPreview.cshtml`
-- Backend: `Controllers/NewImportController.cs`
-- Backend: `Services/ImportOrchestrationService.cs` (new)
-
-**Tasks:**
-1. Complete `NewImportPreview.cshtml` with integrated tree view and statistics
-2. Integrate `_ImportStatistics.cshtml` into layout
-3. Create `ImportOrchestrationService` to coordinate import flow with Work Order entities
-4. Add import selection/confirmation workflow for new system
-5. **TEST**: Complete new import flow from upload to database insertion
-6. **VALIDATE**: New import system works end-to-end independently
-
-**Validation:**
-- [ ] New import preview shows categorized Work Order entities
-- [ ] Statistics display alongside tree view
-- [ ] Delete functionality works in import mode
-- [ ] Complete import flow works from SDF to database
-- [ ] Existing import system remains unaffected
-
-**Dependencies:** Phase I5
-
----
-
-## Phase I7: Final Import Conversion Service - 2-3 hours
-
-**Objective:** Create service to convert from in-memory Work Order entities to database entities.
-
-**Status:** ⏳ PENDING - Depends on Phase I6 completion
-
-**Target Files:**
-- Backend: `Services/NewImportSelectionService.cs` (new)
-- Backend: `Controllers/NewImportController.cs`
-
-**Tasks:**
-1. Create `NewImportSelectionService` to convert in-memory Work Order entities to database entities
-2. **Implement duplicate detection during final import** - check for existing Work Order names and entity IDs
-3. Handle duplicate resolution with suffix strategy (e.g., "WorkOrder_001", "WorkOrder_002")
-4. Preserve all entity relationships during conversion
-5. **TEST**: Final import conversion works correctly with duplicate detection
-6. **VALIDATE**: Imported Work Orders are identical to those created through normal workflows
-
-**Validation:**
-- [ ] Final import works correctly with Work Order entities
-- [ ] Duplicate detection prevents conflicts and provides clear resolution strategy
-- [ ] All entity relationships preserved during conversion
-- [ ] Imported Work Orders match expected database schema
-- [ ] Work Order names and entity IDs are unique after import
-
-**Dependencies:** Phase I6
-
----
-
-## Phase I8: Migration and System Replacement - 3-4 hours
-
-**Objective:** Replace existing import system with new system after complete validation.
-
-**Status:** ⏳ PENDING - Depends on Phase I7 completion
-
-**Target Files:**
-- Backend: `Controllers/AdminController.cs` (import methods)
-- Frontend: `Views/Admin/Import.cshtml` (replace with new version)
-- Backend: Remove old import components
-- Config: Update routing
-
-**Tasks:**
-1. **COMPREHENSIVE TESTING**: Validate new import system works perfectly
-2. Update routing: `/admin/newimport/*` → `/admin/import/*`
-3. **Rename NewImportController → ImportController** for semantic clarity
-4. Replace existing import controller methods with new import controller methods
-5. Replace `Import.cshtml` with `NewImportPreview.cshtml` content
-6. Remove old import entity models and services
-7. Remove old import preview HTML and JavaScript
-8. Update documentation and create migration guide
-
-**Validation:**
-- [ ] New import system works as primary import interface
-- [ ] All import functionality working without regressions
-- [ ] No old import code remains in codebase
-- [ ] Both import and modify use identical tree view interface
-- [ ] Universal delete works correctly in both modes
-
-**Dependencies:** Phase I7
+**Dependencies:** Phase I6 (can be added after universal delete system is in place)
 
 ---
 
@@ -320,6 +299,14 @@ This architecture eliminates the conceptual split between "import" and "work ord
 4. **Safe Migration**: Complete testing before any system replacement
 5. **Rollback Safety**: Can revert to existing system instantly if needed
 
-## Total Estimated Time: 25-32 hours
+## Total Estimated Time: 15-18 hours (Core Implementation)
 
-This approach creates true architectural unity while maintaining absolute safety through parallel development and validation-driven design using the working Modify interface as our baseline.
+**Core Implementation (I1-I5):** 15-18 hours
+- Phase I1-I3: ✅ COMPLETE (11-13 hours)
+- Phase I4-I5: 5-6 hours remaining
+
+**Future Enhancements (I6-I7):** 7-9 hours (postponed)
+- Universal Delete System: 5-6 hours
+- Enhanced Import Statistics: 2-3 hours
+
+This streamlined approach focuses on completing the core import replacement first, then adding enhanced features to both systems simultaneously.
