@@ -19,7 +19,7 @@ namespace ShopBoss.Web.Models
         /// <summary>
         /// API URL for tree data operations
         /// </summary>
-        public string ApiUrl { get; set; } = "/api/WorkOrderTreeApi";
+        public string ApiUrl { get; set; } = "/api/Modify";
 
         /// <summary>
         /// Work Order ID (for modify mode)
@@ -50,7 +50,7 @@ namespace ShopBoss.Web.Models
             {
                 ContainerId = containerId,
                 Mode = "modify",
-                ApiUrl = "/api/WorkOrderTreeApi",
+                ApiUrl = "/api/Modify",
                 WorkOrderId = workOrderId,
                 ShowAuditHistory = showAuditHistory
             };

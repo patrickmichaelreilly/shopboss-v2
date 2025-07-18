@@ -266,7 +266,7 @@
             try {
                 console.log(`Category change: ${nodeId} -> ${newCategory} (${itemType})`);
                 
-                const response = await fetch('/api/WorkOrderTreeApi/updateCategory', {
+                const response = await fetch('/api/Modify/updateCategory', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded',

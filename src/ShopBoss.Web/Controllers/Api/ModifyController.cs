@@ -10,14 +10,14 @@ namespace ShopBoss.Web.Controllers.Api;
 
 [ApiController]
 [Route("api/[controller]")]
-public class WorkOrderTreeApiController : ControllerBase
+public class ModifyController : ControllerBase
 {
     private readonly WorkOrderService _workOrderService;
-    private readonly ILogger<WorkOrderTreeApiController> _logger;
+    private readonly ILogger<ModifyController> _logger;
     private readonly ShopBossDbContext _context;
     private readonly AuditTrailService _auditTrailService;
 
-    public WorkOrderTreeApiController(WorkOrderService workOrderService, ILogger<WorkOrderTreeApiController> logger, ShopBossDbContext context, AuditTrailService auditTrailService)
+    public ModifyController(WorkOrderService workOrderService, ILogger<ModifyController> logger, ShopBossDbContext context, AuditTrailService auditTrailService)
     {
         _workOrderService = workOrderService;
         _logger = logger;
@@ -52,7 +52,7 @@ public class WorkOrderTreeApiController : ControllerBase
                 var productsCategory = new TreeItem
                 {
                     Id = "category_products",
-                    Name = $"Products ({workOrderData.ProductNodes.Count})",
+                    Name = "Products",
                     Type = "category",
                     Quantity = workOrderData.ProductNodes.Count,
                     Status = null,
@@ -79,7 +79,7 @@ public class WorkOrderTreeApiController : ControllerBase
                         var partsCategory = new TreeItem
                         {
                             Id = $"category_parts_{productNode.Product.Id}",
-                            Name = $"Parts ({productNode.Parts.Count})",
+                            Name = "Parts",
                             Type = "category",
                             Quantity = productNode.Parts.Count,
                             Status = null,
@@ -109,7 +109,7 @@ public class WorkOrderTreeApiController : ControllerBase
                         var subassembliesCategory = new TreeItem
                         {
                             Id = $"category_subassemblies_{productNode.Product.Id}",
-                            Name = $"Subassemblies ({productNode.Subassemblies.Count})",
+                            Name = "Subassemblies",
                             Type = "category",
                             Quantity = productNode.Subassemblies.Count,
                             Status = null,
@@ -155,7 +155,7 @@ public class WorkOrderTreeApiController : ControllerBase
                         var hardwareCategory = new TreeItem
                         {
                             Id = $"category_hardware_{productNode.Product.Id}",
-                            Name = $"Hardware ({productNode.Hardware.Count})",
+                            Name = "Hardware",
                             Type = "category",
                             Quantity = productNode.Hardware.Count,
                             Status = null,
@@ -190,7 +190,7 @@ public class WorkOrderTreeApiController : ControllerBase
                 var detachedProductsCategory = new TreeItem
                 {
                     Id = "category_detached_products",
-                    Name = $"Detached Products ({workOrderData.DetachedProducts.Count})",
+                    Name = "Detached Products",
                     Type = "category",
                     Quantity = workOrderData.DetachedProducts.Count,
                     Status = null,
@@ -219,7 +219,7 @@ public class WorkOrderTreeApiController : ControllerBase
                 var nestSheetsCategory = new TreeItem
                 {
                     Id = "category_nestsheets",
-                    Name = $"Nest Sheets ({workOrderData.NestSheets.Count})",
+                    Name = "Nest Sheets",
                     Type = "category",
                     Quantity = workOrderData.NestSheets.Count,
                     Status = null,

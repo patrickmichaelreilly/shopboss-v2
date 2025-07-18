@@ -20,7 +20,7 @@ Transform the Import Preview interface by eliminating Import entities and using 
 
 ---
 
-## Phase I1: Tree View Partial Extraction with Modify Integration - 4-5 hours
+## Phase I1: Tree View Partial Extraction with Modify Integration - 4-5 hours ✅ COMPLETE
 
 **Objective:** Create reusable tree partial that works perfectly in Modify Work Order, then use in New Import.
 
@@ -31,20 +31,21 @@ Transform the Import Preview interface by eliminating Import entities and using 
 - Frontend: `Views/Admin/NewImportPreview.cshtml` (new, using same partial)
 
 **Tasks:**
-1. Extract common tree structure from `_StatusManagementPanel.cshtml` and duplicate code in `Import.cshtml`
-2. Create `_WorkOrderTreeView.cshtml` partial with parameter-driven initialization
-3. Create `TreeViewController` with `RenderTreeView` action for partial rendering
-4. **TEST**: Update ModifyWorkOrder.cshtml to use new partial - must work identically to current
-5. **VALIDATE**: Existing Modify functionality completely preserved with zero regression
-6. Create `NewImportPreview.cshtml` using identical partial with different parameters
-7. Ensure partial handles both `workOrderId` and `sessionId` parameters seamlessly
+1. [x] Extract common tree structure from `_StatusManagementPanel.cshtml` and duplicate code in `Import.cshtml`
+2. [x] Create `_WorkOrderTreeView.cshtml` partial with parameter-driven initialization
+3. [x] Create `TreeViewController` with `RenderTreeView` action for partial rendering
+4. [x] **TEST**: Update ModifyWorkOrder.cshtml to use new partial - must work identically to current
+5. [x] **VALIDATE**: Existing Modify functionality completely preserved with zero regression
+6. [x] Create `NewImportPreview.cshtml` using identical partial with different parameters
+7. [x] Ensure partial handles both `workOrderId` and `sessionId` parameters seamlessly
+8. [x] Remove all checkbox/selection functionality from tree view component
 
 **Validation:**
-- [ ] Modify Work Order interface works identically with new partial
-- [ ] No functional changes to existing Modify behavior
-- [ ] New Import preview renders tree using same partial
-- [ ] Tree initialization works with both parameter types
-- [ ] CSS/JS consolidation eliminates duplication
+- [x] Modify Work Order interface works identically with new partial
+- [x] No functional changes to existing Modify behavior
+- [x] New Import preview renders tree using same partial
+- [x] Tree initialization works with both parameter types
+- [x] CSS/JS consolidation eliminates duplication
 
 **Dependencies:** None
 
@@ -52,9 +53,11 @@ Transform the Import Preview interface by eliminating Import entities and using 
 
 ---
 
-## Phase I2: New Import Service Architecture - 4-5 hours
+## Phase I2: New Import Service Architecture - 4-5 hours ✅ COMPLETE
 
 **Objective:** Build parallel import system using Work Order entities in memory without affecting existing import.
+
+**Status:** Complete - duplicate detection moved to Phase I7 for better architecture
 
 **Target Files:**
 - Backend: `Controllers/NewImportController.cs` (new)
@@ -63,20 +66,21 @@ Transform the Import Preview interface by eliminating Import entities and using 
 - Backend: `Services/ImportSession.cs` (update to support Work Order entities)
 
 **Tasks:**
-1. Create `NewImportController` with separate routes (`/admin/newimport/upload`, `/admin/newimport/preview`)
-2. Create `WorkOrderImportService` to generate in-memory Work Order entities from SDF data
-3. Build SDF → Work Order entity transformation with temporary IDs (prefix "preview_")
-4. Handle quantity expansion (Product qty=3 becomes 3 Product instances)
-5. Populate all navigation properties manually (Products, Parts, Subassemblies, Hardware, etc.)
-6. Update `ImportSession` to support storing Work Order entities alongside existing Import entities
-7. **TEST**: New import flow works independently without affecting existing import system
+1. [x] Create `NewImportController` with separate routes (`/admin/newimport/upload`, `/admin/newimport/preview`)
+2. [x] Create `WorkOrderImportService` to generate in-memory Work Order entities from SDF data
+3. [x] Build SDF → Work Order entity transformation with proper IDs (no prefixes)
+4. [x] Handle quantity expansion (Product qty=3 becomes 3 Product instances)
+5. [x] Populate all navigation properties manually (Products, Parts, Subassemblies, Hardware, etc.)
+6. [x] Update `ImportSession` to support storing Work Order entities alongside existing Import entities
+7. [x] Create complete import preview flow with real IDs (duplicate detection moved to Phase I7)
+8. [x] **TEST**: New import flow works independently without affecting existing import system
 
 **Validation:**
-- [ ] New import routes work independently (`/admin/newimport/*`)
-- [ ] In-memory Work Order entities created correctly from SDF data
-- [ ] Existing import system completely unaffected
-- [ ] New system feeds data to tree partial successfully
-- [ ] Temporary IDs prevent database conflicts
+- [x] New import routes work independently (`/admin/newimport/*`)
+- [x] In-memory Work Order entities created correctly from SDF data
+- [x] Existing import system completely unaffected
+- [x] New system feeds data to tree partial successfully
+- [x] Real IDs used directly (no temporary prefixes needed)
 
 **Dependencies:** Phase I1
 
@@ -84,22 +88,28 @@ Transform the Import Preview interface by eliminating Import entities and using 
 
 ## Phase I3: Auto-Categorization Integration - 2-3 hours
 
-**Objective:** Apply PartFilteringService.ClassifyPart() during Work Order entity creation for new import preview.
+**Objective:** Apply PartFilteringService.ClassifyPart() during Work Order entity creation AND update tree view to show category dropdowns in import mode.
+
+**Status:** ⏳ NEXT - Ready to implement (Phase I2 complete)
 
 **Target Files:**
 - Backend: `Services/WorkOrderImportService.cs`
 - Backend: `Services/PartFilteringService.cs`
+- Frontend: `wwwroot/js/WorkOrderTreeView.js`
 
 **Tasks:**
 1. Integrate `PartFilteringService.ClassifyPart()` into WorkOrderImportService
-2. Apply categorization to all Parts during in-memory Work Order creation
+2. Apply categorization to all Parts during in-memory Work Order creation (run as final step of import processing)
 3. Store categorized parts with proper Category enum values
-4. Add logging for categorization decisions during preview
-5. **TEST**: New import preview shows categorized parts correctly
+4. **Update WorkOrderTreeView.js**: Show category dropdowns in import mode (hide only status dropdowns)
+5. **Update tree view logic**: `import` mode shows category dropdowns but hides status dropdowns\
+6. **TEST**: New import preview shows categorized parts with editable category dropdowns
 
 **Validation:**
 - [ ] Parts show correct categories in new import preview
 - [ ] Auto-categorization rules work consistently
+- [ ] Category dropdowns visible and functional in import mode
+- [ ] Status dropdowns hidden in import mode (only category dropdowns visible)
 - [ ] Existing import system categorization unchanged
 - [ ] No performance impact during preview generation
 
@@ -111,15 +121,17 @@ Transform the Import Preview interface by eliminating Import entities and using 
 
 **Objective:** Create universal delete system that works for both new import and modify scenarios.
 
+**Status:** ⏳ PENDING - Depends on Phase I3 completion
+
 **Target Files:**
 - Frontend: `wwwroot/js/WorkOrderTreeView.js`
-- Backend: `Controllers/Api/WorkOrderTreeApiController.cs`
+- Backend: `Controllers/Api/ModifyController.cs`
 - Backend: `Services/WorkOrderDeletionService.cs` (new)
 - Frontend: `Views/Shared/_WorkOrderTreeView.cshtml`
 
 **Tasks:**
 1. Create `WorkOrderDeletionService` with granular delete operations for all entity types
-2. Add delete endpoints to WorkOrderTreeApiController (Product, Part, Subassembly, Hardware, etc.)
+2. Add delete endpoints to ModifyController (Product, Part, Subassembly, Hardware, etc.)
 3. Update WorkOrderTreeView.js to support delete buttons alongside existing status/category dropdowns
 4. Add confirmation dialogs with cascade impact warnings
 5. Implement optimistic UI updates for delete operations
@@ -142,6 +154,8 @@ Transform the Import Preview interface by eliminating Import entities and using 
 ## Phase I5: Import Statistics Partial - 2-3 hours
 
 **Objective:** Create import-specific statistics component using Work Order entity data.
+
+**Status:** ⏳ PENDING - Depends on Phase I4 completion
 
 **Target Files:**
 - Frontend: `Views/Shared/_ImportStatistics.cshtml`
@@ -169,6 +183,8 @@ Transform the Import Preview interface by eliminating Import entities and using 
 ## Phase I6: New Import Preview Interface Complete - 3-4 hours
 
 **Objective:** Complete the new import preview interface with all components integrated.
+
+**Status:** ⏳ PENDING - Depends on Phase I5 completion
 
 **Target Files:**
 - Frontend: `Views/Admin/NewImportPreview.cshtml`
@@ -198,23 +214,26 @@ Transform the Import Preview interface by eliminating Import entities and using 
 
 **Objective:** Create service to convert from in-memory Work Order entities to database entities.
 
+**Status:** ⏳ PENDING - Depends on Phase I6 completion
+
 **Target Files:**
 - Backend: `Services/NewImportSelectionService.cs` (new)
 - Backend: `Controllers/NewImportController.cs`
 
 **Tasks:**
 1. Create `NewImportSelectionService` to convert in-memory Work Order entities to database entities
-2. Update duplicate detection
-3. Clean up temporary ID prefixes during final conversion
+2. **Implement duplicate detection during final import** - check for existing Work Order names and entity IDs
+3. Handle duplicate resolution with suffix strategy (e.g., "WorkOrder_001", "WorkOrder_002")
 4. Preserve all entity relationships during conversion
-5. **TEST**: Final import conversion works correctly
+5. **TEST**: Final import conversion works correctly with duplicate detection
 6. **VALIDATE**: Imported Work Orders are identical to those created through normal workflows
 
 **Validation:**
 - [ ] Final import works correctly with Work Order entities
-- [ ] Duplicate detection works with temporary vs. real IDs
+- [ ] Duplicate detection prevents conflicts and provides clear resolution strategy
 - [ ] All entity relationships preserved during conversion
 - [ ] Imported Work Orders match expected database schema
+- [ ] Work Order names and entity IDs are unique after import
 
 **Dependencies:** Phase I6
 
@@ -223,6 +242,8 @@ Transform the Import Preview interface by eliminating Import entities and using 
 ## Phase I8: Migration and System Replacement - 3-4 hours
 
 **Objective:** Replace existing import system with new system after complete validation.
+
+**Status:** ⏳ PENDING - Depends on Phase I7 completion
 
 **Target Files:**
 - Backend: `Controllers/AdminController.cs` (import methods)
@@ -233,11 +254,12 @@ Transform the Import Preview interface by eliminating Import entities and using 
 **Tasks:**
 1. **COMPREHENSIVE TESTING**: Validate new import system works perfectly
 2. Update routing: `/admin/newimport/*` → `/admin/import/*`
-3. Replace existing import controller methods with new import controller methods
-4. Replace `Import.cshtml` with `NewImportPreview.cshtml` content
-5. Remove old import entity models and services
-6. Remove old import preview HTML and JavaScript
-7. Update documentation and create migration guide
+3. **Rename NewImportController → ImportController** for semantic clarity
+4. Replace existing import controller methods with new import controller methods
+5. Replace `Import.cshtml` with `NewImportPreview.cshtml` content
+6. Remove old import entity models and services
+7. Remove old import preview HTML and JavaScript
+8. Update documentation and create migration guide
 
 **Validation:**
 - [ ] New import system works as primary import interface

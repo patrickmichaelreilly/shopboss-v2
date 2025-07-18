@@ -204,7 +204,7 @@
                     // Create tree view with sample data
                     treeView = new WorkOrderTreeView('treeViewTestContainer', {
                         mode: selectedMode,
-                        apiUrl: '/api/WorkOrderTreeApi',
+                        apiUrl: '/api/Modify',
                         workOrderId: null, // Will use sample data instead
                         onSelectionChange: handleSelectionChange,
                         onStatusChange: handleStatusChange
@@ -219,7 +219,7 @@
                     // Create tree view with real work order data
                     treeView = new WorkOrderTreeView('treeViewTestContainer', {
                         mode: selectedMode,
-                        apiUrl: '/api/WorkOrderTreeApi',
+                        apiUrl: '/api/Modify',
                         workOrderId: workOrderId,
                         onSelectionChange: handleSelectionChange,
                         onStatusChange: handleStatusChange

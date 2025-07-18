@@ -327,7 +327,7 @@ public class NewImportController : Controller
             var productsCategory = new Models.Api.TreeItem
             {
                 Id = "category_products",
-                Name = $"Products ({workOrder.Products.Count})",
+                Name = "Products",
                 Type = "category",
                 Quantity = workOrder.Products.Count,
                 Status = null,
@@ -352,7 +352,7 @@ public class NewImportController : Controller
                     var partsCategory = new Models.Api.TreeItem
                     {
                         Id = $"category_parts_{product.Id}",
-                        Name = $"Parts ({product.Parts.Count})",
+                        Name = "Parts",
                         Type = "category",
                         Quantity = product.Parts.Count,
                         Status = null,
@@ -368,6 +368,7 @@ public class NewImportController : Controller
                             Type = "part",
                             Quantity = part.Qty,
                             Status = part.Status.ToString(),
+                            Category = part.Category.ToString(),
                             Children = new List<Models.Api.TreeItem>()
                         });
                     }
@@ -381,7 +382,7 @@ public class NewImportController : Controller
                     var subassembliesCategory = new Models.Api.TreeItem
                     {
                         Id = $"category_subassemblies_{product.Id}",
-                        Name = $"Subassemblies ({product.Subassemblies.Count})",
+                        Name = "Subassemblies",
                         Type = "category",
                         Quantity = product.Subassemblies.Count,
                         Status = null,
@@ -410,6 +411,7 @@ public class NewImportController : Controller
                                 Type = "part",
                                 Quantity = part.Qty,
                                 Status = part.Status.ToString(),
+                                Category = part.Category.ToString(),
                                 Children = new List<Models.Api.TreeItem>()
                             });
                         }
@@ -426,7 +428,7 @@ public class NewImportController : Controller
                     var hardwareCategory = new Models.Api.TreeItem
                     {
                         Id = $"category_hardware_{product.Id}",
-                        Name = $"Hardware ({product.Hardware.Count})",
+                        Name = "Hardware",
                         Type = "category",
                         Quantity = product.Hardware.Count,
                         Status = null,
@@ -461,7 +463,7 @@ public class NewImportController : Controller
             var detachedProductsCategory = new Models.Api.TreeItem
             {
                 Id = "category_detached_products",
-                Name = $"Detached Products ({workOrder.DetachedProducts.Count})",
+                Name = "Detached Products",
                 Type = "category",
                 Quantity = workOrder.DetachedProducts.Count,
                 Status = null,
@@ -490,7 +492,7 @@ public class NewImportController : Controller
             var hardwareCategory = new Models.Api.TreeItem
             {
                 Id = "category_hardware",
-                Name = $"Hardware ({workOrder.Hardware.Count})",
+                Name = "Hardware",
                 Type = "category",
                 Quantity = workOrder.Hardware.Count,
                 Status = null,
@@ -519,7 +521,7 @@ public class NewImportController : Controller
             var nestSheetsCategory = new Models.Api.TreeItem
             {
                 Id = "category_nestsheets",
-                Name = $"Nest Sheets ({workOrder.NestSheets.Count})",
+                Name = "Nest Sheets",
                 Type = "category",
                 Quantity = workOrder.NestSheets.Count,
                 Status = null,
@@ -547,6 +549,7 @@ public class NewImportController : Controller
                         Type = "part",
                         Quantity = part.Qty,
                         Status = part.Status.ToString(),
+                        Category = part.Category.ToString(),
                         Children = new List<Models.Api.TreeItem>()
                     });
                 }

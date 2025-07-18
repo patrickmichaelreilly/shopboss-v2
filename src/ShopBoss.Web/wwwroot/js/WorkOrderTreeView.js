@@ -149,7 +149,6 @@ class WorkOrderTreeView {
         node.dataset.itemType = item.type;
 
         const hasChildren = item.children && item.children.length > 0;
-        const nodeId = item.id;
 
         // Determine if this should be expanded by default
         // Top-level categories (level 0 and type "category") should default to expanded
@@ -169,9 +168,9 @@ class WorkOrderTreeView {
                     <span class="me-2">${icon}</span>
                     <span>${this.formatItemName(item)}</span>
                 </div>
-                ${this.mode === 'modify' && item.type !== 'category' ? 
+                ${item.type !== 'category' ? 
                     `<div class="dropdown-container d-flex gap-2">
-                        ${this.createStatusDropdown(item)}
+                        ${this.mode === 'modify' ? this.createStatusDropdown(item) : ''}
                         ${item.type === 'part' && item.category ? this.createCategoryDropdown(item) : ''}
                     </div>` :
                     ''
@@ -249,13 +248,19 @@ class WorkOrderTreeView {
     }
 
     createCategoryDropdown(item) {
-        const categories = ['Standard', 'Hardware', 'Edgeband', 'Veneer', 'Solid Wood', 'Laminate'];
+        const categories = ['Standard', 'DoorsAndDrawerFronts', 'AdjustableShelves', 'Hardware'];
+        const categoryLabels = {
+            'Standard': 'Standard',
+            'DoorsAndDrawerFronts': 'Doors & Drawer Fronts',
+            'AdjustableShelves': 'Adjustable Shelves',
+            'Hardware': 'Hardware'
+        };
         const currentCategory = item.category || 'Standard';
         
         return `
-            <select class="category-dropdown form-select form-select-sm" style="width: auto; min-width: 100px;" data-node-id="${item.id}" data-item-type="${item.type}">
+            <select class="category-dropdown form-select form-select-sm" style="width: auto; min-width: 130px;" data-node-id="${item.id}" data-item-type="${item.type}">
                 ${categories.map(category => 
-                    `<option value="${category}" ${category === currentCategory ? 'selected' : ''}>${category}</option>`
+                    `<option value="${category}" ${category === currentCategory ? 'selected' : ''}>${categoryLabels[category]}</option>`
                 ).join('')}
             </select>
         `;

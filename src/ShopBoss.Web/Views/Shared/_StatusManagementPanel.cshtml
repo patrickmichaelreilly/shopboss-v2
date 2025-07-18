@@ -143,7 +143,7 @@
             try {
                 treeView = new WorkOrderTreeView('workOrderTree', {
                     mode: 'modify',
-                    apiUrl: '/api/WorkOrderTreeApi',
+                    apiUrl: '/api/Modify',
                     workOrderId: workOrderId,
                     onStatusChange: handleStatusChange,
                     onCategoryChange: handleCategoryChange,
@@ -235,7 +235,7 @@
                 console.log(`Category change: ${nodeId} -> ${newCategory} (${itemType})`);
                 
                 // Call the new updateCategory endpoint
-                const response = await fetch('/api/WorkOrderTreeApi/updateCategory', {
+                const response = await fetch('/api/Modify/updateCategory', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded',

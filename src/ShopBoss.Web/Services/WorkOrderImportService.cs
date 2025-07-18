@@ -11,11 +11,13 @@ public class WorkOrderImportService
 {
     private readonly ILogger<WorkOrderImportService> _logger;
     private readonly ColumnMappingService _columnMapping;
+    private readonly PartFilteringService _partFilteringService;
 
-    public WorkOrderImportService(ILogger<WorkOrderImportService> logger, ColumnMappingService columnMapping)
+    public WorkOrderImportService(ILogger<WorkOrderImportService> logger, ColumnMappingService columnMapping, PartFilteringService partFilteringService)
     {
         _logger = logger;
         _columnMapping = columnMapping;
+        _partFilteringService = partFilteringService;
     }
 
     /// <summary>
@@ -50,6 +52,12 @@ public class WorkOrderImportService
             await TransformDetachedProductsAsync(rawData, workOrder);
             await TransformHardwareAsync(rawData, workOrder);
             await TransformNestSheetsAsync(rawData, workOrder);
+
+            // Establish nest sheet relationships using OptimizationResults (same as existing system)
+            await EstablishNestSheetRelationshipsAsync(rawData, workOrder);
+
+            // Phase I3: Apply auto-categorization to all parts (final step of import processing)
+            await ApplyAutoCategorizationAsync(workOrder);
 
             _logger.LogInformation("Phase I2: WorkOrder transformation completed. Created - Products: {ProductCount}, Parts: {PartCount}, Hardware: {HardwareCount}", 
                 workOrder.Products.Count, 
@@ -350,22 +358,210 @@ public class WorkOrderImportService
                 Parts = new List<Part>()
             };
 
-            // Add parts associated with this nest sheet
-            if (rawData.Parts != null)
-            {
-                var nestSheetParts = rawData.Parts
-                    .Where(p => _columnMapping.GetStringValue(p, "PARTS", "NestSheetId") == nestSheet.Id)
-                    .ToList();
+            // Note: Parts are associated with nest sheets later via OptimizationResults
+            // See EstablishNestSheetRelationshipsAsync method
 
-                foreach (var partData in nestSheetParts)
+            workOrder.NestSheets.Add(nestSheet);
+        }
+    }
+
+    /// <summary>
+    /// Phase I3: Apply auto-categorization to all parts in the WorkOrder
+    /// Runs as final step of import processing to ensure all parts are categorized
+    /// </summary>
+    private async Task ApplyAutoCategorizationAsync(WorkOrder workOrder)
+    {
+        var totalParts = 0;
+        var categorizedParts = 0;
+
+        _logger.LogInformation("Phase I3: Starting auto-categorization for WorkOrder {WorkOrderId}", workOrder.Id);
+
+        // Categorize parts in Products
+        foreach (var product in workOrder.Products)
+        {
+            foreach (var part in product.Parts)
+            {
+                totalParts++;
+                var originalCategory = part.Category;
+                part.Category = _partFilteringService.ClassifyPart(part);
+                
+                if (part.Category != originalCategory)
                 {
-                    var part = CreatePartFromData(partData, "", workOrder.Id);
-                    part.NestSheetId = nestSheet.Id;
-                    nestSheet.Parts.Add(part);
+                    categorizedParts++;
+                    _logger.LogDebug("Part '{PartName}' categorized as {Category} (was {OriginalCategory})", 
+                        part.Name, part.Category, originalCategory);
                 }
             }
 
-            workOrder.NestSheets.Add(nestSheet);
+            // Categorize parts in Subassemblies
+            foreach (var subassembly in product.Subassemblies)
+            {
+                var result = await CategorizeSubassemblyPartsAsync(subassembly, totalParts, categorizedParts);
+                totalParts = result.totalParts;
+                categorizedParts = result.categorizedParts;
+            }
+        }
+
+        // Categorize parts in NestSheets
+        foreach (var nestSheet in workOrder.NestSheets)
+        {
+            foreach (var part in nestSheet.Parts)
+            {
+                totalParts++;
+                var originalCategory = part.Category;
+                part.Category = _partFilteringService.ClassifyPart(part);
+                
+                if (part.Category != originalCategory)
+                {
+                    categorizedParts++;
+                    _logger.LogDebug("NestSheet part '{PartName}' categorized as {Category} (was {OriginalCategory})", 
+                        part.Name, part.Category, originalCategory);
+                }
+            }
+        }
+
+        _logger.LogInformation("Phase I3: Auto-categorization completed. Processed {TotalParts} parts, {CategorizedParts} changed from default", 
+            totalParts, categorizedParts);
+    }
+
+    /// <summary>
+    /// Recursively categorize parts in subassemblies
+    /// </summary>
+    private async Task<(int totalParts, int categorizedParts)> CategorizeSubassemblyPartsAsync(Subassembly subassembly, int totalParts, int categorizedParts)
+    {
+        foreach (var part in subassembly.Parts)
+        {
+            totalParts++;
+            var originalCategory = part.Category;
+            part.Category = _partFilteringService.ClassifyPart(part);
+            
+            if (part.Category != originalCategory)
+            {
+                categorizedParts++;
+                _logger.LogDebug("Subassembly part '{PartName}' categorized as {Category} (was {OriginalCategory})", 
+                    part.Name, part.Category, originalCategory);
+            }
+        }
+
+        // Recursively process nested subassemblies
+        foreach (var childSubassembly in subassembly.ChildSubassemblies)
+        {
+            var result = await CategorizeSubassemblyPartsAsync(childSubassembly, totalParts, categorizedParts);
+            totalParts = result.totalParts;
+            categorizedParts = result.categorizedParts;
+        }
+
+        return (totalParts, categorizedParts);
+    }
+
+    /// <summary>
+    /// Establish nest sheet relationships using OptimizationResults (same approach as existing system)
+    /// Parts are associated with nest sheets through the OptimizationResults table, not direct column mapping
+    /// </summary>
+    private async Task EstablishNestSheetRelationshipsAsync(ImportData rawData, WorkOrder workOrder)
+    {
+        try
+        {
+            _logger.LogInformation("Phase I3: Establishing nest sheet relationships using OptimizationResults");
+
+            // Create a mapping of LinkIDPart to LinkIDSheet from OptimizationResults
+            var partToSheetMapping = new Dictionary<string, string>();
+            
+            foreach (var optimizationResult in rawData.OptimizationResults ?? new List<Dictionary<string, object?>>())
+            {
+                var linkIdPart = optimizationResult.TryGetValue("LinkIDPart", out var partValue) ? partValue?.ToString() : null;
+                var linkIdSheet = optimizationResult.TryGetValue("LinkIDSheet", out var sheetValue) ? sheetValue?.ToString() : null;
+                
+                if (!string.IsNullOrEmpty(linkIdPart) && !string.IsNullOrEmpty(linkIdSheet))
+                {
+                    partToSheetMapping[linkIdPart] = linkIdSheet;
+                }
+            }
+
+            _logger.LogInformation("Created part to sheet mapping with {Count} entries", partToSheetMapping.Count);
+
+            // Create a lookup of nest sheet LinkID to NestSheet entity
+            var sheetIdToNestSheetMapping = new Dictionary<string, NestSheet>();
+            foreach (var nestSheet in workOrder.NestSheets)
+            {
+                sheetIdToNestSheetMapping[nestSheet.Id] = nestSheet;
+            }
+
+            // Update parts with proper nest sheet associations
+            await UpdatePartsWithNestSheetInfoAsync(workOrder, partToSheetMapping, sheetIdToNestSheetMapping);
+
+            _logger.LogInformation("Established nest sheet relationships for {PartCount} parts using OptimizationResults", 
+                partToSheetMapping.Count);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error establishing nest sheet part relationships");
+        }
+    }
+
+    /// <summary>
+    /// Update all parts in the WorkOrder with nest sheet information
+    /// </summary>
+    private async Task UpdatePartsWithNestSheetInfoAsync(WorkOrder workOrder, 
+        Dictionary<string, string> partToSheetMapping, 
+        Dictionary<string, NestSheet> sheetIdToNestSheetMapping)
+    {
+        foreach (var product in workOrder.Products)
+        {
+            // Update parts in product
+            foreach (var part in product.Parts)
+            {
+                UpdatePartNestSheetInfo(part, partToSheetMapping, sheetIdToNestSheetMapping);
+            }
+
+            // Update parts in subassemblies
+            foreach (var subassembly in product.Subassemblies)
+            {
+                await UpdatePartsInSubassemblyAsync(subassembly, partToSheetMapping, sheetIdToNestSheetMapping);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Recursively update parts in subassemblies with nest sheet information
+    /// </summary>
+    private async Task UpdatePartsInSubassemblyAsync(Subassembly subassembly, 
+        Dictionary<string, string> partToSheetMapping, 
+        Dictionary<string, NestSheet> sheetIdToNestSheetMapping)
+    {
+        foreach (var part in subassembly.Parts)
+        {
+            UpdatePartNestSheetInfo(part, partToSheetMapping, sheetIdToNestSheetMapping);
+        }
+
+        // Handle nested subassemblies
+        foreach (var nested in subassembly.ChildSubassemblies)
+        {
+            await UpdatePartsInSubassemblyAsync(nested, partToSheetMapping, sheetIdToNestSheetMapping);
+        }
+    }
+
+    /// <summary>
+    /// Update a single part with nest sheet information
+    /// </summary>
+    private void UpdatePartNestSheetInfo(Part part, 
+        Dictionary<string, string> partToSheetMapping, 
+        Dictionary<string, NestSheet> sheetIdToNestSheetMapping)
+    {
+        if (partToSheetMapping.ContainsKey(part.Id))
+        {
+            var nestSheetId = partToSheetMapping[part.Id];
+            part.NestSheetId = nestSheetId;
+            
+            // Add the part to the nest sheet's Parts collection
+            if (sheetIdToNestSheetMapping.ContainsKey(nestSheetId))
+            {
+                var nestSheet = sheetIdToNestSheetMapping[nestSheetId];
+                if (!nestSheet.Parts.Any(p => p.Id == part.Id))
+                {
+                    nestSheet.Parts.Add(part);
+                }
+            }
         }
     }
 }
