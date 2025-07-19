@@ -136,7 +136,7 @@
         const mode = '@Model.Mode';
         const apiUrl = '@Model.ApiUrl';
         const workOrderId = '@Model.WorkOrderId';
-        const sessionId = '@Model.SessionId';
+        let sessionId = '@Model.SessionId';
         const showAuditHistory = @Model.ShowAuditHistory.ToString().ToLower();
         
         const auditHistoryContainer = document.getElementById(containerId + '_auditHistory');
@@ -163,8 +163,10 @@
                 if (mode === 'modify') {
                     config.onStatusChange = handleStatusChange;
                     config.onCategoryChange = handleCategoryChange;
+                    config.onDelete = handleDelete;
                 } else if (mode === 'import') {
                     config.onSelectionChange = handleSelectionChange;
+                    config.onDelete = handleDelete;
                 }
 
                 treeView = new WorkOrderTreeView(containerId, config);
@@ -309,6 +311,83 @@
             }
         }
 
+        // Handle delete requests (both import and modify modes)
+        async function handleDelete(nodeId, itemType, itemName) {
+            // Simple confirmation
+            if (!confirm(`Delete ${itemType} "${itemName}"?`)) {
+                return;
+            }
+
+            if (mode === 'import') {
+                // Import mode: Delete from session data
+                if (!sessionId) {
+                    console.error('Delete in import mode requires sessionId');
+                    return;
+                }
+
+                try {
+                    console.log(`Delete from import session: ${nodeId} (${itemType})`);
+                    
+                    const response = await fetch(`/admin/import/delete?sessionId=${sessionId}&itemId=${nodeId}&itemType=${itemType}`, {
+                        method: 'DELETE'
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        showSuccess(`${itemType} deleted from import preview: ${result.message}`);
+                        
+                        // Refresh tree by reloading data from import session
+                        await refreshImportTree();
+                    } else {
+                        showError(`Failed to delete ${itemType}: ${result.error || result.message}`);
+                    }
+                } catch (error) {
+                    console.error('Error deleting item from import session:', error);
+                    showError(`Error deleting ${itemType} from import preview`);
+                }
+                return;
+            }
+
+            // Modify mode: Delete from database
+            if (!workOrderId) {
+                console.error('Delete in modify mode requires workOrderId');
+                return;
+            }
+
+            try {
+                console.log(`Delete request: ${nodeId} (${itemType})`);
+                
+                // Map frontend item types to backend expectations
+                let endpoint = itemType;
+                if (itemType === 'detached_product') {
+                    endpoint = 'detached-product';
+                }
+                
+                const response = await fetch(`/api/Modify/${endpoint}/${nodeId}?workOrderId=${workOrderId}`, {
+                    method: 'DELETE'
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showSuccess(`${itemType} deleted: ${result.message}`);
+                    
+                    // Refresh tree and statistics
+                    if (treeView && treeView.refresh) {
+                        treeView.refresh();
+                    }
+                    refreshStatistics();
+                    refreshAuditHistory();
+                } else {
+                    showError(`Failed to delete ${itemType}: ${result.message}`);
+                }
+            } catch (error) {
+                console.error('Error deleting item:', error);
+                showError(`Error deleting ${itemType}`);
+            }
+        }
+
         // Load audit history for work order
         async function loadAuditHistoryForWorkOrder() {
             if (!auditHistoryContainer || !workOrderId) return;
@@ -388,6 +467,24 @@
             }
         }
 
+        // Refresh import tree data
+        async function refreshImportTree() {
+            if (mode === 'import' && sessionId && treeView) {
+                try {
+                    const response = await fetch(`/admin/import/tree?sessionId=${sessionId}`);
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    
+                    const treeData = await response.json();
+                    treeView.setData(treeData);
+                } catch (error) {
+                    console.error('Error refreshing import tree:', error);
+                    showError('Failed to refresh tree data');
+                }
+            }
+        }
+
         // Utility functions
         function showSuccess(message) {
             showAlert(message, 'success');
@@ -430,11 +527,25 @@
             }
         }
 
+        // Function to update sessionId for import mode
+        function updateSessionId(newSessionId) {
+            if (mode === 'import') {
+                // Update the sessionId variable
+                sessionId = newSessionId;
+                
+                // Update the tree view configuration if it exists
+                if (treeView && treeView.sessionId !== undefined) {
+                    treeView.sessionId = newSessionId;
+                }
+            }
+        }
+
         // Expose tree view instance for external access
         window[@Html.Raw($"'{Model.ContainerId}_treeView'")] = {
             getInstance: () => treeView,
             refresh: () => treeView?.refresh(),
-            refreshAuditHistory: refreshAuditHistory
+            refreshAuditHistory: refreshAuditHistory,
+            updateSessionId: updateSessionId
         };
 
         // Initialize

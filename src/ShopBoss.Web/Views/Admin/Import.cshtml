@@ -3,89 +3,13 @@
 }
 
 @section Styles {
+    <link rel="stylesheet" href="~/css/tree-view.css" />
     <style>
         .progress-container {
             background: #f8f9fa;
             border-radius: 0.5rem;
             padding: 1.5rem;
             border: 1px solid #dee2e6;
-        }
-        
-        .tree-view {
-            max-height: 400px;
-            overflow-y: auto;
-            border: 1px solid #dee2e6;
-            border-radius: 0.375rem;
-            padding: 1rem;
-            background-color: #ffffff;
-        }
-        
-        .tree-node {
-            padding: 0.25rem 0;
-        }
-        
-        .tree-node.level-0 { margin-left: 0; }
-        .tree-node.level-1 { margin-left: 1.5rem; }
-        .tree-node.level-2 { margin-left: 3rem; }
-        .tree-node.level-3 { margin-left: 4.5rem; }
-        .tree-node.level-4 { margin-left: 6rem; }
-        
-        .tree-toggle {
-            cursor: pointer;
-            user-select: none;
-            color: #6c757d;
-            display: inline-flex !important;
-            align-items: center;
-            justify-content: center;
-            min-width: 16px;
-            height: 16px;
-        }
-        
-        .tree-toggle:hover {
-            color: #495057;
-            background-color: #e9ecef;
-            border-radius: 2px;
-        }
-        
-        .tree-toggle i {
-            font-size: 12px !important;
-            line-height: 1;
-        }
-        
-        .tree-checkbox {
-            margin-right: 0.5rem;
-        }
-        
-        .tree-checkbox.indeterminate {
-            opacity: 0.6;
-        }
-        
-        .tree-node.selected {
-            background-color: #e3f2fd;
-            border-radius: 0.25rem;
-            padding: 0.125rem 0.25rem;
-        }
-        
-        .tree-node.partially-selected {
-            background-color: #fff3e0;
-            border-radius: 0.25rem;
-            padding: 0.125rem 0.25rem;
-        }
-        
-        .selection-summary {
-            background-color: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 0.375rem;
-            padding: 1rem;
-            margin-bottom: 1rem;
-        }
-        
-        .selection-warning {
-            background-color: #fff3cd;
-            border: 1px solid #ffeaa7;
-            border-radius: 0.375rem;
-            padding: 0.75rem;
-            margin-bottom: 1rem;
         }
         
         .stage-indicator {
@@ -104,176 +28,71 @@
     </style>
 }
 
-<div class="row justify-content-center">
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-header">
-                <h3 class="card-title mb-0">
-                    <i class="fas fa-upload me-2"></i>Import Work Order
-                </h3>
-            </div>
-            <div class="card-body">
-                <div class="alert alert-info">
-                    <i class="fas fa-info-circle me-2"></i>
-                    <strong>Important:</strong> The import process takes 2-3 minutes to complete. 
-                    Please be patient and do not close this window during the import.
-                </div>
-
-                <!-- Step 1: File Upload -->
-                <div id="uploadStep" class="step-content">
-                    <div class="mb-4">
-                        <h5>Select SDF File</h5>
-                        <div class="mb-3">
-                            <div id="dropZone" class="border border-2 border-dashed rounded p-4 text-center bg-light" style="min-height: 150px; cursor: pointer;">
-                                <div class="d-flex flex-column align-items-center justify-content-center h-100">
-                                    <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
-                                    <p class="mb-2"><strong>Drop your SDF file here</strong></p>
-                                    <p class="text-muted mb-0">or click to browse</p>
-                                </div>
-                            </div>
-                            <input type="file" id="sdfFile" accept=".sdf" class="d-none" required>
-                            <div id="fileInfo" class="mt-2 d-none">
-                                <div class="alert alert-success">
-                                    <i class="fas fa-file-database me-2"></i>
-                                    <span id="fileName"></span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="d-grid gap-2">
-                        <button type="button" id="startImportBtn" class="btn btn-primary btn-lg" disabled>
-                            <i class="fas fa-play me-2"></i>Start Import Process
-                        </button>
+<div class="container-fluid mt-3">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h3 class="card-title mb-0">
+                        <i class="fas fa-upload me-2"></i>Import Work Order
+                    </h3>
+                    <div>
                         <a asp-action="Index" class="btn btn-secondary">
                             <i class="fas fa-arrow-left me-2"></i>Back to Work Orders
                         </a>
                     </div>
                 </div>
+                <div class="card-body">
 
-                <!-- Step 2: Progress Tracking -->
-                <div id="progressStep" class="step-content d-none">
-                    <div class="progress-container">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h5 class="mb-0">Import Progress</h5>
-                            <button type="button" id="cancelImportBtn" class="btn btn-outline-danger btn-sm">
-                                <i class="fas fa-times me-1"></i>Cancel
+                    <!-- Step 1: File Upload -->
+                    <div id="uploadStep" class="step-content">
+                        <div class="mb-4">
+                            <h5>Select SDF File</h5>
+                            <div class="mb-3">
+                                <div id="dropZone" class="border border-2 border-dashed rounded p-4 text-center bg-light" style="min-height: 150px; cursor: pointer;">
+                                    <div class="d-flex flex-column align-items-center justify-content-center h-100">
+                                        <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
+                                        <p class="mb-2"><strong>Drop your SDF file here</strong></p>
+                                        <p class="text-muted mb-0">or click to browse</p>
+                                    </div>
+                                </div>
+                                <input type="file" id="sdfFile" accept=".sdf" class="d-none" required>
+                                <div id="fileInfo" class="mt-2 d-none">
+                                    <div class="alert alert-success">
+                                        <i class="fas fa-file-database me-2"></i>
+                                        <span id="fileName"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="button" id="startImportBtn" class="btn btn-primary btn-lg" disabled>
+                                <i class="fas fa-play me-2"></i>Start Import Process
                             </button>
                         </div>
-                        
-                        <div class="progress mb-3" style="height: 20px;">
-                            <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" 
-                                 role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
-                                0%
-                            </div>
-                        </div>
-                        
-                        <div class="stage-indicator mb-3">
-                            <i class="fas fa-spinner fa-spin me-2"></i>
-                            <span id="currentStage">Preparing import...</span>
-                        </div>
-                        
-                        <div class="text-muted">
-                            <small>
-                                <i class="fas fa-clock me-1"></i>
-                                Estimated time remaining: <span id="timeRemaining">Calculating...</span>
-                            </small>
-                        </div>
                     </div>
-                </div>
 
-                <!-- Step 3: Preview and Confirm -->
-                <div id="previewStep" class="step-content d-none">
-                    <div class="alert alert-success">
-                        <i class="fas fa-check-circle me-2"></i>
-                        <strong>Import Ready:</strong> Review the work order details below and make any necessary adjustments before importing.
-                    </div>
-                    
-                    <!-- Work Order Metadata Section (Unified Pattern) -->
-                    <div class="mb-4">
-                        <h5>Work Order Information</h5>
-                        <div class="card">
-                            <div class="card-body">
-                                <div class="row">
+                    <!-- Step 2: Import Progress -->
+                    <div id="progressStep" class="step-content d-none">
+                        <div class="mb-4">
+                            <h5>Import Progress</h5>
+                            <div class="progress-container">
+                                <div class="mb-3">
+                                    <div class="progress" style="height: 25px;">
+                                        <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" 
+                                             role="progressbar" style="width: 0%;">0%</div>
+                                    </div>
+                                </div>
+                                <div class="row text-center">
                                     <div class="col-md-6">
-                                        <label for="finalWorkOrderName" class="form-label">Work Order Name</label>
-                                        <input type="text" id="finalWorkOrderName" class="form-control" placeholder="Work Order Name">
-                                        <small class="form-text text-muted">Edit the work order name if needed before importing.</small>
+                                        <small class="text-muted">Current Stage</small>
+                                        <div id="currentStage" class="stage-indicator active">Initializing...</div>
                                     </div>
-                                    <div class="col-md-3">
-                                        <label for="importWorkOrderId" class="form-label">Work Order ID</label>
-                                        <input type="text" id="importWorkOrderId" class="form-control" readonly placeholder="From SDF data">
-                                        <small class="form-text text-muted">Microvellum ID (read-only)</small>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <label for="importDate" class="form-label">Import Date</label>
-                                        <input type="text" id="importDate" class="form-control" readonly>
-                                        <small class="form-text text-muted">Current timestamp</small>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="mb-4">
-                        <h5>Import Statistics</h5>
-                        <div class="row">
-                            <div class="col-lg col-md-4 col-6 mb-3">
-                                <div class="card border-primary h-100">
-                                    <div class="card-body text-center">
-                                        <i class="fas fa-boxes fa-2x text-primary mb-2"></i>
-                                        <h4 id="totalProducts" class="mb-1">0</h4>
-                                        <small class="text-muted">Products</small>
-                                        <div class="mt-1">
-                                            <small class="text-success fw-bold">Selected: <span id="selectedProducts">0</span></small>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-lg col-md-4 col-6 mb-3">
-                                <div class="card border-success h-100">
-                                    <div class="card-body text-center">
-                                        <i class="fas fa-puzzle-piece fa-2x text-success mb-2"></i>
-                                        <h4 id="totalParts" class="mb-1">0</h4>
-                                        <small class="text-muted">Parts</small>
-                                        <div class="mt-1">
-                                            <small class="text-success fw-bold">Selected: <span id="selectedParts">0</span></small>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-lg col-md-4 col-6 mb-3">
-                                <div class="card border-dark h-100">
-                                    <div class="card-body text-center">
-                                        <i class="fas fa-th-large fa-2x text-dark mb-2"></i>
-                                        <h4 id="totalDetachedProducts" class="mb-1">0</h4>
-                                        <small class="text-muted">Detached Products</small>
-                                        <div class="mt-1">
-                                            <small class="text-success fw-bold">Selected: <span id="selectedDetachedProducts">0</span></small>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-lg col-md-4 col-6 mb-3">
-                                <div class="card border-info h-100">
-                                    <div class="card-body text-center">
-                                        <i class="fas fa-tools fa-2x text-info mb-2"></i>
-                                        <h4 id="totalHardware" class="mb-1">0</h4>
-                                        <small class="text-muted">Hardware</small>
-                                        <div class="mt-1">
-                                            <small class="text-success fw-bold">Selected: <span id="selectedHardware">0</span></small>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-lg col-md-4 col-6 mb-3">
-                                <div class="card border-secondary h-100">
-                                    <div class="card-body text-center">
-                                        <i class="fas fa-cut fa-2x text-secondary mb-2"></i>
-                                        <h4 id="totalNestSheets" class="mb-1">0</h4>
-                                        <small class="text-muted">Nest Sheets</small>
-                                        <div class="mt-1">
-                                            <small class="text-success fw-bold">Selected: <span id="selectedNestSheets">0</span></small>
+                                    <div class="col-md-6">
+                                        <small class="text-muted">Time Remaining</small>
+                                        <div class="stage-indicator">
+                                            <span id="timeRemaining">Calculating...</span>
                                         </div>
                                     </div>
                                 </div>
@@ -281,49 +100,101 @@
                         </div>
                     </div>
 
-                    <!-- Selection Summary -->
-                    <div id="selectionSummary" class="selection-summary d-none">
-                        <h6><i class="fas fa-check-circle me-2"></i>Selection Summary</h6>
-                        <div class="row">
-                            <div class="col-lg-2 col-md-4 col-6">
-                                <strong>Products:</strong> <span id="summaryProducts">0</span>
-                            </div>
-                            <div class="col-lg-2 col-md-4 col-6">
-                                <strong>Parts:</strong> <span id="summaryParts">0</span>
-                            </div>
-                            <div class="col-lg-2 col-md-4 col-6">
-                                <strong>Detached Products:</strong> <span id="summaryDetachedProducts">0</span>
-                            </div>
-                            <div class="col-lg-2 col-md-4 col-6">
-                                <strong>Hardware:</strong> <span id="summaryHardware">0</span>
-                            </div>
-                            <div class="col-lg-2 col-md-4 col-6">
-                                <strong>Nest Sheets:</strong> <span id="summaryNestSheets">0</span>
+                    <!-- Step 3: Preview Results -->
+                    <div id="previewStep" class="step-content d-none">
+                        <div class="mb-4">
+                            <h5>Import Information</h5>
+                            <div class="card">
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <label for="workOrderNameInput" class="form-label"><strong>Work Order Name:</strong></label>
+                                            <input type="text" id="workOrderNameInput" class="form-control" 
+                                                   placeholder="Loading..." />
+                                        </div>
+                                        <div class="col-md-4">
+                                            <strong>Import Session:</strong><br>
+                                            <span id="sessionId" class="text-muted">Loading...</span>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <strong>Import Date:</strong><br>
+                                            <span class="text-muted" id="preview-date">Loading...</span>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                    </div>
 
-                    <!-- Selection Warnings -->
-                    <div id="selectionWarnings" class="selection-warning d-none">
-                        <h6><i class="fas fa-exclamation-triangle me-2"></i>Selection Issues</h6>
-                        <ul id="warningsList" class="mb-0">
-                        </ul>
-                    </div>
-
-                    <div class="mb-4">
-                        <h5>Data Structure Preview</h5>
-                        <div id="unifiedTreeContainer">
-                            <!-- Unified tree component will be initialized here -->
+                        <!-- Statistics Cards -->
+                        <div class="mb-4">
+                            <h5>Import Statistics</h5>
+                            <div class="row">
+                                <div class="col-lg col-md-4 col-6 mb-3">
+                                    <div class="card border-primary h-100">
+                                        <div class="card-body text-center">
+                                            <i class="fas fa-boxes fa-2x text-primary mb-2"></i>
+                                            <h4 class="mb-1" id="totalProducts">0</h4>
+                                            <small class="text-muted">Products</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-lg col-md-4 col-6 mb-3">
+                                    <div class="card border-success h-100">
+                                        <div class="card-body text-center">
+                                            <i class="fas fa-puzzle-piece fa-2x text-success mb-2"></i>
+                                            <h4 class="mb-1" id="totalParts">0</h4>
+                                            <small class="text-muted">Parts</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-lg col-md-4 col-6 mb-3">
+                                    <div class="card border-dark h-100">
+                                        <div class="card-body text-center">
+                                            <i class="fas fa-th-large fa-2x text-dark mb-2"></i>
+                                            <h4 class="mb-1" id="totalDetachedProducts">0</h4>
+                                            <small class="text-muted">Detached Products</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-lg col-md-4 col-6 mb-3">
+                                    <div class="card border-info h-100">
+                                        <div class="card-body text-center">
+                                            <i class="fas fa-tools fa-2x text-info mb-2"></i>
+                                            <h4 class="mb-1" id="totalHardware">0</h4>
+                                            <small class="text-muted">Hardware</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-lg col-md-4 col-6 mb-3">
+                                    <div class="card border-secondary h-100">
+                                        <div class="card-body text-center">
+                                            <i class="fas fa-cut fa-2x text-secondary mb-2"></i>
+                                            <h4 class="mb-1" id="totalNestSheets">0</h4>
+                                            <small class="text-muted">Nest Sheets</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                    </div>
 
-                    <div class="d-grid gap-2">
-                        <button type="button" id="confirmImportBtn" class="btn btn-success btn-lg">
-                            <i class="fas fa-check me-2"></i>Confirm Import
-                        </button>
-                        <button type="button" id="startOverBtn" class="btn btn-outline-secondary">
-                            <i class="fas fa-redo me-2"></i>Start Over
-                        </button>
+                        <!-- Tree Partial in Import Mode -->
+                        <div class="mb-4">
+                            <h5>Data Preview</h5>
+                            @{
+                                var treeOptions = ShopBoss.Web.Models.WorkOrderTreeViewOptions.ForImport("placeholder", "importTreeView", false);
+                            }
+                            @await Html.PartialAsync("_WorkOrderTreeView", treeOptions)
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <button type="button" id="finalImportBtn" class="btn btn-success me-md-2" disabled>
+                                <i class="fas fa-check me-2"></i>Import to Database
+                            </button>
+                            <button type="button" id="startOverBtn" class="btn btn-outline-secondary">
+                                <i class="fas fa-redo me-2"></i>Start Over
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -332,29 +203,19 @@
 </div>
 
 @section Scripts {
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/7.0.0/signalr.min.js"></script>
+    <script src="~/lib/signalr/dist/browser/signalr.js"></script>
     <script src="~/js/WorkOrderTreeView.js"></script>
     <script>
         // Global variables
         let currentSessionId = null;
         let signalRConnection = null;
-        let importData = null;
-        let treeComponent = null; // Unified tree component
-        let selectionState = new Map(); // Track selection state by node ID
-        let selectionCounts = {
-            products: 0,
-            parts: 0,
-            detachedProducts: 0,
-            hardware: 0,
-            nestSheets: 0
-        };
+        let treeComponent = null;
         
         // DOM elements
         const dropZone = document.getElementById('dropZone');
         const fileInput = document.getElementById('sdfFile');
         const fileInfo = document.getElementById('fileInfo');
         const fileName = document.getElementById('fileName');
-        // workOrderNameInput removed - name will be extracted from SDF data
         const startImportBtn = document.getElementById('startImportBtn');
         
         // Steps
@@ -366,31 +227,26 @@
         const progressBar = document.getElementById('progressBar');
         const currentStage = document.getElementById('currentStage');
         const timeRemaining = document.getElementById('timeRemaining');
-        const cancelImportBtn = document.getElementById('cancelImportBtn');
         
         // Preview elements
-        const finalWorkOrderName = document.getElementById('finalWorkOrderName');
+        const sessionIdSpan = document.getElementById('sessionId');
+        const workOrderNameInput = document.getElementById('workOrderNameInput');
         const totalProducts = document.getElementById('totalProducts');
         const totalParts = document.getElementById('totalParts');
         const totalDetachedProducts = document.getElementById('totalDetachedProducts');
         const totalHardware = document.getElementById('totalHardware');
         const totalNestSheets = document.getElementById('totalNestSheets');
-        const selectedProducts = document.getElementById('selectedProducts');
-        const selectedParts = document.getElementById('selectedParts');
-        const selectedDetachedProducts = document.getElementById('selectedDetachedProducts');
-        const selectedHardware = document.getElementById('selectedHardware');
-        const selectedNestSheets = document.getElementById('selectedNestSheets');
-        const treeView = document.getElementById('treeView');
-        const confirmImportBtn = document.getElementById('confirmImportBtn');
+        const finalImportBtn = document.getElementById('finalImportBtn');
         const startOverBtn = document.getElementById('startOverBtn');
-        const selectionSummary = document.getElementById('selectionSummary');
-        const selectionWarnings = document.getElementById('selectionWarnings');
-        const warningsList = document.getElementById('warningsList');
-        const summaryProducts = document.getElementById('summaryProducts');
-        const summaryParts = document.getElementById('summaryParts');
-        const summaryDetachedProducts = document.getElementById('summaryDetachedProducts');
-        const summaryHardware = document.getElementById('summaryHardware');
-        const summaryNestSheets = document.getElementById('summaryNestSheets');
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', async function() {
+            await initializeSignalR();
+            initializeFileUpload();
+            
+            // Set current date
+            document.getElementById('preview-date').textContent = new Date().toLocaleString();
+        });
 
         // Initialize SignalR connection
         async function initializeSignalR() {
@@ -418,70 +274,68 @@
             }
         }
 
-        // File upload handlers
-        dropZone.addEventListener('click', () => {
-            fileInput.click();
-        });
-
-        dropZone.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            dropZone.classList.add('border-primary');
-        });
-
-        dropZone.addEventListener('dragleave', (e) => {
-            e.preventDefault();
-            dropZone.classList.remove('border-primary');
-        });
-
-        dropZone.addEventListener('drop', (e) => {
-            e.preventDefault();
-            dropZone.classList.remove('border-primary');
+        // Initialize file upload handlers
+        function initializeFileUpload() {
+            dropZone.addEventListener('click', () => fileInput.click());
             
-            const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                const file = files[0];
-                if (file.name.toLowerCase().endsWith('.sdf')) {
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('border-primary');
+            });
+
+            dropZone.addEventListener('dragleave', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('border-primary');
+            });
+
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('border-primary');
+                
+                const files = e.dataTransfer.files;
+                if (files.length > 0 && files[0].name.toLowerCase().endsWith('.sdf')) {
                     fileInput.files = files;
-                    showFileInfo(file);
+                    showFileInfo(files[0]);
                 } else {
                     alert('Please select an SDF file.');
                 }
-            }
-        });
+            });
 
-        fileInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                showFileInfo(file);
-            }
-        });
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files[0]) {
+                    showFileInfo(e.target.files[0]);
+                }
+            });
+        }
 
         function showFileInfo(file) {
             fileName.textContent = file.name + ' (' + formatBytes(file.size) + ')';
             fileInfo.classList.remove('d-none');
-            checkFormValid();
+            startImportBtn.disabled = false;
         }
 
-        function checkFormValid() {
-            const fileSelected = fileInput.files.length > 0;
-            startImportBtn.disabled = !fileSelected;
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
         }
 
-        // Import process
+        // Start import process
         startImportBtn.addEventListener('click', async () => {
             const file = fileInput.files[0];
-            
             if (!file) {
                 alert('Please select a file.');
                 return;
             }
 
             try {
-                // Upload file
+                // Upload file to new import endpoint
                 const formData = new FormData();
                 formData.append('file', file);
 
-                const uploadResponse = await fetch('/Import/UploadFile', {
+                const uploadResponse = await fetch('/admin/import/upload', {
                     method: 'POST',
                     body: formData
                 });
@@ -499,729 +353,289 @@
                     await signalRConnection.invoke("JoinImportGroup", currentSessionId);
                 }
 
-                // Start import (work order name will be extracted from SDF data)
-                const importResponse = await fetch('/Import/StartImport', {
+                // Show progress step
+                uploadStep.classList.add('d-none');
+                progressStep.classList.remove('d-none');
+
+                // Start import with new endpoint
+                const startResponse = await fetch('/admin/import/start', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        sessionId: currentSessionId,
-                        workOrderName: null // Will be extracted from SDF data
-                    })
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sessionId: currentSessionId })
                 });
 
-                if (!importResponse.ok) {
-                    const error = await importResponse.json();
-                    throw new Error(error.error || 'Import failed to start');
+                if (!startResponse.ok) {
+                    const error = await startResponse.json();
+                    throw new Error(error.error || 'Failed to start import');
                 }
 
-                // Switch to progress view
-                showProgressStep();
-
             } catch (error) {
-                alert('Error starting import: ' + error.message);
                 console.error('Import error:', error);
+                alert('Error: ' + error.message);
+                resetToUpload();
             }
         });
 
-        // Progress tracking
-        function updateProgress(percentage, stage, estimatedTimeRemaining) {
+        // Update progress display
+        function updateProgress(percentage, stage, estimatedTime) {
             progressBar.style.width = percentage + '%';
             progressBar.textContent = percentage + '%';
-            progressBar.setAttribute('aria-valuenow', percentage);
+            currentStage.textContent = stage || 'Processing...';
             
-            currentStage.textContent = stage;
-            
-            if (estimatedTimeRemaining > 0) {
-                const minutes = Math.floor(estimatedTimeRemaining / 60);
-                const seconds = Math.floor(estimatedTimeRemaining % 60);
-                timeRemaining.textContent = `${minutes}m ${seconds}s`;
+            if (estimatedTime && estimatedTime > 0) {
+                const minutes = Math.floor(estimatedTime / 60);
+                const seconds = Math.floor(estimatedTime % 60);
+                timeRemaining.textContent = minutes + 'm ' + seconds + 's';
             } else {
-                timeRemaining.textContent = 'Completing...';
+                timeRemaining.textContent = 'Calculating...';
             }
         }
 
+        // Handle import completion
         async function handleImportComplete(data) {
-            try {
-                // Fetch the import data
-                const response = await fetch(`/Import/GetImportData?sessionId=${currentSessionId}`);
-                if (response.ok) {
-                    importData = await response.json();
-                    showPreviewStep();
-                } else {
-                    throw new Error('Failed to load import data');
-                }
-            } catch (error) {
-                alert('Error loading import data: ' + error.message);
-            }
-        }
-
-        function handleImportError(error) {
-            alert('Import failed: ' + error);
-            showUploadStep();
-        }
-
-        // Cancel import
-        cancelImportBtn.addEventListener('click', async () => {
-            if (confirm('Are you sure you want to cancel the import?')) {
-                try {
-                    await fetch(`/Import/CancelImport?sessionId=${currentSessionId}`, {
-                        method: 'DELETE'
-                    });
-                    showUploadStep();
-                } catch (error) {
-                    console.error('Cancel error:', error);
-                }
-            }
-        });
-
-        // Step navigation
-        function showUploadStep() {
-            uploadStep.classList.remove('d-none');
-            progressStep.classList.add('d-none');
-            previewStep.classList.add('d-none');
-        }
-
-        function showProgressStep() {
-            uploadStep.classList.add('d-none');
-            progressStep.classList.remove('d-none');
-            previewStep.classList.add('d-none');
-        }
-
-        function showPreviewStep() {
-            uploadStep.classList.add('d-none');
             progressStep.classList.add('d-none');
             previewStep.classList.remove('d-none');
             
-            if (importData) {
-                populatePreview();
-                buildTreeView();
-            }
-        }
-
-        // Preview functionality
-        function populatePreview() {
-            // Set work order name (extracted from data or use filename as fallback)
-            finalWorkOrderName.value = importData.name || 'Imported Work Order';
-            
-            // Populate unified interface fields
-            const importWorkOrderId = document.getElementById('importWorkOrderId');
-            const importDate = document.getElementById('importDate');
-            
-            if (importWorkOrderId) {
-                importWorkOrderId.value = importData.id || 'Generated from SDF';
+            // Update statistics
+            if (data.statistics) {
+                totalProducts.textContent = data.statistics.totalProducts || 0;
+                totalParts.textContent = data.statistics.totalParts || 0;
+                totalDetachedProducts.textContent = data.statistics.totalDetachedProducts || 0;
+                totalHardware.textContent = data.statistics.totalHardware || 0;
+                totalNestSheets.textContent = data.statistics.totalNestSheets || 0;
             }
             
-            if (importDate) {
-                importDate.value = new Date().toLocaleString();
-            }
-            
-            const stats = importData.statistics;
-            
-            totalProducts.textContent = stats.totalProducts;
-            totalParts.textContent = stats.totalParts;
-            totalDetachedProducts.textContent = stats.totalDetachedProducts;
-            totalHardware.textContent = stats.totalHardware;
-            totalNestSheets.textContent = stats.totalNestSheets;
-        }
-
-        function buildTreeView() {
-            // Initialize unified tree component for import mode
-            if (treeComponent) {
-                // Clean up existing component
-                const container = document.getElementById('unifiedTreeContainer');
-                container.innerHTML = '';
-            }
-
-            treeComponent = new WorkOrderTreeView('unifiedTreeContainer', {
-                mode: 'import',
-                apiUrl: '/Import/GetImportTreeData',
-                sessionId: currentSessionId,
-                onSelectionChange: (summary) => {
-                    // Update statistics from tree component selection
-                    updateSelectionCountsFromTree(summary);
-                    updateSelectionSummary();
-                    validateSelection();
+            // Get detailed data
+            try {
+                const statusResponse = await fetch('/admin/import/status?sessionId=' + currentSessionId);
+                if (statusResponse.ok) {
+                    const statusData = await statusResponse.json();
+                    sessionIdSpan.textContent = statusData.sessionId;
+                    workOrderNameInput.value = statusData.workOrderName || 'New Import Work Order';
                 }
-            });
-
-            // Load data via sessionId instead of workOrderId
-            if (currentSessionId) {
-                fetch(`/Import/GetImportTreeData?sessionId=${currentSessionId}`)
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.error) {
-                            console.error('Error loading tree data:', data.error);
-                            document.getElementById('unifiedTreeContainer').innerHTML = 
-                                '<p class="text-muted">Error loading import data for preview.</p>';
-                            return;
-                        }
-                        
-                        // Set the tree data directly
-                        treeComponent.setData(data);
-                    })
-                    .catch(error => {
-                        console.error('Failed to load tree data:', error);
-                        document.getElementById('unifiedTreeContainer').innerHTML = 
-                            '<p class="text-muted">Failed to load import data for preview.</p>';
-                    });
-            }
-        }
-
-        function updateSelectionCountsFromTree(summary) {
-            // Update global selection counts from tree component
-            // Tree component returns counts in nested object: { counts: { products: 0, parts: 0, ... } }
-            const counts = summary.counts || {};
-            selectionCounts.products = counts.products || 0;
-            selectionCounts.parts = counts.parts || 0;
-            selectionCounts.detachedProducts = counts.detachedProducts || 0;
-            selectionCounts.hardware = counts.hardware || 0;
-            selectionCounts.nestSheets = counts.nestSheets || 0;
-
-            // Update the displayed counts
-            selectedProducts.textContent = selectionCounts.products;
-            selectedParts.textContent = selectionCounts.parts;
-            selectedDetachedProducts.textContent = selectionCounts.detachedProducts;
-            selectedHardware.textContent = selectionCounts.hardware;
-            selectedNestSheets.textContent = selectionCounts.nestSheets;
-        }
-
-        function createTreeNode(icon, text, type, expanded = false, level = 0, itemId = null, itemData = null) {
-            const node = document.createElement('div');
-            node.className = `tree-node level-${level}`;
-            node.dataset.type = type;
-            node.dataset.itemId = itemId || `${type}-${Math.random().toString(36).substr(2, 9)}`;
-            
-            const hasChildren = type === 'work-order' || type === 'products-header' || type === 'hardware-header' || 
-                               type === 'detached-header' || type === 'nestsheets-header' || type === 'product' || type === 'subassembly';
-            
-            const nodeId = node.dataset.itemId;
-            
-            // Initialize selection state
-            if (!selectionState.has(nodeId)) {
-                selectionState.set(nodeId, {
-                    selected: true, // Default to selected for backward compatibility
-                    type: type,
-                    itemData: itemData,
-                    parentId: null,
-                    childIds: []
-                });
-            }
-            
-            node.innerHTML = `
-                <div class="d-flex align-items-center">
-                    ${hasChildren ? 
-                        `<span class="tree-toggle me-2" data-expanded="${expanded}" style="width: 16px; display: inline-block;">
-                            <i class="fas fa-${expanded ? 'chevron-down' : 'chevron-right'}" style="font-size: 12px;"></i>
-                        </span>` : 
-                        '<span class="me-2" style="width: 16px; display: inline-block;"></span>'
-                    }
-                    <input type="checkbox" class="tree-checkbox form-check-input me-2" checked data-node-id="${nodeId}">
-                    <span class="me-2">${icon}</span>
-                    <span class="flex-grow-1">${text}</span>
-                </div>
-            `;
-
-            // Handle expand/collapse
-            if (hasChildren) {
-                const toggle = node.querySelector('.tree-toggle');
-                if (toggle) {
-                    toggle.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        const isExpanded = toggle.dataset.expanded === 'true';
-                        toggle.dataset.expanded = !isExpanded;
-                        const icon = toggle.querySelector('i');
-                        if (icon) {
-                            icon.className = `fas fa-chevron-${!isExpanded ? 'down' : 'right'}`;
-                        }
-                        
-                        const content = node.querySelector('.tree-content');
-                        if (content) {
-                            content.style.display = !isExpanded ? 'block' : 'none';
-                        }
-                    });
-                }
-            }
-
-            // Handle checkbox changes
-            const checkbox = node.querySelector('.tree-checkbox');
-            if (checkbox) {
-                checkbox.addEventListener('change', (e) => {
-                    e.stopPropagation();
-                    handleNodeSelection(nodeId, checkbox.checked);
-                });
-            }
-
-            return node;
-        }
-
-        function createProductNode(product, level = 0) {
-            // If ProductNumber and Name are the same (no separate product name), show just ItemNumber - Qty
-            // Otherwise show ItemNumber - ProductName - Qty
-            const displayName = (product.productNumber && product.productNumber !== product.name) ? 
-                `${product.productNumber} - ${product.name} - Qty. ${product.quantity}` :
-                `${product.productNumber || product.name} - Qty. ${product.quantity}`;
-            
-            const productNode = createTreeNode('🚪', displayName, 'product', false, level, product.id, product);
-            const productId = productNode.dataset.itemId;
-            
-            const content = document.createElement('div');
-            content.className = 'tree-content';
-            content.style.display = 'none';
-            productNode.appendChild(content);
-
-            // Track child relationships
-            const childIds = [];
-
-            // Add parts
-            product.parts.forEach(part => {
-                const partNode = createPartNode(part, level + 1, productId);
-                content.appendChild(partNode);
-                childIds.push(partNode.dataset.itemId);
-            });
-
-            // Add subassemblies
-            product.subassemblies.forEach(subassembly => {
-                const subassemblyNode = createSubassemblyNode(subassembly, level + 1, productId);
-                content.appendChild(subassemblyNode);
-                childIds.push(subassemblyNode.dataset.itemId);
-            });
-
-            // Add hardware
-            product.hardware.forEach(hardware => {
-                const hardwareNode = createHardwareNode(hardware, level + 1, productId);
-                content.appendChild(hardwareNode);
-                childIds.push(hardwareNode.dataset.itemId);
-            });
-
-            // Update parent-child relationships
-            const productState = selectionState.get(productId);
-            if (productState) {
-                productState.childIds = childIds;
-                childIds.forEach(childId => {
-                    const childState = selectionState.get(childId);
-                    if (childState) {
-                        childState.parentId = productId;
-                    }
-                });
-            }
-
-            return productNode;
-        }
-
-        function createPartNode(part, level = 3, parentId = null) {
-            return createTreeNode('📄', 
-                `${part.id} - ${part.name} (Qty: ${part.quantity}, ${part.width}mm×${part.height}mm×${part.thickness}mm, ${part.material})`, 
-                'part', false, level, part.id, part);
-        }
-
-        function createSubassemblyNode(subassembly, level = 3, parentId = null) {
-            const subassemblyNode = createTreeNode('📁', 
-                `${subassembly.id} - ${subassembly.name} (Qty: ${subassembly.quantity})`, 
-                'subassembly', false, level, subassembly.id, subassembly);
-            const subassemblyId = subassemblyNode.dataset.itemId;
-            
-            const content = document.createElement('div');
-            content.className = 'tree-content';
-            content.style.display = 'none';
-            subassemblyNode.appendChild(content);
-
-            // Track child relationships
-            const childIds = [];
-
-            // Add parts
-            subassembly.parts.forEach(part => {
-                const partNode = createPartNode(part, level + 1, subassemblyId);
-                content.appendChild(partNode);
-                childIds.push(partNode.dataset.itemId);
-            });
-
-            // Add nested subassemblies
-            subassembly.nestedSubassemblies.forEach(nested => {
-                const nestedNode = createSubassemblyNode(nested, level + 1, subassemblyId);
-                content.appendChild(nestedNode);
-                childIds.push(nestedNode.dataset.itemId);
-            });
-
-            // Add hardware
-            subassembly.hardware.forEach(hardware => {
-                const hardwareNode = createHardwareNode(hardware, level + 1, subassemblyId);
-                content.appendChild(hardwareNode);
-                childIds.push(hardwareNode.dataset.itemId);
-            });
-
-            // Update parent-child relationships
-            const subassemblyState = selectionState.get(subassemblyId);
-            if (subassemblyState) {
-                subassemblyState.childIds = childIds;
-                childIds.forEach(childId => {
-                    const childState = selectionState.get(childId);
-                    if (childState) {
-                        childState.parentId = subassemblyId;
-                    }
-                });
-            }
-
-            return subassemblyNode;
-        }
-
-        function createHardwareNode(hardware, level = 3, parentId = null) {
-            return createTreeNode('🔧', 
-                `${hardware.id} - ${hardware.name} (Qty: ${hardware.quantity})`, 
-                'hardware', false, level, hardware.id, hardware);
-        }
-
-        function createDetachedProductNode(detached, level = 2) {
-            return createTreeNode('📄', 
-                `${detached.id} - ${detached.name} (Qty: ${detached.quantity}, ${detached.width}mm×${detached.height}mm×${detached.thickness}mm)`, 
-                'detached', false, level, detached.id, detached);
-        }
-
-        function createNestSheetNode(nestSheet, level = 1) {
-            return createTreeNode('📋', 
-                `${nestSheet.name} (${nestSheet.material || 'Unknown Material'}, ${nestSheet.length}mm×${nestSheet.width}mm×${nestSheet.thickness}mm)`, 
-                'nestsheet', false, level, nestSheet.id, nestSheet);
-        }
-
-        // Selection Management Functions
-        function handleNodeSelection(nodeId, isSelected) {
-            const nodeState = selectionState.get(nodeId);
-            if (!nodeState) return;
-
-            // Update selection state
-            nodeState.selected = isSelected;
-
-            // Handle parent-child dependencies
-            if (isSelected) {
-                // When selecting a node, auto-select all children
-                selectAllChildren(nodeId);
-                // Update parent state (might become partially selected)
-                updateParentState(nodeState.parentId);
-            } else {
-                // When deselecting a node, deselect all children
-                deselectAllChildren(nodeId);
-                // Update parent state
-                updateParentState(nodeState.parentId);
-            }
-
-            // Update UI
-            updateNodeVisualState(nodeId);
-            updateSelectionCounts();
-            updateSelectionSummary();
-            validateSelection();
-        }
-
-        function selectAllChildren(parentId) {
-            const parentState = selectionState.get(parentId);
-            if (!parentState) return;
-
-            parentState.childIds.forEach(childId => {
-                const childState = selectionState.get(childId);
-                if (childState && !childState.selected) {
-                    childState.selected = true;
-                    updateNodeVisualState(childId);
-                    selectAllChildren(childId); // Recursively select grandchildren
-                }
-            });
-        }
-
-        function deselectAllChildren(parentId) {
-            const parentState = selectionState.get(parentId);
-            if (!parentState) return;
-
-            parentState.childIds.forEach(childId => {
-                const childState = selectionState.get(childId);
-                if (childState && childState.selected) {
-                    childState.selected = false;
-                    updateNodeVisualState(childId);
-                    deselectAllChildren(childId); // Recursively deselect grandchildren
-                }
-            });
-        }
-
-        function updateParentState(parentId) {
-            if (!parentId) return;
-
-            const parentState = selectionState.get(parentId);
-            if (!parentState) return;
-
-            // Check children selection states
-            const selectedChildren = parentState.childIds.filter(childId => {
-                const childState = selectionState.get(childId);
-                return childState && childState.selected;
-            });
-
-            const allSelected = selectedChildren.length === parentState.childIds.length;
-            const noneSelected = selectedChildren.length === 0;
-
-            if (allSelected) {
-                parentState.selected = true;
-                parentState.partiallySelected = false;
-            } else if (noneSelected) {
-                parentState.selected = false;
-                parentState.partiallySelected = false;
-            } else {
-                parentState.selected = false;
-                parentState.partiallySelected = true;
-            }
-
-            updateNodeVisualState(parentId);
-            updateParentState(parentState.parentId); // Recursively update grandparents
-        }
-
-        function updateNodeVisualState(nodeId) {
-            const nodeState = selectionState.get(nodeId);
-            if (!nodeState) return;
-
-            const nodeElement = document.querySelector(`[data-item-id="${nodeId}"]`);
-            if (!nodeElement) return;
-
-            const checkbox = nodeElement.querySelector('.tree-checkbox');
-            if (checkbox) {
-                checkbox.checked = nodeState.selected;
-                checkbox.indeterminate = nodeState.partiallySelected || false;
-                checkbox.classList.toggle('indeterminate', nodeState.partiallySelected || false);
-            }
-
-            // Update visual styling
-            nodeElement.classList.remove('selected', 'partially-selected');
-            if (nodeState.selected) {
-                nodeElement.classList.add('selected');
-            } else if (nodeState.partiallySelected) {
-                nodeElement.classList.add('partially-selected');
-            }
-        }
-
-        function updateSelectionCounts() {
-            // Reset counts
-            selectionCounts = {
-                products: 0,
-                parts: 0,
-                detachedProducts: 0,
-                hardware: 0,
-                nestSheets: 0
-            };
-
-            // Count selected items by type
-            selectionState.forEach(state => {
-                if (state.selected) {
-                    switch (state.type) {
-                        case 'product':
-                            selectionCounts.products++;
-                            break;
-                        case 'part':
-                            selectionCounts.parts++;
-                            break;
-                        case 'detached_product':
-                            selectionCounts.detachedProducts++;
-                            break;
-                        case 'hardware':
-                            selectionCounts.hardware++;
-                            break;
-                        case 'nestsheet':
-                            selectionCounts.nestSheets++;
-                            break;
-                    }
-                }
-            });
-
-            // Update UI
-            selectedProducts.textContent = selectionCounts.products;
-            selectedParts.textContent = selectionCounts.parts;
-            selectedDetachedProducts.textContent = selectionCounts.detachedProducts;
-            selectedHardware.textContent = selectionCounts.hardware;
-            selectedNestSheets.textContent = selectionCounts.nestSheets;
-        }
-
-        function updateSelectionSummary() {
-            const hasSelection = selectionCounts.products > 0 || selectionCounts.parts > 0 || 
-                               selectionCounts.detachedProducts > 0 || selectionCounts.hardware > 0 || selectionCounts.nestSheets > 0;
-
-            if (hasSelection) {
-                selectionSummary.classList.remove('d-none');
-                summaryProducts.textContent = selectionCounts.products;
-                summaryParts.textContent = selectionCounts.parts;
-                summaryDetachedProducts.textContent = selectionCounts.detachedProducts;
-                summaryHardware.textContent = selectionCounts.hardware;
-                summaryNestSheets.textContent = selectionCounts.nestSheets;
-            } else {
-                selectionSummary.classList.add('d-none');
-            }
-        }
-
-        function validateSelection() {
-            const warnings = [];
-            let hasValidSelection = false;
-
-            // Check if tree component is available and has selections
-            if (treeComponent) {
-                const selectedItems = treeComponent.getSelectedItems();
                 
-                // Check for any selected items (products, hardware, nestsheets)
-                hasValidSelection = selectedItems.some(item => 
-                    item.type === 'product' || item.type === 'hardware' || item.type === 'nestsheet'
-                );
-                
-                // For now, we'll keep validation simple since the tree component handles
-                // parent-child relationships properly
-            } else {
-                // Fallback to selection counts
-                hasValidSelection = selectionCounts.products > 0 || selectionCounts.nestSheets > 0;
+                // Initialize tree view
+                initializeTreeView();
+            } catch (error) {
+                console.error('Error fetching import details:', error);
             }
-
-            // Update warnings UI
-            if (warnings.length > 0) {
-                selectionWarnings.classList.remove('d-none');
-                warningsList.innerHTML = warnings.map(warning => `<li>${warning}</li>`).join('');
-            } else {
-                selectionWarnings.classList.add('d-none');
-            }
-
-            // Enable/disable confirm button
-            const isValid = hasValidSelection && warnings.length === 0;
-            confirmImportBtn.disabled = !isValid;
-            
-            return isValid;
         }
 
-        // Tree view controls are now handled by the unified tree component
-
-        // CSV download functionality
-        // Confirm import - Updated for unified tree component
-        confirmImportBtn.addEventListener('click', async () => {
-            if (!currentSessionId) {
-                alert('No import session available.');
-                return;
+        // Initialize tree view with imported data
+        async function initializeTreeView() {
+            // The tree is now handled by the _WorkOrderTreeView partial
+            try {
+                // Update the sessionId in the tree view partial
+                if (window.importTreeView_treeView && window.importTreeView_treeView.updateSessionId) {
+                    window.importTreeView_treeView.updateSessionId(currentSessionId);
+                }
+                
+                if (window.importTreeView_treeView && window.importTreeView_treeView.getInstance()) {
+                    const treeInstance = window.importTreeView_treeView.getInstance();
+                    
+                    // Load tree data from import session
+                    const response = await fetch(`/admin/import/tree?sessionId=${currentSessionId}`);
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    
+                    const treeData = await response.json();
+                    treeInstance.setData(treeData);
+                }
+                
+                // Enable final import button
+                finalImportBtn.disabled = false;
+            } catch (error) {
+                console.error('Error loading tree data:', error);
+                const treeContainer = document.getElementById('importTreeView');
+                if (treeContainer) {
+                    treeContainer.innerHTML = `
+                        <div class="alert alert-danger">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            Failed to load import data: ${error.message}
+                        </div>`;
+                }
             }
+        }
 
-            const workOrderName = finalWorkOrderName.value.trim();
-            if (!workOrderName) {
-                alert('Please enter a work order name.');
-                finalWorkOrderName.focus();
-                return;
+        // Handle import error
+        function handleImportError(error) {
+            alert('Import failed: ' + error);
+            resetToUpload();
+        }
+
+        // Reset to upload step
+        function resetToUpload() {
+            uploadStep.classList.remove('d-none');
+            progressStep.classList.add('d-none');
+            previewStep.classList.add('d-none');
+            
+            fileInput.value = '';
+            fileInfo.classList.add('d-none');
+            startImportBtn.disabled = true;
+            
+            currentSessionId = null;
+        }
+
+        // Start over button
+        startOverBtn.addEventListener('click', () => {
+            if (confirm('Are you sure you want to start over?')) {
+                resetToUpload();
             }
+        });
 
-            if (!treeComponent) {
-                alert('Tree component not initialized.');
-                return;
-            }
-
-            // Get selection data from unified tree component
-            const selectionSummary = treeComponent.getSelectionSummary();
-            if (!selectionSummary || !selectionSummary.selectedItems || selectionSummary.selectedItems.length === 0) {
-                alert('Please select at least one item to import.');
+        // Final import button - Phase I4: Convert to database
+        finalImportBtn.addEventListener('click', async () => {
+            if (!confirm('Are you sure you want to import this data to the database?')) {
                 return;
             }
 
             try {
-                // Disable button during processing
-                confirmImportBtn.disabled = true;
-                confirmImportBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing...';
+                // Disable button and show loading state
+                finalImportBtn.disabled = true;
+                finalImportBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Importing...';
 
-                // Prepare selection data from tree component - filter out category items
-                const actualItems = selectionSummary.selectedItems.filter(item => item.type !== 'category');
-                
-                if (actualItems.length === 0) {
-                    alert('Please select at least one actual item (product, part, hardware, or nest sheet) to import.');
-                    confirmImportBtn.disabled = false;
-                    confirmImportBtn.innerHTML = '<i class="fas fa-check me-2"></i>Confirm Import';
-                    return;
-                }
-                
-                const selectedItemIds = actualItems.map(item => item.id);
-                const selectionDetails = {};
-                
-                actualItems.forEach(item => {
-                    selectionDetails[item.id] = {
-                        itemId: item.id,
-                        itemType: item.type,
-                        selected: true,
-                        parentId: null, // Tree component handles hierarchy
-                        childIds: []
-                    };
-                });
+                // Get current work order name for import (from editable input)
+                const workOrderName = workOrderNameInput.value || 'New Import Work Order';
 
-                const selectionRequest = {
-                    sessionId: currentSessionId,
-                    workOrderName: workOrderName,
-                    selectedItemIds: selectedItemIds,
-                    selectionDetails: selectionDetails
-                };
-
-                console.log("Sending selection request with", selectedItemIds.length, "selected items");
-
-                const response = await fetch('/Import/ProcessSelectedItems', {
+                // Call the conversion endpoint
+                const response = await fetch('/admin/import/convert', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(selectionRequest)
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sessionId: currentSessionId,
+                        workOrderName: workOrderName
+                    })
                 });
 
-                const result = await response.json();
-
-                if (response.ok && result.success) {
-                    // Show success message with database confirmation
-                    alert(`Work Order successfully imported to database!\n\n` +
-                          `Saved:\n` +
-                          `• ${result.statistics.convertedProducts} Products\n` +
-                          `• ${result.statistics.convertedParts} Parts\n` +
-                          `• ${result.statistics.convertedDetachedProducts} Detached Products\n` +
-                          `• ${result.statistics.convertedHardware} Hardware\n` +
-                          `• ${result.statistics.convertedNestSheets} Nest Sheets\n\n` +
-                          `Work Order ID: ${result.workOrderId}\n` +
-                          `Work Order Name: ${workOrderName}\n\n` +
-                          `The work order is now available in the system.`);
-
-                    // Redirect to work orders list after successful import
-                    console.log('Import completed successfully:', result);
-                    setTimeout(() => {
-                        window.location.href = '/Admin';
-                    }, 2000);
+                if (!response.ok) {
+                    const errorData = await response.json();
                     
+                    // Handle duplicate detection scenario
+                    if (errorData.duplicateInfo && errorData.duplicateInfo.hasDuplicates) {
+                        const duplicateModal = await showDuplicateModal(errorData);
+                        if (duplicateModal.confirmed) {
+                            // Retry with allowDuplicates = true
+                            await retryImportWithDuplicates(duplicateModal.workOrderName);
+                            return;
+                        }
+                    } else {
+                        throw new Error(errorData.error || 'Import failed');
+                    }
                 } else {
-                    // Show error details
-                    let errorMessage = result.error || 'Unknown error occurred';
-                    if (result.details && result.details.length > 0) {
-                        errorMessage += '\n\nDetails:\n• ' + result.details.join('\n• ');
-                    }
-                    if (result.warnings && result.warnings.length > 0) {
-                        errorMessage += '\n\nWarnings:\n• ' + result.warnings.join('\n• ');
-                    }
-                    alert('Import processing failed:\n\n' + errorMessage);
+                    const result = await response.json();
+                    
+                    // Show success message
+                    showSuccessMessage(result);
+                    
+                    // Redirect to work orders page after a delay
+                    setTimeout(() => {
+                        window.location.href = '/admin';
+                    }, 3000);
                 }
-
             } catch (error) {
-                console.error('Import processing error:', error);
-                alert('Error processing import: ' + error.message);
+                console.error('Import error:', error);
+                alert('Error during import: ' + error.message);
             } finally {
                 // Re-enable button
-                confirmImportBtn.disabled = false;
-                confirmImportBtn.innerHTML = '<i class="fas fa-check me-2"></i>Confirm Import';
+                finalImportBtn.disabled = false;
+                finalImportBtn.innerHTML = '<i class="fas fa-check me-2"></i>Import to Database';
             }
         });
 
-        startOverBtn.addEventListener('click', () => {
-            showUploadStep();
-            // Reset form
-            fileInput.value = '';
-            fileInfo.classList.add('d-none');
-            checkFormValid();
-        });
+        // Retry import with allowDuplicates = true
+        async function retryImportWithDuplicates(workOrderName) {
+            try {
+                const response = await fetch('/admin/import/convert', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sessionId: currentSessionId,
+                        workOrderName: workOrderName
+                    })
+                });
 
-        // Utility functions
-        function formatBytes(bytes) {
-            if (bytes === 0) return '0 Bytes';
-            const k = 1024;
-            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Import failed');
+                }
+
+                const result = await response.json();
+                showSuccessMessage(result);
+                
+                // Redirect to work orders page after a delay
+                setTimeout(() => {
+                    window.location.href = '/admin';
+                }, 3000);
+            } catch (error) {
+                console.error('Retry import error:', error);
+                alert('Error during retry import: ' + error.message);
+            }
         }
 
-        // Initialize on page load
-        document.addEventListener('DOMContentLoaded', () => {
-            initializeSignalR();
-        });
+        // Show duplicate detection modal
+        async function showDuplicateModal(errorData) {
+            return new Promise((resolve) => {
+                const modal = document.createElement('div');
+                modal.className = 'modal fade';
+                modal.innerHTML = `
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Duplicate Work Order Detected</h5>
+                            </div>
+                            <div class="modal-body">
+                                <div class="alert alert-warning">
+                                    <i class="fas fa-exclamation-triangle me-2"></i>
+                                    <strong>Duplicate Found:</strong> ${errorData.details.join(', ')}
+                                </div>
+                                <p>You can proceed with a unique name or cancel the import.</p>
+                                <div class="mb-3">
+                                    <label class="form-label">New Work Order Name:</label>
+                                    <input type="text" class="form-control" id="newWorkOrderName" 
+                                           value="${errorData.duplicateInfo.suggestedNewName || 'New Import Work Order'}" />
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="button" class="btn btn-primary" id="proceedWithDuplicate">Proceed with Import</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                document.body.appendChild(modal);
+                const bootstrapModal = new bootstrap.Modal(modal);
+                bootstrapModal.show();
+                
+                document.getElementById('proceedWithDuplicate').addEventListener('click', () => {
+                    const newName = document.getElementById('newWorkOrderName').value;
+                    bootstrapModal.hide();
+                    modal.remove();
+                    resolve({ confirmed: true, workOrderName: newName });
+                });
+                
+                modal.addEventListener('hidden.bs.modal', () => {
+                    modal.remove();
+                    resolve({ confirmed: false });
+                });
+            });
+        }
+
+        // Show success message
+        function showSuccessMessage(result) {
+            const successAlert = document.createElement('div');
+            successAlert.className = 'alert alert-success alert-dismissible fade show';
+            successAlert.innerHTML = `
+                <i class="fas fa-check-circle me-2"></i>
+                <strong>Import Successful!</strong> Work Order "${result.workOrderId}" has been imported to the database.
+                <br><small>Products: ${result.statistics.convertedProducts}, Parts: ${result.statistics.convertedParts}, 
+                Hardware: ${result.statistics.convertedHardware}</small>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            
+            // Insert at the top of the preview step
+            previewStep.insertBefore(successAlert, previewStep.firstChild);
+        }
     </script>
 }

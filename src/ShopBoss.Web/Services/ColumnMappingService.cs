@@ -116,10 +116,11 @@ public class ColumnMappingService
                 // Subassembly properties
                 { "Name", "Name" },
                 { "SubassemblyName", "Name" },
+                { "Quantity", "Quantity" },
                 
                 // Internal ID
                 { "InternalId", "ID" }
-                // Note: Width, Depth, Quantity, and Height columns are not available in SUBASSEMBLIES table
+                // Note: Width, Depth, and Height columns are not available in SUBASSEMBLIES table
             },
 
             "PARTS" => new Dictionary<string, string>

@@ -1,5 +1,4 @@
 using ShopBoss.Web.Models;
-using ShopBoss.Web.Models.Import;
 
 namespace ShopBoss.Web.Services;
 
@@ -244,7 +243,7 @@ public class WorkOrderImportService
         {
             Id = _columnMapping.GetStringValue(subassemblyData, "SUBASSEMBLIES", "Id"),
             Name = _columnMapping.GetStringValue(subassemblyData, "SUBASSEMBLIES", "Name"),
-            Qty = _columnMapping.GetIntValue(subassemblyData, "SUBASSEMBLIES", "Qty"),
+            Qty = _columnMapping.GetIntValue(subassemblyData, "SUBASSEMBLIES", "Quantity"),
             ProductId = productId,
             Parts = new List<Part>(),
             ChildSubassemblies = new List<Subassembly>()

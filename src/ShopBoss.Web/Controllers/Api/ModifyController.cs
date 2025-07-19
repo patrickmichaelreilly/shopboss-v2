@@ -16,13 +16,15 @@ public class ModifyController : ControllerBase
     private readonly ILogger<ModifyController> _logger;
     private readonly ShopBossDbContext _context;
     private readonly AuditTrailService _auditTrailService;
+    private readonly WorkOrderDeletionService _deletionService;
 
-    public ModifyController(WorkOrderService workOrderService, ILogger<ModifyController> logger, ShopBossDbContext context, AuditTrailService auditTrailService)
+    public ModifyController(WorkOrderService workOrderService, ILogger<ModifyController> logger, ShopBossDbContext context, AuditTrailService auditTrailService, WorkOrderDeletionService deletionService)
     {
         _workOrderService = workOrderService;
         _logger = logger;
         _context = context;
         _auditTrailService = auditTrailService;
+        _deletionService = deletionService;
     }
 
     [HttpGet("{workOrderId}")]
@@ -95,7 +97,7 @@ public class ModifyController : ControllerBase
                                 Type = "part",
                                 Quantity = part.Qty,
                                 Status = includeStatus ? part.Status.ToString() : null,
-                                Category = includeStatus ? part.Category.ToString() : null,
+                                Category = part.Category.ToString(),
                                 Children = new List<TreeItem>()
                             });
                         }
@@ -138,7 +140,7 @@ public class ModifyController : ControllerBase
                                     Type = "part",
                                     Quantity = part.Qty,
                                     Status = includeStatus ? part.Status.ToString() : null,
-                                    Category = includeStatus ? part.Category.ToString() : null,
+                                    Category = part.Category.ToString(),
                                     Children = new List<TreeItem>()
                                 });
                             }
@@ -247,7 +249,7 @@ public class ModifyController : ControllerBase
                             Type = "part",
                             Quantity = part.Qty,
                             Status = includeStatus ? part.Status.ToString() : null,
-                            Category = includeStatus ? part.Category.ToString() : null,
+                            Category = part.Category.ToString(),
                             Children = new List<TreeItem>()
                         });
                     }
@@ -337,6 +339,174 @@ public class ModifyController : ControllerBase
         {
             _logger.LogError(ex, "Error updating part category for {PartId}", partId);
             return StatusCode(500, new { success = false, message = "Error updating category" });
+        }
+    }
+
+    [HttpDelete("part/{partId}")]
+    public async Task<IActionResult> DeletePart(string partId, [FromQuery] string workOrderId)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(partId) || string.IsNullOrEmpty(workOrderId))
+            {
+                return BadRequest(new { success = false, message = "PartId and workOrderId are required" });
+            }
+
+            var result = await _deletionService.DeletePartAsync(partId, workOrderId, "Admin Interface");
+            
+            if (result.Success)
+            {
+                return Ok(new { success = true, message = result.Message, itemsDeleted = result.ItemsDeleted });
+            }
+            else
+            {
+                return BadRequest(new { success = false, message = result.Message });
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in DeletePart endpoint for {PartId}", partId);
+            return StatusCode(500, new { success = false, message = "Error deleting part" });
+        }
+    }
+
+    [HttpDelete("hardware/{hardwareId}")]
+    public async Task<IActionResult> DeleteHardware(string hardwareId, [FromQuery] string workOrderId)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(hardwareId) || string.IsNullOrEmpty(workOrderId))
+            {
+                return BadRequest(new { success = false, message = "HardwareId and workOrderId are required" });
+            }
+
+            var result = await _deletionService.DeleteHardwareAsync(hardwareId, workOrderId, "Admin Interface");
+            
+            if (result.Success)
+            {
+                return Ok(new { success = true, message = result.Message, itemsDeleted = result.ItemsDeleted });
+            }
+            else
+            {
+                return BadRequest(new { success = false, message = result.Message });
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in DeleteHardware endpoint for {HardwareId}", hardwareId);
+            return StatusCode(500, new { success = false, message = "Error deleting hardware" });
+        }
+    }
+
+    [HttpDelete("subassembly/{subassemblyId}")]
+    public async Task<IActionResult> DeleteSubassembly(string subassemblyId, [FromQuery] string workOrderId)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(subassemblyId) || string.IsNullOrEmpty(workOrderId))
+            {
+                return BadRequest(new { success = false, message = "SubassemblyId and workOrderId are required" });
+            }
+
+            var result = await _deletionService.DeleteSubassemblyAsync(subassemblyId, workOrderId, "Admin Interface");
+            
+            if (result.Success)
+            {
+                return Ok(new { success = true, message = result.Message, itemsDeleted = result.ItemsDeleted });
+            }
+            else
+            {
+                return BadRequest(new { success = false, message = result.Message });
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in DeleteSubassembly endpoint for {SubassemblyId}", subassemblyId);
+            return StatusCode(500, new { success = false, message = "Error deleting subassembly" });
+        }
+    }
+
+    [HttpDelete("product/{productId}")]
+    public async Task<IActionResult> DeleteProduct(string productId, [FromQuery] string workOrderId)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(productId) || string.IsNullOrEmpty(workOrderId))
+            {
+                return BadRequest(new { success = false, message = "ProductId and workOrderId are required" });
+            }
+
+            var result = await _deletionService.DeleteProductAsync(productId, workOrderId, "Admin Interface");
+            
+            if (result.Success)
+            {
+                return Ok(new { success = true, message = result.Message, itemsDeleted = result.ItemsDeleted });
+            }
+            else
+            {
+                return BadRequest(new { success = false, message = result.Message });
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in DeleteProduct endpoint for {ProductId}", productId);
+            return StatusCode(500, new { success = false, message = "Error deleting product" });
+        }
+    }
+
+    [HttpDelete("detached-product/{detachedProductId}")]
+    public async Task<IActionResult> DeleteDetachedProduct(string detachedProductId, [FromQuery] string workOrderId)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(detachedProductId) || string.IsNullOrEmpty(workOrderId))
+            {
+                return BadRequest(new { success = false, message = "DetachedProductId and workOrderId are required" });
+            }
+
+            var result = await _deletionService.DeleteDetachedProductAsync(detachedProductId, workOrderId, "Admin Interface");
+            
+            if (result.Success)
+            {
+                return Ok(new { success = true, message = result.Message, itemsDeleted = result.ItemsDeleted });
+            }
+            else
+            {
+                return BadRequest(new { success = false, message = result.Message });
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in DeleteDetachedProduct endpoint for {DetachedProductId}", detachedProductId);
+            return StatusCode(500, new { success = false, message = "Error deleting detached product" });
+        }
+    }
+
+    [HttpDelete("nestsheet/{nestSheetId}")]
+    public async Task<IActionResult> DeleteNestSheet(string nestSheetId, [FromQuery] string workOrderId)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(nestSheetId) || string.IsNullOrEmpty(workOrderId))
+            {
+                return BadRequest(new { success = false, message = "NestSheetId and workOrderId are required" });
+            }
+
+            var result = await _deletionService.DeleteNestSheetAsync(nestSheetId, workOrderId, "Admin Interface");
+            
+            if (result.Success)
+            {
+                return Ok(new { success = true, message = result.Message, itemsDeleted = result.ItemsDeleted });
+            }
+            else
+            {
+                return BadRequest(new { success = false, message = result.Message });
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in DeleteNestSheet endpoint for {NestSheetId}", nestSheetId);
+            return StatusCode(500, new { success = false, message = "Error deleting nest sheet" });
         }
     }
 

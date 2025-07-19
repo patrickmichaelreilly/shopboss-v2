@@ -16,6 +16,7 @@ class WorkOrderTreeView {
         this.onStatusChange = options.onStatusChange || (() => {});
         this.onCategoryChange = options.onCategoryChange || (() => {});
         this.onDataLoaded = options.onDataLoaded || (() => {});
+        this.onDelete = options.onDelete || (() => {});
         
         // State management
         this.data = null;
@@ -139,6 +140,8 @@ class WorkOrderTreeView {
         this.data.items.forEach(item => {
             const itemNode = this.createTreeNode(item, 0);
             treeContent.appendChild(itemNode);
+            // Bind events after node is added to DOM
+            this.bindNodeEvents(itemNode);
         });
     }
 
@@ -172,6 +175,7 @@ class WorkOrderTreeView {
                     `<div class="dropdown-container d-flex gap-2">
                         ${this.mode === 'modify' ? this.createStatusDropdown(item) : ''}
                         ${item.type === 'part' && item.category ? this.createCategoryDropdown(item) : ''}
+                        ${this.createDeleteButton(item)}
                     </div>` :
                     ''
                 }
@@ -187,6 +191,8 @@ class WorkOrderTreeView {
             item.children.forEach(child => {
                 const childNode = this.createTreeNode(child, level + 1);
                 childrenContainer.appendChild(childNode);
+                // Bind events after child node is added to DOM
+                this.bindNodeEvents(childNode);
             });
             node.appendChild(childrenContainer);
 
@@ -196,37 +202,6 @@ class WorkOrderTreeView {
                 toggle.addEventListener('click', (e) => {
                     e.stopPropagation();
                     this.toggleNode(toggle, childrenContainer);
-                });
-            }
-        }
-
-        // Bind status dropdown events for modify mode
-        if (this.mode === 'modify') {
-            const statusSelect = node.querySelector('.status-dropdown');
-            if (statusSelect) {
-                // Remove any existing event listeners to prevent duplicates
-                statusSelect.replaceWith(statusSelect.cloneNode(true));
-                const newStatusSelect = node.querySelector('.status-dropdown');
-                
-                newStatusSelect.addEventListener('change', (e) => {
-                    e.stopPropagation();
-                    const itemType = e.target.dataset.itemType;
-                    const targetNodeId = e.target.dataset.nodeId;
-                    this.handleStatusChange(targetNodeId, e.target.value, itemType);
-                });
-            }
-
-            const categorySelect = node.querySelector('.category-dropdown');
-            if (categorySelect) {
-                // Remove any existing event listeners to prevent duplicates
-                categorySelect.replaceWith(categorySelect.cloneNode(true));
-                const newCategorySelect = node.querySelector('.category-dropdown');
-                
-                newCategorySelect.addEventListener('change', (e) => {
-                    e.stopPropagation();
-                    const itemType = e.target.dataset.itemType;
-                    const targetNodeId = e.target.dataset.nodeId;
-                    this.handleCategoryChange(targetNodeId, e.target.value, itemType);
                 });
             }
         }
@@ -266,12 +241,90 @@ class WorkOrderTreeView {
         `;
     }
 
+    createDeleteButton(item) {
+        // Only show delete button for deletable item types
+        const deletableTypes = ['part', 'hardware', 'subassembly', 'product', 'detached_product', 'nestsheet'];
+        if (!deletableTypes.includes(item.type)) {
+            return '';
+        }
+
+        console.log(`Creating delete button for ${item.type} ${item.id} in mode ${this.mode}`);
+        return `
+            <button type="button" class="delete-btn btn btn-outline-danger btn-sm" 
+                    data-node-id="${item.id}" data-item-type="${item.type}" data-item-name="${item.name || 'Item'}"
+                    title="Delete ${item.type}">
+                <i class="fas fa-trash-alt"></i>
+            </button>
+        `;
+    }
+
     handleStatusChange(nodeId, newStatus, itemType) {
         this.onStatusChange(nodeId, newStatus, itemType);
     }
 
     handleCategoryChange(nodeId, newCategory, itemType) {
         this.onCategoryChange(nodeId, newCategory, itemType);
+    }
+
+    bindNodeEvents(node) {
+        // Bind status dropdown events
+        const statusDropdown = node.querySelector('.status-dropdown');
+        if (statusDropdown) {
+            // Remove any existing event listeners to prevent duplicates
+            const newStatusDropdown = statusDropdown.cloneNode(true);
+            statusDropdown.parentNode.replaceChild(newStatusDropdown, statusDropdown);
+            
+            newStatusDropdown.addEventListener('change', (e) => {
+                const nodeId = e.target.dataset.nodeId;
+                const itemType = e.target.dataset.itemType;
+                const newStatus = e.target.value;
+                console.log(`Status dropdown change: ${nodeId} -> ${newStatus} (${itemType})`);
+                this.handleStatusChange(nodeId, newStatus, itemType);
+            });
+        }
+
+        // Bind category dropdown events
+        const categoryDropdown = node.querySelector('.category-dropdown');
+        if (categoryDropdown) {
+            // Remove any existing event listeners to prevent duplicates
+            const newCategoryDropdown = categoryDropdown.cloneNode(true);
+            categoryDropdown.parentNode.replaceChild(newCategoryDropdown, categoryDropdown);
+            
+            newCategoryDropdown.addEventListener('change', (e) => {
+                const nodeId = e.target.dataset.nodeId;
+                const itemType = e.target.dataset.itemType;
+                const newCategory = e.target.value;
+                console.log(`Category dropdown change: ${nodeId} -> ${newCategory} (${itemType})`);
+                this.handleCategoryChange(nodeId, newCategory, itemType);
+            });
+        }
+
+        // Bind delete button events
+        const deleteButton = node.querySelector('.delete-btn');
+        if (deleteButton) {
+            console.log(`Binding delete button for ${deleteButton.dataset.itemType} ${deleteButton.dataset.nodeId} in mode ${this.mode}`);
+            
+            // Remove any existing event listeners to prevent duplicates
+            const newDeleteButton = deleteButton.cloneNode(true);
+            deleteButton.parentNode.replaceChild(newDeleteButton, deleteButton);
+            
+            newDeleteButton.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const nodeId = e.target.closest('.delete-btn').dataset.nodeId;
+                const itemType = e.target.closest('.delete-btn').dataset.itemType;
+                const itemName = e.target.closest('.delete-btn').dataset.itemName;
+                
+                console.log(`Delete button clicked: ${nodeId}, ${itemType}, ${itemName}`);
+                this.handleDelete(nodeId, itemType, itemName);
+            });
+        }
+    }
+
+    handleDelete(nodeId, itemType, itemName) {
+        console.log(`handleDelete called with: ${nodeId}, ${itemType}, ${itemName}. onDelete callback:`, this.onDelete);
+        this.onDelete(nodeId, itemType, itemName);
     }
 
     formatItemName(item) {

@@ -44,9 +44,7 @@ builder.Services.AddDbContext<ShopBossDbContext>(options =>
 
 // Add custom services
 builder.Services.AddScoped<ImporterService>();
-builder.Services.AddScoped<ImportDataTransformService>();
 builder.Services.AddScoped<ColumnMappingService>();
-builder.Services.AddScoped<ImportSelectionService>();
 builder.Services.AddScoped<AuditTrailService>();
 builder.Services.AddScoped<SortingRuleService>();
 builder.Services.AddScoped<PartFilteringService>();
@@ -55,8 +53,8 @@ builder.Services.AddScoped<HardwareGroupingService>();
 builder.Services.AddScoped<WorkOrderService>();
 builder.Services.AddScoped<BackupService>();
 builder.Services.AddScoped<SystemHealthMonitor>();
-// Phase I2: New import service architecture
 builder.Services.AddScoped<WorkOrderImportService>();
+builder.Services.AddScoped<WorkOrderDeletionService>();
 // UniversalScannerService removed - using event-based architecture instead
 
 // Add background services

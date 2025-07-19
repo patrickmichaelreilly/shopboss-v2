@@ -987,11 +987,6 @@ public class AdminController : Controller
         return View();
     }
 
-    // Phase I1: Standalone test route for NewImportPreview
-    public IActionResult NewImportPreview()
-    {
-        return View();
-    }
 
     // Backup Management Actions (Phase A2)
     [HttpGet]
