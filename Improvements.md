@@ -7,14 +7,8 @@
 # Modify Work Order
     - Not all scan events in audit log.
     - Add capability to merge additional SDF data into existing Work Order. Handle part re-cuts, supplementary Nest Sheets, etc.
-    - Delete entities from work order.
 
 # Import Process
-    - Handle repeat Work Order Names and Work Order IDs
-    - Fully update Import Preview to work exactly like Modify. Specialized mode.
-    - Tree View Api -- why is style info in the View as opposed to within the TreeViewApi?
-    - Need to group and count identical Hardware items.
-    - Handle repeat NestSheet names.
 
 # CNC Station
     - Improve Nest Sheet detail modal to include Nest Sheet image.

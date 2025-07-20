@@ -8,7 +8,7 @@ public class Product
     [Key]
     public string Id { get; set; } = string.Empty;
     
-    public string ProductNumber { get; set; } = string.Empty;
+    public string ItemNumber { get; set; } = string.Empty;
     
     [ForeignKey("WorkOrder")]
     public string WorkOrderId { get; set; } = string.Empty;

@@ -28,7 +28,14 @@
                                 <div class="row" id="workOrderHeader">
                                     <div class="col-md-4">
                                         <strong>Work Order Name:</strong><br>
-                                        <span class="text-muted" id="work-order-name">Loading...</span>
+                                        <div class="input-group">
+                                            <input type="text" id="workOrderNameInput" class="form-control form-control-sm" 
+                                                   placeholder="Loading..." readonly>
+                                            <button class="btn btn-outline-primary btn-sm" 
+                                                    onclick="saveWorkOrderName()" id="saveNameBtn" disabled>
+                                                <i class="fas fa-save me-1"></i>Save
+                                            </button>
+                                        </div>
                                     </div>
                                     <div class="col-md-4">
                                         <strong>Work Order ID:</strong><br>
@@ -167,7 +174,14 @@
 
         // Update work order header information
         function updateWorkOrderHeader(workOrder) {
-            document.getElementById('work-order-name').textContent = workOrder.name || 'Unknown';
+            const nameInput = document.getElementById('workOrderNameInput');
+            const saveBtn = document.getElementById('saveNameBtn');
+            
+            nameInput.value = workOrder.name || 'Unknown';
+            nameInput.dataset.originalValue = workOrder.name || 'Unknown';
+            nameInput.removeAttribute('readonly');
+            saveBtn.removeAttribute('disabled');
+            
             document.getElementById('work-order-id').textContent = workOrder.id || '@Model';
             
             if (workOrder.importDate) {
@@ -176,6 +190,75 @@
             } else {
                 document.getElementById('work-order-import-date').textContent = 'Unknown';
             }
+        }
+
+        // Save work order name
+        async function saveWorkOrderName() {
+            const nameInput = document.getElementById('workOrderNameInput');
+            const saveBtn = document.getElementById('saveNameBtn');
+            const workOrderId = '@Model';
+            const newName = nameInput.value.trim();
+            
+            if (!newName) {
+                showAlert('Work order name cannot be empty', 'danger');
+                return;
+            }
+            
+            // Disable button and show loading state
+            saveBtn.disabled = true;
+            const originalText = saveBtn.innerHTML;
+            saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Saving...';
+            
+            try {
+                const response = await fetch('/Admin/UpdateWorkOrderName', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: new URLSearchParams({
+                        workOrderId: workOrderId,
+                        newName: newName
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showAlert('Work order name updated successfully', 'success');
+                } else {
+                    showAlert(`Failed to update name: ${result.message}`, 'danger');
+                    // Revert the input value if save failed
+                    nameInput.value = nameInput.dataset.originalValue || nameInput.value;
+                }
+            } catch (error) {
+                console.error('Error updating work order name:', error);
+                showAlert('Error updating work order name', 'danger');
+                nameInput.value = nameInput.dataset.originalValue || nameInput.value;
+            } finally {
+                // Restore button state
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = originalText;
+            }
+        }
+
+        // Utility function to show alerts
+        function showAlert(message, type) {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+            alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 1050; max-width: 400px;';
+            alertDiv.innerHTML = `
+                <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-triangle'} me-2"></i>
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            
+            document.body.appendChild(alertDiv);
+            
+            setTimeout(() => {
+                if (alertDiv.parentNode) {
+                    alertDiv.remove();
+                }
+            }, 5000);
         }
 
         // Update statistics cards

@@ -215,6 +215,7 @@ public class ColumnMappingService
                 { "Name", "Name" },
                 { "FileName", "FileName" },
                 { "BarCode", "BarCode" },
+                { "Material", "Name" },
                 
                 // Dimensions
                 { "Width", "Width" },

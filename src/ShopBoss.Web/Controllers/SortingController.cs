@@ -415,7 +415,7 @@ public class SortingController : Controller
                                 {
                                     productId = readyProduct.Id,
                                     productName = readyProduct.Name,
-                                    productNumber = readyProduct.ProductNumber,
+                                    itemNumber = readyProduct.ItemNumber,
                                     workOrderId = activeWorkOrderId,
                                     timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss"),
                                     sortingStation = station
@@ -427,7 +427,7 @@ public class SortingController : Controller
                                 {
                                     productId = readyProduct.Id,
                                     productName = readyProduct.Name,
-                                    productNumber = readyProduct.ProductNumber,
+                                    itemNumber = readyProduct.ItemNumber,
                                     workOrderId = activeWorkOrderId,
                                     readyTime = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss"),
                                     message = $"Product '{readyProduct.Name}' is ready for assembly - all parts sorted!"
@@ -907,7 +907,7 @@ public class SortingController : Controller
                     isReady = true,
                     productId = product.Id,
                     productName = product.Name,
-                    productNumber = product.ProductNumber,
+                    itemNumber = product.ItemNumber,
                     totalParts = totalParts,
                     sortedParts = sortedParts,
                     completedDate = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm")
@@ -960,7 +960,7 @@ public class SortingController : Controller
                 {
                     id = product.Id,
                     name = product.Name,
-                    productNumber = product.ProductNumber,
+                    itemNumber = product.ItemNumber,
                     workOrderName = (await _context.WorkOrders.FindAsync(workOrderId))?.Name ?? "Unknown",
                     totalPartsCount = totalParts,
                     sortedPartsCount = sortedParts,
@@ -1054,12 +1054,12 @@ public class SortingController : Controller
             // First try regular Products table
             var product = await _context.Products.FindAsync(productId);
             if (product != null)
-                return product.Name;
+                return $"{product.ItemNumber} - {product.Name}";
 
             // If not found, try DetachedProducts table
             var detachedProduct = await _context.DetachedProducts.FindAsync(productId);
             if (detachedProduct != null)
-                return detachedProduct.Name;
+                return $"{detachedProduct.ItemNumber} - {detachedProduct.Name}";
 
             return "Unknown";
         }

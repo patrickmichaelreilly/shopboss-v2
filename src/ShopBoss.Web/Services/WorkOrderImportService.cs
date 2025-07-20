@@ -55,11 +55,15 @@ public class WorkOrderImportService
             // Establish nest sheet relationships using OptimizationResults (same as existing system)
             await EstablishNestSheetRelationshipsAsync(rawData, workOrder);
 
+            // Process single-part products as detached products (must be after all transformations)
+            ProcessSinglePartProductsAsDetached(workOrder);
+
             // Phase I3: Apply auto-categorization to all parts (final step of import processing)
             await ApplyAutoCategorizationAsync(workOrder);
 
-            _logger.LogInformation("Phase I2: WorkOrder transformation completed. Created - Products: {ProductCount}, Parts: {PartCount}, Hardware: {HardwareCount}", 
+            _logger.LogInformation("Phase I2: WorkOrder transformation completed. Created - Products: {ProductCount}, DetachedProducts: {DetachedProductCount}, Parts: {PartCount}, Hardware: {HardwareCount}", 
                 workOrder.Products.Count, 
+                workOrder.DetachedProducts.Count,
                 workOrder.Products.SelectMany(p => p.Parts).Count() + workOrder.Products.SelectMany(p => p.Subassemblies).SelectMany(s => s.Parts).Count(),
                 workOrder.Hardware.Count);
 
@@ -132,7 +136,7 @@ public class WorkOrderImportService
         {
             Id = _columnMapping.GetStringValue(productData, "PRODUCTS", "Id"),
             Name = _columnMapping.GetStringValue(productData, "PRODUCTS", "Name"),
-            ProductNumber = _columnMapping.GetStringValue(productData, "PRODUCTS", "ProductNumber"),
+            ItemNumber = _columnMapping.GetStringValue(productData, "PRODUCTS", "ItemNumber"),
             Qty = _columnMapping.GetIntValue(productData, "PRODUCTS", "Quantity"),
             WorkOrderId = workOrderId,
             Status = PartStatus.Pending,
@@ -152,7 +156,7 @@ public class WorkOrderImportService
         {
             Id = source.Id, // Will be overridden with unique ID
             Name = source.Name,
-            ProductNumber = source.ProductNumber,
+            ItemNumber = source.ItemNumber,
             Qty = source.Qty,
             WorkOrderId = source.WorkOrderId,
             Status = source.Status,
@@ -305,13 +309,75 @@ public class WorkOrderImportService
 
     /// <summary>
     /// Transform detached products - Note: DetachedProducts are not in SDF data
-    /// They are identified later as single-part Products
+    /// They are identified and converted from single-part Products by ProcessSinglePartProductsAsDetached
     /// </summary>
     private async Task TransformDetachedProductsAsync(ImportData rawData, WorkOrder workOrder)
     {
         // DetachedProducts are not present in SDF data
-        // They will be identified later through categorization
+        // They are created by converting single-part Products in ProcessSinglePartProductsAsDetached()
         await Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Process single-part products and convert them to detached products
+    /// Based on the original ImportDataTransformService.ProcessSinglePartProductsAsDetached logic
+    /// </summary>
+    private void ProcessSinglePartProductsAsDetached(WorkOrder workOrder)
+    {
+        // Find products with exactly 1 part and no subassemblies
+        var singlePartProducts = workOrder.Products
+            .Where(p => p.Parts.Count == 1 && p.Subassemblies.Count == 0)
+            .ToList();
+        
+        // Create list to track products to remove after conversion
+        var productsToRemove = new List<Product>();
+        
+        foreach (var product in singlePartProducts)
+        {
+            var singlePart = product.Parts.First();
+            
+            // Create a detached product from this single-part product
+            var detachedProduct = new DetachedProduct
+            {
+                Id = $"{product.Id}_detached_{Guid.NewGuid().ToString()[..8]}", // Create unique ID to avoid conflicts
+                ItemNumber = product.ItemNumber,
+                Name = product.Name,
+                Qty = product.Qty,
+                Length = singlePart.Length,
+                Width = singlePart.Width,
+                Thickness = singlePart.Thickness,
+                Material = singlePart.Material ?? "Unknown",
+                EdgebandingTop = singlePart.EdgebandingTop ?? "",
+                EdgebandingBottom = singlePart.EdgebandingBottom ?? "",
+                EdgebandingLeft = singlePart.EdgebandingLeft ?? "",
+                EdgebandingRight = singlePart.EdgebandingRight ?? "",
+                WorkOrderId = workOrder.Id,
+                Status = singlePart.Status, // Inherit status from the part
+                StatusUpdatedDate = singlePart.StatusUpdatedDate ?? DateTime.Now,
+                Parts = new List<Part>()
+            };
+            
+            // Transfer the Part to DetachedProduct (don't delete it)
+            singlePart.ProductId = detachedProduct.Id; // Update foreign key
+            detachedProduct.Parts.Add(singlePart);
+            
+            // Remove Part from Product before deleting Product
+            product.Parts.Clear();
+            
+            workOrder.DetachedProducts.Add(detachedProduct);
+            productsToRemove.Add(product);
+        }
+        
+        // Remove the original single-part products (now empty of Parts)
+        foreach (var product in productsToRemove)
+        {
+            workOrder.Products.Remove(product);
+        }
+        
+        if (singlePartProducts.Any())
+        {
+            _logger.LogInformation("Identified {Count} single-part products as detached products during transformation", singlePartProducts.Count);
+        }
     }
 
     /// <summary>

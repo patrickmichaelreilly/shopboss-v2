@@ -486,7 +486,7 @@ public class CncController : Controller
     }
 
     /// <summary>
-    /// Gets the product name for a part, checking both Products and DetachedProducts tables
+    /// Gets the product display name for a part in "ItemNumber - ProductName" format, checking both Products and DetachedProducts tables
     /// </summary>
     private async Task<string> GetProductNameForPart(string? productId)
     {
@@ -498,12 +498,12 @@ public class CncController : Controller
             // First try regular Products table
             var product = await _context.Products.FindAsync(productId);
             if (product != null)
-                return product.Name;
+                return $"{product.ItemNumber} - {product.Name}";
 
             // If not found, try DetachedProducts table
             var detachedProduct = await _context.DetachedProducts.FindAsync(productId);
             if (detachedProduct != null)
-                return detachedProduct.Name;
+                return $"{detachedProduct.ItemNumber} - {detachedProduct.Name}";
 
             return "Unknown";
         }

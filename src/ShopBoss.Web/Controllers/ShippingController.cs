@@ -450,7 +450,7 @@ public class ShippingController : Controller
             // Find the detached product by barcode (ID or name)
             var detachedProduct = await _context.DetachedProducts
                 .FirstOrDefaultAsync(d => d.WorkOrderId == activeWorkOrderId && 
-                                    (d.Id == barcode || d.Name == barcode || d.ProductNumber == barcode));
+                                    (d.Id == barcode || d.Name == barcode || d.ItemNumber == barcode));
 
             if (detachedProduct == null)
             {

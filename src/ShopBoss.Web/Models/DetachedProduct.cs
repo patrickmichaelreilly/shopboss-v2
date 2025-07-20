@@ -8,7 +8,7 @@ public class DetachedProduct
     [Key]
     public string Id { get; set; } = string.Empty;
     
-    public string ProductNumber { get; set; } = string.Empty;
+    public string ItemNumber { get; set; } = string.Empty;
     
     [ForeignKey("WorkOrder")]
     public string WorkOrderId { get; set; } = string.Empty;
@@ -38,4 +38,6 @@ public class DetachedProduct
     public DateTime? StatusUpdatedDate { get; set; }
     
     public WorkOrder WorkOrder { get; set; } = null!;
+    
+    public List<Part> Parts { get; set; } = new();
 }

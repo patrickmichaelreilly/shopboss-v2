@@ -69,6 +69,7 @@ public class ModifyController : ControllerBase
                         Name = productNode.Product.Name,
                         Type = "product",
                         Quantity = productNode.Product.Qty,
+                        ItemNumber = productNode.Product.ItemNumber,
                         Status = includeStatus ? productNode.EffectiveStatus.ToString() : null,
                         Children = new List<TreeItem>()
                     };
@@ -207,6 +208,7 @@ public class ModifyController : ControllerBase
                         Name = detachedProduct.Name,
                         Type = "detached_product",
                         Quantity = detachedProduct.Qty,
+                        ItemNumber = detachedProduct.ItemNumber,
                         Status = includeStatus ? detachedProduct.Status.ToString() : null,
                         Children = new List<TreeItem>()
                     });

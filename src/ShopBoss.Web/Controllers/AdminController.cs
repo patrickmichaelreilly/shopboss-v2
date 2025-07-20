@@ -549,6 +549,21 @@ public class AdminController : Controller
                         oldValue = new { Status = detachedProduct.Status.ToString() };
                         detachedProduct.Status = newStatus;
                         detachedProduct.StatusUpdatedDate = DateTime.UtcNow;
+
+                        if (cascadeToChildren)
+                        {
+                            // Update all Parts that belong to this DetachedProduct
+                            var detachedProductParts = await _context.Parts
+                                .Where(p => p.ProductId == itemId)  // ProductId points to DetachedProduct.Id
+                                .ToListAsync();
+
+                            foreach (var detachedPart in detachedProductParts)
+                            {
+                                detachedPart.Status = newStatus;
+                                detachedPart.StatusUpdatedDate = DateTime.UtcNow;
+                            }
+                        }
+
                         await _context.SaveChangesAsync();
                         success = true;
                     }
@@ -625,6 +640,65 @@ public class AdminController : Controller
         {
             _logger.LogError(ex, "Error updating status for {ItemType} {ItemId}", itemType, itemId);
             return Json(new { success = false, message = "An error occurred while updating the status" });
+        }
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> UpdateWorkOrderName(string workOrderId, string newName)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(workOrderId))
+            {
+                return Json(new { success = false, message = "Work order ID is required" });
+            }
+
+            if (string.IsNullOrEmpty(newName?.Trim()))
+            {
+                return Json(new { success = false, message = "Work order name cannot be empty" });
+            }
+
+            var workOrder = await _context.WorkOrders.FirstOrDefaultAsync(w => w.Id == workOrderId);
+            if (workOrder == null)
+            {
+                return Json(new { success = false, message = "Work order not found" });
+            }
+
+            var oldName = workOrder.Name;
+            var trimmedNewName = newName.Trim();
+
+            // Check if name is actually changing
+            if (oldName == trimmedNewName)
+            {
+                return Json(new { success = true, message = "Work order name unchanged" });
+            }
+
+            // Update the work order name
+            workOrder.Name = trimmedNewName;
+            await _context.SaveChangesAsync();
+
+            // Log the change to audit trail
+            await _auditTrailService.LogAsync(
+                action: "WorkOrderNameUpdate",
+                entityType: "WorkOrder",
+                entityId: workOrderId,
+                oldValue: new { Name = oldName },
+                newValue: new { Name = trimmedNewName },
+                station: "Modify Interface",
+                workOrderId: workOrderId,
+                details: $"Work order name changed from '{oldName}' to '{trimmedNewName}'",
+                sessionId: HttpContext.Session.Id
+            );
+
+            _logger.LogInformation("Work order {WorkOrderId} name updated from '{OldName}' to '{NewName}'", 
+                workOrderId, oldName, trimmedNewName);
+
+            return Json(new { success = true, message = "Work order name updated successfully" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating work order name for {WorkOrderId}", workOrderId);
+            return Json(new { success = false, message = "An error occurred while updating the work order name" });
         }
     }
 

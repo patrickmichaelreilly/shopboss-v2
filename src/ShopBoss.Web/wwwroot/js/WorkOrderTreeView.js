@@ -107,7 +107,9 @@ class WorkOrderTreeView {
         }
 
         try {
-            const response = await fetch(`${this.apiUrl}/${this.workOrderId}`);
+            // Include status data for modify mode to populate dropdowns correctly
+            const includeStatusParam = this.mode === 'modify' ? '?includeStatus=true' : '';
+            const response = await fetch(`${this.apiUrl}/${this.workOrderId}${includeStatusParam}`);
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
@@ -329,6 +331,12 @@ class WorkOrderTreeView {
 
     formatItemName(item) {
         let name = item.name || 'Unnamed Item';
+        
+        // Add ItemNumber for products and detached products if available
+        if ((item.type === 'product' || item.type === 'detached_product') && item.itemNumber) {
+            name = `${item.itemNumber} - ${name}`;
+        }
+        
         if (item.quantity && item.quantity > 1) {
             name += ` (${item.quantity})`;
         }
@@ -408,6 +416,7 @@ class WorkOrderTreeView {
 
     refresh() {
         if (this.mode === 'modify') {
+            // loadData() will automatically include includeStatus=true for modify mode
             this.loadData();
         } else {
             this.renderTree();

@@ -823,7 +823,7 @@ else
 
         function showAssemblyReadyNotification(data) {
             // Show billboard message for assembly readiness
-            showBillboard('sorting-billboard', `Product ${data.productName} (${data.productNumber || data.productId}) is ready for assembly!`, 'success', 'Ready for Assembly');
+            showBillboard('sorting-billboard', `Product ${data.productName} (${data.itemNumber || data.productId}) is ready for assembly!`, 'success', 'Ready for Assembly');
             
             // Create special assembly ready notification with enhanced content
             // const toastContainer = document.getElementById('toast-container') || createToastContainer();
@@ -839,7 +839,7 @@ else
             //                 <div>
             //                     <div class="fw-bold">🎉 Product Ready for Assembly!</div>
             //                     <div class="small">
-            //                         ${data.productName} (${data.productNumber || data.productId})
+            //                         ${data.productName} (${data.itemNumber || data.productId})
             //                     </div>
             //                     <div class="small text-light">All parts sorted - ready for assembly station</div>
             //                     <div class="small mt-1">

@@ -207,9 +207,9 @@
                                 <div>
                                     <h6 class="mb-1">@product.Product.Name</h6>
                                     <small class="text-muted">ID: @product.Product.Id</small>
-                                    @if (!string.IsNullOrEmpty(product.Product.ProductNumber))
+                                    @if (!string.IsNullOrEmpty(product.Product.ItemNumber))
                                     {
-                                        <small class="text-muted"> | Product #: @product.Product.ProductNumber</small>
+                                        <small class="text-muted"> | Product #: @product.Product.ItemNumber</small>
                                     }
                                 </div>
                                 <div class="d-flex align-items-center">
@@ -329,9 +329,9 @@
                                 <div>
                                     <h6 class="mb-1">@detached.DetachedProduct.Name</h6>
                                     <small class="text-muted">ID: @detached.DetachedProduct.Id</small>
-                                    @if (!string.IsNullOrEmpty(detached.DetachedProduct.ProductNumber))
+                                    @if (!string.IsNullOrEmpty(detached.DetachedProduct.ItemNumber))
                                     {
-                                        <small class="text-muted"> | Product #: @detached.DetachedProduct.ProductNumber</small>
+                                        <small class="text-muted"> | Product #: @detached.DetachedProduct.ItemNumber</small>
                                     }
                                 </div>
                                 <div class="d-flex align-items-center">

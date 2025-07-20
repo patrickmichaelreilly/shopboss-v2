@@ -317,7 +317,7 @@ public class WorkOrderService
             // Find the product by barcode without Include chains
             var product = await _context.Products
                 .FirstOrDefaultAsync(p => p.WorkOrderId == workOrderId && 
-                                    (p.Id == barcode || p.Name == barcode || p.ProductNumber == barcode));
+                                    (p.Id == barcode || p.Name == barcode || p.ItemNumber == barcode));
 
             if (product == null)
             {

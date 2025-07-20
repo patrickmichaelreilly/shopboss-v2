@@ -546,6 +546,7 @@ public class ImportController : Controller
                     Name = product.Name,
                     Type = "product",
                     Quantity = product.Qty,
+                    ItemNumber = product.ItemNumber,
                     Status = product.Status.ToString(),
                     Children = new List<Models.Api.TreeItem>()
                 };
@@ -682,6 +683,7 @@ public class ImportController : Controller
                     Name = detachedProduct.Name,
                     Type = "detached_product",
                     Quantity = detachedProduct.Qty,
+                    ItemNumber = detachedProduct.ItemNumber,
                     Status = detachedProduct.Status.ToString(),
                     Children = new List<Models.Api.TreeItem>()
                 });

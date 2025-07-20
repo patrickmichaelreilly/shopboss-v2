@@ -39,7 +39,7 @@ public class ShopBossDbContext : DbContext
         modelBuilder.Entity<Product>(entity =>
         {
             entity.HasKey(e => e.Id);
-            entity.Property(e => e.ProductNumber).IsRequired();
+            entity.Property(e => e.ItemNumber).IsRequired();
             entity.Property(e => e.Name).IsRequired();
             entity.Property(e => e.Qty).IsRequired();
             
@@ -109,7 +109,7 @@ public class ShopBossDbContext : DbContext
         modelBuilder.Entity<DetachedProduct>(entity =>
         {
             entity.HasKey(e => e.Id);
-            entity.Property(e => e.ProductNumber).IsRequired();
+            entity.Property(e => e.ItemNumber).IsRequired();
             entity.Property(e => e.Name).IsRequired();
             entity.Property(e => e.Qty).IsRequired();
             entity.Property(e => e.Status).IsRequired();

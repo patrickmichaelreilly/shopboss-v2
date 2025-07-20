@@ -861,7 +861,7 @@ public class AssemblyController : Controller
             {
                 ProductId = product.Id,
                 ProductName = product.Name,
-                ProductNumber = product.ProductNumber,
+                ItemNumber = product.ItemNumber,
                 StandardParts = standardParts.Select(p => new
                 {
                     Name = p.Name,

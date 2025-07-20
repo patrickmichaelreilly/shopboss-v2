@@ -14,6 +14,7 @@ public class TreeItem
     public string Name { get; set; } = string.Empty;
     public string Type { get; set; } = string.Empty; // "product", "subassembly", "part", "hardware", "category"
     public int Quantity { get; set; }
+    public string? ItemNumber { get; set; } // For products and detached products
     public string? Status { get; set; } // Only included when includeStatus=true
     public string? Category { get; set; } // Only included when includeStatus=true and Type=part
     public List<TreeItem> Children { get; set; } = new();
