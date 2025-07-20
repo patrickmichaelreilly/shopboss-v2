@@ -1260,27 +1260,30 @@ public class AdminController : Controller
     {
         try
         {
-            // Get current health status
+            // Get fresh health metrics instead of relying solely on database
+            var healthMetrics = await _healthMonitor.CheckSystemHealthAsync();
+            
+            // Also try to get stored status for additional data
             var healthStatus = await _healthMonitor.GetOrCreateHealthStatusAsync();
             
             var response = new
             {
-                overallStatus = healthStatus.OverallStatus.ToString(),
-                databaseStatus = healthStatus.DatabaseStatus.ToString(),
-                diskSpaceStatus = healthStatus.DiskSpaceStatus.ToString(),
-                memoryStatus = healthStatus.MemoryStatus.ToString(),
-                responseTimeStatus = healthStatus.ResponseTimeStatus.ToString(),
-                availableDiskSpaceGB = healthStatus.AvailableDiskSpaceGB,
-                totalDiskSpaceGB = healthStatus.TotalDiskSpaceGB,
-                diskUsagePercentage = healthStatus.TotalDiskSpaceGB > 0 ? 
-                    ((healthStatus.TotalDiskSpaceGB - healthStatus.AvailableDiskSpaceGB) / healthStatus.TotalDiskSpaceGB) * 100 : 0,
-                memoryUsagePercentage = healthStatus.MemoryUsagePercentage,
-                averageResponseTimeMs = healthStatus.AverageResponseTimeMs,
-                databaseConnectionTimeMs = healthStatus.DatabaseConnectionTimeMs,
-                activeWorkOrderCount = healthStatus.ActiveWorkOrderCount,
-                totalPartsCount = healthStatus.TotalPartsCount,
-                lastHealthCheck = healthStatus.LastHealthCheck,
-                errorMessage = healthStatus.ErrorMessage
+                overallStatus = healthMetrics.OverallStatus.ToString(),
+                databaseStatus = healthMetrics.DatabaseStatus.ToString(),
+                diskSpaceStatus = healthMetrics.DiskSpaceStatus.ToString(),
+                memoryStatus = healthMetrics.MemoryStatus.ToString(),
+                responseTimeStatus = healthMetrics.ResponseTimeStatus.ToString(),
+                availableDiskSpaceGB = healthMetrics.AvailableDiskSpaceGB,
+                totalDiskSpaceGB = healthMetrics.TotalDiskSpaceGB,
+                diskUsagePercentage = healthMetrics.TotalDiskSpaceGB > 0 ? 
+                    ((healthMetrics.TotalDiskSpaceGB - healthMetrics.AvailableDiskSpaceGB) / healthMetrics.TotalDiskSpaceGB) * 100 : 0,
+                memoryUsagePercentage = healthMetrics.MemoryUsagePercentage,
+                averageResponseTimeMs = healthMetrics.AverageResponseTimeMs,
+                databaseConnectionTimeMs = healthMetrics.DatabaseConnectionTimeMs,
+                activeWorkOrderCount = healthMetrics.ActiveWorkOrderCount,
+                totalPartsCount = healthMetrics.TotalPartsCount,
+                lastHealthCheck = healthMetrics.LastHealthCheck,
+                errorMessage = healthMetrics.ErrorMessage
             };
 
             return Json(response);
@@ -1288,7 +1291,12 @@ public class AdminController : Controller
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving health metrics");
-            return Json(new { error = "Failed to retrieve health metrics" });
+            return Json(new { 
+                overallStatus = "Error",
+                error = "Failed to retrieve health metrics",
+                errorMessage = ex.Message,
+                lastHealthCheck = DateTime.UtcNow
+            });
         }
     }
 

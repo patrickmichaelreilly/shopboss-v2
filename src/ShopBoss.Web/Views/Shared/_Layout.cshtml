@@ -308,44 +308,24 @@
             // Initialize SignalR connection for health monitoring
             const healthConnection = new signalR.HubConnectionBuilder()
                 .withUrl("/hubs/status")
+                .withAutomaticReconnect()
                 .build();
 
             // Start connection
             healthConnection.start().then(function () {
                 console.log("Health monitoring connected");
-                // Load initial health status
-                loadHealthStatus();
             }).catch(function (err) {
-                console.error("Error connecting to health monitoring:", err);
-                // Set error state
-                updateHealthStatusDisplay('Error', 'Connection failed');
+                console.log("Health monitoring unavailable:", err);
             });
 
             // Listen for health updates
             healthConnection.on("HealthUpdate", function (healthData) {
-                updateHealthStatusDisplay(healthData.OverallStatus, healthData.ErrorMessage);
+                if (healthData?.OverallStatus) {
+                    updateHealthStatusDisplay(healthData.OverallStatus, healthData.ErrorMessage);
+                }
             });
-
-            // Auto-refresh health status every 60 seconds
-            setInterval(loadHealthStatus, 60000);
         }
 
-        // Load health status from server
-        function loadHealthStatus() {
-            fetch('/Admin/GetHealthMetrics')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.error) {
-                        updateHealthStatusDisplay('Error', data.error);
-                    } else {
-                        updateHealthStatusDisplay(data.overallStatus, data.errorMessage);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error loading health status:', error);
-                    updateHealthStatusDisplay('Error', 'Network error');
-                });
-        }
 
         // Update health status display in navbar
         function updateHealthStatusDisplay(status, errorMessage) {

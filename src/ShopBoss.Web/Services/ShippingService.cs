@@ -106,10 +106,14 @@ public class ShippingService
 
             var isShipped = totalParts > 0 && shippedParts == totalParts;
 
+            // A product is ready for shipping only if it's not already shipped
+            // and all its parts are assembled
+            var isReadyForShipping = p.Status != PartStatus.Shipped && readyProductIds.Contains(p.Id);
+
             return new ProductShippingStatus
             {
                 Product = p,
-                IsReadyForShipping = readyProductIds.Contains(p.Id),
+                IsReadyForShipping = isReadyForShipping,
                 IsShipped = p.Status == PartStatus.Shipped,
                 AssembledPartsCount = assembledParts,
                 ShippedPartsCount = shippedParts,
@@ -182,6 +186,10 @@ public class ShippingService
                     part.StatusUpdatedDate = DateTime.UtcNow;
                 }
             }
+
+            // Mark the product itself as shipped
+            product.Status = PartStatus.Shipped;
+            product.StatusUpdatedDate = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
             return true;
