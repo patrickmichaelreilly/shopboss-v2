@@ -13,6 +13,7 @@ public class ShippingController : Controller
     private readonly ShopBossDbContext _context;
     private readonly WorkOrderService _workOrderService;
     private readonly ShippingService _shippingService;
+    private readonly HardwareGroupingService _hardwareGroupingService;
     private readonly AuditTrailService _auditTrailService;
     private readonly IHubContext<StatusHub> _hubContext;
     private readonly ILogger<ShippingController> _logger;
@@ -21,6 +22,7 @@ public class ShippingController : Controller
         ShopBossDbContext context,
         WorkOrderService workOrderService,
         ShippingService shippingService,
+        HardwareGroupingService hardwareGroupingService,
         AuditTrailService auditTrailService,
         IHubContext<StatusHub> hubContext,
         ILogger<ShippingController> logger)
@@ -28,6 +30,7 @@ public class ShippingController : Controller
         _context = context;
         _workOrderService = workOrderService;
         _shippingService = shippingService;
+        _hardwareGroupingService = hardwareGroupingService;
         _auditTrailService = auditTrailService;
         _hubContext = hubContext;
         _logger = logger;
@@ -43,13 +46,38 @@ public class ShippingController : Controller
             return View("NoActiveWorkOrder");
         }
 
-        var dashboardData = await _shippingService.GetShippingDashboardDataAsync(activeWorkOrderId);
+        // Get the shipping station data directly from WorkOrderService
+        var shippingStationData = await _workOrderService.GetShippingStationDataAsync(activeWorkOrderId);
         
-        if (dashboardData.WorkOrder == null)
+        if (shippingStationData.WorkOrder == null)
         {
             TempData["ErrorMessage"] = "Active work order not found. Please select a valid work order.";
             return View("NoActiveWorkOrder");
         }
+
+        // Build the simplified dashboard data
+        var readyProductIds = await _shippingService.GetProductsReadyForShippingAsync(activeWorkOrderId);
+        var shippedProductIds = await _shippingService.GetProductsShippedAsync(activeWorkOrderId);
+        var groupedHardware = _hardwareGroupingService.GroupHardwareByName(shippingStationData.Hardware);
+
+        var dashboardData = new ShippingDashboardData
+        {
+            WorkOrder = shippingStationData.WorkOrder,
+            ReadyProductIds = readyProductIds,
+            ShippedProductIds = shippedProductIds,
+            Products = shippingStationData.Products,
+            Hardware = shippingStationData.Hardware.Select(h => new HardwareShippingStatus
+            {
+                Hardware = h,
+                IsShipped = h.Status == PartStatus.Shipped
+            }).ToList(),
+            GroupedHardware = groupedHardware,
+            DetachedProducts = shippingStationData.DetachedProducts.Select(d => new DetachedProductShippingStatus
+            {
+                DetachedProduct = d,
+                IsShipped = d.Status == PartStatus.Shipped
+            }).ToList()
+        };
 
         return View(dashboardData);
     }
@@ -150,6 +178,11 @@ public class ShippingController : Controller
                     Details = $"Part '{part.Name}' status changed from Assembled to Shipped via product barcode scan (scanned: {barcode})"
                 });
             }
+
+            // Mark the product itself as shipped
+            productWithCounts.Product.Status = PartStatus.Shipped;
+            productWithCounts.Product.StatusUpdatedDate = now;
+            _context.Products.Update(productWithCounts.Product);
 
             await _context.SaveChangesAsync();
 
@@ -689,17 +722,22 @@ public class ShippingController : Controller
                 return Json(new { success = false, message = "No active work order selected" });
             }
 
-            var dashboardData = await _shippingService.GetShippingDashboardDataAsync(activeWorkOrderId);
-            
-            var shippedProducts = dashboardData.Products.Count(p => p.Product.Status == PartStatus.Shipped);
-            var totalProducts = dashboardData.Products.Count;
+            // Get the shipping station data directly
+            var shippingStationData = await _workOrderService.GetShippingStationDataAsync(activeWorkOrderId);
+            if (shippingStationData.WorkOrder == null)
+            {
+                return Json(new { success = false, message = "Work order not found" });
+            }
+
+            var shippedProducts = shippingStationData.Products.Count(p => p.Status == PartStatus.Shipped);
+            var totalProducts = shippingStationData.Products.Count;
             
             // Count actually shipped hardware and detached products
-            var shippedHardware = dashboardData.Hardware.Count(h => h.Hardware.Status == PartStatus.Shipped);
-            var totalHardware = dashboardData.Hardware.Count;
+            var shippedHardware = shippingStationData.Hardware.Count(h => h.Status == PartStatus.Shipped);
+            var totalHardware = shippingStationData.Hardware.Count;
             
-            var shippedDetachedProducts = dashboardData.DetachedProducts.Count(d => d.DetachedProduct.Status == PartStatus.Shipped);
-            var totalDetachedProducts = dashboardData.DetachedProducts.Count;
+            var shippedDetachedProducts = shippingStationData.DetachedProducts.Count(d => d.Status == PartStatus.Shipped);
+            var totalDetachedProducts = shippingStationData.DetachedProducts.Count;
 
             return Json(new
             {
@@ -788,6 +826,7 @@ public class ShippingController : Controller
             return 0;
         }
     }
+
 
     [HttpGet]
     public async Task<IActionResult> GetWorkOrderCompletionReport()

@@ -195,39 +195,39 @@
                 <div class="shipping-section-header">
                     <h4 class="mb-0">
                         <i class="fas fa-cube text-primary me-2"></i>
-                        Products (@Model.Products.Count(p => p.Product.Status == PartStatus.Shipped)/@Model.Products.Count shipped)
+                        Products (@Model.ShippedProductIds.Count/@Model.Products.Count shipped)
                     </h4>
                 </div>
                 @if (Model.Products.Any())
                 {
                     @foreach (var product in Model.Products)
                     {
-                        <div class="shipping-item @(product.Product.Status == PartStatus.Shipped ? "shipped" : product.IsReadyForShipping ? "ready" : "not-ready")">
+                        <div class="shipping-item @(Model.ShippedProductIds.Contains(product.Id) ? "shipped" : Model.ReadyProductIds.Contains(product.Id) ? "ready" : "not-ready")">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
-                                    <h6 class="mb-1">@product.Product.Name</h6>
-                                    <small class="text-muted">ID: @product.Product.Id</small>
-                                    @if (!string.IsNullOrEmpty(product.Product.ItemNumber))
+                                    <h6 class="mb-1">@product.Name</h6>
+                                    <small class="text-muted">ID: @product.Id</small>
+                                    @if (!string.IsNullOrEmpty(product.ItemNumber))
                                     {
-                                        <small class="text-muted"> | Product #: @product.Product.ItemNumber</small>
+                                        <small class="text-muted"> | Product #: @product.ItemNumber</small>
                                     }
                                 </div>
                                 <div class="d-flex align-items-center">
                                     <div class="me-3">
-                                        <small class="text-muted">Parts: @product.ShippedPartsCount/@product.TotalPartsCount</small>
+                                        <small class="text-muted">Qty: @product.Qty</small>
                                     </div>
-                                    @if (product.Product.Status != PartStatus.Shipped && product.IsReadyForShipping)
+                                    @if (!Model.ShippedProductIds.Contains(product.Id) && Model.ReadyProductIds.Contains(product.Id))
                                     {
-                                        <button class="btn btn-success btn-sm me-2" onclick="shipProduct('@product.Product.Id')">
+                                        <button class="btn btn-success btn-sm me-2" onclick="shipProduct('@product.Id')">
                                             <i class="fas fa-shipping-fast me-1"></i>Ship
                                         </button>
                                     }
-                                    <span class="status-badge @(product.Product.Status == PartStatus.Shipped ? "shipped" : product.IsReadyForShipping ? "ready" : "not-ready")">
-                                        @if (product.Product.Status == PartStatus.Shipped)
+                                    <span class="status-badge @(Model.ShippedProductIds.Contains(product.Id) ? "shipped" : Model.ReadyProductIds.Contains(product.Id) ? "ready" : "not-ready")">
+                                        @if (Model.ShippedProductIds.Contains(product.Id))
                                         {
                                             <i class="fas fa-check me-1"></i><text>Shipped</text>
                                         }
-                                        else if (product.IsReadyForShipping)
+                                        else if (Model.ReadyProductIds.Contains(product.Id))
                                         {
                                             <i class="fas fa-clock me-1"></i><text>Ready</text>
                                         }
