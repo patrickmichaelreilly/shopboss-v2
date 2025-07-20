@@ -11,22 +11,6 @@
         </div>
     </div>
 
-    @if (Model.ShowInstructions)
-    {
-        <!-- Instructions Panel -->
-        <div class="alert alert-info">
-            <i class="bi bi-info-circle"></i> 
-            <strong>Tree Navigation:</strong> Use the dropdown next to each item to change its status or category. 
-            @if (Model.Mode == "import")
-            {
-                <text>This preview shows the structure of the imported work order.</text>
-            }
-            else
-            {
-                <text>Status changes are applied immediately.</text>
-            }
-        </div>
-    }
 
     @if (Model.ShowAuditHistory)
     {

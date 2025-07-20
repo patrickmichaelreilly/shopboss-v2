@@ -130,27 +130,39 @@ public class ShippingController : Controller
                 .ToListAsync();
 
             var shippedParts = 0;
+            var now = DateTime.UtcNow;
+            var auditItems = new List<BatchAuditItem>();
+            
             foreach (var part in partsToShip)
             {
                 part.Status = PartStatus.Shipped;
-                part.StatusUpdatedDate = DateTime.UtcNow;
+                part.StatusUpdatedDate = now;
                 shippedParts++;
 
-                // Log the status change
-                await _auditTrailService.LogAsync(
-                    action: "PartScannedForShipping",
-                    entityType: "Part",
-                    entityId: part.Id,
-                    oldValue: "Assembled",
-                    newValue: "Shipped",
-                    station: "Shipping",
-                    workOrderId: activeWorkOrderId,
-                    details: $"Part status changed from Assembled to Shipped via barcode scan (scanned: {barcode})",
-                    sessionId: HttpContext.Session.Id
-                );
+                // Prepare audit item for batch logging
+                auditItems.Add(new BatchAuditItem
+                {
+                    Action = "PartScannedForShipping",
+                    EntityType = "Part",
+                    EntityId = part.Id,
+                    OldValue = "Assembled",
+                    NewValue = "Shipped",
+                    Details = $"Part '{part.Name}' status changed from Assembled to Shipped via product barcode scan (scanned: {barcode})"
+                });
             }
 
             await _context.SaveChangesAsync();
+
+            // Create batch audit log for all parts shipped (performance optimization)
+            if (auditItems.Any())
+            {
+                await _auditTrailService.LogBatchAsync(
+                    items: auditItems,
+                    station: "Shipping",
+                    workOrderId: activeWorkOrderId,
+                    sessionId: HttpContext.Session.Id
+                );
+            }
 
             // Check if work order is now fully shipped
             var workOrderFullyShipped = await IsWorkOrderFullyShippedAsync(activeWorkOrderId);
@@ -429,6 +441,147 @@ public class ShippingController : Controller
     }
 
     [HttpPost]
+    public async Task<IActionResult> ShipHardwareGroup(string hardwareIds)
+    {
+        try
+        {
+            var activeWorkOrderId = HttpContext.Session.GetString("ActiveWorkOrderId");
+            if (string.IsNullOrEmpty(activeWorkOrderId))
+            {
+                return Json(new { success = false, message = "No active work order selected" });
+            }
+
+            // Validate input
+            if (string.IsNullOrWhiteSpace(hardwareIds))
+            {
+                return Json(new { success = false, message = "No hardware IDs provided" });
+            }
+
+            var ids = hardwareIds.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                                 .Select(id => id.Trim())
+                                 .ToList();
+
+            if (!ids.Any())
+            {
+                return Json(new { success = false, message = "No valid hardware IDs provided" });
+            }
+
+            // Use a transaction to prevent database locking issues
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            
+            try
+            {
+                // Find all hardware items by IDs in a single query
+                var hardwareItems = await _context.Hardware
+                    .Where(h => h.WorkOrderId == activeWorkOrderId && ids.Contains(h.Id))
+                    .ToListAsync();
+
+                if (!hardwareItems.Any())
+                {
+                    await transaction.RollbackAsync();
+                    return Json(new { 
+                        success = false, 
+                        message = "No matching hardware items found in active work order" 
+                    });
+                }
+
+                var shippedItems = new List<object>();
+                var groupName = hardwareItems.First().Name; // Group name from first item
+                var now = DateTime.UtcNow;
+                var auditItems = new List<BatchAuditItem>();
+
+                // Mark all hardware items as shipped in a single operation
+                foreach (var hardware in hardwareItems)
+                {
+                    hardware.Status = PartStatus.Shipped;
+                    hardware.StatusUpdatedDate = now;
+
+                    shippedItems.Add(new
+                    {
+                        id = hardware.Id,
+                        name = hardware.Name,
+                        quantity = hardware.Qty
+                    });
+
+                    // Prepare audit item for batch logging
+                    auditItems.Add(new BatchAuditItem
+                    {
+                        Action = "HardwareGroupShipped",
+                        EntityType = "Hardware",
+                        EntityId = hardware.Id,
+                        OldValue = "Pending",
+                        NewValue = "Shipped",
+                        Details = $"Hardware '{hardware.Name}' shipped as part of group '{groupName}' (bulk operation)"
+                    });
+                }
+
+                // Save all changes in a single transaction
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                // Create batch audit log for all hardware items (performance optimization)
+                if (auditItems.Any())
+                {
+                    await _auditTrailService.LogBatchAsync(
+                        items: auditItems,
+                        station: "Shipping",
+                        workOrderId: activeWorkOrderId,
+                        sessionId: HttpContext.Session.Id
+                    );
+                }
+
+                // Check if work order is now fully shipped
+                var workOrderFullyShipped = await IsWorkOrderFullyShippedAsync(activeWorkOrderId);
+
+                // Send SignalR notifications for the group operation
+                await _hubContext.Clients.Group($"WorkOrder_{activeWorkOrderId}")
+                    .SendAsync("HardwareGroupShipped", new
+                    {
+                        GroupName = groupName,
+                        HardwareItems = shippedItems,
+                        WorkOrderId = activeWorkOrderId,
+                        Timestamp = DateTime.UtcNow,
+                        IsWorkOrderFullyShipped = workOrderFullyShipped
+                    });
+
+                await _hubContext.Clients.Group("all-stations")
+                    .SendAsync("StatusUpdate", new
+                    {
+                        type = "hardware-group-shipped",
+                        groupName = groupName,
+                        itemCount = shippedItems.Count,
+                        workOrderId = activeWorkOrderId,
+                        station = "Shipping",
+                        timestamp = DateTime.UtcNow,
+                        isWorkOrderFullyShipped = workOrderFullyShipped,
+                        message = $"Hardware group '{groupName}' shipped ({shippedItems.Count} items)"
+                    });
+
+                _logger.LogInformation("Hardware group '{GroupName}' shipped - {ItemCount} items processed", 
+                    groupName, shippedItems.Count);
+
+                return Json(new { 
+                    success = true, 
+                    message = $"✅ Hardware group '{groupName}' shipped successfully! ({shippedItems.Count} items)",
+                    groupName = groupName,
+                    shippedCount = shippedItems.Count,
+                    shippedItems = shippedItems
+                });
+            }
+            catch (Exception)
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error processing hardware group shipping: {HardwareIds}", hardwareIds);
+            return Json(new { success = false, message = "An error occurred while processing the group shipping" });
+        }
+    }
+
+    [HttpPost]
     public async Task<IActionResult> ScanDetachedProduct(string barcode)
     {
         try
@@ -571,27 +724,45 @@ public class ShippingController : Controller
     {
         try
         {
-            var workOrder = await _context.WorkOrders
-                .Include(w => w.Products)
-                    .ThenInclude(p => p.Parts)
-                .Include(w => w.Hardware)
-                .Include(w => w.DetachedProducts)
-                .FirstOrDefaultAsync(w => w.Id == workOrderId);
-
-            if (workOrder == null)
+            // Optimized approach: Use COUNT queries instead of loading all data into memory
+            
+            // Check parts (product parts)
+            var productPartsQuery = _context.Parts.Where(p => p.Product.WorkOrderId == workOrderId);
+            var totalParts = await productPartsQuery.CountAsync();
+            if (totalParts > 0)
             {
-                return false;
+                var shippedParts = await productPartsQuery.CountAsync(p => p.Status == PartStatus.Shipped);
+                if (shippedParts != totalParts)
+                {
+                    return false;
+                }
+            }
+            
+            // Check hardware
+            var hardwareQuery = _context.Hardware.Where(h => h.WorkOrderId == workOrderId);
+            var totalHardware = await hardwareQuery.CountAsync();
+            if (totalHardware > 0)
+            {
+                var shippedHardware = await hardwareQuery.CountAsync(h => h.Status == PartStatus.Shipped);
+                if (shippedHardware != totalHardware)
+                {
+                    return false;
+                }
+            }
+            
+            // Check detached products
+            var detachedProductsQuery = _context.DetachedProducts.Where(d => d.WorkOrderId == workOrderId);
+            var totalDetachedProducts = await detachedProductsQuery.CountAsync();
+            if (totalDetachedProducts > 0)
+            {
+                var shippedDetachedProducts = await detachedProductsQuery.CountAsync(d => d.Status == PartStatus.Shipped);
+                if (shippedDetachedProducts != totalDetachedProducts)
+                {
+                    return false;
+                }
             }
 
-            // Check if all products are shipped
-            var allProductsShipped = workOrder.Products.All(p => 
-                p.Parts.Any() && p.Parts.All(part => part.Status == PartStatus.Shipped));
-
-            // Check if all hardware and detached products are shipped
-            var allHardwareShipped = workOrder.Hardware.All(h => h.Status == PartStatus.Shipped);
-            var allDetachedProductsShipped = workOrder.DetachedProducts.All(d => d.Status == PartStatus.Shipped);
-
-            return allProductsShipped && allHardwareShipped && allDetachedProductsShipped;
+            return true;
         }
         catch (Exception ex)
         {

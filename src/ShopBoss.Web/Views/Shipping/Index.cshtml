@@ -556,32 +556,29 @@
                 }
                 
                 const ids = hardwareIds.split(',');
-                let completedCount = 0;
-                let totalCount = ids.length;
+                const totalCount = ids.length;
                 
                 showAlert(`🔄 Shipping ${totalCount} hardware items in group "${groupName}"...`, 'info');
                 
-                // Ship each hardware item in the group
-                ids.forEach(function(hardwareId) {
-                    $.ajax({
-                        url: '/Shipping/ScanHardware',
-                        method: 'POST',
-                        data: { barcode: hardwareId },
-                        dataType: 'json'
-                    })
-                    .done(function(response) {
-                        completedCount++;
-                        if (completedCount === totalCount) {
-                            // All items shipped successfully
-                            showAlert(`✅ Hardware group "${groupName}" shipped successfully! (${totalCount} items)`, 'success');
-                            updateOverallProgress();
-                            // Refresh the page to show updated grouping
-                            setTimeout(() => location.reload(), 1500);
-                        }
-                    })
-                    .fail(function() {
-                        showAlert(`❌ Error shipping hardware group "${groupName}"`, 'danger');
-                    });
+                // Use the new bulk shipping endpoint to avoid database locking
+                $.ajax({
+                    url: '/Shipping/ShipHardwareGroup',
+                    method: 'POST',
+                    data: { hardwareIds: hardwareIds },
+                    dataType: 'json'
+                })
+                .done(function(response) {
+                    if (response.success) {
+                        showAlert(response.message, 'success');
+                        // Refresh immediately to show updated hardware grouping
+                        location.reload();
+                    } else {
+                        showAlert(`❌ ${response.message}`, 'danger');
+                    }
+                })
+                .fail(function(xhr, status, error) {
+                    console.error('Error shipping hardware group:', error);
+                    showAlert(`❌ Error shipping hardware group "${groupName}"`, 'danger');
                 });
             };
 

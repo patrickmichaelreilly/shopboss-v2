@@ -89,6 +89,9 @@ public class SortingController : Controller
                 return Json(new { success = false, message = "Rack not found." });
             }
 
+            // Get active work order from session for cross-work order bin detection
+            var activeWorkOrderId = HttpContext.Session.GetString("ActiveWorkOrderId");
+
             // Create a list of rows, each containing a list of bins
             var grid = new List<List<object>>();
             for (int row = 1; row <= rack.Rows; row++)
@@ -121,20 +124,34 @@ public class SortingController : Controller
                         // Calculate enhanced progress information for this bin
                         var (progressPartsCount, progressTotalNeeded, progressPercentage) = await CalculateBinProgressAsync(bin);
                         
+                        // Determine bin status - check if it belongs to a different work order
+                        var binStatus = bin.Status.ToString().ToLower();
+                        var statusText = bin.Status.ToString();
+                        
+                        // If bin has a work order assigned and it's different from active work order, mark as blocked
+                        if (!string.IsNullOrEmpty(bin.WorkOrderId) && 
+                            !string.IsNullOrEmpty(activeWorkOrderId) && 
+                            bin.WorkOrderId != activeWorkOrderId)
+                        {
+                            binStatus = "blocked";
+                            statusText = "Blocked - Different Work Order";
+                        }
+                        
                         binRow.Add(new
                         {
                             id = bin.Id,
                             row = bin.Row,
                             column = bin.Column,
                             label = bin.BinLabel,
-                            status = bin.Status.ToString().ToLower(),
-                            statusText = bin.Status.ToString(),
+                            status = binStatus,
+                            statusText = statusText,
                             contents = bin.Contents,
                             partsCount = progressPartsCount,
                             maxCapacity = progressTotalNeeded,
                             capacityPercentage = Math.Round(progressPercentage, 1),
                             productName = bin.Product?.Name ?? "",
                             partName = bin.Part?.Name ?? "",
+                            workOrderId = bin.WorkOrderId,
                             isAvailable = bin.IsAvailable,
                             assignedDate = bin.AssignedDate?.ToString("yyyy-MM-dd HH:mm"),
                             notes = bin.Notes

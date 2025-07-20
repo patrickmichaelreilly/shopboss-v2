@@ -23,7 +23,7 @@ public class WorkOrderDeletionService
     /// <summary>
     /// Delete a part from the database with audit logging
     /// </summary>
-    public async Task<DeletionResult> DeletePartAsync(string partId, string workOrderId, string station = "Manual")
+    public async Task<DeletionResult> DeletePartAsync(string partId, string workOrderId, string station = "Manual", string? parentContext = null)
     {
         try
         {
@@ -54,6 +54,10 @@ public class WorkOrderDeletionService
             await _context.SaveChangesAsync();
 
             // Log the deletion
+            var details = string.IsNullOrEmpty(parentContext) 
+                ? $"Part '{part.Name}' deleted from work order"
+                : $"Part '{part.Name}' deleted from work order (via {parentContext} deletion)";
+                
             await _auditTrailService.LogAsync(
                 action: "DeletePart",
                 entityType: "Part",
@@ -62,7 +66,7 @@ public class WorkOrderDeletionService
                 newValue: null,
                 station: station,
                 workOrderId: workOrderId,
-                details: $"Part '{part.Name}' deleted from work order",
+                details: details,
                 sessionId: null
             );
 
@@ -89,7 +93,7 @@ public class WorkOrderDeletionService
     /// <summary>
     /// Delete a hardware item from the database with audit logging
     /// </summary>
-    public async Task<DeletionResult> DeleteHardwareAsync(string hardwareId, string workOrderId, string station = "Manual")
+    public async Task<DeletionResult> DeleteHardwareAsync(string hardwareId, string workOrderId, string station = "Manual", string? parentContext = null)
     {
         try
         {
@@ -117,6 +121,10 @@ public class WorkOrderDeletionService
             await _context.SaveChangesAsync();
 
             // Log the deletion
+            var details = string.IsNullOrEmpty(parentContext) 
+                ? $"Hardware '{hardware.Name}' deleted from work order"
+                : $"Hardware '{hardware.Name}' deleted from work order (via {parentContext} deletion)";
+                
             await _auditTrailService.LogAsync(
                 action: "DeleteHardware",
                 entityType: "Hardware",
@@ -125,7 +133,7 @@ public class WorkOrderDeletionService
                 newValue: null,
                 station: station,
                 workOrderId: workOrderId,
-                details: $"Hardware '{hardware.Name}' deleted from work order",
+                details: details,
                 sessionId: null
             );
 
@@ -152,7 +160,7 @@ public class WorkOrderDeletionService
     /// <summary>
     /// Delete a subassembly and all its parts with cascade deletion and audit logging
     /// </summary>
-    public async Task<DeletionResult> DeleteSubassemblyAsync(string subassemblyId, string workOrderId, string station = "Manual")
+    public async Task<DeletionResult> DeleteSubassemblyAsync(string subassemblyId, string workOrderId, string station = "Manual", string? parentContext = null)
     {
         try
         {
@@ -174,7 +182,7 @@ public class WorkOrderDeletionService
             // Delete all parts in the subassembly first
             foreach (var part in subassembly.Parts.ToList())
             {
-                var partResult = await DeletePartAsync(part.Id, workOrderId, station);
+                var partResult = await DeletePartAsync(part.Id, workOrderId, station, $"Subassembly '{subassembly.Name}'");
                 if (partResult.Success)
                 {
                     deletedItems += partResult.ItemsDeleted;
@@ -196,6 +204,10 @@ public class WorkOrderDeletionService
             await _context.SaveChangesAsync();
 
             // Log the subassembly deletion
+            var details = string.IsNullOrEmpty(parentContext) 
+                ? $"Subassembly '{subassembly.Name}' and {oldValue.PartsCount} parts deleted from work order"
+                : $"Subassembly '{subassembly.Name}' and {oldValue.PartsCount} parts deleted from work order (via {parentContext} deletion)";
+                
             await _auditTrailService.LogAsync(
                 action: "DeleteSubassembly",
                 entityType: "Subassembly",
@@ -204,7 +216,7 @@ public class WorkOrderDeletionService
                 newValue: null,
                 station: station,
                 workOrderId: workOrderId,
-                details: $"Subassembly '{subassembly.Name}' and {oldValue.PartsCount} parts deleted from work order",
+                details: details,
                 sessionId: null
             );
 
@@ -216,7 +228,7 @@ public class WorkOrderDeletionService
             return new DeletionResult 
             { 
                 Success = true, 
-                Message = $"Subassembly '{subassembly.Name}' and {oldValue.PartsCount} parts deleted successfully.",
+                Message = $"Subassembly '{subassembly.Name}' and all children deleted successfully.",
                 ItemsDeleted = deletedItems
             };
         }
@@ -259,7 +271,7 @@ public class WorkOrderDeletionService
             // Delete all subassemblies (which will cascade to their parts)
             foreach (var subassembly in product.Subassemblies.ToList())
             {
-                var subassemblyResult = await DeleteSubassemblyAsync(subassembly.Id, workOrderId, station);
+                var subassemblyResult = await DeleteSubassemblyAsync(subassembly.Id, workOrderId, station, $"Product '{product.Name}'");
                 if (subassemblyResult.Success)
                 {
                     deletedItems += subassemblyResult.ItemsDeleted;
@@ -269,7 +281,7 @@ public class WorkOrderDeletionService
             // Delete all direct parts
             foreach (var part in product.Parts.ToList())
             {
-                var partResult = await DeletePartAsync(part.Id, workOrderId, station);
+                var partResult = await DeletePartAsync(part.Id, workOrderId, station, $"Product '{product.Name}'");
                 if (partResult.Success)
                 {
                     deletedItems += partResult.ItemsDeleted;
@@ -279,7 +291,7 @@ public class WorkOrderDeletionService
             // Delete all hardware
             foreach (var hardware in product.Hardware.ToList())
             {
-                var hardwareResult = await DeleteHardwareAsync(hardware.Id, workOrderId, station);
+                var hardwareResult = await DeleteHardwareAsync(hardware.Id, workOrderId, station, $"Product '{product.Name}'");
                 if (hardwareResult.Success)
                 {
                     deletedItems += hardwareResult.ItemsDeleted;
@@ -428,7 +440,7 @@ public class WorkOrderDeletionService
             // Delete all parts in the nest sheet first
             foreach (var part in nestSheet.Parts.ToList())
             {
-                var partResult = await DeletePartAsync(part.Id, workOrderId, station);
+                var partResult = await DeletePartAsync(part.Id, workOrderId, station, $"NestSheet '{nestSheet.Name}'");
                 if (partResult.Success)
                 {
                     deletedItems += partResult.ItemsDeleted;
@@ -470,7 +482,7 @@ public class WorkOrderDeletionService
             return new DeletionResult 
             { 
                 Success = true, 
-                Message = $"Nest sheet '{nestSheet.Name}' and {oldValue.PartsCount} parts deleted successfully.",
+                Message = $"Nest sheet '{nestSheet.Name}' and all children deleted successfully.",
                 ItemsDeleted = deletedItems
             };
         }

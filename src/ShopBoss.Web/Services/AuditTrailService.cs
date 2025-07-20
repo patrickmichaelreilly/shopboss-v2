@@ -5,6 +5,16 @@ using System.Text.Json;
 
 namespace ShopBoss.Web.Services;
 
+public class BatchAuditItem
+{
+    public string Action { get; set; } = string.Empty;
+    public string EntityType { get; set; } = string.Empty;
+    public string EntityId { get; set; } = string.Empty;
+    public object? OldValue { get; set; }
+    public object? NewValue { get; set; }
+    public string Details { get; set; } = string.Empty;
+}
+
 public class AuditTrailService
 {
     private readonly ShopBossDbContext _context;
@@ -48,6 +58,44 @@ public class AuditTrailService
         {
             _logger.LogError(ex, "Failed to create audit log for {Action} on {EntityType} {EntityId}", 
                 action, entityType, entityId);
+        }
+    }
+
+    public async Task LogBatchAsync(List<BatchAuditItem> items, string station, string? workOrderId = null, 
+        string? userId = null, string? sessionId = null, string? ipAddress = null)
+    {
+        if (!items.Any())
+        {
+            return;
+        }
+
+        try
+        {
+            var auditLogs = items.Select(item => new AuditLog
+            {
+                Action = item.Action,
+                EntityType = item.EntityType,
+                EntityId = item.EntityId,
+                OldValue = item.OldValue != null ? JsonSerializer.Serialize(item.OldValue) : null,
+                NewValue = item.NewValue != null ? JsonSerializer.Serialize(item.NewValue) : null,
+                UserId = userId,
+                Station = station,
+                WorkOrderId = workOrderId,
+                Details = item.Details,
+                SessionId = sessionId,
+                IPAddress = ipAddress
+            }).ToList();
+
+            _context.AuditLogs.AddRange(auditLogs);
+            await _context.SaveChangesAsync();
+            
+            _logger.LogInformation("Batch audit log created: {ItemCount} {EntityType} records from {Station}", 
+                items.Count, items.First().EntityType, station);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to create batch audit log for {ItemCount} items from {Station}", 
+                items.Count, station);
         }
     }
 

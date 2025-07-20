@@ -251,21 +251,9 @@ else
             const container = document.getElementById('rack-grid-container');
             let gridHtml = '<div class="rack-grid">';
             
-            // Add column headers
-            gridHtml += '<div class="grid-header-row">';
-            gridHtml += '<div class="grid-header-corner"></div>';
-            for (let col = 1; col <= rack.columns; col++) {
-                gridHtml += `<div class="grid-header-col">${col.toString().padStart(2, '0')}</div>`;
-            }
-            gridHtml += '</div>';
-
-            // Add rows with bins
+            // Add rows with bins (no headers)
             for (let row = 0; row < rack.rows; row++) {
                 gridHtml += '<div class="grid-row">';
-                
-                // Row header
-                const rowLabel = String.fromCharCode(65 + row); // A, B, C, etc.
-                gridHtml += `<div class="grid-header-row-label">${rowLabel}</div>`;
                 
                 // Bins in this row
                 for (let col = 0; col < rack.columns; col++) {
@@ -335,6 +323,12 @@ else
             let tooltip = `${bin.label}: ${bin.statusText}`;
             if (bin.contents) tooltip += `\nContents: ${bin.contents}`;
             if (bin.productName) tooltip += `\nProduct: ${bin.productName}`;
+            
+            // Show Work Order info for blocked bins from different work orders
+            if (bin.status === 'blocked' && bin.statusText === 'Blocked - Different Work Order' && bin.workOrderId) {
+                tooltip += `\nWork Order: ${bin.workOrderId}`;
+            }
+            
             if (bin.assignedDate) tooltip += `\nAssigned: ${bin.assignedDate}`;
             if (bin.notes) tooltip += `\nNotes: ${bin.notes}`;
             tooltip += `\nProgress: ${bin.partsCount}/${bin.maxCapacity} (${bin.capacityPercentage}%)`;
@@ -895,10 +889,8 @@ else
                         currentBinDetails = data.bin;
                         displayBinDetails(data.bin);
                         
-                        // Show clear button if bin has contents
-                        if (data.bin.parts && data.bin.parts.length > 0) {
-                            clearBtn.style.display = 'block';
-                        }
+                        // Always show clear button to handle orphaned items
+                        clearBtn.style.display = 'block';
                     } else {
                         content.innerHTML = `
                             <div class="alert alert-warning">
@@ -1160,33 +1152,26 @@ else
             display: table;
             margin: 0 auto;
             border-collapse: separate;
-            border-spacing: 2px;
+            border-spacing: 3px;
+            width: 75vw;
+            max-width: 1200px;
         }
 
-        .grid-header-row, .grid-row {
+        .grid-row {
             display: table-row;
         }
 
-        .grid-header-corner, .grid-header-col, .grid-header-row-label, .grid-bin {
+        .grid-bin {
             display: table-cell;
-            width: 50px;
-            height: 50px;
+            width: 75px;
+            height: 75px;
             text-align: center;
             vertical-align: middle;
-            border: 1px solid #dee2e6;
+            border: 2px solid #dee2e6;
             position: relative;
-        }
-
-        .grid-header-corner, .grid-header-col, .grid-header-row-label {
-            background-color: #f8f9fa;
-            font-weight: bold;
-            font-size: 0.8rem;
-        }
-
-        .grid-bin {
             cursor: pointer;
             transition: all 0.2s ease;
-            font-size: 0.7rem;
+            font-size: 0.85rem;
         }
 
         .grid-bin:hover {
@@ -1198,19 +1183,20 @@ else
         .bin-label {
             font-weight: bold;
             line-height: 1;
+            font-size: 0.8rem;
         }
 
         .bin-content {
-            font-size: 0.6rem;
+            font-size: 0.7rem;
             opacity: 0.8;
         }
 
         .bin-warning {
             position: absolute;
-            top: 2px;
-            right: 2px;
+            top: 3px;
+            right: 3px;
             color: #dc3545;
-            font-size: 0.6rem;
+            font-size: 0.7rem;
         }
 
         .bin-empty {
@@ -1261,14 +1247,24 @@ else
         }
 
         @@media (max-width: 768px) {
-            .grid-bin, .grid-header-corner, .grid-header-col, .grid-header-row-label {
-                width: 40px;
-                height: 40px;
-                font-size: 0.6rem;
+            .rack-grid {
+                width: 95vw;
+                border-spacing: 2px;
             }
             
-            .rack-grid {
-                border-spacing: 1px;
+            .grid-bin {
+                width: 55px;
+                height: 55px;
+                font-size: 0.7rem;
+                border-width: 1px;
+            }
+        }
+        
+        @@media (max-width: 480px) {
+            .grid-bin {
+                width: 45px;
+                height: 45px;
+                font-size: 0.6rem;
             }
         }
 
