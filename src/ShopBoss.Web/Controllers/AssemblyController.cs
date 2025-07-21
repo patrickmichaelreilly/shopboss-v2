@@ -369,7 +369,7 @@ public class AssemblyController : Controller
                     .ThenInclude(pr => pr.Parts)
                 .Include(p => p.NestSheet)
                 .FirstOrDefaultAsync(p => p.NestSheet!.WorkOrderId == activeWorkOrderId && 
-                                    (p.Id == barcode || p.Name == barcode));
+                                    (p.Id == barcode || p.Name == barcode || p.Id.StartsWith(barcode + "_")));
 
             if (part == null)
             {

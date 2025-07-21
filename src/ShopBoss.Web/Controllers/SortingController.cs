@@ -1000,7 +1000,7 @@ public class SortingController : Controller
             var partInDifferentStatus = await _context.Parts
                 .Include(p => p.NestSheet)
                 .FirstOrDefaultAsync(p => p.NestSheet!.WorkOrderId == workOrderId && 
-                                         (p.Id == barcode || p.Name == barcode));
+                                         (p.Id == barcode || p.Name == barcode || p.Id.StartsWith(barcode + "_")));
 
             if (partInDifferentStatus != null)
             {

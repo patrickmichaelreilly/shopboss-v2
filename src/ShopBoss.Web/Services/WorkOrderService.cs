@@ -310,41 +310,6 @@ public class WorkOrderService
         }
     }
 
-    public async Task<ProductWithPartCounts?> GetProductForShippingScanAsync(string workOrderId, string barcode)
-    {
-        try
-        {
-            // Find the product by barcode without Include chains
-            var product = await _context.Products
-                .FirstOrDefaultAsync(p => p.WorkOrderId == workOrderId && 
-                                    (p.Id == barcode || p.Name == barcode || p.ItemNumber == barcode));
-
-            if (product == null)
-            {
-                return null;
-            }
-
-            // Get part status counts for this product in a separate optimized query
-            var partStatusCounts = await _context.Parts
-                .Where(p => p.ProductId == product.Id)
-                .GroupBy(p => p.Status)
-                .Select(g => new { Status = g.Key, Count = g.Count() })
-                .ToListAsync();
-
-            return new ProductWithPartCounts
-            {
-                Product = product,
-                TotalParts = partStatusCounts.Sum(psc => psc.Count),
-                AssembledParts = partStatusCounts.Where(psc => psc.Status == PartStatus.Assembled).Sum(psc => psc.Count),
-                ShippedParts = partStatusCounts.Where(psc => psc.Status == PartStatus.Shipped).Sum(psc => psc.Count)
-            };
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting product for shipping scan for work order {WorkOrderId}, barcode {Barcode}", workOrderId, barcode);
-            return null;
-        }
-    }
 
     public async Task<bool> ArchiveWorkOrderAsync(string workOrderId)
     {
@@ -568,10 +533,3 @@ public class PartStatusSummary
     public int Count { get; set; }
 }
 
-public class ProductWithPartCounts
-{
-    public Product Product { get; set; } = null!;
-    public int TotalParts { get; set; }
-    public int AssembledParts { get; set; }
-    public int ShippedParts { get; set; }
-}

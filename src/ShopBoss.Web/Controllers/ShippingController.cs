@@ -111,10 +111,13 @@ public class ShippingController : Controller
                 details: "Shipping station barcode scan attempt"
             );
 
-            // Find the product by barcode using optimized method
-            var productWithCounts = await _workOrderService.GetProductForShippingScanAsync(activeWorkOrderId, barcode);
+            // Find the product by barcode (consistent with other scan methods)
+            var product = await _context.Products
+                .Include(p => p.Parts)
+                .FirstOrDefaultAsync(p => p.WorkOrderId == activeWorkOrderId && 
+                                    (p.Id == barcode || p.Name == barcode || p.ItemNumber == barcode || p.Id.StartsWith(barcode + "_")));
 
-            if (productWithCounts == null)
+            if (product == null)
             {
                 return Json(new { 
                     success = false, 
@@ -123,14 +126,14 @@ public class ShippingController : Controller
             }
 
             // Check if product is ready for shipping (all parts assembled)
-            var assembledParts = productWithCounts.AssembledParts;
-            var totalParts = productWithCounts.TotalParts;
+            var assembledParts = product.Parts.Count(p => p.Status == PartStatus.Assembled);
+            var totalParts = product.Parts.Count;
             
             if (assembledParts == 0)
             {
                 return Json(new { 
                     success = false, 
-                    message = $"Product '{productWithCounts.Product.Name}' has no assembled parts. Cannot ship." 
+                    message = $"Product '{product.Name}' has no assembled parts. Cannot ship." 
                 });
             }
 
@@ -138,23 +141,22 @@ public class ShippingController : Controller
             {
                 return Json(new { 
                     success = false, 
-                    message = $"Product '{productWithCounts.Product.Name}' is not fully assembled. Only {assembledParts}/{totalParts} parts are assembled." 
+                    message = $"Product '{product.Name}' is not fully assembled. Only {assembledParts}/{totalParts} parts are assembled." 
                 });
             }
 
-            // Check if product is already shipped
-            var alreadyShipped = productWithCounts.ShippedParts == totalParts;
-            if (alreadyShipped)
+            // Check if product is already shipped (simple status check)
+            if (product.Status == PartStatus.Shipped)
             {
                 return Json(new { 
                     success = false, 
-                    message = $"Product '{productWithCounts.Product.Name}' is already shipped" 
+                    message = $"Product '{product.Name}' is already shipped" 
                 });
             }
 
             // Load and update parts for shipping (separate query to avoid Include chains)
             var partsToShip = await _context.Parts
-                .Where(p => p.ProductId == productWithCounts.Product.Id && p.Status == PartStatus.Assembled)
+                .Where(p => p.ProductId == product.Id && p.Status == PartStatus.Assembled)
                 .ToListAsync();
 
             var shippedParts = 0;
@@ -180,9 +182,9 @@ public class ShippingController : Controller
             }
 
             // Mark the product itself as shipped
-            productWithCounts.Product.Status = PartStatus.Shipped;
-            productWithCounts.Product.StatusUpdatedDate = now;
-            _context.Products.Update(productWithCounts.Product);
+            product.Status = PartStatus.Shipped;
+            product.StatusUpdatedDate = now;
+            _context.Products.Update(product);
 
             await _context.SaveChangesAsync();
 
@@ -204,8 +206,8 @@ public class ShippingController : Controller
             // Send SignalR notifications to all stations
             var shippingCompletionData = new
             {
-                ProductId = productWithCounts.Product.Id,
-                ProductName = productWithCounts.Product.Name,
+                ProductId = product.Id,
+                ProductName = product.Name,
                 ScannedBarcode = barcode,
                 ShippedPartsCount = shippedParts,
                 WorkOrderId = activeWorkOrderId,
@@ -226,8 +228,8 @@ public class ShippingController : Controller
             await _hubContext.Clients.Group("admin-station")
                 .SendAsync("ProductShipped", new
                 {
-                    ProductId = productWithCounts.Product.Id,
-                    ProductName = productWithCounts.Product.Name,
+                    ProductId = product.Id,
+                    ProductName = product.Name,
                     WorkOrderId = activeWorkOrderId,
                     ShippedProductCount = shippedProductCount,
                     IsWorkOrderFullyShipped = workOrderFullyShipped,
@@ -238,14 +240,14 @@ public class ShippingController : Controller
                 .SendAsync("StatusUpdate", new
                 {
                     type = "product-shipped",
-                    productId = productWithCounts.Product.Id,
-                    productName = productWithCounts.Product.Name,
+                    productId = product.Id,
+                    productName = product.Name,
                     workOrderId = activeWorkOrderId,
                     station = "Shipping",
                     timestamp = DateTime.UtcNow,
                     shippedProductCount = shippedProductCount,
                     isWorkOrderFullyShipped = workOrderFullyShipped,
-                    message = $"Product '{productWithCounts.Product.Name}' has been shipped"
+                    message = $"Product '{product.Name}' has been shipped"
                 });
 
             // Log successful scan
@@ -256,17 +258,17 @@ public class ShippingController : Controller
                 workOrderId: activeWorkOrderId,
                 partsProcessed: shippedParts,
                 sessionId: HttpContext.Session.Id,
-                details: $"Shipping completed for product '{productWithCounts.Product.Name}' - {shippedParts} parts marked as Shipped"
+                details: $"Shipping completed for product '{product.Name}' - {shippedParts} parts marked as Shipped"
             );
 
             _logger.LogInformation("Product {ProductId} ({ProductName}) shipped via barcode scan '{Barcode}' - {ShippedParts} parts marked as Shipped",
-                productWithCounts.Product.Id, productWithCounts.Product.Name, barcode, shippedParts);
+                product.Id, product.Name, barcode, shippedParts);
 
             return Json(new { 
                 success = true, 
-                message = $"✅ Product '{productWithCounts.Product.Name}' shipped successfully!",
-                productId = productWithCounts.Product.Id,
-                productName = productWithCounts.Product.Name,
+                message = $"✅ Product '{product.Name}' shipped successfully!",
+                productId = product.Id,
+                productName = product.Name,
                 shippedPartsCount = shippedParts,
                 isWorkOrderFullyShipped = workOrderFullyShipped
             });
@@ -311,7 +313,7 @@ public class ShippingController : Controller
             var part = await _context.Parts
                 .Include(p => p.Product)
                 .FirstOrDefaultAsync(p => p.Product.WorkOrderId == activeWorkOrderId &&
-                                        (p.Id == barcode || p.Name == barcode));
+                                        (p.Id == barcode || p.Name == barcode || p.Id.StartsWith(barcode + "_")));
 
             if (part == null)
             {
@@ -398,7 +400,7 @@ public class ShippingController : Controller
             // Find the hardware item by barcode (ID or name)
             var hardware = await _context.Hardware
                 .FirstOrDefaultAsync(h => h.WorkOrderId == activeWorkOrderId && 
-                                    (h.Id == barcode || h.Name == barcode));
+                                    (h.Id == barcode || h.Name == barcode || h.Id.StartsWith(barcode + "_")));
 
             if (hardware == null)
             {
@@ -636,7 +638,7 @@ public class ShippingController : Controller
             // Find the detached product by barcode (ID or name)
             var detachedProduct = await _context.DetachedProducts
                 .FirstOrDefaultAsync(d => d.WorkOrderId == activeWorkOrderId && 
-                                    (d.Id == barcode || d.Name == barcode || d.ItemNumber == barcode));
+                                    (d.Id == barcode || d.Name == barcode || d.ItemNumber == barcode || d.Id.StartsWith(barcode + "_")));
 
             if (detachedProduct == null)
             {
