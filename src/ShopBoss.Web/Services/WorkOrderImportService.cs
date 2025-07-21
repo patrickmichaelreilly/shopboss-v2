@@ -556,27 +556,11 @@ public class WorkOrderImportService
     /// Establish nest sheet relationships using OptimizationResults (same approach as existing system)
     /// Parts are associated with nest sheets through the OptimizationResults table, not direct column mapping
     /// </summary>
-    private async Task EstablishNestSheetRelationshipsAsync(ImportData rawData, WorkOrder workOrder)
+    private Task EstablishNestSheetRelationshipsAsync(ImportData rawData, WorkOrder workOrder)
     {
         try
         {
-            _logger.LogInformation("Phase I3: Establishing nest sheet relationships using OptimizationResults");
-
-            // Create a mapping of LinkIDPart to LinkIDSheet from OptimizationResults
-            var partToSheetMapping = new Dictionary<string, string>();
-            
-            foreach (var optimizationResult in rawData.OptimizationResults ?? new List<Dictionary<string, object?>>())
-            {
-                var linkIdPart = optimizationResult.TryGetValue("LinkIDPart", out var partValue) ? partValue?.ToString() : null;
-                var linkIdSheet = optimizationResult.TryGetValue("LinkIDSheet", out var sheetValue) ? sheetValue?.ToString() : null;
-                
-                if (!string.IsNullOrEmpty(linkIdPart) && !string.IsNullOrEmpty(linkIdSheet))
-                {
-                    partToSheetMapping[linkIdPart] = linkIdSheet;
-                }
-            }
-
-            _logger.LogInformation("Created part to sheet mapping with {Count} entries", partToSheetMapping.Count);
+            _logger.LogInformation("Phase I3: Establishing nest sheet relationships using sequential OptimizationResults processing");
 
             // Create a lookup of nest sheet LinkID to NestSheet entity
             var sheetIdToNestSheetMapping = new Dictionary<string, NestSheet>();
@@ -585,81 +569,128 @@ public class WorkOrderImportService
                 sheetIdToNestSheetMapping[nestSheet.Id] = nestSheet;
             }
 
-            // Update parts with proper nest sheet associations
-            await UpdatePartsWithNestSheetInfoAsync(workOrder, partToSheetMapping, sheetIdToNestSheetMapping);
+            // Track assigned parts to prevent duplicate assignments
+            var assignedPartIds = new HashSet<string>();
+            int assignedCount = 0;
 
-            _logger.LogInformation("Established nest sheet relationships for {PartCount} parts using OptimizationResults", 
-                partToSheetMapping.Count);
+            // Process OptimizationResults sequentially - each row assigns to one part instance
+            foreach (var optimizationResult in rawData.OptimizationResults ?? new List<Dictionary<string, object?>>())
+            {
+                var linkIdPart = optimizationResult.TryGetValue("LinkIDPart", out var partValue) ? partValue?.ToString() : null;
+                var linkIdSheet = optimizationResult.TryGetValue("LinkIDSheet", out var sheetValue) ? sheetValue?.ToString() : null;
+                
+                if (string.IsNullOrEmpty(linkIdPart) || string.IsNullOrEmpty(linkIdSheet))
+                    continue;
+
+                // Find first unassigned part with this original ID (handles suffixed parts)
+                var unassignedPart = FindFirstUnassignedPartInWorkOrder(workOrder, linkIdPart, assignedPartIds);
+                
+                if (unassignedPart != null && sheetIdToNestSheetMapping.ContainsKey(linkIdSheet))
+                {
+                    // Assign part to nest sheet
+                    unassignedPart.NestSheetId = linkIdSheet;
+                    var nestSheet = sheetIdToNestSheetMapping[linkIdSheet];
+                    
+                    // Add to nest sheet's Parts collection
+                    if (!nestSheet.Parts.Any(p => p.Id == unassignedPart.Id))
+                    {
+                        nestSheet.Parts.Add(unassignedPart);
+                    }
+                    
+                    // Mark as assigned
+                    assignedPartIds.Add(unassignedPart.Id);
+                    assignedCount++;
+                    
+                    _logger.LogDebug("Assigned part '{PartId}' to nest sheet '{SheetId}'", unassignedPart.Id, linkIdSheet);
+                }
+                else
+                {
+                    _logger.LogWarning("Could not assign OptimizationResult: LinkIDPart='{LinkIdPart}' LinkIDSheet='{LinkIdSheet}' - Part not found or sheet missing", 
+                        linkIdPart, linkIdSheet);
+                }
+            }
+
+            _logger.LogInformation("Established nest sheet relationships for {AssignedCount} parts using sequential OptimizationResults processing", 
+                assignedCount);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error establishing nest sheet part relationships");
         }
+        return Task.CompletedTask;
+    }
+
+
+    /// <summary>
+    /// Extract original part ID from suffixed ID (e.g., "PART123_1" → "PART123")
+    /// </summary>
+    private string ExtractOriginalPartId(string partId)
+    {
+        if (partId.Contains('_') && char.IsDigit(partId.Last()))
+        {
+            var lastUnderscoreIndex = partId.LastIndexOf('_');
+            return partId.Substring(0, lastUnderscoreIndex);
+        }
+        return partId;
     }
 
     /// <summary>
-    /// Update all parts in the WorkOrder with nest sheet information
+    /// Find first unassigned part in work order with matching original ID
     /// </summary>
-    private async Task UpdatePartsWithNestSheetInfoAsync(WorkOrder workOrder, 
-        Dictionary<string, string> partToSheetMapping, 
-        Dictionary<string, NestSheet> sheetIdToNestSheetMapping)
+    private Part? FindFirstUnassignedPartInWorkOrder(WorkOrder workOrder, string originalPartId, HashSet<string> assignedPartIds)
     {
+        // Search through all products
         foreach (var product in workOrder.Products)
         {
-            // Update parts in product
+            // Check parts directly under product
             foreach (var part in product.Parts)
             {
-                UpdatePartNestSheetInfo(part, partToSheetMapping, sheetIdToNestSheetMapping);
+                if (ExtractOriginalPartId(part.Id) == originalPartId && 
+                    !assignedPartIds.Contains(part.Id) && 
+                    string.IsNullOrEmpty(part.NestSheetId))
+                {
+                    return part;
+                }
             }
 
-            // Update parts in subassemblies
+            // Check parts in subassemblies
             foreach (var subassembly in product.Subassemblies)
             {
-                await UpdatePartsInSubassemblyAsync(subassembly, partToSheetMapping, sheetIdToNestSheetMapping);
-            }
-        }
-    }
-
-    /// <summary>
-    /// Recursively update parts in subassemblies with nest sheet information
-    /// </summary>
-    private async Task UpdatePartsInSubassemblyAsync(Subassembly subassembly, 
-        Dictionary<string, string> partToSheetMapping, 
-        Dictionary<string, NestSheet> sheetIdToNestSheetMapping)
-    {
-        foreach (var part in subassembly.Parts)
-        {
-            UpdatePartNestSheetInfo(part, partToSheetMapping, sheetIdToNestSheetMapping);
-        }
-
-        // Handle nested subassemblies
-        foreach (var nested in subassembly.ChildSubassemblies)
-        {
-            await UpdatePartsInSubassemblyAsync(nested, partToSheetMapping, sheetIdToNestSheetMapping);
-        }
-    }
-
-    /// <summary>
-    /// Update a single part with nest sheet information
-    /// </summary>
-    private void UpdatePartNestSheetInfo(Part part, 
-        Dictionary<string, string> partToSheetMapping, 
-        Dictionary<string, NestSheet> sheetIdToNestSheetMapping)
-    {
-        if (partToSheetMapping.ContainsKey(part.Id))
-        {
-            var nestSheetId = partToSheetMapping[part.Id];
-            part.NestSheetId = nestSheetId;
-            
-            // Add the part to the nest sheet's Parts collection
-            if (sheetIdToNestSheetMapping.ContainsKey(nestSheetId))
-            {
-                var nestSheet = sheetIdToNestSheetMapping[nestSheetId];
-                if (!nestSheet.Parts.Any(p => p.Id == part.Id))
+                var foundPart = FindFirstUnassignedPartInSubassembly(subassembly, originalPartId, assignedPartIds);
+                if (foundPart != null)
                 {
-                    nestSheet.Parts.Add(part);
+                    return foundPart;
                 }
             }
         }
+        return null;
+    }
+
+    /// <summary>
+    /// Recursively search for unassigned parts in subassemblies
+    /// </summary>
+    private Part? FindFirstUnassignedPartInSubassembly(Subassembly subassembly, string originalPartId, HashSet<string> assignedPartIds)
+    {
+        // Check parts in this subassembly
+        foreach (var part in subassembly.Parts)
+        {
+            if (ExtractOriginalPartId(part.Id) == originalPartId && 
+                !assignedPartIds.Contains(part.Id) && 
+                string.IsNullOrEmpty(part.NestSheetId))
+            {
+                return part;
+            }
+        }
+
+        // Check nested subassemblies
+        foreach (var nested in subassembly.ChildSubassemblies)
+        {
+            var foundPart = FindFirstUnassignedPartInSubassembly(nested, originalPartId, assignedPartIds);
+            if (foundPart != null)
+            {
+                return foundPart;
+            }
+        }
+        return null;
     }
 }
