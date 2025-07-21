@@ -224,19 +224,37 @@ public class ImportController : Controller
     [HttpPost("admin/import/convert")]
     public async Task<IActionResult> ProcessFinalImport([FromBody] FinalImportRequest request)
     {
+        // DEBUG: Enhanced error logging for service mode debugging
+        _logger.LogInformation("DEBUG: ProcessFinalImport called. ModelState.IsValid: {IsValid}, Request: {@Request}", 
+            ModelState.IsValid, request);
+
         if (string.IsNullOrEmpty(request.SessionId))
         {
-            return BadRequest(new { error = "Session ID is required" });
+            var error = "Session ID is required";
+            _logger.LogWarning("DEBUG: {Error}", error);
+            return BadRequest(new { error, debugInfo = "SessionId null or empty" });
         }
 
         if (!_importSessions.TryGetValue(request.SessionId, out var session))
         {
-            return NotFound(new { error = "Import session not found" });
+            var error = "Import session not found";
+            _logger.LogWarning("DEBUG: {Error}. Available sessions: {SessionIds}", 
+                error, string.Join(", ", _importSessions.Keys));
+            return NotFound(new { error, debugInfo = $"SessionId '{request.SessionId}' not in active sessions" });
         }
 
         if (session.Status != ImportStatus.Completed || session.WorkOrderEntities == null)
         {
-            return BadRequest(new { error = "Import not completed or no WorkOrder data available" });
+            var error = "Import not completed or no WorkOrder data available";
+            _logger.LogWarning("DEBUG: {Error}. Session status: {Status}, WorkOrderEntities null: {IsNull}", 
+                error, session.Status, session.WorkOrderEntities == null);
+            return BadRequest(new { 
+                error, 
+                debugInfo = new { 
+                    sessionStatus = session.Status.ToString(), 
+                    workOrderEntitiesNull = session.WorkOrderEntities == null 
+                } 
+            });
         }
 
         try
@@ -252,12 +270,17 @@ public class ImportController : Controller
 
             if (!result.Success)
             {
-                _logger.LogWarning("Conversion failed for session {SessionId}: {Errors}", 
+                _logger.LogWarning("DEBUG: Conversion failed for session {SessionId}: {Errors}", 
                     request.SessionId, string.Join(", ", result.Errors));
                 return BadRequest(new { 
                     error = "Import conversion failed", 
                     details = result.Errors,
-                    duplicateInfo = result.DuplicateInfo
+                    duplicateInfo = result.DuplicateInfo,
+                    debugInfo = new { 
+                        sessionId = request.SessionId,
+                        errorCount = result.Errors?.Count ?? 0,
+                        firstError = result.Errors?.FirstOrDefault() 
+                    }
                 });
             }
 
@@ -277,8 +300,16 @@ public class ImportController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during final import conversion for session {SessionId}", request.SessionId);
-            return StatusCode(500, new { error = "Failed to complete import conversion" });
+            _logger.LogError(ex, "DEBUG: Error during final import conversion for session {SessionId}", request.SessionId);
+            return StatusCode(500, new { 
+                error = "Failed to complete import conversion",
+                debugInfo = new {
+                    sessionId = request.SessionId,
+                    exceptionType = ex.GetType().Name,
+                    exceptionMessage = ex.Message,
+                    stackTrace = ex.StackTrace?.Split('\n').Take(5).ToArray() // First 5 lines
+                }
+            });
         }
     }
 

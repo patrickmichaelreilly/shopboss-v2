@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using ShopBoss.Web.Data;
 using ShopBoss.Web.Hubs;
@@ -14,6 +15,11 @@ builder.Services.AddSignalR();
 
 // Add HTTP context accessor for services that need access to the current HTTP context
 builder.Services.AddHttpContextAccessor();
+
+// Configure Data Protection for Windows Service compatibility
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(builder.Environment.ContentRootPath, "keys")))
+    .SetApplicationName("ShopBoss");
 
 // Add session support
 builder.Services.AddDistributedMemoryCache();
