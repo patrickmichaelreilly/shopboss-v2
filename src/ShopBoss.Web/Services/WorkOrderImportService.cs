@@ -113,14 +113,30 @@ public class WorkOrderImportService
             
             // Phase I2: Handle quantity expansion - create multiple Product instances
             var quantity = _columnMapping.GetIntValue(productData, "PRODUCTS", "Quantity");
-            for (int i = 0; i < quantity; i++)
+            
+            if (quantity > 1)
             {
-                var product = CloneProduct(baseProduct);
-                product.Id = Guid.NewGuid().ToString(); // Each instance gets unique ID
+                _logger.LogInformation("Converting product '{ProductName}' (ID: {ProductId}) with quantity {Quantity} to {Quantity} individual product instances",
+                    baseProduct.Name, baseProduct.Id, quantity, quantity);
+            }
+            
+            for (int i = 1; i <= quantity; i++)
+            {
+                var product = CloneProduct(baseProduct, i);
+                
+                // Create unique ID for each instance if quantity > 1
+                if (quantity > 1)
+                {
+                    product.Id = $"{baseProduct.Id}_{i}"; // Use original ID with instance suffix
+                }
+                else
+                {
+                    product.Id = baseProduct.Id; // Single instance keeps original ID
+                }
                 product.Qty = 1; // Each instance has quantity 1
                 
                 // Add parts, subassemblies, and hardware to this product instance
-                await PopulateProductChildrenAsync(rawData, product, baseProduct.Id);
+                await PopulateProductChildrenAsync(rawData, product, baseProduct.Id, quantity > 1 ? $"_{i}" : null);
                 
                 workOrder.Products.Add(product);
             }
@@ -148,14 +164,14 @@ public class WorkOrderImportService
     }
 
     /// <summary>
-    /// Clone product for quantity expansion
+    /// Clone product for quantity expansion with instance suffixing
     /// </summary>
-    private Product CloneProduct(Product source)
+    private Product CloneProduct(Product source, int instanceNumber)
     {
         return new Product
         {
             Id = source.Id, // Will be overridden with unique ID
-            Name = source.Name,
+            Name = $"{source.Name} (Instance {instanceNumber})", // Add instance suffix like old system
             ItemNumber = source.ItemNumber,
             Qty = source.Qty,
             WorkOrderId = source.WorkOrderId,
@@ -170,7 +186,7 @@ public class WorkOrderImportService
     /// <summary>
     /// Populate product children with proper navigation properties
     /// </summary>
-    private async Task PopulateProductChildrenAsync(ImportData rawData, Product product, string originalProductId)
+    private async Task PopulateProductChildrenAsync(ImportData rawData, Product product, string originalProductId, string? instanceSuffix = null)
     {
         // Add parts directly under product
         if (rawData.Parts != null)
@@ -182,7 +198,7 @@ public class WorkOrderImportService
 
             foreach (var partData in productParts)
             {
-                var part = CreatePartFromData(partData, product.Id, product.WorkOrderId);
+                var part = CreatePartFromData(partData, product.Id, product.WorkOrderId, instanceSuffix);
                 product.Parts.Add(part);
             }
         }
@@ -197,7 +213,7 @@ public class WorkOrderImportService
 
             foreach (var subassemblyData in productSubassemblies)
             {
-                var subassembly = await CreateSubassemblyFromDataAsync(subassemblyData, product.Id, product.WorkOrderId, rawData);
+                var subassembly = await CreateSubassemblyFromDataAsync(subassemblyData, product.Id, product.WorkOrderId, rawData, instanceSuffix);
                 product.Subassemblies.Add(subassembly);
             }
         }
@@ -218,13 +234,21 @@ public class WorkOrderImportService
     }
 
     /// <summary>
-    /// Create Part entity from raw data
+    /// Create Part entity from raw data with instance suffix support
     /// </summary>
-    private Part CreatePartFromData(Dictionary<string, object?> partData, string productId, string workOrderId)
+    private Part CreatePartFromData(Dictionary<string, object?> partData, string productId, string workOrderId, string? instanceSuffix = null)
     {
+        var partId = _columnMapping.GetStringValue(partData, "PARTS", "Id");
+        
+        // Apply instance suffix if this part belongs to a cloned product instance
+        if (!string.IsNullOrEmpty(instanceSuffix))
+        {
+            partId = $"{partId}{instanceSuffix}";
+        }
+        
         return new Part
         {
-            Id = _columnMapping.GetStringValue(partData, "PARTS", "Id"),
+            Id = partId,
             Name = _columnMapping.GetStringValue(partData, "PARTS", "Name"),
             Qty = _columnMapping.GetIntValue(partData, "PARTS", "Quantity"),
             Width = _columnMapping.GetDecimalValue(partData, "PARTS", "Width"),
@@ -239,13 +263,21 @@ public class WorkOrderImportService
     }
 
     /// <summary>
-    /// Create Subassembly entity from raw data with recursive children
+    /// Create Subassembly entity from raw data with recursive children and instance suffix support
     /// </summary>
-    private async Task<Subassembly> CreateSubassemblyFromDataAsync(Dictionary<string, object?> subassemblyData, string productId, string workOrderId, ImportData rawData)
+    private async Task<Subassembly> CreateSubassemblyFromDataAsync(Dictionary<string, object?> subassemblyData, string productId, string workOrderId, ImportData rawData, string? instanceSuffix = null)
     {
+        var subassemblyId = _columnMapping.GetStringValue(subassemblyData, "SUBASSEMBLIES", "Id");
+        
+        // Apply instance suffix if this subassembly belongs to a cloned product instance
+        if (!string.IsNullOrEmpty(instanceSuffix))
+        {
+            subassemblyId = $"{subassemblyId}{instanceSuffix}";
+        }
+        
         var subassembly = new Subassembly
         {
-            Id = _columnMapping.GetStringValue(subassemblyData, "SUBASSEMBLIES", "Id"),
+            Id = subassemblyId,
             Name = _columnMapping.GetStringValue(subassemblyData, "SUBASSEMBLIES", "Name"),
             Qty = _columnMapping.GetIntValue(subassemblyData, "SUBASSEMBLIES", "Quantity"),
             ProductId = productId,
@@ -262,7 +294,7 @@ public class WorkOrderImportService
 
             foreach (var partData in subassemblyParts)
             {
-                var part = CreatePartFromData(partData, productId, workOrderId);
+                var part = CreatePartFromData(partData, productId, workOrderId, instanceSuffix);
                 part.SubassemblyId = subassembly.Id;
                 subassembly.Parts.Add(part);
             }
@@ -277,7 +309,7 @@ public class WorkOrderImportService
 
             foreach (var nestedData in nestedSubassemblies)
             {
-                var nested = await CreateSubassemblyFromDataAsync(nestedData, productId, workOrderId, rawData);
+                var nested = await CreateSubassemblyFromDataAsync(nestedData, productId, workOrderId, rawData, instanceSuffix);
                 nested.ParentSubassemblyId = subassembly.Id;
                 subassembly.ChildSubassemblies.Add(nested);
             }
