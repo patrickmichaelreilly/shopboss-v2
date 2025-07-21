@@ -215,6 +215,7 @@ echo Creating data directories...
 mkdir "%INSTALL_PATH%\Backups" 2>nul
 mkdir "%INSTALL_PATH%\Logs" 2>nul
 mkdir "%INSTALL_PATH%\temp\uploads" 2>nul
+mkdir "%INSTALL_PATH%\keys" 2>nul
 
 REM Install Windows Service
 echo Installing Windows Service...
