@@ -35,7 +35,7 @@ public class FastSdfReader
         // Read each table with column names matching ColumnMappingService expectations
         // Use LinkID (not ID) for primary keys to match ColumnMappingService mappings
         data.Products = await ReadTableWithColumnsAsync(connection, "Products", 
-            "LinkID, Name, ItemNumber, Quantity");
+            "LinkID, Name, ItemNumber, Quantity, WorkOrderName");
         data.Parts = await ReadTableWithColumnsAsync(connection, "Parts", 
             "LinkID, Name, Width, Length, Thickness, MaterialName, LinkIDProduct, LinkIDSubAssembly");
         data.PlacedSheets = await ReadTableWithColumnsAsync(connection, "PlacedSheets", 
