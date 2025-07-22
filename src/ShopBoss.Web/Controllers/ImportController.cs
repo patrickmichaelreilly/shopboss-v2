@@ -15,7 +15,6 @@ namespace ShopBoss.Web.Controllers;
 /// </summary>
 public class ImportController : Controller
 {
-    private readonly ImporterService _importerService;
     private readonly FastImportService _fastImportService;
     private readonly WorkOrderImportService _workOrderImportService;
     private readonly ShopBossDbContext _context;
@@ -28,7 +27,6 @@ public class ImportController : Controller
     private static readonly ConcurrentDictionary<string, ImportSession> _importSessions = new();
 
     public ImportController(
-        ImporterService importerService,
         FastImportService fastImportService,
         WorkOrderImportService workOrderImportService,
         ShopBossDbContext context,
@@ -37,7 +35,6 @@ public class ImportController : Controller
         ILogger<ImportController> logger,
         IWebHostEnvironment environment)
     {
-        _importerService = importerService;
         _fastImportService = fastImportService;
         _workOrderImportService = workOrderImportService;
         _context = context;
@@ -109,49 +106,6 @@ public class ImportController : Controller
         }
     }
 
-    /// <summary>
-    /// Start new import process
-    /// Route: /admin/import/start
-    /// </summary>
-    [HttpPost("admin/import/start")]
-    public IActionResult StartImport([FromBody] StartImportRequest request)
-    {
-        if (string.IsNullOrEmpty(request.SessionId))
-        {
-            return BadRequest(new { error = "Session ID is required" });
-        }
-
-        if (!_importSessions.TryGetValue(request.SessionId, out var session))
-        {
-            return NotFound(new { error = "Import session not found" });
-        }
-
-        if (session.Status != ImportStatus.Uploaded)
-        {
-            return BadRequest(new { error = "Import already started or completed" });
-        }
-
-        try
-        {
-            // Update session status
-            session.Status = ImportStatus.Processing;
-            session.WorkOrderName = request.WorkOrderName ?? "New Import Work Order";
-
-            // Start background import task
-            _ = Task.Run(() => ProcessNewImportAsync(session));
-
-            _logger.LogInformation("New import started for session {SessionId}", request.SessionId);
-
-            return Ok(new { message = "New import started", sessionId = request.SessionId });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error starting new import for session {SessionId}", request.SessionId);
-            session.Status = ImportStatus.Failed;
-            session.ErrorMessage = ex.Message;
-            return StatusCode(500, new { error = "Failed to start new import" });
-        }
-    }
 
     /// <summary>
     /// Start FAST import process using FastImportService (Phase 3 Integration)
@@ -495,105 +449,6 @@ public class ImportController : Controller
         }
     }
 
-    /// <summary>
-    /// Process import with WorkOrder entities
-    /// </summary>
-    private async Task ProcessNewImportAsync(ImportSession session)
-    {
-        var progress = new Progress<ImporterProgress>(async p =>
-        {
-            session.Progress = p.Percentage;
-            session.CurrentStage = p.Stage;
-            session.EstimatedTimeRemaining = p.EstimatedTimeRemaining;
-
-            // Send progress update via SignalR
-            try
-            {
-                await _hubContext.Clients.Group($"import-{session.Id}")
-                    .SendAsync("ImportProgress", new
-                    {
-                        sessionId = session.Id,
-                        percentage = p.Percentage,
-                        stage = p.Stage,
-                        estimatedTimeRemaining = p.EstimatedTimeRemaining.TotalSeconds
-                    });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to send progress update via SignalR for session {SessionId}", session.Id);
-            }
-        });
-
-        try
-        {
-            // Check for cancellation
-            if (session.CancellationRequested)
-            {
-                session.Status = ImportStatus.Cancelled;
-                return;
-            }
-
-            // Run the importer to get raw data
-            var result = await _importerService.ImportSdfFileAsync(session.FilePath, progress);
-
-            if (!result.Success)
-            {
-                session.Status = ImportStatus.Failed;
-                session.ErrorMessage = result.Message;
-                
-                await _hubContext.Clients.Group($"import-{session.Id}")
-                    .SendAsync("ImportError", new { sessionId = session.Id, error = result.Message });
-                return;
-            }
-
-            // Transform raw data directly to WorkOrder entities
-            if (result.Data != null)
-            {
-                session.RawImportData = result.Data;
-                
-                // Create WorkOrder entities directly (no Import entities)
-                session.WorkOrderEntities = await _workOrderImportService.TransformToWorkOrderAsync(
-                    result.Data, session.WorkOrderName ?? "New Import Work Order");
-            }
-
-            session.Status = ImportStatus.Completed;
-            session.CompletedAt = DateTime.Now;
-
-            // Send completion notification
-            try
-            {
-                await _hubContext.Clients.Group($"import-{session.Id}")
-                    .SendAsync("ImportComplete", new
-                    {
-                        sessionId = session.Id,
-                        statistics = session.WorkOrderEntities?.GetStatistics()
-                    });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to send completion notification via SignalR for session {SessionId}", session.Id);
-            }
-
-            _logger.LogInformation("New import completed successfully for session {SessionId}", session.Id);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error processing new import for session {SessionId}", session.Id);
-            
-            session.Status = ImportStatus.Failed;
-            session.ErrorMessage = ex.Message;
-
-            try
-            {
-                await _hubContext.Clients.Group($"import-{session.Id}")
-                    .SendAsync("ImportError", new { sessionId = session.Id, error = ex.Message });
-            }
-            catch (Exception signalREx)
-            {
-                _logger.LogWarning(signalREx, "Failed to send error notification via SignalR for session {SessionId}", session.Id);
-            }
-        }
-    }
 
     /// <summary>
     /// Process FAST import using FastImportService (Phase 3 Integration)
@@ -647,7 +502,7 @@ public class ImportController : Controller
             try
             {
                 await _hubContext.Clients.Group($"import-{session.Id}")
-                    .SendAsync("ImportCompleted", new 
+                    .SendAsync("ImportComplete", new 
                     { 
                         sessionId = session.Id,
                         statistics = workOrder.GetStatistics()
@@ -657,6 +512,8 @@ public class ImportController : Controller
             {
                 _logger.LogWarning(ex, "Failed to send fast import completion notification via SignalR for session {SessionId}", session.Id);
             }
+
+            _logger.LogInformation("Fast import completed successfully for session {SessionId}", session.Id);
         }
         catch (Exception ex)
         {
@@ -673,6 +530,30 @@ public class ImportController : Controller
             {
                 _logger.LogWarning(signalREx, "Failed to send error notification via SignalR for session {SessionId}", session.Id);
             }
+        }
+        finally
+        {
+            // Clean up the uploaded SDF file
+            CleanupUploadedFile(session.FilePath, session.Id);
+        }
+    }
+
+    /// <summary>
+    /// Clean up uploaded SDF file after import completion
+    /// </summary>
+    private void CleanupUploadedFile(string filePath, string sessionId)
+    {
+        try
+        {
+            if (!string.IsNullOrEmpty(filePath) && System.IO.File.Exists(filePath))
+            {
+                System.IO.File.Delete(filePath);
+                _logger.LogInformation("Successfully cleaned up uploaded SDF file for session {SessionId}: {FilePath}", sessionId, filePath);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to clean up uploaded SDF file for session {SessionId}: {FilePath}", sessionId, filePath);
         }
     }
 
@@ -1315,12 +1196,12 @@ public static class WorkOrderExtensions
     {
         return new
         {
-            totalProducts = workOrder.Products.Count,
-            totalParts = workOrder.Products.SelectMany(p => p.Parts).Count() + 
-                        workOrder.Products.SelectMany(p => p.Subassemblies).SelectMany(s => s.Parts).Count(),
-            totalHardware = workOrder.Hardware.Count + workOrder.Products.SelectMany(p => p.Hardware).Count(),
-            totalDetachedProducts = workOrder.DetachedProducts.Count,
-            totalNestSheets = workOrder.NestSheets.Count
+            totalProducts = workOrder.Products?.Count ?? 0,
+            totalParts = (workOrder.Products?.SelectMany(p => p.Parts ?? new List<Part>()).Count() ?? 0) + 
+                        (workOrder.Products?.SelectMany(p => p.Subassemblies ?? new List<Subassembly>()).SelectMany(s => s.Parts ?? new List<Part>()).Count() ?? 0),
+            totalHardware = (workOrder.Hardware?.Count ?? 0) + (workOrder.Products?.SelectMany(p => p.Hardware ?? new List<Hardware>()).Count() ?? 0),
+            totalDetachedProducts = workOrder.DetachedProducts?.Count ?? 0,
+            totalNestSheets = workOrder.NestSheets?.Count ?? 0
         };
     }
 }
@@ -1352,7 +1233,6 @@ public class ImportSession
     public DateTime CreatedAt { get; set; }
     public DateTime? CompletedAt { get; set; }
     public bool CancellationRequested { get; set; }
-    public ImportData? RawImportData { get; set; }
     
     // Support for WorkOrder entities in parallel system
     public ShopBoss.Web.Models.WorkOrder? WorkOrderEntities { get; set; }

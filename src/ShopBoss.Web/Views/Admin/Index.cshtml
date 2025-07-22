@@ -87,8 +87,8 @@ else
                     <th width="40">
                         <input type="checkbox" id="selectAll" class="form-check-input">
                     </th>
+                    <th width="50" class="text-center">Active</th>
                     <th>Name</th>
-                    <th>Work Order ID</th>
                     <th>Imported Date</th>
                     <th>Products</th>
                     <th>Hardware Items</th>
@@ -106,27 +106,37 @@ else
                             <input type="checkbox" class="form-check-input work-order-checkbox" 
                                    value="@workOrder.Id" onchange="updateBulkActions()">
                         </td>
+                        <td class="text-center">
+                            @if (isActive)
+                            {
+                                <button type="button" class="btn btn-sm btn-warning" disabled title="Currently Active Work Order">
+                                    <i class="fas fa-star"></i>
+                                </button>
+                            }
+                            else if (!workOrder.IsArchived)
+                            {
+                                <button type="button" class="btn btn-sm btn-outline-secondary" 
+                                        onclick="setActiveWorkOrder('@workOrder.Id')" title="Set as Active Work Order">
+                                    <i class="fas fa-star"></i>
+                                </button>
+                            }
+                            else
+                            {
+                                <button type="button" class="btn btn-sm btn-outline-secondary" disabled title="Cannot set archived work order as active">
+                                    <i class="fas fa-star text-muted"></i>
+                                </button>
+                            }
+                        </td>
                         <td>
                             <div class="d-flex align-items-center">
-                                @if (isActive)
-                                {
-                                    <i class="fas fa-star text-warning me-2" title="Active Work Order (In Service)"></i>
-                                }
-                                else if (workOrder.IsArchived)
+                                @if (workOrder.IsArchived)
                                 {
                                     <i class="fas fa-archive text-muted me-2" title="Archived Work Order"></i>
-                                }
-                                else
-                                {
-                                    <i class="fas fa-star text-muted me-2" title="Inactive Work Order"></i>
                                 }
                                 <a asp-action="ModifyWorkOrder" asp-route-id="@workOrder.Id" class="text-decoration-none @(workOrder.IsArchived ? "text-muted" : "")">
                                     @workOrder.Name
                                 </a>
                             </div>
-                        </td>
-                        <td>
-                            <small class="text-muted">@workOrder.Id</small>
                         </td>
                         <td>@workOrder.ImportedDate.ToString("yyyy-MM-dd HH:mm")</td>
                         <td>
@@ -140,25 +150,6 @@ else
                         </td>
                         <td>
                             <div class="btn-group" role="group">
-                                @if (isActive)
-                                {
-                                    <button type="button" class="btn btn-sm btn-outline-success" disabled title="Currently Active Work Order">
-                                        <i class="fas fa-star"></i>
-                                    </button>
-                                }
-                                else if (!workOrder.IsArchived)
-                                {
-                                    <button type="button" class="btn btn-sm btn-outline-success" 
-                                            onclick="setActiveWorkOrder('@workOrder.Id')" title="Set as Active">
-                                        <i class="fas fa-star"></i>
-                                    </button>
-                                }
-                                else
-                                {
-                                    <button type="button" class="btn btn-sm btn-outline-secondary" disabled title="Cannot set archived work order as active">
-                                        <i class="fas fa-star"></i>
-                                    </button>
-                                }
                                 @if (!workOrder.IsArchived)
                                 {
                                     <a asp-action="ModifyWorkOrder" asp-route-id="@workOrder.Id" 
@@ -272,7 +263,7 @@ else
 
             const workOrderNames = Array.from(checkedBoxes).map(cb => {
                 const row = cb.closest('tr');
-                return row.cells[1].textContent.trim(); // Name column (now at index 1)
+                return row.cells[2].textContent.trim(); // Name column (now at index 2)
             });
 
             const confirmMessage = `Are you sure you want to delete ${checkedBoxes.length} work order(s)?\n\n${workOrderNames.join('\n')}\n\nThis action cannot be undone.`;

@@ -330,6 +330,15 @@
                 return;
             }
 
+            // INSTANT UI FEEDBACK - Disable button and show progress immediately
+            startImportBtn.disabled = true;
+            startImportBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing...';
+            
+            // Show progress step immediately with upload stage
+            uploadStep.classList.add('d-none');
+            progressStep.classList.remove('d-none');
+            updateProgress(0, 'Uploading file...', null);
+
             try {
                 // Upload file to new import endpoint
                 const formData = new FormData();
@@ -347,18 +356,20 @@
 
                 const uploadResult = await uploadResponse.json();
                 currentSessionId = uploadResult.sessionId;
+                
+                // Update progress after successful upload
+                updateProgress(30, 'File uploaded, connecting...', null);
 
                 // Join SignalR group
                 if (signalRConnection) {
                     await signalRConnection.invoke("JoinImportGroup", currentSessionId);
                 }
+                
+                // Update progress after SignalR connection
+                updateProgress(50, 'Starting import process...', null);
 
-                // Show progress step
-                uploadStep.classList.add('d-none');
-                progressStep.classList.remove('d-none');
-
-                // Start import with new endpoint
-                const startResponse = await fetch('/admin/import/start', {
+                // Start import with fast endpoint
+                const startResponse = await fetch('/admin/import/faststart', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ sessionId: currentSessionId })
@@ -368,6 +379,9 @@
                     const error = await startResponse.json();
                     throw new Error(error.error || 'Failed to start import');
                 }
+                
+                // FastImportService will take over progress reporting from here
+                updateProgress(70, 'Processing SDF file...', null);
 
             } catch (error) {
                 console.error('Import error:', error);
@@ -473,6 +487,7 @@
             fileInput.value = '';
             fileInfo.classList.add('d-none');
             startImportBtn.disabled = true;
+            startImportBtn.innerHTML = '<i class="fas fa-play me-2"></i>Start Import Process';
             
             currentSessionId = null;
         }

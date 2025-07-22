@@ -119,15 +119,6 @@ dotnet publish "$PROJECT_PATH" \
   --self-contained false \
   -o "$WINDOWS_TEST_PATH"
 
-# Copy importer tool
-echo "📦 Copying importer tool..."
-mkdir -p "$WINDOWS_TEST_PATH/tools/importer"
-if [ -d "tools/importer" ]; then
-  cp -r tools/importer/* "$WINDOWS_TEST_PATH/tools/importer/"
-else
-  echo "⚠️  Warning: tools/importer directory not found - skipping importer copy"
-fi
-
 # Copy FastSdfReader tool (Phase 2)
 echo "⚡ Building and copying FastSdfReader tool..."
 mkdir -p "$WINDOWS_TEST_PATH/tools/fast-sdf-reader"

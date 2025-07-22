@@ -49,8 +49,6 @@
                                 <li><a class="dropdown-item" asp-controller="Admin" asp-action="HealthDashboard">
                                     <i class="fas fa-heartbeat me-2"></i>Health Dashboard
                                 </a></li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="#" onclick="showComingSoon('Other Settings')">Other Settings</a></li>
                             </ul>
                         </li>
                     </ul>
@@ -129,10 +127,7 @@
     
     <script>
         // Global Active Work Order functionality
-        function showComingSoon(featureName) {
-            alert(`${featureName} is coming soon! This feature will be implemented in future phases of the ShopBoss development roadmap.`);
-        }
-
+        
         // Load all work orders for dropdown
         function loadWorkOrderDropdown() {
             fetch('/Admin/GetAllWorkOrders')
