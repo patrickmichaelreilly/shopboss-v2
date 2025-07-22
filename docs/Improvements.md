@@ -9,6 +9,7 @@
     - Add capability to merge additional SDF data into existing Work Order. Handle part re-cuts, supplementary Nest Sheets, etc.
 
 # Import Process
+    - Build Work Order Browser Modal from Import interface with new API endopoint for Browsing whitelisted folders.
 
 # CNC Station
     - Improve Nest Sheet detail modal to include Nest Sheet image.

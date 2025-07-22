@@ -54,6 +54,9 @@ public class SdfToSqliteConverter
 
     private async Task ConvertSdfToSqlScript(string sdfPath, string sqlPath, string workingDirectory)
     {
+        Console.Error.WriteLine($"Starting optimized SDF export (excluding 22 unnecessary tables)...");
+        var startTime = DateTime.Now;
+        
         var exportTool = Path.Combine(_toolsDirectory, "ExportSqlCe40.exe");
         
         if (!File.Exists(exportTool))
@@ -64,10 +67,12 @@ public class SdfToSqliteConverter
         var connectionString = $"Data Source={sdfPath};";
         var baseWorkPath = Path.Combine(workingDirectory, "work");
         
+        // Tables to exclude - we only need 6 core tables
+        var excludedTables = "DrillsHorizontal,DrillsVertical,Edgebanding,ErrorMessages,FaceFrameImages,FaceFrameImagesParts,FaceFrameImagesSubassemblies,HardwareProcessingStations,MicrovellumSystem,OptimizationResultAssociates,PartsProcessingStations,PlacedSheetsVendors,ProductsPrompts,Prompts,Routes,SawCutLines,Saws,SawStacks,Sheets,Vectors,WorkOrderBatches";
         
         using var process = new Process();
         process.StartInfo.FileName = exportTool;
-        process.StartInfo.Arguments = $"\"{connectionString}\" \"{baseWorkPath}\"";
+        process.StartInfo.Arguments = $"\"{connectionString}\" \"{baseWorkPath}\" exclude:{excludedTables}";
         process.StartInfo.UseShellExecute = false;
         process.StartInfo.RedirectStandardOutput = true;
         process.StartInfo.RedirectStandardError = true;
@@ -99,6 +104,9 @@ public class SdfToSqliteConverter
         {
             throw new InvalidOperationException($"ExportSqlCe40.exe failed with exit code {process.ExitCode}. Error: {error}");
         }
+
+        var exportTime = (DateTime.Now - startTime).TotalSeconds;
+        Console.Error.WriteLine($"SDF export completed in {exportTime:F1} seconds (optimized with table exclusion)");
 
         // ExportSqlCe40.exe creates files like work_0000.sql, work_0001.sql, etc.
         // We need to combine them into a single temp.sql file

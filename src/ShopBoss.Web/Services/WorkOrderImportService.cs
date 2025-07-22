@@ -114,31 +114,30 @@ public class WorkOrderImportService
             // Phase I2: Handle quantity expansion - create multiple Product instances
             var quantity = _columnMapping.GetIntValue(productData, "PRODUCTS", "Quantity");
             
-            if (quantity > 1)
+            if (quantity == 1)
             {
+                // Single quantity: use baseProduct directly, no cloning needed
+                baseProduct.Qty = 1;
+                await PopulateProductChildrenAsync(rawData, baseProduct, baseProduct.Id, null);
+                workOrder.Products.Add(baseProduct);
+            }
+            else
+            {
+                // Multiple quantity: clone for each instance
                 _logger.LogInformation("Converting product '{ProductName}' (ID: {ProductId}) with quantity {Quantity} to {Quantity} individual product instances",
                     baseProduct.Name, baseProduct.Id, quantity, quantity);
-            }
-            
-            for (int i = 1; i <= quantity; i++)
-            {
-                var product = CloneProduct(baseProduct, i);
                 
-                // Create unique ID for each instance if quantity > 1
-                if (quantity > 1)
+                for (int i = 1; i <= quantity; i++)
                 {
+                    var product = CloneProduct(baseProduct, i);
                     product.Id = $"{baseProduct.Id}_{i}"; // Use original ID with instance suffix
+                    product.Qty = 1; // Each instance has quantity 1
+                    
+                    // Add parts, subassemblies, and hardware to this product instance
+                    await PopulateProductChildrenAsync(rawData, product, baseProduct.Id, $"_{i}");
+                    
+                    workOrder.Products.Add(product);
                 }
-                else
-                {
-                    product.Id = baseProduct.Id; // Single instance keeps original ID
-                }
-                product.Qty = 1; // Each instance has quantity 1
-                
-                // Add parts, subassemblies, and hardware to this product instance
-                await PopulateProductChildrenAsync(rawData, product, baseProduct.Id, quantity > 1 ? $"_{i}" : null);
-                
-                workOrder.Products.Add(product);
             }
         }
     }
@@ -171,7 +170,7 @@ public class WorkOrderImportService
         return new Product
         {
             Id = source.Id, // Will be overridden with unique ID
-            Name = $"{source.Name} (Instance {instanceNumber})", // Add instance suffix like old system
+            Name = $"{source.Name} (Instance {instanceNumber})", // Add instance suffix
             ItemNumber = source.ItemNumber,
             Qty = source.Qty,
             WorkOrderId = source.WorkOrderId,
