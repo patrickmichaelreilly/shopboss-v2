@@ -416,42 +416,18 @@ public class WorkOrderService
                 subassembly.Parts = subassemblyParts.Where(p => p.SubassemblyId == subassembly.Id).ToList();
             }
 
-            // Calculate effective status
-            var allProductParts = productParts.ToList();
-            allProductParts.AddRange(productSubassemblies.SelectMany(s => s.Parts));
-            var effectiveStatus = CalculateEffectiveStatus(allProductParts);
-
             productNodes.Add(new ProductStatusNode
             {
                 Product = product,
                 Parts = productParts,
                 Subassemblies = productSubassemblies,
-                Hardware = productHardware,
-                EffectiveStatus = effectiveStatus
+                Hardware = productHardware
             });
         }
 
         return productNodes;
     }
 
-    private PartStatus CalculateEffectiveStatus(List<Part> parts)
-    {
-        if (!parts.Any()) return PartStatus.Pending;
-
-        // If all parts have the same status, return that status
-        var distinctStatuses = parts.Select(p => p.Status).Distinct().ToList();
-        if (distinctStatuses.Count == 1)
-        {
-            return distinctStatuses.First();
-        }
-
-        // Return the "lowest" status if mixed
-        if (parts.Any(p => p.Status == PartStatus.Pending)) return PartStatus.Pending;
-        if (parts.Any(p => p.Status == PartStatus.Cut)) return PartStatus.Cut;
-        if (parts.Any(p => p.Status == PartStatus.Sorted)) return PartStatus.Sorted;
-        if (parts.Any(p => p.Status == PartStatus.Assembled)) return PartStatus.Assembled;
-        return PartStatus.Shipped;
-    }
 }
 
 public class WorkOrderManagementData
@@ -478,7 +454,6 @@ public class ProductStatusNode
     public List<Part> Parts { get; set; } = new();
     public List<Subassembly> Subassemblies { get; set; } = new();
     public List<Hardware> Hardware { get; set; } = new();
-    public PartStatus EffectiveStatus { get; set; }
 }
 
 public class WorkOrderSummary

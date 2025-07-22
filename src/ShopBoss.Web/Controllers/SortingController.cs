@@ -764,10 +764,6 @@ public class SortingController : Controller
                 return Json(new { success = false, message = "Bin not found." });
             }
 
-            if (bin.PartsCount == 0)
-            {
-                return Json(new { success = false, message = "Bin is already empty." });
-            }
 
             // Find all parts that are currently sorted to this specific bin location
             // Location format matches what's stored: "{RackName}:{BinLabel}" (e.g., "Standard Rack A:A01")

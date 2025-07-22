@@ -70,7 +70,7 @@ public class ModifyController : ControllerBase
                         Type = "product",
                         Quantity = productNode.Product.Qty,
                         ItemNumber = productNode.Product.ItemNumber,
-                        Status = includeStatus ? productNode.EffectiveStatus.ToString() : null,
+                        Status = includeStatus ? await CalculateProductStatus(productNode.Product.Id) : null,
                         Children = new List<TreeItem>()
                     };
 
@@ -300,6 +300,26 @@ public class ModifyController : ControllerBase
         if (parts.Any(p => p.Status == Models.PartStatus.Sorted)) return Models.PartStatus.Sorted;
         if (parts.Any(p => p.Status == Models.PartStatus.Assembled)) return Models.PartStatus.Assembled;
         return Models.PartStatus.Shipped;
+    }
+
+    private async Task<string> CalculateProductStatus(string productId)
+    {
+        // Calculate EffectiveStatus from Product's Parts (direct + subassembly parts)
+        // Following successful WorkOrderService logic pattern
+        var productParts = await _context.Parts
+            .Where(p => p.ProductId == productId)
+            .ToListAsync();
+        
+        var subassemblyParts = await _context.Parts
+            .Where(p => p.Subassembly.ProductId == productId)
+            .ToListAsync();
+        
+        // Combine all parts like WorkOrderService does
+        var allProductParts = productParts.ToList();
+        allProductParts.AddRange(subassemblyParts);
+        
+        var effectiveStatus = CalculateEffectiveStatus(allProductParts);
+        return effectiveStatus.ToString();
     }
 
     [HttpPost("updateCategory")]

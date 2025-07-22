@@ -1097,12 +1097,7 @@ else
         function clearEntireBin() {
             if (!currentBinDetails) return;
             
-            const partCount = currentBinDetails.parts ? currentBinDetails.parts.length : 0;
-            if (partCount === 0) {
-                // showToast('Bin is already empty', 'info');
-                showBillboard('sorting-billboard', 'Bin is already empty', 'info', 'Bin Status');
-                return;
-            }
+            // Nuclear bin clearing - always allow the clear operation to proceed to server
             
             fetch('/Sorting/ClearBin', {
                 method: 'POST',

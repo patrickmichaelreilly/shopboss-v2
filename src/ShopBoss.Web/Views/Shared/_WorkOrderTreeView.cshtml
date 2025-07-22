@@ -190,8 +190,8 @@
                     backendItemType = 'detachedproduct';
                 }
                 
-                // Enable cascading for products and detached products to update child parts
-                const shouldCascade = itemType === 'product' || itemType === 'detached_product';
+                // Enable cascading for products, detached products, and nest sheets to update child parts
+                const shouldCascade = itemType === 'product' || itemType === 'detached_product' || itemType === 'nestsheet';
                 
                 // Call the existing UpdateStatus endpoint
                 const response = await fetch('/Admin/UpdateStatus', {
