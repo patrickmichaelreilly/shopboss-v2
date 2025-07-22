@@ -250,7 +250,6 @@ class WorkOrderTreeView {
             return '';
         }
 
-        console.log(`Creating delete button for ${item.type} ${item.id} in mode ${this.mode}`);
         return `
             <button type="button" class="delete-btn btn btn-outline-danger btn-sm" 
                     data-node-id="${item.id}" data-item-type="${item.type}" data-item-name="${item.name || 'Item'}"
@@ -304,7 +303,6 @@ class WorkOrderTreeView {
         // Bind delete button events
         const deleteButton = node.querySelector('.delete-btn');
         if (deleteButton) {
-            console.log(`Binding delete button for ${deleteButton.dataset.itemType} ${deleteButton.dataset.nodeId} in mode ${this.mode}`);
             
             // Remove any existing event listeners to prevent duplicates
             const newDeleteButton = deleteButton.cloneNode(true);

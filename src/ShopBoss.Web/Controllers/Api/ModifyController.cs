@@ -127,7 +127,7 @@ public class ModifyController : ControllerBase
                                 Name = subassembly.Name,
                                 Type = "subassembly",
                                 Quantity = subassembly.Qty,
-                                Status = includeStatus ? CalculateSubassemblyStatus(subassembly.Parts).ToString() : null,
+                                Status = includeStatus ? CalculateEffectiveStatus(subassembly.Parts).ToString() : null,
                                 Children = new List<TreeItem>()
                             };
 
@@ -202,6 +202,18 @@ public class ModifyController : ControllerBase
 
                 foreach (var detachedProduct in workOrderData.DetachedProducts)
                 {
+                    string statusDisplay = null;
+                    if (includeStatus)
+                    {
+                        // Calculate EffectiveStatus from DetachedProduct's Parts (same as regular Products)
+                        var detachedProductParts = await _context.Parts
+                            .Where(p => p.ProductId == detachedProduct.Id)
+                            .ToListAsync();
+                        
+                        var effectiveStatus = CalculateEffectiveStatus(detachedProductParts);
+                        statusDisplay = effectiveStatus.ToString();
+                    }
+
                     detachedProductsCategory.Children.Add(new TreeItem
                     {
                         Id = detachedProduct.Id,
@@ -209,7 +221,7 @@ public class ModifyController : ControllerBase
                         Type = "detached_product",
                         Quantity = detachedProduct.Qty,
                         ItemNumber = detachedProduct.ItemNumber,
-                        Status = includeStatus ? detachedProduct.Status.ToString() : null,
+                        Status = statusDisplay,
                         Children = new List<TreeItem>()
                     });
                 }
@@ -271,7 +283,7 @@ public class ModifyController : ControllerBase
         }
     }
 
-    private Models.PartStatus CalculateSubassemblyStatus(List<Models.Part> parts)
+    private Models.PartStatus CalculateEffectiveStatus(List<Models.Part> parts)
     {
         if (!parts.Any()) return Models.PartStatus.Pending;
 

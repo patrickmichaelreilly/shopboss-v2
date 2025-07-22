@@ -553,7 +553,7 @@ public class AdminController : Controller
                         {
                             // Update all Parts that belong to this DetachedProduct
                             var detachedProductParts = await _context.Parts
-                                .Where(p => p.ProductId == itemId)  // ProductId points to DetachedProduct.Id
+                                .Where(p => p.ProductId == itemId)
                                 .ToListAsync();
 
                             foreach (var detachedPart in detachedProductParts)
@@ -1406,21 +1406,19 @@ public class AdminController : Controller
 
             foreach (var bin in bins)
             {
-                if (!string.IsNullOrEmpty(bin.PartId))
-                {
-                    await _auditTrailService.LogAsync("BinCleared", "Bin", bin.Id,
-                        new { PartId = bin.PartId, PartsCount = bin.PartsCount },
-                        new { PartId = (string)null, PartsCount = 0 },
-                        station: "Admin", workOrderId: activeWorkOrderId,
-                        details: $"Manual bin clear - removed part {bin.PartId}");
+                // Nuclear bin clearing - always clear regardless of current state
+                await _auditTrailService.LogAsync("BinCleared", "Bin", bin.Id,
+                    new { PartId = bin.PartId, PartsCount = bin.PartsCount },
+                    new { PartId = (string)null, PartsCount = 0 },
+                    station: "Admin", workOrderId: activeWorkOrderId,
+                    details: $"Nuclear bin clear - was: PartId={bin.PartId}, PartsCount={bin.PartsCount}");
 
-                    bin.PartId = null;
-                    bin.PartsCount = 0;
-                    bin.Status = BinStatus.Empty;
-                    bin.LastUpdatedDate = DateTime.UtcNow;
-                    
-                    clearedCount++;
-                }
+                bin.PartId = null;
+                bin.PartsCount = 0;
+                bin.Status = BinStatus.Empty;
+                bin.LastUpdatedDate = DateTime.UtcNow;
+                
+                clearedCount++;
             }
 
             await _context.SaveChangesAsync();
