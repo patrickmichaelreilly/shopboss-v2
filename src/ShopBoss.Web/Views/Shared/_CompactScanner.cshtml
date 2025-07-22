@@ -102,58 +102,6 @@
                     </div>
                 </div>
             </div>
-            <div class="modal-footer">
-                <div class="d-flex justify-content-between align-items-center w-100">
-                    <div class="scanner-help-section">
-                        <button type="button" class="btn btn-outline-info btn-sm" 
-                                data-bs-toggle="collapse" 
-                                data-bs-target="#scanner-help-@containerId" 
-                                aria-expanded="false">
-                            <i class="fas fa-question-circle me-1"></i>Help
-                        </button>
-                    </div>
-                    <div>
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    </div>
-                </div>
-                
-                <!-- Help Section -->
-                <div class="collapse mt-3" id="scanner-help-@containerId">
-                    <div class="card card-body bg-light">
-                        <h6><i class="fas fa-info-circle me-2"></i>Scanner Commands</h6>
-                        <div class="row">
-                            <div class="col-md-4">
-                                <strong>Navigation:</strong>
-                                <ul class="list-unstyled small mt-1">
-                                    <li><code>NAV-ADMIN</code> - Admin Panel</li>
-                                    <li><code>NAV-CNC</code> - CNC Station</li>
-                                    <li><code>NAV-SORTING</code> - Sorting Station</li>
-                                    <li><code>NAV-ASSEMBLY</code> - Assembly Station</li>
-                                    <li><code>NAV-SHIPPING</code> - Shipping Station</li>
-                                </ul>
-                            </div>
-                            <div class="col-md-4">
-                                <strong>System:</strong>
-                                <ul class="list-unstyled small mt-1">
-                                    <li><code>CMD:REFRESH</code> - Refresh page</li>
-                                    <li><code>CMD:HELP</code> - Show help</li>
-                                    <li><code>CMD:CLEAR</code> - Clear session</li>
-                                    <li><code>CMD:RECENT</code> - Recent scans</li>
-                                    <li><code>CMD:SUMMARY</code> - Work order summary</li>
-                                </ul>
-                            </div>
-                            <div class="col-md-4">
-                                <strong>Admin:</strong>
-                                <ul class="list-unstyled small mt-1">
-                                    <li><code>ADMIN:BACKUP</code> - Create backup</li>
-                                    <li><code>ADMIN:ARCHIVE</code> - Archive work order</li>
-                                    <li><code>ADMIN:HEALTHCHECK</code> - Run health check</li>
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
 </div>
@@ -255,30 +203,5 @@
     100% { opacity: 1; }
 }
 
-/* Auto-focus input when modal opens */
-.modal.show .universal-scanner-input {
-    animation: focusInput 0.3s ease;
-}
-
-@@keyframes focusInput {
-    from { background-color: #f8f9fa; }
-    to { background-color: white; }
-}
 </style>
 
-<script>
-// Auto-focus scanner input when modal opens
-document.addEventListener('DOMContentLoaded', function() {
-    const scannerModal = document.getElementById('scanner-modal-@containerId');
-    if (scannerModal) {
-        scannerModal.addEventListener('shown.bs.modal', function() {
-            const input = document.getElementById('scanner-input-@containerId');
-            if (input) {
-                setTimeout(() => {
-                    input.focus();
-                }, 300);
-            }
-        });
-    }
-});
-</script>

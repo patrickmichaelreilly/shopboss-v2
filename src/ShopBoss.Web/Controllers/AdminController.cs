@@ -266,7 +266,6 @@ public class AdminController : Controller
 
             // Set as active work order in session
             HttpContext.Session.SetString("ActiveWorkOrderId", id);
-            TempData["SuccessMessage"] = $"'{workOrder.Name}' is now the active work order.";
             
             return RedirectToAction(nameof(Index));
         }

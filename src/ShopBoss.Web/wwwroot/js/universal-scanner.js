@@ -2,7 +2,6 @@
 class UniversalScanner {
     constructor(containerId, options = {}) {
         this.containerId = containerId;
-        this.autoFocus = options.autoFocus !== false;
         this.clearOnSuccess = options.clearOnSuccess !== false;
         this.showRecentScans = options.showRecentScans !== false;
         
@@ -35,15 +34,11 @@ class UniversalScanner {
         this.submitButton?.addEventListener('click', () => this.processScan());
         this.clearButton?.addEventListener('click', () => this.clearInput());
         
-        // Auto-focus
-        if (this.autoFocus) {
-            this.focus();
-        }
         
         // Recent scans will be populated in real-time as scans happen
         
-        // Set up periodic focus return for barcode scanners
-        this.setupFocusManagement();
+        // Set up document-level key listener for barcode scanning
+        this.setupDocumentKeyListener();
         
         // Initialize collapse state
         this.initializeCollapseState();
@@ -90,7 +85,6 @@ class UniversalScanner {
         
         if (!barcode) {
             this.showStatus('warning', '⚠️ Please enter a barcode');
-            this.focus();
             return;
         }
         
@@ -147,7 +141,6 @@ class UniversalScanner {
             this.isProcessing = false;
             this.setProcessingState(false);
             this.updateHealthIndicator('ready', 'Scanner Ready');
-            this.focus();
         }
     }
     
@@ -231,7 +224,7 @@ class UniversalScanner {
         // Create and dispatch a custom event that pages can listen to
         const scanEvent = new CustomEvent('scanReceived', {
             detail: {
-                barcode: barcode,
+                barcode: barcode.toUpperCase(),
                 timestamp: new Date(),
                 containerId: this.containerId,
                 scanner: this
@@ -341,7 +334,6 @@ class UniversalScanner {
     clearInput() {
         if (this.input) {
             this.input.value = '';
-            this.focus();
         }
         
         if (this.statusDiv) {
@@ -353,36 +345,6 @@ class UniversalScanner {
         }
     }
     
-    focus() {
-        console.log(`[Scanner-${this.containerId}] focus() called:`, {
-            isProcessing: this.isProcessing,
-            currentActiveElement: document.activeElement?.tagName + (document.activeElement?.id ? `#${document.activeElement.id}` : ''),
-            hasModalInput: !!this.input,
-            isCollapsed: this.isCollapsed()
-        });
-        
-        if (!this.isProcessing) {
-            if (this.isCollapsed()) {
-                console.log(`[Scanner-${this.containerId}] Scanner collapsed - using document-level listener, no focus needed`);
-            } else if (this.input) {
-                console.log(`[Scanner-${this.containerId}] Attempting to focus modal input`);
-                // Check if input is in a modal that's currently shown
-                const modal = this.input.closest('.modal');
-                if (modal && modal.classList.contains('show')) {
-                    this.input.focus();
-                    console.log(`[Scanner-${this.containerId}] Modal input focused. New active element:`, document.activeElement?.tagName + (document.activeElement?.id ? `#${document.activeElement.id}` : ''));
-                } else if (!modal) {
-                    // Not in a modal, focus normally
-                    this.input.focus();
-                    console.log(`[Scanner-${this.containerId}] Non-modal input focused. New active element:`, document.activeElement?.tagName + (document.activeElement?.id ? `#${document.activeElement.id}` : ''));
-                } else {
-                    console.log(`[Scanner-${this.containerId}] Modal not shown, skipping focus`);
-                }
-            }
-        } else {
-            console.log(`[Scanner-${this.containerId}] Skipping focus - scanner is processing`);
-        }
-    }
     
     setProcessingState(processing) {
         if (this.submitButton) {
@@ -403,59 +365,30 @@ class UniversalScanner {
         }
     }
     
-    setupFocusManagement() {
-        // Return focus to scanner input after brief delays
-        // This helps with barcode scanners that may steal focus
-        let focusTimeout;
-        
-        document.addEventListener('click', () => {
-            clearTimeout(focusTimeout);
-            focusTimeout = setTimeout(() => {
-                if (!this.isProcessing && !this.isCollapsed()) {
-                    // When not collapsed (modal open), focus modal input
-                    if (document.activeElement !== this.input) {
-                        const modal = this.input ? this.input.closest('.modal') : null;
-                        if (!modal || (modal && modal.classList.contains('show'))) {
-                            this.focus();
-                        }
-                    }
-                }
-            }, 2000);
-        });
-        
-        // Set up document-level key listener for collapsed state
-        this.setupDocumentKeyListener();
-    }
-    
     setupDocumentKeyListener() {
         // Initialize barcode accumulation
         this.barcodeBuffer = '';
         this.barcodeTimeout = null;
         
-        // Document-level keydown listener for collapsed state
+        // Simplest possible document-level keydown listener - no conditionals
         this.documentKeyHandler = (e) => {
-            // Only handle when scanner is collapsed and not processing
-            if (!this.isCollapsed() || this.isProcessing) {
-                return;
-            }
-            
             // Handle Enter key - process accumulated barcode
             if (e.key === 'Enter') {
-                e.preventDefault();
                 if (this.barcodeBuffer.trim()) {
-                    this.processScanFromDocument();
+                    const barcode = this.barcodeBuffer.trim().toUpperCase();
+                    this.barcodeBuffer = '';
+                    this.emitScanEvent(barcode);
                 }
                 return;
             }
             
-            // Skip special keys, only accumulate printable characters
+            // Accumulate printable characters
             if (e.key.length === 1) {
                 this.barcodeBuffer += e.key;
                 
                 // Reset timeout on each keystroke
                 clearTimeout(this.barcodeTimeout);
                 this.barcodeTimeout = setTimeout(() => {
-                    // Clear buffer after 2 seconds of inactivity
                     this.barcodeBuffer = '';
                 }, 2000);
             }
@@ -466,12 +399,8 @@ class UniversalScanner {
         
         // Clean up on page unload
         window.addEventListener('beforeunload', () => {
-            if (this.documentKeyHandler) {
-                document.removeEventListener('keydown', this.documentKeyHandler);
-            }
-            if (this.barcodeTimeout) {
-                clearTimeout(this.barcodeTimeout);
-            }
+            document.removeEventListener('keydown', this.documentKeyHandler);
+            clearTimeout(this.barcodeTimeout);
         });
     }
     
@@ -529,7 +458,6 @@ class UniversalScanner {
             this.updateStatusIndicator('error', 'Error processing scan.');
         } finally {
             this.isProcessing = false;
-            // No focus management needed for document-level listener
         }
     }
     
@@ -691,7 +619,6 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (containerId && !window.universalScanners[containerId]) {
             window.createUniversalScanner(containerId, {
-                autoFocus: true,
                 clearOnSuccess: true,
                 showRecentScans: true
             });

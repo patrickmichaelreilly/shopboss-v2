@@ -87,7 +87,7 @@ else
                     <th width="40">
                         <input type="checkbox" id="selectAll" class="form-check-input">
                     </th>
-                    <th width="50" class="text-center">Active</th>
+                    <th width="50" class="text-center"></th>
                     <th>Name</th>
                     <th>Imported Date</th>
                     <th>Products</th>
@@ -109,22 +109,15 @@ else
                         <td class="text-center">
                             @if (isActive)
                             {
-                                <button type="button" class="btn btn-sm btn-warning" disabled title="Currently Active Work Order">
-                                    <i class="fas fa-star"></i>
-                                </button>
+                                <i class="fas fa-star text-warning" title="Currently Active Work Order" style="font-size: 1.2em;"></i>
                             }
                             else if (!workOrder.IsArchived)
                             {
-                                <button type="button" class="btn btn-sm btn-outline-secondary" 
-                                        onclick="setActiveWorkOrder('@workOrder.Id')" title="Set as Active Work Order">
-                                    <i class="fas fa-star"></i>
-                                </button>
+                                <i class="fas fa-star text-muted" onclick="setActiveWorkOrder('@workOrder.Id')" title="Set as Active Work Order" style="font-size: 1.2em; cursor: pointer;"></i>
                             }
                             else
                             {
-                                <button type="button" class="btn btn-sm btn-outline-secondary" disabled title="Cannot set archived work order as active">
-                                    <i class="fas fa-star text-muted"></i>
-                                </button>
+                                <i class="fas fa-star text-muted" title="Cannot set archived work order as active" style="font-size: 1.2em;"></i>
                             }
                         </td>
                         <td>
