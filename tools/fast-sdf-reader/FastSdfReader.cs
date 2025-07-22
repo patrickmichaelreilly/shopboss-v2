@@ -1,5 +1,6 @@
 using System.Data;
 using System.Runtime.InteropServices;
+using System.Text.Json;
 
 namespace FastSdfReader;
 
@@ -20,51 +21,31 @@ public class FastSdfReader
     public async Task<SdfData> ReadAsync()
     {
         var data = new SdfData();
-        var startTime = DateTime.Now;
-
-        Console.WriteLine($"FastSdfReader starting: {_sdfPath}");
-        Console.WriteLine($"File size: {new FileInfo(_sdfPath).Length / 1024 / 1024:F1} MB");
-
-        // Direct SqlCeConnection access to SDF file
         await ReadSdfDirectlyAsync(data);
-
-        var totalTime = (DateTime.Now - startTime).TotalSeconds;
-        Console.WriteLine($"FastSdfReader completed in {totalTime:F2} seconds");
-        
         return data;
     }
 
     private async Task ReadSdfDirectlyAsync(SdfData data)
     {        
-        try
-        {
-            // Use OLE DB to connect to SQL CE
-            using var connection = new SqlCeConnectionWrapper(_sdfPath);
-            await connection.OpenAsync();
+        // Use OLE DB to connect to SQL CE
+        using var connection = new SqlCeConnectionWrapper(_sdfPath);
+        await connection.OpenAsync();
 
-            Console.WriteLine("Connected to SDF file successfully");
-
-            
-            // Read each table with ONLY the columns specified in phases.md - skip ALL BLOBs
-            data.Products = await ReadTableWithColumnsAsync(connection, "Products", 
-                "ID, Name, ItemNumber, Quantity");
-            data.Parts = await ReadTableWithColumnsAsync(connection, "Parts", 
-                "ID, Name, Width, Length, Thickness, MaterialName, LinkIDProduct, LinkIDSubAssembly");
-            data.PlacedSheets = await ReadTableWithColumnsAsync(connection, "PlacedSheets", 
-                "ID, FileName, LinkIDMaterial, Length, Width, Thickness");
-            data.Hardware = await ReadTableWithColumnsAsync(connection, "Hardware", 
-                "ID, Name, Quantity, LinkIDProduct, LinkIDSubAssembly");
-            data.Subassemblies = await ReadTableWithColumnsAsync(connection, "Subassemblies", 
-                "ID, Name, Quantity, LinkIDParentProduct, LinkIDParentSubassembly");
-            data.OptimizationResults = await ReadTableWithColumnsAsync(connection, "OptimizationResults", 
-                "LinkIDPart, LinkIDSheet");
-
-            Console.WriteLine("SDF direct reading completed successfully");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error reading SDF: {ex.Message}");
-        }
+        
+        // Read each table with column names matching ColumnMappingService expectations
+        // Use LinkID (not ID) for primary keys to match ColumnMappingService mappings
+        data.Products = await ReadTableWithColumnsAsync(connection, "Products", 
+            "LinkID, Name, ItemNumber, Quantity");
+        data.Parts = await ReadTableWithColumnsAsync(connection, "Parts", 
+            "LinkID, Name, Width, Length, Thickness, MaterialName, LinkIDProduct, LinkIDSubAssembly");
+        data.PlacedSheets = await ReadTableWithColumnsAsync(connection, "PlacedSheets", 
+            "LinkID, FileName, Name, LinkIDMaterial, Length, Width, Thickness");
+        data.Hardware = await ReadTableWithColumnsAsync(connection, "Hardware", 
+            "LinkID, Name, Quantity, LinkIDProduct, LinkIDSubAssembly");
+        data.Subassemblies = await ReadTableWithColumnsAsync(connection, "Subassemblies", 
+            "LinkID, Name, Quantity, LinkIDParentProduct, LinkIDParentSubassembly");
+        data.OptimizationResults = await ReadTableWithColumnsAsync(connection, "OptimizationResults", 
+            "LinkIDPart, LinkIDSheet");
     }
 
     private async Task<List<Dictionary<string, object?>>> ReadTableAsync(
@@ -82,12 +63,11 @@ public class FastSdfReader
             
             results.AddRange(records);
             
-            var elapsed = (DateTime.Now - startTime).TotalMilliseconds;
-            Console.WriteLine($"{tableName}: {results.Count} records in {elapsed:F0}ms");
+            // Silent operation for JSON output
         }
-        catch (Exception ex)
+        catch
         {
-            Console.WriteLine($"Error reading {tableName}: {ex.Message}");
+            // Silent failure
         }
 
         return results;
@@ -108,66 +88,20 @@ public class FastSdfReader
             
             results.AddRange(records);
             
-            var elapsed = (DateTime.Now - startTime).TotalMilliseconds;
-            Console.WriteLine($"{tableName}: {results.Count} records in {elapsed:F0}ms");
+            // Silent operation for JSON output
             
             // Show column information
             if (results.Count > 0)
             {
-                var columnNames = string.Join(", ", results[0].Keys);
-                Console.WriteLine($"  Columns: {columnNames}");
+                // Silent operation for JSON output
             }
         }
-        catch (Exception ex)
+        catch
         {
-            Console.WriteLine($"Error reading {tableName}: {ex.Message}");
+            // Silent failure
         }
 
         return results;
-    }
-
-
-
-    public async Task PrintSummaryAsync()
-    {
-        try
-        {
-            var data = await ReadAsync();
-            
-            Console.WriteLine("\n=== SDF READING SUMMARY ===");
-            Console.WriteLine($"Products: {data.Products.Count} records");
-            Console.WriteLine($"Parts: {data.Parts.Count} records");
-            Console.WriteLine($"PlacedSheets: {data.PlacedSheets.Count} records");
-            Console.WriteLine($"Hardware: {data.Hardware.Count} records");
-            Console.WriteLine($"Subassemblies: {data.Subassemblies.Count} records");
-            Console.WriteLine($"OptimizationResults: {data.OptimizationResults.Count} records");
-            
-            // Show sample data from Products table
-            if (data.Products.Count > 0)
-            {
-                Console.WriteLine("\n=== SAMPLE PRODUCT DATA ===");
-                var sample = data.Products.First();
-                foreach (var kvp in sample)
-                {
-                    Console.WriteLine($"{kvp.Key}: {kvp.Value}");
-                }
-            }
-            
-            // Show sample data from Parts table
-            if (data.Parts.Count > 0)
-            {
-                Console.WriteLine("\n=== SAMPLE PART DATA ===");
-                var sample = data.Parts.First();
-                foreach (var kvp in sample)
-                {
-                    Console.WriteLine($"{kvp.Key}: {kvp.Value}");
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error: {ex.Message}");
-        }
     }
 }
 

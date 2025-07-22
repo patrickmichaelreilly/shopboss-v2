@@ -22,7 +22,7 @@ public class SqlCeConnectionWrapper : IDisposable
             _connection = new OleDbConnection(_connectionString);
             await _connection.OpenAsync();
             
-            Console.WriteLine("Connected to SDF file via OLE DB");
+            // Silent operation for JSON output
         }
         catch (Exception ex)
         {
@@ -124,7 +124,7 @@ public class SqlCeConnectionWrapper : IDisposable
         {
             _connection?.Close();
             _connection?.Dispose();
-            Console.WriteLine("SQL CE OLE DB connection closed");
+            // Silent operation for JSON output
             _disposed = true;
         }
     }

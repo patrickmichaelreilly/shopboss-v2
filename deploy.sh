@@ -128,6 +128,23 @@ else
   echo "⚠️  Warning: tools/importer directory not found - skipping importer copy"
 fi
 
+# Copy FastSdfReader tool (Phase 2)
+echo "⚡ Building and copying FastSdfReader tool..."
+mkdir -p "$WINDOWS_TEST_PATH/tools/fast-sdf-reader"
+
+# Force rebuild to ensure latest JSON-only version
+echo "   🔨 Building FastSdfReader (JSON-only version)..."
+dotnet build tools/fast-sdf-reader/fast-sdf-reader.csproj -c Release -r win-x86 --self-contained true >/dev/null 2>&1
+
+if [ -d "tools/fast-sdf-reader/bin/Release/net8.0/win-x86" ]; then
+  cp tools/fast-sdf-reader/bin/Release/net8.0/win-x86/FastSdfReader.exe "$WINDOWS_TEST_PATH/tools/fast-sdf-reader/"
+  cp tools/fast-sdf-reader/bin/Release/net8.0/win-x86/*.dll "$WINDOWS_TEST_PATH/tools/fast-sdf-reader/" 2>/dev/null || true
+  cp tools/fast-sdf-reader/bin/Release/net8.0/win-x86/*.json "$WINDOWS_TEST_PATH/tools/fast-sdf-reader/" 2>/dev/null || true
+  echo "   ✅ FastSdfReader rebuilt and deployed (JSON output mode)"
+else
+  echo "   ❌ FastSdfReader build failed"
+fi
+
 
 # Copy test data (if exists)
 if [ -d "test-data" ]; then

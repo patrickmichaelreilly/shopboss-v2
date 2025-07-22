@@ -50,6 +50,7 @@ builder.Services.AddDbContext<ShopBossDbContext>(options =>
 
 // Add custom services
 builder.Services.AddScoped<ImporterService>();
+builder.Services.AddScoped<FastImportService>();
 builder.Services.AddScoped<ColumnMappingService>();
 builder.Services.AddScoped<AuditTrailService>();
 builder.Services.AddScoped<SortingRuleService>();

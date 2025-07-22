@@ -16,6 +16,7 @@ namespace ShopBoss.Web.Controllers;
 public class ImportController : Controller
 {
     private readonly ImporterService _importerService;
+    private readonly FastImportService _fastImportService;
     private readonly WorkOrderImportService _workOrderImportService;
     private readonly ShopBossDbContext _context;
     private readonly PartFilteringService _partFilteringService;
@@ -28,6 +29,7 @@ public class ImportController : Controller
 
     public ImportController(
         ImporterService importerService,
+        FastImportService fastImportService,
         WorkOrderImportService workOrderImportService,
         ShopBossDbContext context,
         PartFilteringService partFilteringService,
@@ -36,6 +38,7 @@ public class ImportController : Controller
         IWebHostEnvironment environment)
     {
         _importerService = importerService;
+        _fastImportService = fastImportService;
         _workOrderImportService = workOrderImportService;
         _context = context;
         _partFilteringService = partFilteringService;
@@ -147,6 +150,50 @@ public class ImportController : Controller
             session.Status = ImportStatus.Failed;
             session.ErrorMessage = ex.Message;
             return StatusCode(500, new { error = "Failed to start new import" });
+        }
+    }
+
+    /// <summary>
+    /// Start FAST import process using FastImportService (Phase 3 Integration)
+    /// Route: /admin/import/faststart
+    /// </summary>
+    [HttpPost("admin/import/faststart")]
+    public IActionResult StartFastImport([FromBody] StartImportRequest request)
+    {
+        if (string.IsNullOrEmpty(request.SessionId))
+        {
+            return BadRequest(new { error = "Session ID is required" });
+        }
+
+        if (!_importSessions.TryGetValue(request.SessionId, out var session))
+        {
+            return NotFound(new { error = "Import session not found" });
+        }
+
+        if (session.Status != ImportStatus.Uploaded)
+        {
+            return BadRequest(new { error = "Import already started or completed" });
+        }
+
+        try
+        {
+            // Update session status
+            session.Status = ImportStatus.Processing;
+            session.WorkOrderName = request.WorkOrderName ?? "Fast Import Work Order";
+
+            // Start background FAST import task using FastImportService
+            _ = Task.Run(() => ProcessFastImportAsync(session));
+
+            _logger.LogInformation("Fast import started for session {SessionId}", request.SessionId);
+
+            return Ok(new { message = "Fast import started", sessionId = request.SessionId });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error starting fast import for session {SessionId}", request.SessionId);
+            session.Status = ImportStatus.Failed;
+            session.ErrorMessage = ex.Message;
+            return StatusCode(500, new { error = "Failed to start fast import" });
         }
     }
 
@@ -536,6 +583,87 @@ public class ImportController : Controller
             session.Status = ImportStatus.Failed;
             session.ErrorMessage = ex.Message;
 
+            try
+            {
+                await _hubContext.Clients.Group($"import-{session.Id}")
+                    .SendAsync("ImportError", new { sessionId = session.Id, error = ex.Message });
+            }
+            catch (Exception signalREx)
+            {
+                _logger.LogWarning(signalREx, "Failed to send error notification via SignalR for session {SessionId}", session.Id);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Process FAST import using FastImportService (Phase 3 Integration)
+    /// </summary>
+    private async Task ProcessFastImportAsync(ImportSession session)
+    {
+        var progress = new Progress<FastImportProgress>(async p =>
+        {
+            session.Progress = p.Percentage;
+            session.CurrentStage = p.Stage;
+            // Fast imports are typically under 1 second, so estimated time is minimal
+            session.EstimatedTimeRemaining = TimeSpan.FromMilliseconds(Math.Max(0, 1000 - (p.Percentage * 10)));
+
+            // Send progress update via SignalR
+            try
+            {
+                await _hubContext.Clients.Group($"import-{session.Id}")
+                    .SendAsync("ImportProgress", new
+                    {
+                        sessionId = session.Id,
+                        percentage = p.Percentage,
+                        stage = p.Stage,
+                        estimatedTimeRemaining = session.EstimatedTimeRemaining?.TotalSeconds ?? 0
+                    });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to send fast import progress update via SignalR for session {SessionId}", session.Id);
+            }
+        });
+
+        try
+        {
+            // Check for cancellation
+            if (session.CancellationRequested)
+            {
+                session.Status = ImportStatus.Cancelled;
+                return;
+            }
+
+            // Use FastImportService to get WorkOrder directly (skipping raw import data step)
+            var workOrder = await _fastImportService.ImportSdfFileAsync(session.FilePath, session.WorkOrderName ?? "Fast Import Work Order", progress);
+
+            // Store the WorkOrder entities directly
+            session.WorkOrderEntities = workOrder;
+            
+            session.Status = ImportStatus.Completed;
+            session.CompletedAt = DateTime.Now;
+
+            // Send completion notification
+            try
+            {
+                await _hubContext.Clients.Group($"import-{session.Id}")
+                    .SendAsync("ImportCompleted", new 
+                    { 
+                        sessionId = session.Id,
+                        statistics = workOrder.GetStatistics()
+                    });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to send fast import completion notification via SignalR for session {SessionId}", session.Id);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fast import failed for session {SessionId}", session.Id);
+            session.Status = ImportStatus.Failed;
+            session.ErrorMessage = ex.Message;
+            
             try
             {
                 await _hubContext.Clients.Group($"import-{session.Id}")
@@ -1132,6 +1260,49 @@ public class ImportController : Controller
                                           workOrder.NestSheets.SelectMany(n => n.Parts).Count();
         
         result.Statistics.ConvertedSubassemblies = workOrder.Products.SelectMany(p => p.Subassemblies).Count();
+    }
+
+    /// <summary>
+    /// QUICK DIRTY TEST: Test FastImportService and show TreeView
+    /// Route: /admin/import/testfast
+    /// </summary>
+    [HttpGet("admin/import/testfast")]
+    public async Task<IActionResult> TestFastImport()
+    {
+        try
+        {
+            // Hardcode a test SDF path (user will need to put their SDF here)
+            var testSdfPath = @"C:\test\MicrovellumWorkOrder.sdf";
+            
+            if (!System.IO.File.Exists(testSdfPath))
+            {
+                ViewBag.Error = $"Test SDF file not found at: {testSdfPath}. Please copy your SDF file there.";
+                return View("~/Views/Admin/TestFastImport.cshtml");
+            }
+
+            // Use FastImportService to create WorkOrder
+            var workOrder = await _fastImportService.ImportSdfFileAsync(testSdfPath, "TEST Fast Import");
+
+            // Build tree data exactly like the working Import Preview
+            var response = new Models.Api.TreeDataResponse
+            {
+                WorkOrderId = workOrder.Id,
+                WorkOrderName = workOrder.Name,
+                Items = new List<Models.Api.TreeItem>()
+            };
+            
+            BuildTreeFromWorkOrderEntities(workOrder, response);
+            
+            ViewBag.TreeData = response;
+            ViewBag.Success = $"Successfully imported {workOrder.Products.Count} products in fast mode!";
+            
+            return View("~/Views/Admin/TestFastImport.cshtml");
+        }
+        catch (Exception ex)
+        {
+            ViewBag.Error = $"FastImport failed: {ex.Message}";
+            return View("~/Views/Admin/TestFastImport.cshtml");
+        }
     }
 }
 
