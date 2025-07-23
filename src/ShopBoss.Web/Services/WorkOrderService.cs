@@ -31,6 +31,7 @@ public class WorkOrderService
             // Load entities separately to avoid massive joins
             var products = await _context.Products
                 .Where(p => p.WorkOrderId == workOrderId)
+                .OrderBy(p => p.ItemNumber)
                 .ToListAsync();
 
             var parts = await _context.Parts

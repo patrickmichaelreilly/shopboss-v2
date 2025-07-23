@@ -64,10 +64,7 @@ public class ImportController : Controller
             return BadRequest(new { error = "Only .sdf files are allowed" });
         }
 
-        if (file.Length > 100 * 1024 * 1024) // 100MB limit
-        {
-            return BadRequest(new { error = "File too large. Maximum size is 100MB" });
-        }
+        // No file size limit - allow any size SDF file
 
         try
         {
