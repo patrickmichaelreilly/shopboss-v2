@@ -57,5 +57,4 @@ public class Bin
     public bool IsAvailable => Status == BinStatus.Empty && !IsBlocked;
     public bool IsBlocked => Status == BinStatus.Blocked;
     public string BinLabel => $"{(char)('A' + Row - 1)}{Column:D2}";
-    public double CapacityPercentage => MaxCapacity > 0 ? (double)PartsCount / MaxCapacity * 100 : 0;
 }

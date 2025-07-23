@@ -90,7 +90,7 @@ public static class StorageRackSeedService
                         Row = row,
                         Column = col,
                         Status = BinStatus.Empty,
-                        MaxCapacity = rack.Type == RackType.DoorsAndDrawerFronts ? 20 : 50
+                        MaxCapacity = 50 // Orphaned property - kept for database compatibility
                     });
                 }
             }

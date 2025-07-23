@@ -1041,7 +1041,7 @@ public class AdminController : Controller
                     Row = row,
                     Column = col,
                     Status = BinStatus.Empty,
-                    MaxCapacity = rack.Type == RackType.DoorsAndDrawerFronts ? 20 : 50,
+                    MaxCapacity = 50, // Orphaned property - kept for database compatibility
                     PartsCount = 0,
                     AssignedDate = DateTime.UtcNow,
                     LastUpdatedDate = DateTime.UtcNow
