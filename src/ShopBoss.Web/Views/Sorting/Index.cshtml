@@ -29,7 +29,87 @@
     </div>
     
     <!-- Station Action Buttons -->
-    <div class="btn-group" role="group">
+    <div class="d-flex gap-2">
+        <!-- Rack Selection Dropdown -->
+        @if (Model.Any())
+        {
+            var selectedRack = Model.FirstOrDefault(r => r.Id == ViewBag.SelectedRackId);
+            var buttonText = selectedRack?.Name ?? "Select Rack";
+            var buttonIcon = selectedRack?.Type switch
+            {
+                ShopBoss.Web.Models.RackType.DoorsAndDrawerFronts => "fas fa-door-open",
+                ShopBoss.Web.Models.RackType.AdjustableShelves => "fas fa-layer-group", 
+                ShopBoss.Web.Models.RackType.Hardware => "fas fa-tools",
+                ShopBoss.Web.Models.RackType.Cart => "fas fa-dolly",
+                _ => "fas fa-warehouse"
+            };
+            var buttonColor = selectedRack?.Type switch
+            {
+                ShopBoss.Web.Models.RackType.DoorsAndDrawerFronts => "primary",
+                ShopBoss.Web.Models.RackType.AdjustableShelves => "success",
+                ShopBoss.Web.Models.RackType.Hardware => "warning", 
+                ShopBoss.Web.Models.RackType.Cart => "info",
+                _ => "secondary"
+            };
+            <div class="dropdown">
+                <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="rackDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="@buttonIcon me-2"></i>
+                    <span id="selectedRackName">@buttonText</span>
+                    @if (selectedRack != null)
+                    {
+                        <span id="selectedRackBadge" class="badge bg-@buttonColor ms-2">@selectedRack.OccupiedBins/@selectedRack.TotalBins</span>
+                    }
+                    else
+                    {
+                        <span id="selectedRackBadge" class="badge ms-2" style="display: none;"></span>
+                    }
+                </button>
+                <ul class="dropdown-menu" aria-labelledby="rackDropdown">
+                    @{
+                        var orderedRacks = Model.OrderBy(r => r.Type).ThenBy(r => r.Name).ToList();
+                    }
+                    @foreach (var rack in orderedRacks)
+                    {
+                        var rackTypeIcon = rack.Type switch
+                        {
+                            ShopBoss.Web.Models.RackType.DoorsAndDrawerFronts => "fas fa-door-open",
+                            ShopBoss.Web.Models.RackType.AdjustableShelves => "fas fa-layer-group",
+                            ShopBoss.Web.Models.RackType.Hardware => "fas fa-tools",
+                            ShopBoss.Web.Models.RackType.Cart => "fas fa-dolly",
+                            _ => "fas fa-th"
+                        };
+                        var rackTypeColor = rack.Type switch
+                        {
+                            ShopBoss.Web.Models.RackType.DoorsAndDrawerFronts => "primary",
+                            ShopBoss.Web.Models.RackType.AdjustableShelves => "success",
+                            ShopBoss.Web.Models.RackType.Hardware => "warning",
+                            ShopBoss.Web.Models.RackType.Cart => "info",
+                            _ => "secondary"
+                        };
+
+                        <li>
+                            <a class="dropdown-item rack-dropdown-item" href="#" 
+                               data-rack-id="@rack.Id" 
+                               data-rack-name="@rack.Name"
+                               data-rack-icon="@rackTypeIcon"
+                               data-rack-color="@rackTypeColor"
+                               data-rack-occupied="@rack.OccupiedBins"
+                               data-rack-total="@rack.TotalBins"
+                               onclick="selectRackFromDropdown('@rack.Id', '@rack.Name', '@rackTypeIcon', '@rackTypeColor', @rack.OccupiedBins, @rack.TotalBins); return false;">
+                                <i class="@rackTypeIcon me-2"></i>
+                                @rack.Name
+                                <span class="badge bg-@rackTypeColor ms-2">@rack.OccupiedBins/@rack.TotalBins</span>
+                                @if (rack.IsPortable)
+                                {
+                                    <i class="fas fa-dolly ms-1 text-muted" title="Portable"></i>
+                                }
+                            </a>
+                        </li>
+                    }
+                </ul>
+            </div>
+        }
+        
         <button type="button" class="btn btn-outline-info" onclick="loadCutParts()" id="cutPartsButton">
             <i class="fas fa-list me-2"></i>Cut Parts (<span id="cutPartsCount">@ViewBag.CutPartsCount</span>)
         </button>
@@ -55,78 +135,11 @@
 }
 else
 {
-    <!-- Rack Selection Tabs -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-warehouse me-2"></i>Storage Racks
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <nav>
-                        <div class="nav nav-pills" id="rack-tabs" role="tablist">
-                            @{
-                                var orderedRacks = Model.OrderBy(r => r.Type).ThenBy(r => r.Name).ToList();
-                            }
-                            @foreach (var rack in orderedRacks)
-                            {
-                                var isFirst = rack == orderedRacks.First();
-                                var rackTypeIcon = rack.Type switch
-                                {
-                                    ShopBoss.Web.Models.RackType.DoorsAndDrawerFronts => "fas fa-door-open",
-                                    ShopBoss.Web.Models.RackType.AdjustableShelves => "fas fa-layer-group",
-                                    ShopBoss.Web.Models.RackType.Hardware => "fas fa-tools",
-                                    ShopBoss.Web.Models.RackType.Cart => "fas fa-dolly",
-                                    _ => "fas fa-th"
-                                };
-                                var rackTypeColor = rack.Type switch
-                                {
-                                    ShopBoss.Web.Models.RackType.DoorsAndDrawerFronts => "primary",
-                                    ShopBoss.Web.Models.RackType.AdjustableShelves => "success",
-                                    ShopBoss.Web.Models.RackType.Hardware => "warning",
-                                    ShopBoss.Web.Models.RackType.Cart => "info",
-                                    _ => "secondary"
-                                };
-
-                                <button class="nav-link @(isFirst ? "active" : "")" 
-                                        id="rack-@rack.Id-tab" 
-                                        data-bs-toggle="pill" 
-                                        data-bs-target="#rack-@rack.Id" 
-                                        type="button" 
-                                        role="tab" 
-                                        onclick="loadRackDetails('@rack.Id')">
-                                    <i class="@rackTypeIcon me-2"></i>
-                                    @rack.Name
-                                    <span class="badge bg-@rackTypeColor ms-2" id="rack-@rack.Id-badge">@rack.OccupiedBins/@rack.TotalBins</span>
-                                    @if (rack.IsPortable)
-                                    {
-                                        <i class="fas fa-dolly ms-1 text-muted" title="Portable"></i>
-                                    }
-                                </button>
-                            }
-                        </div>
-                    </nav>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- Rack Display Area -->
-    <div class="row">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="card-title mb-0" id="current-rack-title">
-                        <i class="fas fa-th me-2"></i>Select a rack to view
-                    </h5>
-                    <div id="rack-stats" class="text-muted small" style="display: none;">
-                        <span id="rack-occupancy"></span>
-                        <span class="mx-2">|</span>
-                        <span id="rack-location"></span>
-                    </div>
-                </div>
+    <div class="rack-display-wrapper">
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
                 <div class="card-body">
                     <div id="rack-grid-container" class="text-center text-muted">
                         <i class="fas fa-warehouse fa-3x mb-3"></i>
@@ -135,6 +148,7 @@ else
                 </div>
             </div>
         </div>
+    </div>
     </div>
 }
 
@@ -205,6 +219,53 @@ else
         // Global SignalR connection
         let signalRConnection = null;
 
+        // ===== Rack Dropdown Functions =====
+        
+        // Handle rack selection from dropdown
+        function selectRackFromDropdown(rackId, rackName, rackIcon, rackColor, occupied, total) {
+            // Navigate to URL with rackId parameter for consistency
+            window.location.href = `/Sorting?rackId=${encodeURIComponent(rackId)}`;
+        }
+
+        // Update rack badge (handles both direct updates and fetching from server)
+        function updateRackBadge(rackId, occupiedBins, totalBins) {
+            // If bins data not provided, fetch from server
+            if (occupiedBins === undefined || totalBins === undefined) {
+                fetch(`/Sorting/GetRackOccupancy/${rackId}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            updateRackBadge(rackId, data.occupiedBins, data.totalBins);
+                        }
+                    })
+                    .catch(error => console.error('Error fetching rack occupancy:', error));
+                return;
+            }
+            
+            // Update dropdown item badge
+            const dropdownItem = document.querySelector(`[data-rack-id="${rackId}"]`);
+            if (dropdownItem) {
+                const badge = dropdownItem.querySelector('.badge');
+                if (badge) {
+                    badge.textContent = `${occupiedBins}/${totalBins}`;
+                }
+                // Update data attributes for future selections
+                dropdownItem.setAttribute('data-rack-occupied', occupiedBins);
+                dropdownItem.setAttribute('data-rack-total', totalBins);
+            }
+            
+            // If this is the currently selected rack, update the dropdown button badge
+            if (currentRackId === rackId) {
+                const selectedBadge = document.getElementById('selectedRackBadge');
+                if (selectedBadge) {
+                    selectedBadge.textContent = `${occupiedBins}/${totalBins}`;
+                }
+            }
+            console.log(`Updated rack ${rackId} badge to ${occupiedBins}/${totalBins}`);
+        }
+        
+        // ===== End Rack Dropdown Functions =====
+
         // Load rack details and display grid
         function loadRackDetails(rackId) {
             console.log('loadRackDetails called with rackId:', rackId);
@@ -237,43 +298,36 @@ else
 
         // Display rack grid visualization
         function displayRackGrid(rack) {
-            document.getElementById('current-rack-title').innerHTML = 
-                `<i class="fas fa-th me-2"></i>${rack.name} (${rack.type})`;
-                
-            document.getElementById('rack-occupancy').textContent = 
-                `${rack.occupiedBins}/${rack.totalBins} bins occupied (${rack.occupancyPercentage}%)`;
-                
-            document.getElementById('rack-location').textContent = 
-                rack.location || 'Location not specified';
-                
-            document.getElementById('rack-stats').style.display = 'block';
 
             const container = document.getElementById('rack-grid-container');
-            let gridHtml = '<div class="rack-grid">';
             
-            // Add rows with bins (no headers)
+            // Create CSS Grid with dynamic dimensions
+            let gridHtml = `<div class="rack-grid" style="grid-template-rows: repeat(${rack.rows}, 1fr); grid-template-columns: repeat(${rack.columns}, 1fr);">`;
+            
+            // Generate flat list of grid items (no nested structure)
             for (let row = 0; row < rack.rows; row++) {
-                gridHtml += '<div class="grid-row">';
-                
-                // Bins in this row
                 for (let col = 0; col < rack.columns; col++) {
                     const bin = rack.bins[row][col];
-                    const statusClass = getBinStatusClass(bin.status);
+                    // Determine status class - blocked takes precedence over full
+                    const statusClass = bin.status === 'blocked' ? 'bin-blocked' : 
+                                      bin.capacityPercentage > 80 ? 'bin-full' : 
+                                      getBinStatusClass(bin.status);
                     const title = getBinTooltip(bin);
                     
                     gridHtml += `
                         <div class="grid-bin ${statusClass}" 
                              title="${title}"
                              onclick="selectBin('${bin.label}', '${bin.row}', '${bin.column}')">
-                            <div class="bin-label">${bin.label}</div>
                             <div class="bin-content">
-                                ${bin.status === 'empty' ? '' : `<small>${bin.partsCount}</small>`}
+                                ${bin.status === 'empty' ? 
+                                    '' : 
+                                    `<div class="item-number">${bin.itemNumber || bin.productName || 'Unknown'}</div>
+                                     <div class="part-count">${bin.partsCount} parts</div>`
+                                }
                             </div>
-                            ${bin.capacityPercentage > 80 ? '<div class="bin-warning"><i class="fas fa-exclamation-triangle"></i></div>' : ''}
                         </div>
                     `;
                 }
-                gridHtml += '</div>';
             }
             gridHtml += '</div>';
 
@@ -326,12 +380,12 @@ else
             
             // Show Work Order info for blocked bins from different work orders
             if (bin.status === 'blocked' && bin.statusText === 'Blocked - Different Work Order' && bin.workOrderId) {
-                tooltip += `\nWork Order: ${bin.workOrderId}`;
+                tooltip += `\nWork Order: ${bin.workOrderName || bin.workOrderId}`;
             }
             
             if (bin.assignedDate) tooltip += `\nAssigned: ${bin.assignedDate}`;
             if (bin.notes) tooltip += `\nNotes: ${bin.notes}`;
-            tooltip += `\nProgress: ${bin.partsCount}/${bin.maxCapacity} (${bin.capacityPercentage}%)`;
+            tooltip += `\nProgress: ${bin.partsCount} parts`;
             
             return tooltip;
         }
@@ -443,7 +497,7 @@ else
                         <td class="small">${part.nestSheetName}</td>
                         <td>
                             <button type="button" class="btn btn-sm btn-primary" 
-                                    onclick="handleSortingScan('${part.id}', Object.values(window.universalScanners)[0])">
+                                    onclick="handleSortingScan('${part.id}', Object.values(window.universalScanners)[0], this)">
                                 <i class="fas fa-sort me-1"></i>Sort
                             </button>
                         </td>
@@ -495,38 +549,14 @@ else
 
         // Old modal event listeners removed - using Universal Scanner instead
 
-        // Load first rack on page load and ensure tab is properly activated
+        // Auto-load selected rack on page load
         document.addEventListener('DOMContentLoaded', function() {
-            const firstTab = document.querySelector('.nav-link');
-            if (firstTab && firstTab.id) {
-                const parts = firstTab.id.split('-');
-                // Expected format: rack-{uuid}-tab, so extract the full UUID
-                if (parts.length >= 3 && parts[0] === 'rack' && parts[parts.length - 1] === 'tab') {
-                    // Join all middle parts to reconstruct the full UUID
-                    const rackId = parts.slice(1, -1).join('-');
-                    console.log('DOMContentLoaded: Loading rack', rackId, 'from tab', firstTab.id);
-                    // Ensure the first tab is properly activated
-                    if (!firstTab.classList.contains('active')) {
-                        firstTab.classList.add('active');
-                    }
-                    loadRackDetails(rackId);
-                } else {
-                    console.error('DOMContentLoaded: Invalid tab ID format:', firstTab.id);
-                }
+            const selectedRackId = '@ViewBag.SelectedRackId';
+            if (selectedRackId) {
+                console.log('DOMContentLoaded: Loading rack', selectedRackId);
+                loadRackDetails(selectedRackId);
             } else {
-                // Fallback: Try to find any rack tab and activate it
-                const anyTab = document.querySelector('[data-bs-toggle="pill"]');
-                if (anyTab && anyTab.id) {
-                    const parts = anyTab.id.split('-');
-                    if (parts.length >= 3 && parts[0] === 'rack' && parts[parts.length - 1] === 'tab') {
-                        const rackId = parts.slice(1, -1).join('-');
-                        console.log('DOMContentLoaded: Fallback loading rack', rackId, 'from tab', anyTab.id);
-                        anyTab.classList.add('active');
-                        loadRackDetails(rackId);
-                    } else {
-                        console.error('DOMContentLoaded: No valid rack tabs found');
-                    }
-                }
+                console.log('DOMContentLoaded: No rack selected');
             }
             
             // Setup SignalR connection for real-time updates
@@ -571,13 +601,13 @@ else
         });
         
         // Sorting scan handler that integrates Universal Scanner with existing logic
-        async function handleSortingScan(barcode, scanner) {
+        async function handleSortingScan(barcode, scanner, buttonElement = null) {
             try {
                 // Show processing status
                 scanner.showScanResult(false, '🔄 Processing part for sorting...', false);
                 
                 // Get currently displayed rack ID
-                const selectedRackId = getCurrentlySelectedRackId();
+                const selectedRackId = currentRackId;
                 console.log('DEBUG: Selected rack ID for scan:', selectedRackId);
                 console.log('DEBUG: Current rack ID global:', currentRackId);
                 
@@ -604,6 +634,14 @@ else
                 
                 if (data.success) {
                     scanner.showScanResult(true, data.message);
+                    
+                    // Immediately remove the part row from cut parts modal if button was clicked from there
+                    if (buttonElement) {
+                        const row = buttonElement.closest('tr');
+                        if (row) {
+                            row.remove();
+                        }
+                    }
                     
                     // Instead of reloading the page, refresh the current rack data
                     setTimeout(() => {
@@ -655,7 +693,7 @@ else
             connection.on("PartSorted", function (data) {
                 console.log("PartSorted event received:", data);
                 // showToast(`Part '${data.partName}' sorted to ${data.binLabel}`, 'success');
-                showBillboard('sorting-billboard', `Part '${data.partName}' sorted to ${data.binLabel}`, 'success', 'Part Sorted');
+                showBillboard('sorting-billboard', `${data.productName} ${data.partName} sorted to ${data.binLabel}`, 'info', 'Part Sorted');
                 
                 // Always refresh current rack to ensure consistency
                 if (currentRackId) {
@@ -695,7 +733,7 @@ else
                     
                     // Update rack badge if rack info is available
                     if (data.rackId) {
-                        refreshRackBadge(data.rackId);
+                        updateRackBadge(data.rackId);
                     }
                 }
             });
@@ -730,45 +768,6 @@ else
             return connection;
         }
 
-        function getCurrentlySelectedRackId() {
-            const activeTab = document.querySelector('.nav-link.active');
-            if (activeTab && activeTab.id) {
-                const parts = activeTab.id.split('-');
-                // Expected format: rack-{uuid}-tab, so extract the full UUID
-                if (parts.length >= 3 && parts[0] === 'rack' && parts[parts.length - 1] === 'tab') {
-                    // Join all middle parts to reconstruct the full UUID
-                    const rackId = parts.slice(1, -1).join('-');
-                    console.log('getCurrentlySelectedRackId: Found rack', rackId, 'from tab', activeTab.id);
-                    return rackId;
-                }
-            }
-            // Fallback: try to get from currentRackId global variable
-            console.log('getCurrentlySelectedRackId: Using fallback currentRackId', currentRackId);
-            return currentRackId;
-        }
-
-        function updateRackBadge(rackId, occupiedBins, totalBins) {
-            const badge = document.querySelector(`#rack-${rackId}-badge`);
-            if (badge) {
-                badge.textContent = `${occupiedBins}/${totalBins}`;
-                console.log(`Updated rack ${rackId} badge to ${occupiedBins}/${totalBins}`);
-            } else {
-                console.warn(`Badge not found for rack ${rackId}`);
-            }
-        }
-
-        function refreshRackBadge(rackId) {
-            fetch(`/Sorting/GetRackOccupancy/${rackId}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        updateRackBadge(rackId, data.occupiedBins, data.totalBins);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error fetching rack occupancy:', error);
-                });
-        }
 
         function updateCutPartsCount(count) {
             currentCutPartsCount = count;
@@ -788,72 +787,9 @@ else
         }
 
 
-        function showErrorSuggestions(suggestions) {
-            // Show helpful suggestions for scan errors
-            const guidance = document.getElementById('placementGuidance');
-            const messageDiv = document.getElementById('placementMessage');
-            
-            let suggestionHtml = '<div><strong>Suggested actions:</strong><ul class="mt-2">';
-            suggestions.forEach(suggestion => {
-                suggestionHtml += `<li>${suggestion}</li>`;
-            });
-            suggestionHtml += '</ul></div>';
-            
-            messageDiv.innerHTML = suggestionHtml;
-            guidance.className = 'alert alert-warning';
-            guidance.style.display = 'block';
-        }
-
-        function playSuccessSound() {
-            // Play a subtle success sound (browser permitting)
-            try {
-                const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmYgCT2X2O/AciMFl');
-                audio.volume = 0.1;
-                audio.play().catch(() => {}); // Ignore errors if audio can't play
-            } catch (e) {
-                // Ignore audio errors
-            }
-        }
-
         function showAssemblyReadyNotification(data) {
             // Show billboard message for assembly readiness
             showBillboard('sorting-billboard', `Product ${data.productName} (${data.itemNumber || data.productId}) is ready for assembly!`, 'success', 'Ready for Assembly');
-            
-            // Create special assembly ready notification with enhanced content
-            // const toastContainer = document.getElementById('toast-container') || createToastContainer();
-            // const toast = document.createElement('div');
-            // toast.className = 'toast align-items-center text-white bg-success border-0';
-            // toast.setAttribute('role', 'alert');
-            // toast.setAttribute('data-bs-autohide', 'false'); // Keep error toasts visible until manually dismissed
-            // toast.innerHTML = `
-            //     <div class="d-flex">
-            //         <div class="toast-body">
-            //             <div class="d-flex align-items-center">
-            //                 <i class="fas fa-tools fa-2x me-3"></i>
-            //                 <div>
-            //                     <div class="fw-bold">🎉 Product Ready for Assembly!</div>
-            //                     <div class="small">
-            //                         ${data.productName} (${data.itemNumber || data.productId})
-            //                     </div>
-            //                     <div class="small text-light">All parts sorted - ready for assembly station</div>
-            //                     <div class="small mt-1">
-            //                         <i class="fas fa-arrow-right me-1"></i>
-            //                         Next: Move to Assembly Station
-            //                     </div>
-            //                 </div>
-            //             </div>
-            //         </div>
-            //         <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-            //     </div>
-            // `;
-            // toastContainer.appendChild(toast);
-            // const bsToast = new bootstrap.Toast(toast, { delay: 10000 }); // Show longer for assembly notifications
-            // bsToast.show();
-            // 
-            // toast.addEventListener('hidden.bs.toast', () => toast.remove());
-            
-            // Play success sound for assembly readiness
-            playSuccessSound();
         }
 
         // Bin detail modal functions
@@ -913,6 +849,17 @@ else
 
         function displayBinDetails(bin) {
             const content = document.getElementById('binDetailContent');
+            const modal = document.getElementById('binDetailModal');
+            
+            // Check if bin is from different work order and style modal accordingly
+            const activeWorkOrderId = '@ViewBag.ActiveWorkOrderId';
+            const isDifferentWorkOrder = bin.workOrderId && activeWorkOrderId && bin.workOrderId !== activeWorkOrderId;
+            
+            if (isDifferentWorkOrder) {
+                modal.classList.add('different-work-order-modal');
+            } else {
+                modal.classList.remove('different-work-order-modal');
+            }
             
             let html = `
                 <div class="row mb-4">
@@ -922,14 +869,14 @@ else
                             <tr><td><strong>Label:</strong></td><td>${bin.label}</td></tr>
                             <tr><td><strong>Position:</strong></td><td>Row ${bin.row}, Column ${bin.column}</td></tr>
                             <tr><td><strong>Status:</strong></td><td><span class="badge bg-${getBinStatusBadgeClass(bin.status)}">${bin.statusText}</span></td></tr>
-                            <tr><td><strong>Progress:</strong></td><td>${bin.partsCount}/${bin.maxCapacity} parts (${bin.capacityPercentage}%)</td></tr>
+                            <tr><td><strong>Progress:</strong></td><td>${bin.status === 'empty' ? '' : `${bin.partsCount} parts`}</td></tr>
                         </table>
                     </div>
                     <div class="col-md-6">
                         <h6>Assignment Details</h6>
                         <table class="table table-sm">
                             <tr><td><strong>Product:</strong></td><td>${bin.productName || 'Not assigned'}</td></tr>
-                            <tr><td><strong>Work Order:</strong></td><td>${bin.workOrderId || 'Not assigned'}</td></tr>
+                            <tr><td><strong>Work Order:</strong></td><td>${bin.workOrderName || 'Not assigned'}</td></tr>
                             <tr><td><strong>Assigned:</strong></td><td>${bin.assignedDate || 'N/A'}</td></tr>
                             <tr><td><strong>Last Updated:</strong></td><td>${bin.lastUpdatedDate || 'N/A'}</td></tr>
                         </table>
@@ -1048,6 +995,8 @@ else
                     // Refresh the rack display
                     if (currentRackId) {
                         loadRackDetails(currentRackId);
+                        // Update the rack badge in dropdown
+                        updateRackBadge(currentRackId);
                     }
                     
                     // Update cut parts count
@@ -1122,6 +1071,8 @@ else
                     // Refresh the rack display
                     if (currentRackId) {
                         loadRackDetails(currentRackId);
+                        // Update the rack badge in dropdown
+                        updateRackBadge(currentRackId);
                     }
                     
                     // Update cut parts count
@@ -1143,30 +1094,89 @@ else
     </script>
 
     <style>
-        .rack-grid {
-            display: table;
-            margin: 0 auto;
-            border-collapse: separate;
-            border-spacing: 3px;
-            width: 75vw;
-            max-width: 1200px;
+        /* Full viewport height layout */
+        html, body {
+            height: 100vh;
+            overflow-x: hidden; /* Prevent horizontal scroll */
+            overflow-y: hidden; /* No vertical scroll on body */
+            margin: 0;
+            padding: 0;
         }
-
-        .grid-row {
-            display: table-row;
+        
+        /* Adjust main container to use flexbox */
+        main.container-fluid {
+            height: calc(100vh - 76px); /* Subtract navbar height */
+            display: flex;
+            flex-direction: column;
+            padding-bottom: 165px !important; /* Space for fixed billboard (150px + 15px padding) */
+            overflow: hidden;
+        }
+        
+        /* Make rack display area scrollable and fill remaining height */
+        .rack-display-wrapper {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            min-height: 0; /* Important for flexbox */
+            margin-left: -15px; /* Compensate for container padding */
+            margin-right: -15px;
+            padding-left: 15px;
+            padding-right: 15px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .rack-display-wrapper .row {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .rack-display-wrapper .col-12 {
+            flex: 1;
+            display: flex;
+        }
+        
+        .rack-display-wrapper .card {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .rack-display-wrapper .card-body {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 15px;
+        }
+        
+        #rack-grid-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .rack-grid {
+            display: grid;
+            margin: 0 auto;
+            gap: 4px;
+            width: 100%;
+            flex: 1; /* Take all available space */
+            max-width: none;
+            /* grid-template-rows and grid-template-columns set dynamically via JavaScript */
         }
 
         .grid-bin {
-            display: table-cell;
-            width: 75px;
-            height: 75px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             text-align: center;
-            vertical-align: middle;
             border: 2px solid #dee2e6;
             position: relative;
             cursor: pointer;
             transition: all 0.2s ease;
-            font-size: 0.85rem;
+            font-size: 1.2rem;
+            font-weight: 600;
         }
 
         .grid-bin:hover {
@@ -1175,23 +1185,26 @@ else
             border-color: #004F00;
         }
 
-        .bin-label {
-            font-weight: bold;
-            line-height: 1;
-            font-size: 0.8rem;
-        }
-
         .bin-content {
-            font-size: 0.7rem;
-            opacity: 0.8;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
         }
 
-        .bin-warning {
-            position: absolute;
-            top: 3px;
-            right: 3px;
-            color: #dc3545;
-            font-size: 0.7rem;
+        .item-number {
+            font-size: 1.2rem;
+            font-weight: 700;
+            line-height: 1.2;
+            margin-bottom: 4px;
+            text-align: center;
+        }
+
+        .part-count {
+            font-size: 0.9rem;
+            opacity: 0.8;
+            font-weight: 500;
         }
 
         .bin-empty {
@@ -1289,6 +1302,22 @@ else
                 opacity: 1; 
                 transform: translateY(0) scale(1); 
             }
+        }
+
+        /* Different work order modal styling */
+        .different-work-order-modal .modal-content {
+            background-color: #f8d7da;
+            border: 2px solid #dc3545;
+        }
+
+        .different-work-order-modal .modal-header {
+            background-color: #dc3545;
+            color: white;
+            border-bottom: none;
+        }
+
+        .different-work-order-modal .modal-header .btn-close {
+            filter: invert(1);
         }
     </style>
 }

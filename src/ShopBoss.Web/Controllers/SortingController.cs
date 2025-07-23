@@ -26,17 +26,12 @@ public class SortingController : Controller
         _sortingRules = sortingRules;
     }
 
-    public async Task<IActionResult> Index()
+    public async Task<IActionResult> Index(string rackId = null)
     {
         try
         {
-            // Get active work order from session
+            // Get active work order from session (optional)
             var activeWorkOrderId = HttpContext.Session.GetString("ActiveWorkOrderId");
-            if (string.IsNullOrEmpty(activeWorkOrderId))
-            {
-                ViewBag.ErrorMessage = "No active work order selected. Please set an active work order from the Admin station.";
-                return View(new List<StorageRack>());
-            }
 
             // Get active work order details for display
             var activeWorkOrder = await _context.WorkOrders.FindAsync(activeWorkOrderId);
@@ -46,11 +41,13 @@ public class SortingController : Controller
             // Get all active storage racks with their bins
             var racks = await _sortingRules.GetActiveRacksAsync();
 
-            // Get cut parts that need sorting
-            var cutParts = await _context.Parts
-                .Include(p => p.NestSheet)
-                .Where(p => p.NestSheet!.WorkOrderId == activeWorkOrderId && p.Status == PartStatus.Cut)
-                .ToListAsync();
+            // Get cut parts that need sorting (only if active work order exists)
+            var cutParts = string.IsNullOrEmpty(activeWorkOrderId) 
+                ? new List<Part>()
+                : await _context.Parts
+                    .Include(p => p.NestSheet)
+                    .Where(p => p.NestSheet!.WorkOrderId == activeWorkOrderId && p.Status == PartStatus.Cut)
+                    .ToListAsync();
 
             // Sort by product name (resolved from both Products and DetachedProducts)
             var cutPartsWithProductNames = new List<(Part part, string productName)>();
@@ -69,6 +66,21 @@ public class SortingController : Controller
             ViewBag.CutPartsCount = sortedCutParts.Count;
             ViewBag.CutParts = sortedCutParts;
 
+            // Determine which rack to select
+            string selectedRackId = null;
+            if (!string.IsNullOrEmpty(rackId) && racks.Any(r => r.Id == rackId))
+            {
+                // Use provided rack if valid
+                selectedRackId = rackId;
+            }
+            else if (racks.Any())
+            {
+                // Fallback to first rack (no sorting)
+                selectedRackId = racks.First().Id;
+            }
+            
+            ViewBag.SelectedRackId = selectedRackId;
+            
             return View(racks);
         }
         catch (Exception ex)
@@ -150,6 +162,7 @@ public class SortingController : Controller
                             maxCapacity = progressTotalNeeded,
                             capacityPercentage = Math.Round(progressPercentage, 1),
                             productName = bin.Product?.Name ?? "",
+                            itemNumber = await GetItemNumberForPart(bin.ProductId),
                             partName = bin.Part?.Name ?? "",
                             workOrderId = bin.WorkOrderId,
                             isAvailable = bin.IsAvailable,
@@ -612,6 +625,14 @@ public class SortingController : Controller
             // Calculate enhanced progress information for this bin
             var (progressPartsCount, progressTotalNeeded, progressPercentage) = await CalculateBinProgressAsync(bin);
 
+            // Get work order name if bin has a work order assigned
+            string workOrderName = "None";
+            if (!string.IsNullOrEmpty(bin.WorkOrderId))
+            {
+                var workOrder = await _context.WorkOrders.FindAsync(bin.WorkOrderId);
+                workOrderName = workOrder?.Name ?? "Unknown";
+            }
+
             var binDetails = new
             {
                 success = true,
@@ -628,7 +649,9 @@ public class SortingController : Controller
                     maxCapacity = progressTotalNeeded,
                     capacityPercentage = Math.Round(progressPercentage, 1),
                     productName = bin.Product?.Name,
+                    itemNumber = bin.Product?.ItemNumber ?? "",
                     workOrderId = bin.WorkOrderId,
+                    workOrderName = workOrderName,
                     assignedDate = bin.AssignedDate?.ToString("yyyy-MM-dd HH:mm"),
                     lastUpdatedDate = bin.LastUpdatedDate?.ToString("yyyy-MM-dd HH:mm"),
                     notes = bin.Notes,
@@ -1054,33 +1077,25 @@ public class SortingController : Controller
         return suggestions;
     }
 
-    /// <summary>
-    /// Gets the product name for a part, checking both Products and DetachedProducts tables
-    /// </summary>
+    private async Task<string> GetItemNumberForPart(string? productId)
+    {
+        if (string.IsNullOrEmpty(productId)) return "Item #";
+        
+        return (await _context.Products.FindAsync(productId))?.ItemNumber ??
+               (await _context.DetachedProducts.FindAsync(productId))?.ItemNumber ??
+               "Item #";
+    }
+
     private async Task<string> GetProductNameForPart(string? productId)
     {
-        if (string.IsNullOrEmpty(productId))
-            return "Unknown";
-
-        try
-        {
-            // First try regular Products table
-            var product = await _context.Products.FindAsync(productId);
-            if (product != null)
-                return $"{product.ItemNumber} - {product.Name}";
-
-            // If not found, try DetachedProducts table
-            var detachedProduct = await _context.DetachedProducts.FindAsync(productId);
-            if (detachedProduct != null)
-                return $"{detachedProduct.ItemNumber} - {detachedProduct.Name}";
-
-            return "Unknown";
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Error getting product name for ProductId {ProductId}", productId);
-            return "Unknown";
-        }
+        if (string.IsNullOrEmpty(productId)) return "Item #";
+        
+        var product = await _context.Products.FindAsync(productId);
+        var detachedProduct = await _context.DetachedProducts.FindAsync(productId);
+        
+        return product != null ? $"{product.ItemNumber} - {product.Name}" :
+               detachedProduct != null ? $"{detachedProduct.ItemNumber} - {detachedProduct.Name}" :
+               "Item #";
     }
 
 
