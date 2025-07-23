@@ -115,7 +115,11 @@ public class ShippingController : Controller
             var product = await _context.Products
                 .Include(p => p.Parts)
                 .FirstOrDefaultAsync(p => p.WorkOrderId == activeWorkOrderId && 
-                                    (p.Id == barcode || p.Name == barcode || p.ItemNumber == barcode || p.Id.StartsWith(barcode + "_")));
+                                    (EF.Functions.Collate(p.Id, "NOCASE") == EF.Functions.Collate(barcode, "NOCASE") || 
+                                     EF.Functions.Collate(p.Name, "NOCASE") == EF.Functions.Collate(barcode, "NOCASE") || 
+                                     EF.Functions.Collate(p.ItemNumber, "NOCASE") == EF.Functions.Collate(barcode, "NOCASE") || 
+                                     EF.Functions.Like(EF.Functions.Collate(p.Id, "NOCASE"), EF.Functions.Collate(barcode + "_%", "NOCASE"))) &&
+                                    p.Status != PartStatus.Shipped);
 
             if (product == null)
             {
@@ -313,7 +317,10 @@ public class ShippingController : Controller
             var part = await _context.Parts
                 .Include(p => p.Product)
                 .FirstOrDefaultAsync(p => p.Product.WorkOrderId == activeWorkOrderId &&
-                                        (p.Id == barcode || p.Name == barcode || p.Id.StartsWith(barcode + "_")));
+                                        (EF.Functions.Collate(p.Id, "NOCASE") == EF.Functions.Collate(barcode, "NOCASE") || 
+                                         EF.Functions.Collate(p.Name, "NOCASE") == EF.Functions.Collate(barcode, "NOCASE") || 
+                                         EF.Functions.Like(EF.Functions.Collate(p.Id, "NOCASE"), EF.Functions.Collate(barcode + "_%", "NOCASE"))) &&
+                                        p.Product.Status != PartStatus.Shipped);
 
             if (part == null)
             {
@@ -400,7 +407,10 @@ public class ShippingController : Controller
             // Find the hardware item by barcode (ID or name)
             var hardware = await _context.Hardware
                 .FirstOrDefaultAsync(h => h.WorkOrderId == activeWorkOrderId && 
-                                    (h.Id == barcode || h.Name == barcode || h.Id.StartsWith(barcode + "_")));
+                                    (EF.Functions.Collate(h.Id, "NOCASE") == EF.Functions.Collate(barcode, "NOCASE") || 
+                                     EF.Functions.Collate(h.Name, "NOCASE") == EF.Functions.Collate(barcode, "NOCASE") || 
+                                     EF.Functions.Like(EF.Functions.Collate(h.Id, "NOCASE"), EF.Functions.Collate(barcode + "_%", "NOCASE"))) &&
+                                    h.Status != PartStatus.Shipped);
 
             if (hardware == null)
             {
@@ -638,7 +648,11 @@ public class ShippingController : Controller
             // Find the detached product by barcode (ID or name)
             var detachedProduct = await _context.DetachedProducts
                 .FirstOrDefaultAsync(d => d.WorkOrderId == activeWorkOrderId && 
-                                    (d.Id == barcode || d.Name == barcode || d.ItemNumber == barcode || d.Id.StartsWith(barcode + "_")));
+                                    (EF.Functions.Collate(d.Id, "NOCASE") == EF.Functions.Collate(barcode, "NOCASE") || 
+                                     EF.Functions.Collate(d.Name, "NOCASE") == EF.Functions.Collate(barcode, "NOCASE") || 
+                                     EF.Functions.Collate(d.ItemNumber, "NOCASE") == EF.Functions.Collate(barcode, "NOCASE") || 
+                                     EF.Functions.Like(EF.Functions.Collate(d.Id, "NOCASE"), EF.Functions.Collate(barcode + "_%", "NOCASE"))) &&
+                                    d.Status != PartStatus.Shipped);
 
             if (detachedProduct == null)
             {

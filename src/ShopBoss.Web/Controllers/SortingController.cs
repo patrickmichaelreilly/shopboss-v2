@@ -281,7 +281,9 @@ public class SortingController : Controller
             var part = await _context.Parts
                 .Include(p => p.NestSheet)
                 .FirstOrDefaultAsync(p => p.NestSheet!.WorkOrderId == activeWorkOrderId && 
-                                         (p.Id == cleanBarcode || p.Name == cleanBarcode) &&
+                                         (EF.Functions.Collate(p.Id, "NOCASE") == EF.Functions.Collate(cleanBarcode, "NOCASE") || 
+                                          EF.Functions.Collate(p.Name, "NOCASE") == EF.Functions.Collate(cleanBarcode, "NOCASE") ||
+                                          EF.Functions.Like(EF.Functions.Collate(p.Id, "NOCASE"), EF.Functions.Collate(cleanBarcode + "_%", "NOCASE"))) &&
                                          p.Status == PartStatus.Cut);
 
             if (part == null)

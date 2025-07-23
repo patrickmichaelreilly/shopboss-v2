@@ -105,7 +105,8 @@ public class CncController : Controller
             var nestSheet = await _context.NestSheets
                 .Include(n => n.Parts)
                 .FirstOrDefaultAsync(n => n.WorkOrderId == activeWorkOrderId && 
-                                         (n.Barcode == cleanBarcode || n.Name == cleanBarcode));
+                                         (EF.Functions.Collate(n.Barcode, "NOCASE") == EF.Functions.Collate(cleanBarcode, "NOCASE") || 
+                                          EF.Functions.Collate(n.Name, "NOCASE") == EF.Functions.Collate(cleanBarcode, "NOCASE")));
 
             if (nestSheet == null)
             {

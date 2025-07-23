@@ -218,7 +218,7 @@ class UniversalScanner {
         // Create and dispatch a custom event that pages can listen to
         const scanEvent = new CustomEvent('scanReceived', {
             detail: {
-                barcode: barcode.toUpperCase(),
+                barcode: barcode,
                 timestamp: new Date(),
                 containerId: this.containerId,
                 scanner: this
@@ -334,7 +334,7 @@ class UniversalScanner {
             // Handle Enter key - process accumulated barcode
             if (e.key === 'Enter') {
                 if (this.barcodeBuffer.trim()) {
-                    const barcode = this.barcodeBuffer.trim().toUpperCase();
+                    const barcode = this.barcodeBuffer.trim();
                     this.barcodeBuffer = '';
                     this.emitScanEvent(barcode);
                 }

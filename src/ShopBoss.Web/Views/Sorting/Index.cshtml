@@ -306,7 +306,7 @@ else
                     const bin = rack.bins[row][col];
                     // Determine status class - blocked takes precedence over full
                     const statusClass = bin.status === 'blocked' ? 'bin-blocked' : 
-                                      bin.capacityPercentage > 80 ? 'bin-full' : 
+                                      bin.capacityPercentage >= 100 ? 'bin-full' : 
                                       getBinStatusClass(bin.status);
                     const title = getBinTooltip(bin);
                     
@@ -864,7 +864,7 @@ else
                         <table class="table table-sm">
                             <tr><td><strong>Label:</strong></td><td>${bin.label}</td></tr>
                             <tr><td><strong>Position:</strong></td><td>Row ${bin.row}, Column ${bin.column}</td></tr>
-                            <tr><td><strong>Status:</strong></td><td><span class="badge bg-${getBinStatusBadgeClass(bin.status)}">${bin.statusText}</span></td></tr>
+                            <tr><td><strong>Status:</strong></td><td><span class="badge bg-${getBinStatusBadgeClass(bin.status === 'blocked' ? 'blocked' : bin.capacityPercentage >= 100 ? 'full' : bin.status)}">${bin.status === 'blocked' ? 'Blocked' : bin.capacityPercentage >= 100 ? 'Complete' : bin.statusText}</span></td></tr>
                             <tr><td><strong>Progress:</strong></td><td>${bin.status === 'empty' ? '' : `${bin.partsCount} parts`}</td></tr>
                         </table>
                     </div>

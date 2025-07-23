@@ -314,7 +314,10 @@ public class AssemblyController : Controller
                     .ThenInclude(pr => pr.Parts)
                 .Include(p => p.NestSheet)
                 .FirstOrDefaultAsync(p => p.NestSheet!.WorkOrderId == activeWorkOrderId && 
-                                    (p.Id == barcode || p.Name == barcode || p.Id.StartsWith(barcode + "_")));
+                                    (EF.Functions.Collate(p.Id, "NOCASE") == EF.Functions.Collate(barcode, "NOCASE") || 
+                                     EF.Functions.Collate(p.Name, "NOCASE") == EF.Functions.Collate(barcode, "NOCASE") || 
+                                     EF.Functions.Like(EF.Functions.Collate(p.Id, "NOCASE"), EF.Functions.Collate(barcode + "_%", "NOCASE"))) &&
+                                    p.Product.Status != PartStatus.Assembled);
 
             if (part == null)
             {
