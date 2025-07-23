@@ -99,10 +99,6 @@
                                 <i class="@rackTypeIcon me-2"></i>
                                 @rack.Name
                                 <span class="badge bg-@rackTypeColor ms-2">@rack.OccupiedBins/@rack.TotalBins</span>
-                                @if (rack.IsPortable)
-                                {
-                                    <i class="fas fa-dolly ms-1 text-muted" title="Portable"></i>
-                                }
                             </a>
                         </li>
                     }
@@ -1098,6 +1094,12 @@ else
             overflow-y: hidden; /* No vertical scroll on body */
             margin: 0;
             padding: 0;
+        }
+        
+        /* Prevent word wrapping in all table cells to maintain consistent row heights */
+        #cutPartsModal table td,
+        #binDetailModal table td {
+            white-space: nowrap;
         }
         
         /* Adjust main container to use flexbox */

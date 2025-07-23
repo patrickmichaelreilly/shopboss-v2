@@ -606,12 +606,17 @@ public class SortingController : Controller
 
                 foreach (var part in sortedParts)
                 {
+                    var productDisplayName = await GetProductNameForPart(part.ProductId);
+                    // Extract just the ItemNumber (part before the " - ")
+                    var itemNumber = productDisplayName.Contains(" - ") ? 
+                        productDisplayName.Split(" - ")[0] : productDisplayName;
+                    
                     binParts.Add(new
                     {
                         id = part.Id,
                         name = part.Name,
                         qty = part.Qty,
-                        productName = part.ProductId,
+                        productName = itemNumber,
                         material = part.Material,
                         length = part.Length,
                         width = part.Width,
@@ -1085,6 +1090,7 @@ public class SortingController : Controller
                "Item #";
     }
 
+
     private async Task<string> GetProductNameForPart(string? productId)
     {
         if (string.IsNullOrEmpty(productId)) return "Item #";
@@ -1121,16 +1127,22 @@ public class SortingController : Controller
                 return (0, 0, 0.0);
             }
 
-            // Get the product and its parts
+            // Get the product and its parts (check both Products and DetachedProducts)
             var product = await _context.Products
                 .Include(p => p.Parts)
                 .FirstOrDefaultAsync(p => p.Id == bin.ProductId);
 
-            if (product == null)
+            var detachedProduct = await _context.DetachedProducts
+                .Include(p => p.Parts)
+                .FirstOrDefaultAsync(p => p.Id == bin.ProductId);
+
+            if (product == null && detachedProduct == null)
             {
                 return (0, 0, 0.0);
             }
 
+            // Use parts from either regular product or detached product
+            var allParts = product?.Parts ?? detachedProduct!.Parts;
             List<Part> relevantParts;
             string progressType;
 
@@ -1139,7 +1151,7 @@ public class SortingController : Controller
             {
                 case RackType.DoorsAndDrawerFronts:
                     // For doors & fronts racks, track progress of doors and drawer fronts for this product
-                    relevantParts = product.Parts
+                    relevantParts = allParts
                         .Where(p => p.Category == PartCategory.DoorsAndDrawerFronts)
                         .ToList();
                     progressType = "doors/drawer fronts";
@@ -1147,7 +1159,7 @@ public class SortingController : Controller
 
                 case RackType.AdjustableShelves:
                     // For adjustable shelves racks, track progress of adjustable shelves for this product
-                    relevantParts = product.Parts
+                    relevantParts = allParts
                         .Where(p => p.Category == PartCategory.AdjustableShelves)
                         .ToList();
                     progressType = "adjustable shelves";
@@ -1155,7 +1167,7 @@ public class SortingController : Controller
 
                 case RackType.Hardware:
                     // For hardware racks, track progress of hardware parts for this product
-                    relevantParts = product.Parts
+                    relevantParts = allParts
                         .Where(p => p.Category == PartCategory.Hardware)
                         .ToList();
                     progressType = "hardware";
@@ -1165,7 +1177,7 @@ public class SortingController : Controller
                 case RackType.Cart:
                 default:
                     // For standard racks and carts, track standard parts for assembly readiness
-                    relevantParts = product.Parts.Where(p => p.Category == PartCategory.Standard).ToList();
+                    relevantParts = allParts.Where(p => p.Category == PartCategory.Standard).ToList();
                     progressType = "standard parts";
                     break;
             }
