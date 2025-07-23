@@ -25,9 +25,11 @@
     z-index: 10;
     height: 150px; /* Fixed height - 1.5-2x taller than original */
     margin: 0;
-    padding: 0 15px 15px 15px; /* Match Bootstrap container-fluid padding */
+    padding: 0 15px; /* Match Bootstrap container-fluid left/right padding, no bottom padding */
     background: transparent;
     box-sizing: border-box;
+    display: flex;
+    align-items: center; /* Center the billboard vertically within the container */
 }
 
 .billboard-message {
@@ -38,7 +40,7 @@
     box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
     border: 1px solid rgba(255, 255, 255, 0.2);
     animation: slideIn 0.3s ease-out;
-    height: 100%;
+    width: 100%;
     display: flex;
     align-items: center;
 }

@@ -153,21 +153,20 @@ public class SortingRuleService
 
     private Task<Bin?> FindProductGroupBinAsync(string productId, List<StorageRack> racks, Part newPart)
     {
-        // Look for existing bins with same product assignment that have capacity for this part
+        // Look for existing bins with same product assignment
         foreach (var rack in racks)
         {
             var productBin = rack.Bins
                 .Where(b => b.ProductId == productId && 
                            b.Status != BinStatus.Full && 
-                           b.Status != BinStatus.Blocked &&
-                           (b.PartsCount + newPart.Qty) <= b.MaxCapacity) // Ensure new part will fit
+                           b.Status != BinStatus.Blocked)
                 .OrderBy(b => b.PartsCount) // Prefer bins with fewer parts to balance load
                 .FirstOrDefault();
 
             if (productBin != null)
             {
-                _logger.LogInformation("Found existing product group bin {BinLabel} for product {ProductId} (current: {CurrentParts}, adding: {NewParts}, max: {MaxCapacity})", 
-                    productBin.BinLabel, productId, productBin.PartsCount, newPart.Qty, productBin.MaxCapacity);
+                _logger.LogInformation("Found existing product group bin {BinLabel} for product {ProductId} (current: {CurrentParts}, adding: {NewParts})", 
+                    productBin.BinLabel, productId, productBin.PartsCount, newPart.Qty);
                 return Task.FromResult<Bin?>(productBin);
             }
         }
@@ -192,14 +191,6 @@ public class SortingRuleService
 
             if (bin == null || bin.Status == BinStatus.Blocked) return false;
 
-            // Check if adding this part would exceed capacity
-            var newTotalParts = bin.PartsCount + part.Qty;
-            if (newTotalParts > bin.MaxCapacity)
-            {
-                _logger.LogWarning("Cannot assign part {PartId} to bin {BinLabel} - would exceed capacity ({Current} + {New} > {Max})", 
-                    partId, bin.BinLabel, bin.PartsCount, part.Qty, bin.MaxCapacity);
-                return false;
-            }
 
             // Update bin assignment - handle multiple parts in same bin
             if (bin.Status == BinStatus.Empty)
@@ -228,8 +219,8 @@ public class SortingRuleService
                 }
             }
             
-            bin.PartsCount = newTotalParts;
-            bin.Status = newTotalParts >= bin.MaxCapacity ? BinStatus.Full : BinStatus.Partial;
+            bin.PartsCount = bin.PartsCount + 1;
+            bin.Status = BinStatus.Partial; // Always partial when parts are added (full status determined by product completion logic elsewhere)
             bin.LastUpdatedDate = DateTime.UtcNow;
 
             // Update part status to Sorted and set location
@@ -237,8 +228,8 @@ public class SortingRuleService
             part.StatusUpdatedDate = DateTime.UtcNow;
             part.Location = $"{bin.StorageRack.Name}:{bin.BinLabel}"; // e.g., "Standard Rack A:A01"
 
-            _logger.LogInformation("Assigned part {PartId} ({PartName}) to bin {BinLabel} at location {Location} - new total: {TotalParts}/{MaxCapacity}", 
-                partId, part.Name, bin.BinLabel, part.Location, bin.PartsCount, bin.MaxCapacity);
+            _logger.LogInformation("Assigned part {PartId} ({PartName}) to bin {BinLabel} at location {Location} - new total: {TotalParts} parts", 
+                partId, part.Name, bin.BinLabel, part.Location, bin.PartsCount);
 
             await _context.SaveChangesAsync();
             return true;

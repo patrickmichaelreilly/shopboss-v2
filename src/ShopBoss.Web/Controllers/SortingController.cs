@@ -606,13 +606,12 @@ public class SortingController : Controller
 
                 foreach (var part in sortedParts)
                 {
-                    var productName = await GetProductNameForPart(part.ProductId);
                     binParts.Add(new
                     {
                         id = part.Id,
                         name = part.Name,
                         qty = part.Qty,
-                        productName = productName,
+                        productName = part.ProductId,
                         material = part.Material,
                         length = part.Length,
                         width = part.Width,
@@ -713,8 +712,8 @@ public class SortingController : Controller
                 }
                 else
                 {
-                    // Update bin status based on remaining capacity
-                    bin.Status = bin.PartsCount >= bin.MaxCapacity ? BinStatus.Full : BinStatus.Partial;
+                    // Update bin status
+                    bin.Status = bin.PartsCount > 0 ? BinStatus.Partial : BinStatus.Empty;
                     
                     // Update contents to remove this part
                     if (!string.IsNullOrEmpty(bin.Contents))
@@ -1109,8 +1108,8 @@ public class SortingController : Controller
     {
         if (string.IsNullOrEmpty(bin.ProductId))
         {
-            // No product assigned - use existing capacity logic
-            return (bin.PartsCount, bin.MaxCapacity, bin.CapacityPercentage);
+            // No product assigned - return blank/zero values
+            return (0, 0, 0.0);
         }
 
         try
@@ -1119,7 +1118,7 @@ public class SortingController : Controller
             var rack = await _context.StorageRacks.FindAsync(bin.StorageRackId);
             if (rack == null)
             {
-                return (bin.PartsCount, bin.MaxCapacity, bin.CapacityPercentage);
+                return (0, 0, 0.0);
             }
 
             // Get the product and its parts
@@ -1129,7 +1128,7 @@ public class SortingController : Controller
 
             if (product == null)
             {
-                return (bin.PartsCount, bin.MaxCapacity, bin.CapacityPercentage);
+                return (0, 0, 0.0);
             }
 
             List<Part> relevantParts;
@@ -1194,8 +1193,8 @@ public class SortingController : Controller
             _logger.LogWarning(ex, "Error calculating bin progress for bin {BinId} and product {ProductId}", 
                 bin.Id, bin.ProductId);
             
-            // Fallback to existing capacity logic
-            return (bin.PartsCount, bin.MaxCapacity, bin.CapacityPercentage);
+            // Fallback for error cases
+            return (0, 0, 0.0);
         }
     }
 }

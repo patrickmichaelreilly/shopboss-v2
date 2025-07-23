@@ -47,19 +47,70 @@
         .progress-76-99 { background-color: #198754; }
         .progress-100 { background-color: #004F00; }
         
-        .rack-indicator {
-            display: inline-block;
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            margin-right: 8px;
+        /* Assembly Station Layout - match Sorting Station viewport usage */
+        main.container-fluid {
+            height: calc(100vh - 76px - 175px); /* Subtract navbar height and billboard space */
+            display: flex;
+            flex-direction: column;
+            padding-bottom: 0 !important; /* No bottom padding since we subtracted it from height */
+            overflow: hidden;
         }
         
-        .rack-standard { background-color: #004F00; }
-        .rack-doors { background-color: #198754; }
-        .rack-shelves { background-color: #fd7e14; }
-        .rack-hardware { background-color: #6f42c1; }
-        .rack-cart { background-color: #dc3545; }
+        /* Make assembly queue area scrollable and fill remaining height - match Sorting Station */
+        .assembly-queue-wrapper {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            min-height: 0; /* Important for flexbox */
+            margin-left: 0; /* Match billboard width - no negative margins */
+            margin-right: 0;
+            padding-left: 0; /* No extra padding since we're not compensating */
+            padding-right: 0;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .assembly-queue-wrapper .row {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .assembly-queue-wrapper .col-12 {
+            flex: 1;
+            display: flex;
+        }
+        
+        .assembly-queue-wrapper .card {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .assembly-queue-wrapper .card-body {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 15px;
+        }
+        
+        /* Ensure assembly cards maintain horizontal layout for their internal elements */
+        .assembly-card .row {
+            display: flex !important;
+            flex-direction: row !important;
+            align-items: center !important;
+            margin: 0 !important;
+        }
+        
+        .assembly-card .col-auto {
+            flex: 0 0 auto !important;
+            display: block !important;
+        }
+        
+        .assembly-card .col {
+            flex: 1 1 0% !important;
+            display: block !important;
+        }
         
         .part-location {
             background-color: #e9ecef;
@@ -68,14 +119,6 @@
             margin: 2px;
             display: inline-block;
             font-size: 0.875rem;
-        }
-        
-        .filtered-parts-section {
-            background-color: #fff3cd;
-            border: 1px solid #ffecb5;
-            border-radius: 8px;
-            padding: 15px;
-            margin-top: 20px;
         }
         
         .btn-start-assembly {
@@ -105,7 +148,7 @@
     </style>
 }
 
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex justify-content-between align-items-center mb-3">
     <div class="d-flex align-items-center gap-3">
         <div>
             <h1 class="h2 mb-0">Assembly Station</h1>
@@ -150,33 +193,12 @@
 
 
 
-<!-- Inline Location Guidance -->
-<div id="locationGuidanceSection" class="row mb-4" style="display: none;">
-    <div class="col-12">
-        <div class="card border-success">
-            <div class="card-header bg-success text-white">
-                <h6 class="mb-0">
-                    <i class="fas fa-map-marker-alt me-2"></i>
-                    Component Location Guidance
-                </h6>
-            </div>
-            <div class="card-body" id="locationGuidanceContent">
-                <!-- Content will be populated by JavaScript -->
-            </div>
-        </div>
-    </div>
-</div>
 
 <!-- Assembly Queue -->
-<div class="row">
-    <div class="col-lg-8">
+<div class="assembly-queue-wrapper">
+    <div class="row">
+        <div class="col-12">
         <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">
-                    <i class="fas fa-clipboard-list me-2"></i>
-                    Assembly Queue
-                </h5>
-            </div>
             <div class="card-body">
                 @if (!Model.Products.Any())
                 {
@@ -280,89 +302,9 @@
             </div>
         </div>
     </div>
-    
-    <!-- Sorting Rack Status -->
-    <div class="col-lg-4">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">
-                    <i class="fas fa-warehouse me-2"></i>
-                    Sorting Rack Status
-                </h5>
-            </div>
-            <div class="card-body">
-                @if (!Model.StorageRacks.Any())
-                {
-                    <p class="text-muted">No storage racks configured.</p>
-                }
-                else
-                {
-                    @foreach (var rack in Model.StorageRacks.OrderBy(r => r.Type))
-                    {
-                        var rackClass = rack.Type.ToString().ToLower();
-                        
-                        <div class="d-flex justify-content-between align-items-center mb-2 p-2 bg-light rounded">
-                            <div>
-                                <span class="rack-indicator rack-@rackClass"></span>
-                                <strong>@rack.Name</strong>
-                                <br>
-                                <small class="text-muted">@rack.Type</small>
-                            </div>
-                            <div class="text-end">
-                                <div class="fw-bold">@rack.OccupiedBins/@rack.TotalBins</div>
-                                <div class="small text-muted">@rack.OccupancyPercentage.ToString("F0")% full</div>
-                            </div>
-                        </div>
-                    }
-                }
-                
-                <div class="mt-3">
-                    <a href="/Sorting" class="btn btn-outline-primary btn-sm w-100">
-                        <i class="fas fa-external-link-alt me-1"></i>
-                        View Sorting Station
-                    </a>
-                </div>
-            </div>
-        </div>
-    </div>
+</div>
 </div>
 
-<!-- Filtered Parts Information -->
-@if (Model.FilteredParts.Any())
-{
-    <div class="filtered-parts-section mt-4">
-        <h5>
-            <i class="fas fa-filter me-2"></i>
-            Doors, Fronts & Adjustable Shelves
-        </h5>
-        <p class="mb-3">
-            <small class="text-muted">
-                These components are processed separately and will need to be collected from specialized racks after standard assembly.
-            </small>
-        </p>
-        
-        <div class="row">
-            @foreach (var group in Model.FilteredParts.GroupBy(f => f.Category))
-            {
-                <div class="col-md-4 mb-3">
-                    <h6>@group.Key</h6>
-                    @foreach (var part in group.Take(5))
-                    {
-                        <div class="small mb-1">
-                            <strong>@part.PartName</strong> (Qty: @part.Quantity)
-                            <br>
-                            <span class="text-muted">@part.Location</span>
-                        </div>
-                    }
-                    @if (group.Count() > 5)
-                    {
-                        <div class="small text-muted">+@(group.Count() - 5) more items</div>
-                    }
-                </div>
-            }
-        </div>
-    </div>
-}
 
 <!-- Barcode Scan Modal -->
 <div class="modal fade" id="assemblyScanModal" tabindex="-1">
@@ -398,28 +340,6 @@
     </div>
 </div>
 
-<!-- Filtered Parts Guidance Modal -->
-<div class="modal fade" id="filteredPartsModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">
-                    <i class="fas fa-map-marker-alt me-2"></i>
-                    Next Steps: Collect Finishing Components
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body" id="filteredPartsContent">
-                <!-- Content will be populated dynamically -->
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">
-                    <i class="fas fa-check me-1"></i>Got it!
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
 
 <!-- Product Details Modal -->
 <div class="modal fade" id="productDetailsModal" tabindex="-1">
@@ -739,42 +659,6 @@
                 </div>
             `;
 
-            if (product.FilteredParts && product.FilteredParts.length > 0) {
-                html += `
-                    <h6 class="mt-3">Doors, Fronts & Adjustable Shelves</h6>
-                    <div class="table-responsive">
-                        <table class="table table-sm">
-                            <thead>
-                                <tr>
-                                    <th>Part Name</th>
-                                    <th>Category</th>
-                                    <th>Status</th>
-                                    <th>Location</th>
-                                    <th>Qty</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                `;
-
-                product.FilteredParts.forEach(part => {
-                    const statusBadge = part.Status === 'Sorted' ? 'bg-success' : 'bg-secondary';
-                    html += `
-                        <tr>
-                            <td>${part.Name}</td>
-                            <td><span class="badge bg-info">${part.Category}</span></td>
-                            <td><span class="badge ${statusBadge}">${part.Status}</span></td>
-                            <td>${part.Location}</td>
-                            <td>${part.Quantity}</td>
-                        </tr>
-                    `;
-                });
-
-                html += `
-                            </tbody>
-                        </table>
-                    </div>
-                `;
-            }
 
             return html;
         }
@@ -826,159 +710,7 @@
 
         // Old showScanStatus function removed - using Universal Scanner instead
 
-        function showInlineLocationGuidance(productName, filteredParts) {
-            console.log('showInlineLocationGuidance called with:', { productName, filteredParts });
-            
-            const section = document.getElementById('locationGuidanceSection');
-            const content = document.getElementById('locationGuidanceContent');
-            
-            let html = `
-                <div class="alert alert-success mb-3">
-                    <h6><i class="fas fa-check-circle me-2"></i>Standard Assembly Complete!</h6>
-                    <p class="mb-0">Product "<strong>${productName}</strong>" standard assembly is complete. Now collect these finishing components:</p>
-                </div>
-            `;
-            
-            // Group by category
-            const categories = {};
-            filteredParts.forEach(part => {
-                if (!categories[part.category]) {
-                    categories[part.category] = [];
-                }
-                categories[part.category].push(part);
-            });
-            
-            // Display parts by category
-            Object.keys(categories).forEach(category => {
-                html += `
-                    <div class="mb-3">
-                        <h6 class="text-primary mb-2">
-                            <i class="fas fa-folder me-1"></i>${category}
-                        </h6>
-                `;
-                
-                categories[category].forEach(part => {
-                    const locationBadge = part.location && part.location !== 'Not Sorted' 
-                        ? `<span class="badge bg-success ms-2">${part.location}</span>`
-                        : `<span class="badge bg-warning ms-2">Not Sorted</span>`;
-                    
-                    html += `
-                        <div class="d-flex justify-content-between align-items-center p-2 mb-1 bg-light rounded">
-                            <span><strong>${part.partName}</strong> (Qty: ${part.quantity})</span>
-                            ${locationBadge}
-                        </div>
-                    `;
-                });
-                
-                html += `</div>`;
-            });
-            
-            html += `
-                <div class="alert alert-info mb-0">
-                    <i class="fas fa-info-circle me-2"></i>
-                    <strong>Next Step:</strong> Collect these components and continue with assembly. 
-                    This guidance will disappear automatically in 30 seconds.
-                </div>
-            `;
-            
-            content.innerHTML = html;
-            section.style.display = 'block';
-            
-            // Auto-hide after 30 seconds for scanner-friendly workflow
-            setTimeout(() => {
-                section.style.display = 'none';
-            }, 30000);
-        }
 
-        function showFilteredPartsGuidance(productName, filteredParts) {
-            console.log('showFilteredPartsGuidance called with:', { productName, filteredParts });
-            
-            const modal = new bootstrap.Modal(document.getElementById('filteredPartsModal'));
-            const content = document.getElementById('filteredPartsContent');
-            
-            let html = `
-                <div class="alert alert-success mb-3">
-                    <h6><i class="fas fa-check-circle me-2"></i>Standard Assembly Complete!</h6>
-                    <p class="mb-0">Product "<strong>${productName}</strong>" standard assembly is complete. Now collect these finishing components:</p>
-                </div>
-            `;
-
-            // Group by category
-            const categories = {};
-            filteredParts.forEach((part, index) => {
-                console.log(`Part ${index}:`, part);
-                if (!categories[part.category]) {
-                    categories[part.category] = [];
-                }
-                categories[part.category].push(part);
-            });
-
-            Object.keys(categories).forEach(category => {
-                const categoryName = category || 'Unknown Category';
-                const categoryIcon = categoryName === 'DoorsAndDrawerFronts' ? 'fa-door-open' : 
-                                   categoryName === 'AdjustableShelves' ? 'fa-th-large' : 'fa-cube';
-                const displayName = categoryName.replace(/([A-Z])/g, ' $1').trim() || 'Unknown Category';
-                
-                html += `
-                    <div class="card mb-3">
-                        <div class="card-header">
-                            <h6 class="mb-0">
-                                <i class="fas ${categoryIcon} me-2"></i>
-                                ${displayName}
-                            </h6>
-                        </div>
-                        <div class="card-body">
-                            <div class="row">
-                `;
-
-                categories[category].forEach(part => {
-                    const partName = part.name || 'Unknown Part';
-                    const partQuantity = part.quantity || 0;
-                    const partLocation = part.location || 'Location Unknown';
-                    
-                    html += `
-                        <div class="col-md-6 mb-2">
-                            <div class="d-flex justify-content-between align-items-center p-2 bg-light rounded">
-                                <div>
-                                    <strong>${partName}</strong>
-                                    <br>
-                                    <small class="text-muted">Qty: ${partQuantity}</small>
-                                </div>
-                                <div class="text-end">
-                                    <span class="badge bg-info">${partLocation}</span>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                });
-
-                html += `
-                            </div>
-                        </div>
-                    </div>
-                `;
-            });
-
-            html += `
-                <div class="alert alert-info">
-                    <i class="fas fa-info-circle me-2"></i>
-                    <strong>Next Steps:</strong> Collect the components above from their rack locations and complete the final assembly.
-                </div>
-            `;
-
-            content.innerHTML = html;
-            
-            // Add event listener for when modal is dismissed to refresh the UI
-            const modalElement = document.getElementById('filteredPartsModal');
-            modalElement.addEventListener('hidden.bs.modal', function handleModalDismiss() {
-                // Remove the event listener to prevent multiple listeners
-                modalElement.removeEventListener('hidden.bs.modal', handleModalDismiss);
-                // Reload the page to show updated product status
-                location.reload();
-            });
-            
-            modal.show();
-        }
         
         // Listen for scan events from Universal Scanner (auto-initialized)
         // First, remove any existing listeners to prevent duplicates
@@ -1030,10 +762,6 @@
                 if (data.success) {
                     scanner.showScanResult(true, data.message);
                     
-                    // Show filtered parts guidance if needed
-                    if (data.hasFilteredParts && data.filteredPartsGuidance && data.filteredPartsGuidance.length > 0) {
-                        showInlineLocationGuidance(data.productName, data.filteredPartsGuidance);
-                    }
                     
                     // Auto-refresh after 3 seconds to show updated queue
                     setTimeout(() => {

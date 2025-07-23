@@ -59,17 +59,13 @@ public class AssemblyController : Controller
         // Get assembly readiness information
         var readyProductIds = await _sortingRuleService.CheckAssemblyReadinessAsync(activeWorkOrderId);
         
-        // Get rack information to show sorting status
-        var racks = await _sortingRuleService.GetActiveRacksAsync();
 
         // Prepare assembly readiness data using optimized data
         var assemblyData = new AssemblyDashboardData
         {
             WorkOrder = assemblyStationData.WorkOrder,
             ReadyProductIds = readyProductIds,
-            StorageRacks = racks,
-            Products = GetProductsWithAssemblyStatusOptimized(assemblyStationData.Products, assemblyStationData.Parts, readyProductIds),
-            FilteredParts = GetFilteredPartsLocationsOptimized(assemblyStationData.Products, assemblyStationData.Parts)
+            Products = GetProductsWithAssemblyStatusOptimized(assemblyStationData.Products, assemblyStationData.Parts, readyProductIds)
         };
 
         return View(assemblyData);
@@ -282,57 +278,6 @@ public class AssemblyController : Controller
                     .ToList();
     }
 
-    private List<FilteredPartLocation> GetFilteredPartsLocationsOptimized(
-        List<Product> products,
-        List<PartSummary> allParts)
-    {
-        var result = new List<FilteredPartLocation>();
-
-        foreach (var product in products)
-        {
-            // Get parts for this product from the optimized part list
-            var productParts = allParts.Where(p => p.ProductId == product.Id).ToList();
-            
-            // Convert PartSummary to Part objects for filtering service compatibility
-            var convertedParts = productParts.Select(ps => new Part
-            {
-                Id = ps.Id,
-                Name = ps.Name,
-                Status = ps.Status,
-                Qty = ps.Qty,
-                Location = ps.Location,
-                Length = ps.Length,
-                Width = ps.Width,
-                Thickness = ps.Thickness,
-                Material = ps.Material,
-                Category = ps.Category
-            }).ToList();
-
-            var filteredParts = convertedParts.Where(p => p.Category != PartCategory.Standard).ToList();
-            
-            foreach (var part in filteredParts)
-            {
-                var category = part.Category;
-                var location = !string.IsNullOrEmpty(part.Location) ? part.Location : "Not Sorted";
-                
-                result.Add(new FilteredPartLocation
-                {
-                    ProductId = product.Id,
-                    ProductName = product.Name,
-                    PartName = part.Name,
-                    Category = category.ToString(),
-                    Location = location,
-                    Status = part.Status.ToString(),
-                    Quantity = part.Qty
-                });
-            }
-        }
-
-        return result.OrderBy(f => f.ProductName)
-                    .ThenBy(f => f.Category)
-                    .ThenBy(f => f.PartName)
-                    .ToList();
-    }
 
     [HttpPost]
     public async Task<IActionResult> ScanPartForAssembly(string barcode)
@@ -895,9 +840,7 @@ public class AssemblyDashboardData
 {
     public WorkOrder WorkOrder { get; set; } = null!;
     public List<string> ReadyProductIds { get; set; } = new();
-    public List<StorageRack> StorageRacks { get; set; } = new();
     public List<ProductAssemblyStatus> Products { get; set; } = new();
-    public List<FilteredPartLocation> FilteredParts { get; set; } = new();
 }
 
 public class ProductAssemblyStatus

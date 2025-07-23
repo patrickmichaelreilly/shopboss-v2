@@ -896,7 +896,6 @@ else
                                     <th>Qty</th>
                                     <th>Material</th>
                                     <th>Dimensions</th>
-                                    <th>Sorted Date</th>
                                     <th>Action</th>
                                 </tr>
                             </thead>
@@ -917,7 +916,6 @@ else
                             <td>${part.qty}</td>
                             <td>${part.material || 'N/A'}</td>
                             <td class="small">${dimensions}</td>
-                            <td class="small">${part.sortedDate}</td>
                             <td>
                                 <button type="button" class="btn btn-sm btn-outline-danger" 
                                         onclick="removePartFromBin('${part.id}', '${part.name}')"
@@ -967,6 +965,11 @@ else
         }
 
         function removePartFromBin(partId, partName) {
+            // Find the row for this part and remove it instantly
+            const partRow = document.querySelector(`button[onclick*="${partId}"]`)?.closest('tr');
+            if (partRow) {
+                partRow.remove();
+            }
             
             fetch('/Sorting/RemovePartFromBin', {
                 method: 'POST',
@@ -978,19 +981,7 @@ else
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    // showToast(`Part "${partName}" removed from bin successfully`, 'success');
-                    showBillboard('sorting-billboard', `Part "${partName}" removed from bin successfully`, 'success', 'Part Removed');
-                    
-                    // Check if bin is now empty and close modal, otherwise refresh
-                    if (data.updatedCutPartsCount !== undefined) {
-                        // If the operation succeeded, check if we should close or refresh the modal
-                        const binModal = bootstrap.Modal.getInstance(document.getElementById('binDetailModal'));
-                        if (binModal) {
-                            binModal.hide();
-                        }
-                        // Clean up any stuck modal state
-                        cleanupModalState();
-                    }
+                    showBillboard('sorting-billboard', `Part "${partName}" removed from bin successfully`, 'info', 'Part Removed');
                     
                     // Refresh the rack display
                     if (currentRackId) {
@@ -1004,14 +995,20 @@ else
                         updateCutPartsCount(data.updatedCutPartsCount);
                     }
                 } else {
-                    // showToast(`Failed to remove part: ${data.message}`, 'error');
                     showBillboard('sorting-billboard', `Failed to remove part: ${data.message}`, 'danger', 'Remove Error');
+                    // If the removal failed, we need to refresh the modal to restore the removed row
+                    if (currentBinDetails) {
+                        showBinDetailModal(currentBinDetails.rackId, currentBinDetails.row, currentBinDetails.column, currentBinDetails.label);
+                    }
                 }
             })
             .catch(error => {
                 console.error('Error removing part from bin:', error);
-                // showToast('An error occurred while removing the part', 'error');
                 showBillboard('sorting-billboard', 'An error occurred while removing the part', 'danger', 'Network Error');
+                // If there was an error, refresh the modal to restore the removed row
+                if (currentBinDetails) {
+                    showBinDetailModal(currentBinDetails.rackId, currentBinDetails.row, currentBinDetails.column, currentBinDetails.label);
+                }
             });
         }
 
@@ -1059,7 +1056,7 @@ else
             .then(data => {
                 if (data.success) {
                     // showToast(`Bin "${currentBinDetails.label}" cleared successfully. ${data.partsRemoved} parts removed.`, 'success');
-                    showBillboard('sorting-billboard', `Bin "${currentBinDetails.label}" cleared successfully. ${data.partsRemoved} parts removed.`, 'success', 'Bin Cleared');
+                    showBillboard('sorting-billboard', `Bin "${currentBinDetails.label}" cleared successfully. ${data.partsRemoved} parts removed.`, 'info', 'Bin Cleared');
                     
                     // Close the modal and ensure backdrop is removed
                     const modal = bootstrap.Modal.getInstance(document.getElementById('binDetailModal'));
@@ -1108,7 +1105,7 @@ else
             height: calc(100vh - 76px); /* Subtract navbar height */
             display: flex;
             flex-direction: column;
-            padding-bottom: 165px !important; /* Space for fixed billboard (150px + 15px padding) */
+            padding-bottom: 175px !important; /* Space for fixed billboard (150px height) + 25px buffer */
             overflow: hidden;
         }
         
