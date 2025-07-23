@@ -13,6 +13,14 @@ builder.Host.UseWindowsService();
 builder.Services.AddControllersWithViews();
 builder.Services.AddSignalR();
 
+// Configure form options for large file uploads
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
+{
+    options.ValueLengthLimit = int.MaxValue;
+    options.MultipartBodyLengthLimit = long.MaxValue;
+    options.MultipartHeadersLengthLimit = int.MaxValue;
+});
+
 // Add HTTP context accessor for services that need access to the current HTTP context
 builder.Services.AddHttpContextAccessor();
 
