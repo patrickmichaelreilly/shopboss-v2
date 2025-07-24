@@ -431,21 +431,14 @@
 
         // Listen for products assembled via manual button
         connection.on("ProductAssembledManually", function (data) {
-            console.log("ProductAssembledManually event received:", data);
-            showToast(`Product "${data.ProductName}" assembled successfully!`, 'success');
-            showBillboard('assembly-billboard', `Product "${data.ProductName}" assembled successfully!`, 'success', 'Manual Assembly Complete');
-            updateProductStatus(data.ProductId, 'completed');
+            // showToast(`Product "${data.productName}" assembled successfully!`, 'success');
+            showBillboard('assembly-billboard', `Product "${data.productName}" assembled successfully!`, 'success', 'Manual Assembly Complete');
+            updateProductStatus(data.productId, 'completed');
             updateShippingReadinessStatus(data);
-            
-            // Refresh the page to show updated assembly queue
-            setTimeout(() => {
-                location.reload();
-            }, 2000);
         });
 
         // Listen for general status updates
         connection.on("StatusUpdate", function (data) {
-            console.log("StatusUpdate event received:", data);
             if (data.type === "product-assembled") {
                 updateProductStatus(data.productId, 'completed');
                 updateShippingReadinessStatus(data);
@@ -560,7 +553,6 @@
 
         // Assembly functions
         function startAssembly(productId, productName) {
-
             const button = event.target.closest('button');
             const originalHtml = button.innerHTML;
             button.disabled = true;
@@ -578,11 +570,8 @@
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    showToast(data.message, 'success');
-                    showBillboard('assembly-billboard', data.message, 'success', 'Assembly Started');
-                    setTimeout(() => {
-                        location.reload();
-                    }, 2000);
+                    // Don't show toast here - SignalR will handle the notification
+                    // The page will reload when SignalR message is received
                 } else {
                     showToast(data.message, 'error');
                     showBillboard('assembly-billboard', data.message, 'danger', 'Assembly Error');

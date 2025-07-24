@@ -301,7 +301,6 @@ else
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    alert(data.message);
                     location.reload(); // Refresh to show updated status
                 } else {
                     alert('Error: ' + data.message);

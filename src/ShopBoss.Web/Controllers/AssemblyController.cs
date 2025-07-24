@@ -460,54 +460,48 @@ public class AssemblyController : Controller
             // Empty the bins that contained the assembled parts
             foreach (var binLocation in binsToEmpty)
             {
-                var binParts = await _context.Parts
-                    .Where(p => p.Location == binLocation && p.Status == PartStatus.Sorted)
-                    .ToListAsync();
-                
-                // If bin has no more sorted parts, mark it as empty
-                if (!binParts.Any())
+                // We know these bins should be empty now, so clear them unconditionally
+                // (same approach as the Clear Bin button in Sorting Station)
+                // Parse the location format "RackName:BinCode" (e.g., "Standard Rack A:A01")
+                var locationParts = binLocation.Split(':', 2);
+                Bin? bin = null;
+                if (locationParts.Length == 2)
                 {
-                    // Parse the location format "RackName:BinCode" (e.g., "Standard Rack A:A01")
-                    var locationParts = binLocation.Split(':', 2);
-                    Bin? bin = null;
-                    if (locationParts.Length == 2)
-                    {
-                        var rackName = locationParts[0];
-                        var binCode = locationParts[1]; // e.g., "A01"
-                        
-                        // Parse bin code: first char is row letter (A=1, B=2, etc), remaining digits are column
-                        if (binCode.Length >= 2 && char.IsLetter(binCode[0]) && int.TryParse(binCode.Substring(1), out var column))
-                        {
-                            var row = char.ToUpper(binCode[0]) - 'A' + 1;
-                            
-                            bin = await _context.Bins
-                                .Include(b => b.StorageRack)
-                                .FirstOrDefaultAsync(b => b.StorageRack.Name == rackName && b.Row == row && b.Column == column);
-                        }
-                    }
+                    var rackName = locationParts[0];
+                    var binCode = locationParts[1]; // e.g., "A01"
                     
-                    if (bin != null)
+                    // Parse bin code: first char is row letter (A=1, B=2, etc), remaining digits are column
+                    if (binCode.Length >= 2 && char.IsLetter(binCode[0]) && int.TryParse(binCode.Substring(1), out var column))
                     {
-                        bin.Status = BinStatus.Empty;
-                        bin.ProductId = null;
-                        bin.PartId = null;
-                        bin.WorkOrderId = null;
-                        bin.PartsCount = 0;
-                        bin.Contents = string.Empty;
-                        bin.LastUpdatedDate = DateTime.UtcNow;
+                        var row = char.ToUpper(binCode[0]) - 'A' + 1;
                         
-                        await _auditTrailService.LogAsync(
-                            action: "BinEmptied",
-                            entityType: "StorageBin",
-                            entityId: bin.Id,
-                            oldValue: "Occupied",
-                            newValue: "Empty",
-                            station: "Assembly",
-                            workOrderId: activeWorkOrderId,
-                            details: $"Bin emptied after assembly of product {part.Product.Name}",
-                            sessionId: HttpContext.Session.Id
-                        );
+                        bin = await _context.Bins
+                            .Include(b => b.StorageRack)
+                            .FirstOrDefaultAsync(b => b.StorageRack.Name == rackName && b.Row == row && b.Column == column);
                     }
+                }
+                
+                if (bin != null)
+                {
+                    bin.Status = BinStatus.Empty;
+                    bin.ProductId = null;
+                    bin.PartId = null;
+                    bin.WorkOrderId = null;
+                    bin.PartsCount = 0;
+                    bin.Contents = string.Empty;
+                    bin.LastUpdatedDate = DateTime.UtcNow;
+                    
+                    await _auditTrailService.LogAsync(
+                        action: "BinEmptied",
+                        entityType: "StorageBin",
+                        entityId: bin.Id,
+                        oldValue: "Occupied",
+                        newValue: "Empty",
+                        station: "Assembly",
+                        workOrderId: activeWorkOrderId,
+                        details: $"Bin emptied after assembly of product {product.Name}",
+                        sessionId: HttpContext.Session.Id
+                    );
                 }
             }
 
@@ -689,54 +683,48 @@ public class AssemblyController : Controller
             // Empty the bins that contained the assembled parts
             foreach (var binLocation in binsToEmpty)
             {
-                var binParts = await _context.Parts
-                    .Where(p => p.Location == binLocation && p.Status == PartStatus.Sorted)
-                    .ToListAsync();
-                
-                // If bin has no more sorted parts, mark it as empty
-                if (!binParts.Any())
+                // We know these bins should be empty now, so clear them unconditionally
+                // (same approach as the Clear Bin button in Sorting Station)
+                // Parse the location format "RackName:BinCode" (e.g., "Standard Rack A:A01")
+                var locationParts = binLocation.Split(':', 2);
+                Bin? bin = null;
+                if (locationParts.Length == 2)
                 {
-                    // Parse the location format "RackName:BinCode" (e.g., "Standard Rack A:A01")
-                    var locationParts = binLocation.Split(':', 2);
-                    Bin? bin = null;
-                    if (locationParts.Length == 2)
-                    {
-                        var rackName = locationParts[0];
-                        var binCode = locationParts[1]; // e.g., "A01"
-                        
-                        // Parse bin code: first char is row letter (A=1, B=2, etc), remaining digits are column
-                        if (binCode.Length >= 2 && char.IsLetter(binCode[0]) && int.TryParse(binCode.Substring(1), out var column))
-                        {
-                            var row = char.ToUpper(binCode[0]) - 'A' + 1;
-                            
-                            bin = await _context.Bins
-                                .Include(b => b.StorageRack)
-                                .FirstOrDefaultAsync(b => b.StorageRack.Name == rackName && b.Row == row && b.Column == column);
-                        }
-                    }
+                    var rackName = locationParts[0];
+                    var binCode = locationParts[1]; // e.g., "A01"
                     
-                    if (bin != null)
+                    // Parse bin code: first char is row letter (A=1, B=2, etc), remaining digits are column
+                    if (binCode.Length >= 2 && char.IsLetter(binCode[0]) && int.TryParse(binCode.Substring(1), out var column))
                     {
-                        bin.Status = BinStatus.Empty;
-                        bin.ProductId = null;
-                        bin.PartId = null;
-                        bin.WorkOrderId = null;
-                        bin.PartsCount = 0;
-                        bin.Contents = string.Empty;
-                        bin.LastUpdatedDate = DateTime.UtcNow;
+                        var row = char.ToUpper(binCode[0]) - 'A' + 1;
                         
-                        await _auditTrailService.LogAsync(
-                            action: "BinEmptied",
-                            entityType: "StorageBin",
-                            entityId: bin.Id,
-                            oldValue: "Occupied",
-                            newValue: "Empty",
-                            station: "Assembly",
-                            workOrderId: activeWorkOrderId,
-                            details: $"Bin emptied after manual assembly of product {product.Name}",
-                            sessionId: HttpContext.Session.Id
-                        );
+                        bin = await _context.Bins
+                            .Include(b => b.StorageRack)
+                            .FirstOrDefaultAsync(b => b.StorageRack.Name == rackName && b.Row == row && b.Column == column);
                     }
+                }
+                
+                if (bin != null)
+                {
+                    bin.Status = BinStatus.Empty;
+                    bin.ProductId = null;
+                    bin.PartId = null;
+                    bin.WorkOrderId = null;
+                    bin.PartsCount = 0;
+                    bin.Contents = string.Empty;
+                    bin.LastUpdatedDate = DateTime.UtcNow;
+                    
+                    await _auditTrailService.LogAsync(
+                        action: "BinEmptied",
+                        entityType: "StorageBin",
+                        entityId: bin.Id,
+                        oldValue: "Occupied",
+                        newValue: "Empty",
+                        station: "Assembly",
+                        workOrderId: activeWorkOrderId,
+                        details: $"Bin emptied after manual assembly of product {product.Name}",
+                        sessionId: HttpContext.Session.Id
+                    );
                 }
             }
 
