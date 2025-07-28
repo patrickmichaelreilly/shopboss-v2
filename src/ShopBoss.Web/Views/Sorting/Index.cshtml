@@ -294,40 +294,65 @@ else
 
         // Display rack grid visualization
         function displayRackGrid(rack) {
-
+            console.log('displayRackGrid called with rack:', rack);
+            
             const container = document.getElementById('rack-grid-container');
             
-            // Create CSS Grid with dynamic dimensions
-            let gridHtml = `<div class="rack-grid" style="grid-template-rows: repeat(${rack.rows}, 1fr); grid-template-columns: repeat(${rack.columns}, 1fr);">`;
-            
-            // Generate flat list of grid items (no nested structure)
-            for (let row = 0; row < rack.rows; row++) {
-                for (let col = 0; col < rack.columns; col++) {
-                    const bin = rack.bins[row][col];
-                    // Determine status class - blocked takes precedence over full
-                    const statusClass = bin.status === 'blocked' ? 'bin-blocked' : 
-                                      bin.progressPercentage >= 100 ? 'bin-full' : 
-                                      getBinStatusClass(bin.status);
-                    const title = getBinTooltip(bin);
-                    
-                    gridHtml += `
-                        <div class="grid-bin ${statusClass}" 
-                             title="${title}"
-                             onclick="selectBin('${bin.label}', '${bin.row}', '${bin.column}')">
-                            <div class="bin-content">
-                                <div class="bin-label">${bin.label}</div>
-                                ${bin.status !== 'empty' ? 
-                                    `<div class="bin-details">
-                                        <div class="item-number">${bin.itemNumber || bin.productName || 'Unknown'}</div>
-                                        <div class="part-count">${bin.partsCount} parts</div>
-                                    </div>` : 
-                                    ''
-                                }
-                            </div>
-                        </div>
-                    `;
-                }
+            if (!rack.bins || rack.bins.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center text-muted">
+                        <i class="fas fa-inbox fa-3x mb-3"></i>
+                        <p>No bins configured for this rack</p>
+                    </div>
+                `;
+                return;
             }
+            
+            // Calculate optimal grid dimensions based on number of bins
+            const totalBins = rack.bins.length;
+            const cols = Math.ceil(Math.sqrt(totalBins * 1.5)); // Slightly wider than square
+            const rows = Math.ceil(totalBins / cols);
+            
+            console.log(`Creating grid: ${rows} rows x ${cols} cols for ${totalBins} bins`);
+            
+            // Create CSS Grid with calculated dimensions
+            let gridHtml = `<div class="rack-grid" style="grid-template-rows: repeat(${rows}, 1fr); grid-template-columns: repeat(${cols}, 1fr);">`;
+            
+            // Generate grid items from flat bin list
+            for (let i = 0; i < totalBins; i++) {
+                const bin = rack.bins[i];
+                const row = Math.floor(i / cols);
+                const col = i % cols;
+                
+                // Determine status class - blocked takes precedence over full
+                const statusClass = bin.status === 'blocked' ? 'bin-blocked' : 
+                                  bin.progressPercentage >= 100 ? 'bin-full' : 
+                                  getBinStatusClass(bin.status);
+                const title = getBinTooltip(bin);
+                
+                gridHtml += `
+                    <div class="grid-bin ${statusClass}" 
+                         title="${title}"
+                         onclick="selectBin('${bin.id}', '${bin.label}')">
+                        <div class="bin-content">
+                            <div class="bin-label">${bin.label}</div>
+                            ${bin.status !== 'empty' ? 
+                                `<div class="bin-details">
+                                    <div class="item-number">${bin.itemNumber || bin.productName || 'Unknown'}</div>
+                                    <div class="part-count">${bin.partsCount} parts</div>
+                                </div>` : 
+                                ''
+                            }
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // Fill empty grid cells if needed
+            for (let i = totalBins; i < rows * cols; i++) {
+                gridHtml += `<div class="grid-bin bin-empty" style="visibility: hidden;"></div>`;
+            }
+            
             gridHtml += '</div>';
 
             // Add legend
@@ -391,9 +416,9 @@ else
             return tooltip;
         }
 
-        function selectBin(label, row, column) {
-            if (currentRackId) {
-                showBinDetailModal(currentRackId, row, column, label);
+        function selectBin(binId, label) {
+            if (binId) {
+                showBinDetailModal(binId, label);
             }
         }
 
@@ -796,7 +821,7 @@ else
         // Bin detail modal functions
         let currentBinDetails = null;
 
-        function showBinDetailModal(rackId, row, column, label) {
+        function showBinDetailModal(binId, label) {
             const modal = new bootstrap.Modal(document.getElementById('binDetailModal'));
             const content = document.getElementById('binDetailContent');
             const clearBtn = document.getElementById('clearBinBtn');
@@ -818,8 +843,8 @@ else
             clearBtn.style.display = 'none';
             modal.show();
             
-            // Fetch bin details
-            fetch(`/Sorting/GetBinDetails?rackId=${encodeURIComponent(rackId)}&row=${row}&column=${column}`)
+            // Fetch bin details using bin ID
+            fetch(`/Sorting/GetBinDetails?binId=${encodeURIComponent(binId)}`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
@@ -868,7 +893,6 @@ else
                         <h6>Bin Information</h6>
                         <table class="table table-sm">
                             <tr><td><strong>Bin Label:</strong></td><td><span class="badge bg-primary fs-6 px-3 py-2">${bin.label}</span></td></tr>
-                            <tr><td><strong>Position:</strong></td><td>Row ${bin.row}, Column ${bin.column}</td></tr>
                             <tr><td><strong>Status:</strong></td><td><span class="badge bg-${getBinStatusBadgeClass(bin.status === 'blocked' ? 'blocked' : bin.progressPercentage >= 100 ? 'full' : bin.status)}">${bin.status === 'blocked' ? 'Blocked' : bin.progressPercentage >= 100 ? 'Complete' : bin.statusText}</span></td></tr>
                             <tr><td><strong>Progress:</strong></td><td>${bin.status === 'empty' ? '' : `${bin.partsCount}/${bin.totalNeeded || 0} parts`}</td></tr>
                         </table>
@@ -999,7 +1023,7 @@ else
                     showBillboard('sorting-billboard', `Failed to remove part: ${data.message}`, 'danger', 'Remove Error');
                     // If the removal failed, we need to refresh the modal to restore the removed row
                     if (currentBinDetails) {
-                        showBinDetailModal(currentBinDetails.rackId, currentBinDetails.row, currentBinDetails.column, currentBinDetails.label);
+                        showBinDetailModal(currentBinDetails.id, currentBinDetails.label);
                     }
                 }
             })
@@ -1008,7 +1032,7 @@ else
                 showBillboard('sorting-billboard', 'An error occurred while removing the part', 'danger', 'Network Error');
                 // If there was an error, refresh the modal to restore the removed row
                 if (currentBinDetails) {
-                    showBinDetailModal(currentBinDetails.rackId, currentBinDetails.row, currentBinDetails.column, currentBinDetails.label);
+                    showBinDetailModal(currentBinDetails.id, currentBinDetails.label);
                 }
             });
         }
@@ -1051,7 +1075,7 @@ else
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
                 },
-                body: `rackId=${encodeURIComponent(currentBinDetails.rackId)}&row=${currentBinDetails.row}&column=${currentBinDetails.column}`
+                body: `binId=${encodeURIComponent(currentBinDetails.id)}`
             })
             .then(response => response.json())
             .then(data => {

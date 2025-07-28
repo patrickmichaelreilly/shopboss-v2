@@ -158,6 +158,31 @@
         </div>
 
         <div class="col-lg-4">
+            <!-- Bin Management Section -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-th me-2"></i>Bin Management</h6>
+                </div>
+                <div class="card-body">
+                    <div id="binManagementContent">
+                        <div class="text-center">
+                            <div class="spinner-border spinner-border-sm" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="small text-muted mt-2">Loading bins...</p>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <button type="button" class="btn btn-outline-success btn-sm" onclick="addNewBin()">
+                            <i class="fas fa-plus me-1"></i>Add Bin
+                        </button>
+                        <button type="button" class="btn btn-outline-warning btn-sm" onclick="saveBinChanges()">
+                            <i class="fas fa-save me-1"></i>Save Changes
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <div class="card">
                 <div class="card-header">
                     <h6 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Current Status</h6>
@@ -251,9 +276,269 @@
     @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
     
     <script>
+        let rackBins = [];
+        let binsModified = false;
+
         // Rack edit form functionality
         document.addEventListener('DOMContentLoaded', function() {
-            // Form validation and submission logic can be added here
+            // Load bin data when page loads
+            loadRackBins();
         });
+
+        async function loadRackBins() {
+            try {
+                const response = await fetch(`/admin/api/racks/@Model.Id/bins`);
+                if (response.ok) {
+                    rackBins = await response.json();
+                    displayBins();
+                } else {
+                    throw new Error('Failed to load bins');
+                }
+            } catch (error) {
+                console.error('Error loading bins:', error);
+                document.getElementById('binManagementContent').innerHTML = `
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Failed to load bins. Please refresh the page.
+                    </div>
+                `;
+            }
+        }
+
+        function displayBins() {
+            const content = document.getElementById('binManagementContent');
+            
+            if (rackBins.length === 0) {
+                content.innerHTML = `
+                    <div class="text-center text-muted">
+                        <i class="fas fa-inbox fa-2x mb-2"></i>
+                        <p class="mb-0">No bins configured</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '<div class="bin-grid-edit">';
+            
+            rackBins.forEach((bin, index) => {
+                const statusClass = bin.Status === 'Empty' ? 'bin-empty' : 
+                                  bin.Status === 'Partial' ? 'bin-partial' :
+                                  bin.Status === 'Full' ? 'bin-full' : 'bin-occupied';
+                                  
+                html += `
+                    <div class="bin-item ${statusClass}" data-bin-index="${index}">
+                        <div class="bin-label-edit">
+                            <input type="text" 
+                                   class="form-control form-control-sm bin-label-input" 
+                                   value="${bin.Label}"
+                                   onchange="updateBinLabel(${index}, this.value)"
+                                   pattern="^[A-Z0-9]{1,10}$"
+                                   title="Bin label must contain only uppercase letters and numbers (e.g., A01, B15, ZONE1)"
+                                   maxlength="10">
+                        </div>
+                        <div class="bin-status-info">
+                            <small class="text-muted">${bin.Status}</small>
+                            ${bin.PartsCount > 0 ? `<small class="text-muted">${bin.PartsCount} parts</small>` : ''}
+                        </div>
+                        <div class="bin-actions">
+                            <button type="button" class="btn btn-outline-danger btn-xs" 
+                                    onclick="removeBin(${index})"
+                                    ${bin.Status !== 'Empty' ? 'disabled title="Cannot remove bin with parts"' : ''}>
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            content.innerHTML = html;
+        }
+
+        function updateBinLabel(index, newLabel) {
+            if (newLabel && /^[A-Z0-9]{1,10}$/.test(newLabel)) {
+                rackBins[index].Label = newLabel;
+                binsModified = true;
+                updateSaveButtonState();
+            } else {
+                // Reset to original value if invalid
+                document.querySelector(`[data-bin-index="${index}"] .bin-label-input`).value = rackBins[index].Label;
+                alert('Bin label must contain only uppercase letters and numbers (1-10 characters)');
+            }
+        }
+
+        function addNewBin() {
+            // Generate next available label
+            const existingLabels = rackBins.map(b => b.Label);
+            let newLabel = generateNextLabel(existingLabels);
+            
+            const newBin = {
+                Id: 'new-' + Date.now(), // Temporary ID for new bins
+                Label: newLabel,
+                Status: 'Empty',
+                PartsCount: 0,
+                IsNew: true
+            };
+            
+            rackBins.push(newBin);
+            binsModified = true;
+            displayBins();
+            updateSaveButtonState();
+        }
+
+        function generateNextLabel(existingLabels) {
+            // Try A01, A02, etc. then B01, B02, etc.
+            for (let row = 0; row < 26; row++) {
+                for (let col = 1; col <= 99; col++) {
+                    const label = String.fromCharCode(65 + row) + col.toString().padStart(2, '0');
+                    if (!existingLabels.includes(label)) {
+                        return label;
+                    }
+                }
+            }
+            return 'Z99'; // Fallback
+        }
+
+        function removeBin(index) {
+            if (rackBins[index].Status !== 'Empty') {
+                alert('Cannot remove bin with assigned parts');
+                return;
+            }
+            
+            if (confirm(`Remove bin "${rackBins[index].Label}"?`)) {
+                rackBins.splice(index, 1);
+                binsModified = true;
+                displayBins();
+                updateSaveButtonState();
+            }
+        }
+
+        function updateSaveButtonState() {
+            const saveButton = document.querySelector('button[onclick="saveBinChanges()"]');
+            if (binsModified) {
+                saveButton.classList.remove('btn-outline-warning');
+                saveButton.classList.add('btn-warning');
+                saveButton.innerHTML = '<i class="fas fa-save me-1"></i>Save Changes *';
+            } else {
+                saveButton.classList.remove('btn-warning');
+                saveButton.classList.add('btn-outline-warning');
+                saveButton.innerHTML = '<i class="fas fa-save me-1"></i>Save Changes';
+            }
+        }
+
+        async function saveBinChanges() {
+            if (!binsModified) return;
+
+            try {
+                const saveButton = document.querySelector('button[onclick="saveBinChanges()"]');
+                saveButton.disabled = true;
+                saveButton.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Saving...';
+
+                const response = await fetch(`/admin/api/racks/@Model.Id/bins`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(rackBins)
+                });
+
+                if (response.ok) {
+                    binsModified = false;
+                    updateSaveButtonState();
+                    // Reload bins to get updated data from server
+                    await loadRackBins();
+                    
+                    // Show success message
+                    const alert = document.createElement('div');
+                    alert.className = 'alert alert-success alert-dismissible fade show mt-2';
+                    alert.innerHTML = `
+                        <i class="fas fa-check me-2"></i>Bin changes saved successfully
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    `;
+                    document.getElementById('binManagementContent').insertAdjacentElement('afterend', alert);
+                    
+                    // Auto-dismiss after 3 seconds
+                    setTimeout(() => {
+                        if (alert.parentNode) alert.remove();
+                    }, 3000);
+                } else {
+                    throw new Error('Failed to save changes');
+                }
+            } catch (error) {
+                console.error('Error saving bins:', error);
+                alert('Failed to save bin changes. Please try again.');
+            } finally {
+                const saveButton = document.querySelector('button[onclick="saveBinChanges()"]');
+                saveButton.disabled = false;
+                updateSaveButtonState();
+            }
+        }
     </script>
+
+    <style>
+        .bin-grid-edit {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 8px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .bin-item {
+            border: 2px solid #dee2e6;
+            border-radius: 4px;
+            padding: 8px;
+            background-color: #f8f9fa;
+            transition: all 0.2s ease;
+        }
+
+        .bin-item:hover {
+            border-color: #0d6efd;
+        }
+
+        .bin-item.bin-empty {
+            background-color: #f8f9fa;
+            border-color: #e9ecef;
+        }
+
+        .bin-item.bin-partial {
+            background-color: #cff4fc;
+            border-color: #0dcaf0;
+        }
+
+        .bin-item.bin-full {
+            background-color: #d1e7dd;
+            border-color: #198754;
+        }
+
+        .bin-item.bin-occupied {
+            background-color: #fff3cd;
+            border-color: #ffc107;
+        }
+
+        .bin-label-input {
+            font-weight: bold;
+            text-align: center;
+            font-size: 0.85rem;
+        }
+
+        .bin-status-info {
+            text-align: center;
+            margin: 4px 0;
+        }
+
+        .bin-status-info small {
+            display: block;
+            font-size: 0.7rem;
+        }
+
+        .bin-actions {
+            text-align: center;
+        }
+
+        .btn-xs {
+            padding: 2px 6px;
+            font-size: 0.7rem;
+        }
+    </style>
 }

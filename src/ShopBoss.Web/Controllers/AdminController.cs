@@ -1385,6 +1385,104 @@ public class AdminController : Controller
         }
     }
 
+    [HttpPost("admin/api/racks/{rackId}/bins")]
+    public async Task<IActionResult> SaveRackBins(string rackId, [FromBody] List<BinUpdateModel> binData)
+    {
+        try
+        {
+            // Verify rack exists
+            var rack = await _context.StorageRacks.FindAsync(rackId);
+            if (rack == null)
+            {
+                return NotFound("Rack not found");
+            }
+
+            // Get existing bins
+            var existingBins = await _context.Bins
+                .Where(b => b.StorageRackId == rackId)
+                .ToListAsync();
+
+            var session = HttpContext.Session.Id;
+            var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+
+            // Process bin updates
+            foreach (var binUpdate in binData)
+            {
+                if (binUpdate.IsNew)
+                {
+                    // Create new bin
+                    var newBin = new Bin
+                    {
+                        Id = Guid.NewGuid().ToString(),
+                        StorageRackId = rackId,
+                        BinLabel = binUpdate.Label,
+                        Status = BinStatus.Empty,
+                        PartsCount = 0,
+                        AssignedDate = DateTime.UtcNow,
+                        LastUpdatedDate = DateTime.UtcNow
+                    };
+
+                    _context.Bins.Add(newBin);
+
+                    await _auditTrailService.LogAsync("BinCreated", "Bin", newBin.Id,
+                        oldValue: null,
+                        newValue: new { newBin.BinLabel, newBin.Status },
+                        station: "Admin", details: $"New bin '{newBin.BinLabel}' created",
+                        sessionId: session, ipAddress: ipAddress);
+                }
+                else
+                {
+                    // Update existing bin
+                    var existingBin = existingBins.FirstOrDefault(b => b.Id == binUpdate.Id);
+                    if (existingBin != null && existingBin.BinLabel != binUpdate.Label)
+                    {
+                        var oldLabel = existingBin.BinLabel;
+                        existingBin.BinLabel = binUpdate.Label;
+                        existingBin.LastUpdatedDate = DateTime.UtcNow;
+
+                        await _auditTrailService.LogAsync("BinUpdated", "Bin", existingBin.Id,
+                            oldValue: new { BinLabel = oldLabel },
+                            newValue: new { BinLabel = binUpdate.Label },
+                            station: "Admin", details: $"Bin label changed from '{oldLabel}' to '{binUpdate.Label}'",
+                            sessionId: session, ipAddress: ipAddress);
+                    }
+                }
+            }
+
+            // Handle deleted bins (bins that exist in DB but not in update data)
+            var updatedBinIds = binData.Where(b => !b.IsNew).Select(b => b.Id).ToList();
+            var binsToDelete = existingBins.Where(b => !updatedBinIds.Contains(b.Id)).ToList();
+
+            foreach (var binToDelete in binsToDelete)
+            {
+                if (binToDelete.Status != BinStatus.Empty)
+                {
+                    return BadRequest($"Cannot delete bin '{binToDelete.BinLabel}' - it contains assigned parts");
+                }
+
+                _context.Bins.Remove(binToDelete);
+
+                await _auditTrailService.LogAsync("BinDeleted", "Bin", binToDelete.Id,
+                    oldValue: new { binToDelete.BinLabel, binToDelete.Status },
+                    newValue: null,
+                    station: "Admin", details: $"Bin '{binToDelete.BinLabel}' deleted",
+                    sessionId: session, ipAddress: ipAddress);
+            }
+
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Bins updated for rack {RackId}: {UpdatedCount} updated, {NewCount} created, {DeletedCount} deleted",
+                rackId, binData.Count(b => !b.IsNew), binData.Count(b => b.IsNew), binsToDelete.Count);
+
+            return Ok(new { success = true, message = "Bins updated successfully" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error saving bins for rack {RackId}", rackId);
+            return StatusCode(500, "An error occurred while saving bins");
+        }
+    }
+
     [HttpPost("admin/api/clearbins")]
     public async Task<IActionResult> ClearBins([FromBody] ClearBinsRequest request)
     {
@@ -1433,6 +1531,13 @@ public class AdminController : Controller
     public class ClearBinsRequest
     {
         public List<string> BinIds { get; set; } = new();
+    }
+
+    public class BinUpdateModel
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Label { get; set; } = string.Empty;
+        public bool IsNew { get; set; }
     }
 
     #endregion
