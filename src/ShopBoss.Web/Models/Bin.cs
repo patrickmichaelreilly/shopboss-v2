@@ -19,13 +19,6 @@ public class Bin
     [Required]
     public string StorageRackId { get; set; } = string.Empty;
     
-    [Required]
-    [Range(1, 50)]
-    public int Row { get; set; }
-    
-    [Required]
-    [Range(1, 50)]
-    public int Column { get; set; }
     
     [Required]
     public BinStatus Status { get; set; } = BinStatus.Empty;
@@ -38,13 +31,17 @@ public class Bin
     public string Contents { get; set; } = string.Empty;
     
     public int PartsCount { get; set; } = 0;
-    public int MaxCapacity { get; set; } = 50;
     
     public DateTime? AssignedDate { get; set; }
     public DateTime? LastUpdatedDate { get; set; }
     
     [StringLength(500)]
     public string Notes { get; set; } = string.Empty;
+    
+    [Required]
+    [StringLength(10)]
+    [RegularExpression(@"^[A-Z0-9]{1,10}$", ErrorMessage = "Bin label must contain only uppercase letters and numbers (e.g., A01, B15, ZONE1)")]
+    public string BinLabel { get; set; } = string.Empty;
     
     // Navigation properties
     public virtual StorageRack StorageRack { get; set; } = null!;
@@ -56,5 +53,4 @@ public class Bin
     public bool IsOccupied => Status != BinStatus.Empty && Status != BinStatus.Blocked;
     public bool IsAvailable => Status == BinStatus.Empty && !IsBlocked;
     public bool IsBlocked => Status == BinStatus.Blocked;
-    public string BinLabel => $"{(char)('A' + Row - 1)}{Column:D2}";
 }

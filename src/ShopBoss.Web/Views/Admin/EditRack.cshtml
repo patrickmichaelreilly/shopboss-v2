@@ -113,6 +113,7 @@
                         <div class="alert alert-info">
                             <i class="fas fa-info-circle me-2"></i>
                             <strong>Total Bins:</strong> <span id="totalBins">@Model.TotalBins</span> bins will be available.
+                            <br><strong>Bin Labels:</strong> New bins will be automatically labeled (A01, A02, B01, B02, etc.) based on row and column positions.
                             @if (Model.OccupiedBins > 0)
                             {
                                 @:<br><strong>Current Occupancy:</strong> @Model.OccupiedBins occupied bins will be preserved if dimensions don't change.

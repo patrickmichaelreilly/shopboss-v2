@@ -104,74 +104,44 @@ public class SortingController : Controller
             // Get active work order from session for cross-work order bin detection
             var activeWorkOrderId = HttpContext.Session.GetString("ActiveWorkOrderId");
 
-            // Create a list of rows, each containing a list of bins
-            var grid = new List<List<object>>();
-            for (int row = 1; row <= rack.Rows; row++)
+            // Create a simple list of bins (no grid layout)
+            var binList = new List<object>();
+            foreach (var bin in rack.Bins.OrderBy(b => b.BinLabel))
             {
-                var binRow = new List<object>();
-                for (int col = 1; col <= rack.Columns; col++)
+                // Calculate enhanced progress information for this bin
+                var (progressPartsCount, progressTotalNeeded, progressPercentage) = await CalculateBinProgressAsync(bin);
+                
+                // Determine bin status - check if it belongs to a different work order
+                var binStatus = bin.Status.ToString().ToLower();
+                var statusText = bin.Status.ToString();
+                
+                // If bin has a work order assigned and it's different from active work order, mark as blocked
+                if (!string.IsNullOrEmpty(bin.WorkOrderId) && 
+                    !string.IsNullOrEmpty(activeWorkOrderId) && 
+                    bin.WorkOrderId != activeWorkOrderId)
                 {
-                    var bin = rack.Bins.FirstOrDefault(b => b.Row == row && b.Column == col);
-                    if (bin == null)
-                    {
-                        // Create empty bin representation
-                        binRow.Add(new
-                        {
-                            row = row,
-                            column = col,
-                            label = $"{(char)('A' + row - 1)}{col:D2}",
-                            status = "empty",
-                            statusText = "Empty",
-                            contents = "",
-                            partsCount = 0,
-                            maxCapacity = 50,
-                            capacityPercentage = 0,
-                            productName = "",
-                            partName = "",
-                            isAvailable = true
-                        });
-                    }
-                    else
-                    {
-                        // Calculate enhanced progress information for this bin
-                        var (progressPartsCount, progressTotalNeeded, progressPercentage) = await CalculateBinProgressAsync(bin);
-                        
-                        // Determine bin status - check if it belongs to a different work order
-                        var binStatus = bin.Status.ToString().ToLower();
-                        var statusText = bin.Status.ToString();
-                        
-                        // If bin has a work order assigned and it's different from active work order, mark as blocked
-                        if (!string.IsNullOrEmpty(bin.WorkOrderId) && 
-                            !string.IsNullOrEmpty(activeWorkOrderId) && 
-                            bin.WorkOrderId != activeWorkOrderId)
-                        {
-                            binStatus = "blocked";
-                            statusText = "Blocked - Different Work Order";
-                        }
-                        
-                        binRow.Add(new
-                        {
-                            id = bin.Id,
-                            row = bin.Row,
-                            column = bin.Column,
-                            label = bin.BinLabel,
-                            status = binStatus,
-                            statusText = statusText,
-                            contents = bin.Contents,
-                            partsCount = progressPartsCount,
-                            maxCapacity = progressTotalNeeded,
-                            capacityPercentage = Math.Round(progressPercentage, 1),
-                            productName = bin.Product?.Name ?? "",
-                            itemNumber = await GetItemNumberForPart(bin.ProductId),
-                            partName = bin.Part?.Name ?? "",
-                            workOrderId = bin.WorkOrderId,
-                            isAvailable = bin.IsAvailable,
-                            assignedDate = bin.AssignedDate?.ToString("yyyy-MM-dd HH:mm"),
-                            notes = bin.Notes
-                        });
-                    }
+                    binStatus = "blocked";
+                    statusText = "Blocked - Different Work Order";
                 }
-                grid.Add(binRow);
+                
+                binList.Add(new
+                {
+                    id = bin.Id,
+                    label = bin.BinLabel,
+                    status = binStatus,
+                    statusText = statusText,
+                    contents = bin.Contents,
+                    partsCount = progressPartsCount,
+                    totalNeeded = progressTotalNeeded,
+                    progressPercentage = Math.Round(progressPercentage, 1),
+                    productName = bin.Product?.Name ?? "",
+                    itemNumber = await GetItemNumberForPart(bin.ProductId),
+                    partName = bin.Part?.Name ?? "",
+                    workOrderId = bin.WorkOrderId,
+                    isAvailable = bin.IsAvailable,
+                    assignedDate = bin.AssignedDate?.ToString("yyyy-MM-dd HH:mm"),
+                    notes = bin.Notes
+                });
             }
 
             var rackData = new
@@ -183,15 +153,13 @@ public class SortingController : Controller
                     name = rack.Name,
                     type = rack.Type.ToString(),
                     description = rack.Description,
-                    rows = rack.Rows,
-                    columns = rack.Columns,
                     location = rack.Location,
                     isPortable = rack.IsPortable,
                     totalBins = rack.TotalBins,
                     occupiedBins = rack.OccupiedBins,
                     availableBins = rack.AvailableBins,
                     occupancyPercentage = Math.Round(rack.OccupancyPercentage, 1),
-                    bins = grid
+                    bins = binList
                 }
             };
 
@@ -322,9 +290,9 @@ public class SortingController : Controller
                 part.Name, partCategory, preferredRackType);
 
             // Find optimal bin placement - prefer selected rack if provided
-            var (rackId, row, column, placementMessage) = await _sortingRules.FindOptimalBinForPartAsync(part.Id, activeWorkOrderId, selectedRackId);
+            var (binId, placementMessage) = await _sortingRules.FindOptimalBinForPartAsync(part.Id, activeWorkOrderId, selectedRackId);
 
-            if (rackId == null || row == null || column == null)
+            if (binId == null)
             {
                 await _auditTrail.LogScanAsync(cleanBarcode, station, false, 
                     placementMessage, workOrderId: activeWorkOrderId, 
@@ -336,13 +304,13 @@ public class SortingController : Controller
                 });
             }
 
-            // Log which rack was selected for debugging
-            var selectedRack = await _context.StorageRacks.FindAsync(rackId);
-            _logger.LogInformation("SCAN DEBUG: Part '{PartName}' assigned to rack '{RackName}' (Type: {RackType}, ID: {RackId})", 
-                part.Name, selectedRack?.Name ?? "Unknown", selectedRack?.Type ?? RackType.Standard, rackId);
+            // Log which bin was selected for debugging
+            var selectedBin = await _context.Bins.Include(b => b.StorageRack).FirstOrDefaultAsync(b => b.Id == binId);
+            _logger.LogInformation("SCAN DEBUG: Part '{PartName}' assigned to bin '{BinLabel}' in rack '{RackName}' (Type: {RackType})", 
+                part.Name, selectedBin?.BinLabel ?? "Unknown", selectedBin?.StorageRack?.Name ?? "Unknown", selectedBin?.StorageRack?.Type ?? RackType.Standard);
 
             // Assign part to bin
-            var assignmentSuccess = await _sortingRules.AssignPartToBinAsync(part.Id, rackId, row.Value, column.Value, activeWorkOrderId);
+            var assignmentSuccess = await _sortingRules.AssignPartToBinAsync(part.Id, binId, activeWorkOrderId);
 
             if (!assignmentSuccess)
             {
@@ -572,14 +540,15 @@ public class SortingController : Controller
         }
     }
 
-    public async Task<IActionResult> GetBinDetails(string rackId, int row, int column)
+    public async Task<IActionResult> GetBinDetails(string binId)
     {
         try
         {
             var bin = await _context.Bins
                 .Include(b => b.Part)
                 .Include(b => b.Product)
-                .FirstOrDefaultAsync(b => b.StorageRackId == rackId && b.Row == row && b.Column == column);
+                .Include(b => b.StorageRack)
+                .FirstOrDefaultAsync(b => b.Id == binId);
 
             if (bin == null)
             {
@@ -588,12 +557,7 @@ public class SortingController : Controller
 
             // Get parts that are currently assigned to this specific bin location
             // Location format matches what's stored: "{RackName}:{BinLabel}" (e.g., "Standard Rack A:A01")
-            var rack = await _context.StorageRacks.FindAsync(rackId);
-            if (rack == null)
-            {
-                return Json(new { success = false, message = "Rack not found." });
-            }
-            var binLocation = $"{rack.Name}:{bin.BinLabel}";
+            var binLocation = $"{bin.StorageRack.Name}:{bin.BinLabel}";
             var activeWorkOrderId = HttpContext.Session.GetString("ActiveWorkOrderId");
             var binParts = new List<object>();
 
@@ -646,14 +610,12 @@ public class SortingController : Controller
                 {
                     id = bin.Id,
                     rackId = bin.StorageRackId,
-                    row = bin.Row,
-                    column = bin.Column,
                     label = bin.BinLabel,
                     status = bin.Status.ToString().ToLower(),
                     statusText = bin.Status.ToString(),
                     partsCount = progressPartsCount,
-                    maxCapacity = progressTotalNeeded,
-                    capacityPercentage = Math.Round(progressPercentage, 1),
+                    totalNeeded = progressTotalNeeded,
+                    progressPercentage = Math.Round(progressPercentage, 1),
                     productName = bin.Product?.Name,
                     itemNumber = bin.Product?.ItemNumber ?? "",
                     workOrderId = bin.WorkOrderId,
@@ -670,7 +632,7 @@ public class SortingController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving bin details for rack {RackId} bin {Row},{Column}", rackId, row, column);
+            _logger.LogError(ex, "Error retrieving bin details for bin {BinId}", binId);
             return Json(new { success = false, message = "An error occurred while retrieving bin details." });
         }
     }
@@ -771,7 +733,7 @@ public class SortingController : Controller
     }
 
     [HttpPost]
-    public async Task<IActionResult> ClearBin(string rackId, int row, int column)
+    public async Task<IActionResult> ClearBin(string binId)
     {
         var sessionId = HttpContext.Session.Id;
         var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
@@ -786,7 +748,8 @@ public class SortingController : Controller
             }
 
             var bin = await _context.Bins
-                .FirstOrDefaultAsync(b => b.StorageRackId == rackId && b.Row == row && b.Column == column);
+                .Include(b => b.StorageRack)
+                .FirstOrDefaultAsync(b => b.Id == binId);
 
             if (bin == null)
             {
@@ -796,12 +759,7 @@ public class SortingController : Controller
 
             // Find all parts that are currently sorted to this specific bin location
             // Location format matches what's stored: "{RackName}:{BinLabel}" (e.g., "Standard Rack A:A01")
-            var rack = await _context.StorageRacks.FindAsync(rackId);
-            if (rack == null)
-            {
-                return Json(new { success = false, message = "Rack not found." });
-            }
-            var binLocation = $"{rack.Name}:{bin.BinLabel}";
+            var binLocation = $"{bin.StorageRack.Name}:{bin.BinLabel}";
             var partsToRemove = await _context.Parts
                 .Include(p => p.NestSheet)
                 .Where(p => p.Location == binLocation && 
@@ -876,7 +834,7 @@ public class SortingController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error clearing bin at rack {RackId} position {Row},{Column}", rackId, row, column);
+            _logger.LogError(ex, "Error clearing bin {BinId}", binId);
             return Json(new { success = false, message = "An error occurred while clearing the bin." });
         }
     }

@@ -907,15 +907,10 @@ public class AdminController : Controller
                 }
 
                 // Store original dimensions
-                var originalRows = existingRack.Rows;
-                var originalColumns = existingRack.Columns;
-
                 // Update rack properties
                 existingRack.Name = rack.Name;
                 existingRack.Type = rack.Type;
                 existingRack.Description = rack.Description;
-                existingRack.Rows = rack.Rows;
-                existingRack.Columns = rack.Columns;
                 existingRack.Length = rack.Length;
                 existingRack.Width = rack.Width;
                 existingRack.Height = rack.Height;
@@ -924,15 +919,8 @@ public class AdminController : Controller
                 existingRack.IsPortable = rack.IsPortable;
                 existingRack.LastModifiedDate = DateTime.UtcNow;
 
-                // If dimensions changed, recreate bins
-                if (originalRows != rack.Rows || originalColumns != rack.Columns)
-                {
-                    // Remove existing bins
-                    _context.Bins.RemoveRange(existingRack.Bins);
-                    
-                    // Create new bins
-                    await CreateBinsForRack(existingRack);
-                }
+                // Note: Bins are no longer automatically recreated when updating racks
+                // as they are managed independently with BinLabel
 
                 await _context.SaveChangesAsync();
 
@@ -1030,25 +1018,31 @@ public class AdminController : Controller
     {
         var bins = new List<Bin>();
 
-        for (int row = 1; row <= rack.Rows; row++)
+        // Create a standard set of bins with predefined labels
+        // For simplicity, create 32 bins (4 rows x 8 columns equivalent)
+        var binLabels = new List<string>();
+        for (int row = 1; row <= 4; row++)
         {
-            for (int col = 1; col <= rack.Columns; col++)
+            for (int col = 1; col <= 8; col++)
             {
-                var bin = new Bin
-                {
-                    Id = Guid.NewGuid().ToString(),
-                    StorageRackId = rack.Id,
-                    Row = row,
-                    Column = col,
-                    Status = BinStatus.Empty,
-                    MaxCapacity = 50, // Orphaned property - kept for database compatibility
-                    PartsCount = 0,
-                    AssignedDate = DateTime.UtcNow,
-                    LastUpdatedDate = DateTime.UtcNow
-                };
-
-                bins.Add(bin);
+                binLabels.Add($"{(char)('A' + row - 1)}{col:D2}");
             }
+        }
+
+        foreach (var label in binLabels)
+        {
+            var bin = new Bin
+            {
+                Id = Guid.NewGuid().ToString(),
+                StorageRackId = rack.Id,
+                Status = BinStatus.Empty,
+                BinLabel = label,
+                PartsCount = 0,
+                AssignedDate = DateTime.UtcNow,
+                LastUpdatedDate = DateTime.UtcNow
+            };
+
+            bins.Add(bin);
         }
 
         _context.Bins.AddRange(bins);
@@ -1371,12 +1365,11 @@ public class AdminController : Controller
         {
             var bins = await _context.Bins
                 .Where(b => b.StorageRackId == rackId)
-                .OrderBy(b => b.Row)
-                .ThenBy(b => b.Column)
+                .OrderBy(b => b.BinLabel)
                 .Select(b => new
                 {
                     b.Id,
-                    Label = $"R{b.Row}C{b.Column}",
+                    Label = b.BinLabel,
                     b.PartId,
                     b.Status,
                     b.PartsCount

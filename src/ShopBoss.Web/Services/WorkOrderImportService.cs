@@ -170,7 +170,7 @@ public class WorkOrderImportService
         return new Product
         {
             Id = source.Id, // Will be overridden with unique ID
-            Name = $"{source.Name} (Instance {instanceNumber})", // Add instance suffix
+            Name = $"{source.Name} (Copy {instanceNumber})", // Add copy suffix
             ItemNumber = source.ItemNumber,
             Qty = source.Qty,
             WorkOrderId = source.WorkOrderId,

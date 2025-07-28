@@ -306,7 +306,7 @@ else
                     const bin = rack.bins[row][col];
                     // Determine status class - blocked takes precedence over full
                     const statusClass = bin.status === 'blocked' ? 'bin-blocked' : 
-                                      bin.capacityPercentage >= 100 ? 'bin-full' : 
+                                      bin.progressPercentage >= 100 ? 'bin-full' : 
                                       getBinStatusClass(bin.status);
                     const title = getBinTooltip(bin);
                     
@@ -315,10 +315,13 @@ else
                              title="${title}"
                              onclick="selectBin('${bin.label}', '${bin.row}', '${bin.column}')">
                             <div class="bin-content">
-                                ${bin.status === 'empty' ? 
-                                    '' : 
-                                    `<div class="item-number">${bin.itemNumber || bin.productName || 'Unknown'}</div>
-                                     <div class="part-count">${bin.partsCount} parts</div>`
+                                <div class="bin-label">${bin.label}</div>
+                                ${bin.status !== 'empty' ? 
+                                    `<div class="bin-details">
+                                        <div class="item-number">${bin.itemNumber || bin.productName || 'Unknown'}</div>
+                                        <div class="part-count">${bin.partsCount} parts</div>
+                                    </div>` : 
+                                    ''
                                 }
                             </div>
                         </div>
@@ -367,12 +370,13 @@ else
 
         function getBinTooltip(bin) {
             if (bin.status === 'empty') {
-                return `${bin.label}: Empty bin (Available)`;
+                return `Bin ${bin.label}: Empty (Available)`;
             }
             
-            let tooltip = `${bin.label}: ${bin.statusText}`;
+            let tooltip = `Bin ${bin.label}: ${bin.statusText}`;
             if (bin.contents) tooltip += `\nContents: ${bin.contents}`;
             if (bin.productName) tooltip += `\nProduct: ${bin.productName}`;
+            if (bin.itemNumber) tooltip += `\nItem: ${bin.itemNumber}`;
             
             // Show Work Order info for blocked bins from different work orders
             if (bin.status === 'blocked' && bin.statusText === 'Blocked - Different Work Order' && bin.workOrderId) {
@@ -381,7 +385,8 @@ else
             
             if (bin.assignedDate) tooltip += `\nAssigned: ${bin.assignedDate}`;
             if (bin.notes) tooltip += `\nNotes: ${bin.notes}`;
-            tooltip += `\nProgress: ${bin.partsCount} parts`;
+            tooltip += `\nProgress: ${bin.partsCount}${bin.totalNeeded ? `/${bin.totalNeeded}` : ''} parts`;
+            tooltip += `\nClick to view details`;
             
             return tooltip;
         }
@@ -796,9 +801,9 @@ else
             const content = document.getElementById('binDetailContent');
             const clearBtn = document.getElementById('clearBinBtn');
             
-            // Update modal title
+            // Update modal title with prominent bin label
             document.getElementById('binDetailModalLabel').innerHTML = 
-                `<i class="fas fa-box me-2"></i>Bin ${label} Details`;
+                `<i class="fas fa-box me-2"></i>Bin <strong class="text-primary">${label}</strong> Details`;
             
             // Show loading state
             content.innerHTML = `
@@ -862,10 +867,10 @@ else
                     <div class="col-md-6">
                         <h6>Bin Information</h6>
                         <table class="table table-sm">
-                            <tr><td><strong>Label:</strong></td><td>${bin.label}</td></tr>
+                            <tr><td><strong>Bin Label:</strong></td><td><span class="badge bg-primary fs-6 px-3 py-2">${bin.label}</span></td></tr>
                             <tr><td><strong>Position:</strong></td><td>Row ${bin.row}, Column ${bin.column}</td></tr>
-                            <tr><td><strong>Status:</strong></td><td><span class="badge bg-${getBinStatusBadgeClass(bin.status === 'blocked' ? 'blocked' : bin.capacityPercentage >= 100 ? 'full' : bin.status)}">${bin.status === 'blocked' ? 'Blocked' : bin.capacityPercentage >= 100 ? 'Complete' : bin.statusText}</span></td></tr>
-                            <tr><td><strong>Progress:</strong></td><td>${bin.status === 'empty' ? '' : `${bin.partsCount} parts`}</td></tr>
+                            <tr><td><strong>Status:</strong></td><td><span class="badge bg-${getBinStatusBadgeClass(bin.status === 'blocked' ? 'blocked' : bin.progressPercentage >= 100 ? 'full' : bin.status)}">${bin.status === 'blocked' ? 'Blocked' : bin.progressPercentage >= 100 ? 'Complete' : bin.statusText}</span></td></tr>
+                            <tr><td><strong>Progress:</strong></td><td>${bin.status === 'empty' ? '' : `${bin.partsCount}/${bin.totalNeeded || 0} parts`}</td></tr>
                         </table>
                     </div>
                     <div class="col-md-6">
@@ -1190,20 +1195,45 @@ else
             justify-content: center;
             align-items: center;
             height: 100%;
+            padding: 4px;
+        }
+
+        .bin-label {
+            font-size: 1.6rem;
+            font-weight: 900;
+            color: #000;
+            text-shadow: 1px 1px 2px rgba(255,255,255,0.8);
+            margin-bottom: 2px;
+            text-align: center;
+            line-height: 1;
+            letter-spacing: 0.5px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 100%;
+        }
+
+        .bin-details {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 2px;
         }
 
         .item-number {
-            font-size: 1.2rem;
-            font-weight: 700;
-            line-height: 1.2;
-            margin-bottom: 4px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            line-height: 1.1;
+            margin-bottom: 2px;
             text-align: center;
+            opacity: 0.9;
         }
 
         .part-count {
-            font-size: 0.9rem;
-            opacity: 0.8;
+            font-size: 0.75rem;
+            opacity: 0.7;
             font-weight: 500;
+            text-align: center;
         }
 
         .bin-empty {
@@ -1265,6 +1295,19 @@ else
                 font-size: 0.7rem;
                 border-width: 1px;
             }
+            
+            .bin-label {
+                font-size: 1.2rem;
+                font-weight: 800;
+            }
+            
+            .item-number {
+                font-size: 0.65rem;
+            }
+            
+            .part-count {
+                font-size: 0.55rem;
+            }
         }
         
         @@media (max-width: 480px) {
@@ -1272,6 +1315,19 @@ else
                 width: 45px;
                 height: 45px;
                 font-size: 0.6rem;
+            }
+            
+            .bin-label {
+                font-size: 1rem;
+                font-weight: 800;
+            }
+            
+            .item-number {
+                font-size: 0.55rem;
+            }
+            
+            .part-count {
+                font-size: 0.45rem;
             }
         }
 

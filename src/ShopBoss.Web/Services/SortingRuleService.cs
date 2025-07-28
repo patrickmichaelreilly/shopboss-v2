@@ -14,7 +14,7 @@ public class SortingRuleService
         _logger = logger;
     }
 
-    public async Task<(string? RackId, int? Row, int? Column, string Message)> FindOptimalBinForPartAsync(string partId, string workOrderId, string? preferredRackId = null)
+    public async Task<(string? BinId, string Message)> FindOptimalBinForPartAsync(string partId, string workOrderId, string? preferredRackId = null)
     {
         try
         {
@@ -24,19 +24,41 @@ public class SortingRuleService
 
             if (part == null)
             {
-                return (null, null, null, "Part not found");
+                return (null, "Part not found");
             }
 
-            // Use the part's stored category to determine if it needs specialized routing
-            var partCategory = part.Category;
-            var preferredRackType = (RackType)partCategory;
+            // Check for detached product (single-part products go to Cart)
+            if (part.Product != null)
+            {
+                var productPartsCount = await _context.Parts
+                    .CountAsync(p => p.ProductId == part.ProductId);
+                    
+                if (productPartsCount == 1)
+                {
+                    // This is a detached product - route to Cart
+                    var cartRacks = await _context.StorageRacks
+                        .Include(r => r.Bins)
+                        .Where(r => r.IsActive && r.Type == RackType.Cart)
+                        .ToListAsync();
+                        
+                    if (cartRacks.Any())
+                    {
+                        return await FindBinInRacks(cartRacks, part, "Cart (detached product)");
+                    }
+                    
+                    _logger.LogWarning("No Cart racks available for detached product {PartName}", part.Name);
+                }
+            }
+
+            // Determine rack type using keyword-based sorting rules
+            var preferredRackType = await DetermineRackTypeForPartAsync(part.Name);
             
             List<StorageRack> suitableRacks;
             
-            // Check if this part requires specialized routing (doors, drawer fronts, adjustable shelves)
-            if (part.Category != PartCategory.Standard)
+            // Check if this part requires specialized routing based on sorting rules
+            if (preferredRackType != RackType.Standard)
             {
-                // Filtered parts ALWAYS go to specialized racks, ignoring any preferred rack selection
+                // Specialized parts ALWAYS go to their designated racks, ignoring any preferred rack selection
                 _logger.LogInformation("Part '{PartName}' requires specialized routing to {RackType} - ignoring preferred rack selection", 
                     part.Name, preferredRackType);
                 
@@ -47,8 +69,10 @@ public class SortingRuleService
                     
                 if (!suitableRacks.Any())
                 {
-                    return (null, null, null, $"No {preferredRackType} racks available for {partCategory} parts. Please configure appropriate specialized racks.");
+                    return (null, $"No {preferredRackType} racks available. Please configure appropriate specialized racks.");
                 }
+                
+                return await FindBinInRacks(suitableRacks, part, $"{preferredRackType} (keyword match)");
             }
             else if (!string.IsNullOrEmpty(preferredRackId))
             {
@@ -76,7 +100,7 @@ public class SortingRuleService
 
                     if (!suitableRacks.Any())
                     {
-                        return (null, null, null, $"Preferred rack '{preferredRackId}' not found and no alternative suitable racks available for {partCategory} parts");
+                        return (null, $"Preferred rack '{preferredRackId}' not found and no alternative suitable racks available");
                     }
                 }
                 else
@@ -86,7 +110,7 @@ public class SortingRuleService
                     // Check if rack is completely full
                     if (specificRack.AvailableBins == 0)
                     {
-                        return (null, null, null, $"Rack '{specificRack.Name}' is full - no available bins. Please select a different rack.");
+                        return (null, $"Rack '{specificRack.Name}' is full - no available bins. Please select a different rack.");
                     }
                 }
             }
@@ -98,7 +122,7 @@ public class SortingRuleService
                     .Include(r => r.Bins)
                     .Where(r => r.IsActive && 
                                (r.Type == preferredRackType || 
-                                (preferredRackType == RackType.Standard && r.Type != RackType.DoorsAndDrawerFronts)))
+                                (preferredRackType == RackType.Standard && r.Type == RackType.Standard)))
                     .ToListAsync();
 
                 // Sort in memory since OccupancyPercentage is a computed property
@@ -109,7 +133,7 @@ public class SortingRuleService
 
                 if (!suitableRacks.Any())
                 {
-                    return (null, null, null, $"No suitable racks available for {partCategory} parts");
+                    return (null, "No suitable racks available for standard parts");
                 }
             }
 
@@ -119,35 +143,16 @@ public class SortingRuleService
                 var productGroupBin = await FindProductGroupBinAsync(part.ProductId, suitableRacks, part);
                 if (productGroupBin != null)
                 {
-                    return (productGroupBin.StorageRackId, productGroupBin.Row, productGroupBin.Column, 
-                           $"Grouped with product '{part.Product?.Name}' in bin {productGroupBin.BinLabel}");
+                    return (productGroupBin.Id, $"Grouped with product '{part.Product?.Name}' in bin {productGroupBin.BinLabel}");
                 }
             }
 
-            // Find first available bin in suitable racks
-            foreach (var rack in suitableRacks)
-            {
-                var availableBin = rack.Bins
-                    .Where(b => b.IsAvailable)
-                    .OrderBy(b => b.Row)
-                    .ThenBy(b => b.Column)
-                    .FirstOrDefault();
-
-                if (availableBin != null)
-                {
-                    return (rack.Id, availableBin.Row, availableBin.Column, 
-                           $"Assigned to {rack.Type} rack '{rack.Name}' bin {availableBin.BinLabel}");
-                }
-            }
-
-            // No available bins found
-            string rackNames = string.Join(", ", suitableRacks.Select(r => r.Name));
-            return (null, null, null, $"No available bins found in racks: {rackNames}");
+            return await FindBinInRacks(suitableRacks, part, "Standard");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error finding optimal bin for part {PartId}", partId);
-            return (null, null, null, "Error occurred while finding bin placement");
+            return (null, "Error occurred while finding bin placement");
         }
     }
 
@@ -175,7 +180,7 @@ public class SortingRuleService
     }
 
 
-    public async Task<bool> AssignPartToBinAsync(string partId, string rackId, int row, int column, string workOrderId)
+    public async Task<bool> AssignPartToBinAsync(string partId, string binId, string workOrderId)
     {
         try
         {
@@ -187,7 +192,7 @@ public class SortingRuleService
 
             var bin = await _context.Bins
                 .Include(b => b.StorageRack)
-                .FirstOrDefaultAsync(b => b.StorageRackId == rackId && b.Row == row && b.Column == column);
+                .FirstOrDefaultAsync(b => b.Id == binId);
 
             if (bin == null || bin.Status == BinStatus.Blocked) return false;
 
@@ -223,10 +228,11 @@ public class SortingRuleService
             bin.Status = BinStatus.Partial; // Always partial when parts are added (full status determined by product completion logic elsewhere)
             bin.LastUpdatedDate = DateTime.UtcNow;
 
-            // Update part status to Sorted and set location
+            // Update part status to Sorted and set bin relationship
             part.Status = PartStatus.Sorted;
             part.StatusUpdatedDate = DateTime.UtcNow;
-            part.Location = $"{bin.StorageRack.Name}:{bin.BinLabel}"; // e.g., "Standard Rack A:A01"
+            part.BinId = bin.Id; // Direct foreign key reference
+            part.Location = $"{bin.StorageRack.Name}:{bin.BinLabel}"; // Keep legacy location for compatibility
 
             _logger.LogInformation("Assigned part {PartId} ({PartName}) to bin {BinLabel} at location {Location} - new total: {TotalParts} parts", 
                 partId, part.Name, bin.BinLabel, part.Location, bin.PartsCount);
@@ -311,7 +317,15 @@ public class SortingRuleService
             {
                 // Only consider standard parts for assembly readiness - filtered parts (doors, drawer fronts, adjustable shelves) 
                 // are processed in specialized streams and don't determine standard assembly readiness
-                var standardParts = product.Parts.Where(p => p.Category == PartCategory.Standard).ToList();
+                var standardParts = new List<Part>();
+                foreach (var part in product.Parts)
+                {
+                    var rackType = await DetermineRackTypeForPartAsync(part.Name);
+                    if (rackType == RackType.Standard)
+                    {
+                        standardParts.Add(part);
+                    }
+                }
                 
                 if (!standardParts.Any())
                 {
@@ -326,10 +340,11 @@ public class SortingRuleService
                 {
                     readyProducts.Add(product.Id);
                     
-                    var filteredParts = product.Parts.Where(p => p.Category != PartCategory.Standard).ToList();
+                    var totalPartsCount = product.Parts.Count;
+                    var filteredPartsCount = totalPartsCount - standardParts.Count;
                     _logger.LogInformation("Product {ProductId} ({ProductName}) is ready for assembly - all {StandardPartCount} standard parts are sorted. " +
                                          "Filtered parts: {FilteredPartCount} (doors/fronts/shelves processed separately)",
-                        product.Id, product.Name, standardParts.Count, filteredParts.Count);
+                        product.Id, product.Name, standardParts.Count, filteredPartsCount);
                 }
             }
 
@@ -357,7 +372,15 @@ public class SortingRuleService
             }
 
             // Verify all standard parts are actually sorted (filtered parts processed separately)
-            var standardParts = product.Parts.Where(p => p.Category == PartCategory.Standard).ToList();
+            var standardParts = new List<Part>();
+            foreach (var part in product.Parts)
+            {
+                var rackType = await DetermineRackTypeForPartAsync(part.Name);
+                if (rackType == RackType.Standard)
+                {
+                    standardParts.Add(part);
+                }
+            }
             var allStandardPartsSorted = standardParts.All(part => part.Status == PartStatus.Sorted);
             
             if (!allStandardPartsSorted)
@@ -378,6 +401,133 @@ public class SortingRuleService
         {
             _logger.LogError(ex, "Error marking product {ProductId} as ready for assembly", productId);
             return false;
+        }
+    }
+
+    /// <summary>
+    /// Determines the appropriate rack type for a part based on keyword-based sorting rules
+    /// </summary>
+    private async Task<RackType> DetermineRackTypeForPartAsync(string partName)
+    {
+        try
+        {
+            // Get active sorting rules ordered by priority (lower number = higher priority)
+            var rules = await _context.SortingRules
+                .Where(r => r.IsActive)
+                .OrderBy(r => r.Priority)
+                .ToListAsync();
+
+            // Check each rule in priority order
+            foreach (var rule in rules)
+            {
+                if (rule.MatchesPartName(partName))
+                {
+                    _logger.LogDebug("Part '{PartName}' matched rule '{RuleName}' -> {RackType}", 
+                        partName, rule.Name, rule.TargetRackType);
+                    return rule.TargetRackType;
+                }
+            }
+
+            // No rules matched - default to Standard
+            _logger.LogDebug("Part '{PartName}' did not match any sorting rules -> Standard", partName);
+            return RackType.Standard;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error determining rack type for part '{PartName}', defaulting to Standard", partName);
+            return RackType.Standard;
+        }
+    }
+
+    /// <summary>
+    /// Finds an available bin in the provided racks, with product grouping logic
+    /// </summary>
+    private async Task<(string? BinId, string Message)> FindBinInRacks(
+        List<StorageRack> suitableRacks, Part part, string rackTypeDescription)
+    {
+        // Try to group parts by product - look for existing bins with same product
+        if (part.ProductId != null)
+        {
+            var productGroupBin = await FindProductGroupBinAsync(part.ProductId, suitableRacks, part);
+            if (productGroupBin != null)
+            {
+                return (productGroupBin.Id, $"Grouped with product '{part.Product?.Name}' in bin {productGroupBin.BinLabel}");
+            }
+        }
+
+        // Find first available bin in suitable racks
+        foreach (var rack in suitableRacks)
+        {
+            var availableBin = rack.Bins
+                .Where(b => b.IsAvailable)
+                .OrderBy(b => b.BinLabel)
+                .FirstOrDefault();
+
+            if (availableBin != null)
+            {
+                return (availableBin.Id, 
+                       $"Assigned to {rack.Type} rack '{rack.Name}' bin {availableBin.BinLabel} ({rackTypeDescription})");
+            }
+        }
+
+        // No available bins found
+        string rackNames = string.Join(", ", suitableRacks.Select(r => r.Name));
+        return (null, $"No available bins found in {rackTypeDescription} racks: {rackNames}");
+    }
+
+    /// <summary>
+    /// Seeds default sorting rules that match the current PartCategory behavior
+    /// </summary>
+    public async Task SeedDefaultSortingRulesAsync()
+    {
+        try
+        {
+            // Check if rules already exist
+            var existingRulesCount = await _context.SortingRules.CountAsync();
+            if (existingRulesCount > 0)
+            {
+                _logger.LogInformation("Sorting rules already exist ({Count} rules), skipping seeding", existingRulesCount);
+                return;
+            }
+
+            var defaultRules = new List<SortingRule>
+            {
+                new SortingRule
+                {
+                    Name = "Doors and Drawer Fronts",
+                    Priority = 1,
+                    Keywords = "DOOR,DRAWER FRONT",
+                    TargetRackType = RackType.DoorsAndDrawerFronts,
+                    IsActive = true
+                },
+                new SortingRule
+                {
+                    Name = "Adjustable Shelves",
+                    Priority = 2,
+                    Keywords = "ADJ SHELF,ADJUSTABLE",
+                    TargetRackType = RackType.AdjustableShelves,
+                    IsActive = true
+                },
+                new SortingRule
+                {
+                    Name = "Hardware",
+                    Priority = 3,
+                    Keywords = "HARDWARE,HINGE,SLIDE",
+                    TargetRackType = RackType.Hardware,
+                    IsActive = true
+                }
+                // Standard parts don't need a rule - they default to Standard rack type
+            };
+
+            _context.SortingRules.AddRange(defaultRules);
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Successfully seeded {Count} default sorting rules", defaultRules.Count);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error seeding default sorting rules");
+            throw;
         }
     }
 }

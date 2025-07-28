@@ -21,8 +21,6 @@ public static class StorageRackSeedService
                 Name = "Standard Rack A",
                 Type = RackType.Standard,
                 Description = "Main storage for standard parts",
-                Rows = 4,
-                Columns = 8,
                 Location = "East Wall",
                 IsActive = true,
                 IsPortable = false
@@ -32,8 +30,6 @@ public static class StorageRackSeedService
                 Name = "Standard Rack B",
                 Type = RackType.Standard,
                 Description = "Secondary storage for standard parts",
-                Rows = 4,
-                Columns = 8,
                 Location = "East Wall",
                 IsActive = true,
                 IsPortable = false
@@ -43,8 +39,6 @@ public static class StorageRackSeedService
                 Name = "Doors & Fronts Rack",
                 Type = RackType.DoorsAndDrawerFronts,
                 Description = "Specialized storage for doors and drawer fronts",
-                Rows = 3,
-                Columns = 6,
                 Location = "North Wall",
                 IsActive = true,
                 IsPortable = false
@@ -54,8 +48,6 @@ public static class StorageRackSeedService
                 Name = "Adjustable Shelves Rack",
                 Type = RackType.AdjustableShelves,
                 Description = "Storage for adjustable shelves",
-                Rows = 2,
-                Columns = 10,
                 Location = "South Wall",
                 IsActive = true,
                 IsPortable = false
@@ -65,8 +57,6 @@ public static class StorageRackSeedService
                 Name = "Mobile Cart 1",
                 Type = RackType.Cart,
                 Description = "Portable storage cart",
-                Rows = 3,
-                Columns = 4,
                 Location = "Mobile",
                 IsActive = true,
                 IsPortable = true
@@ -80,20 +70,28 @@ public static class StorageRackSeedService
         foreach (var rack in racks)
         {
             var bins = new List<Bin>();
-            for (int row = 1; row <= rack.Rows; row++)
+            
+            // Create a standard set of bins with predefined labels
+            // For simplicity, create 32 bins (4 rows x 8 columns equivalent)
+            var binLabels = new List<string>();
+            for (int row = 1; row <= 4; row++)
             {
-                for (int col = 1; col <= rack.Columns; col++)
+                for (int col = 1; col <= 8; col++)
                 {
-                    bins.Add(new Bin
-                    {
-                        StorageRackId = rack.Id,
-                        Row = row,
-                        Column = col,
-                        Status = BinStatus.Empty,
-                        MaxCapacity = 50 // Orphaned property - kept for database compatibility
-                    });
+                    binLabels.Add($"{(char)('A' + row - 1)}{col:D2}");
                 }
             }
+
+            foreach (var label in binLabels)
+            {
+                bins.Add(new Bin
+                {
+                    StorageRackId = rack.Id,
+                    Status = BinStatus.Empty,
+                    BinLabel = label
+                });
+            }
+            
             context.Bins.AddRange(bins);
         }
 

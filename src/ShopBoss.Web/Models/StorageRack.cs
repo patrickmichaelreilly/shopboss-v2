@@ -25,13 +25,6 @@ public class StorageRack
     
     public string Description { get; set; } = string.Empty;
     
-    [Required]
-    [Range(1, 50)]
-    public int Rows { get; set; } = 4;
-    
-    [Required]
-    [Range(1, 50)]
-    public int Columns { get; set; } = 8;
     
     public decimal? Length { get; set; }
     public decimal? Width { get; set; }
@@ -50,7 +43,7 @@ public class StorageRack
     public virtual ICollection<Bin> Bins { get; set; } = new List<Bin>();
     
     // Computed properties
-    public int TotalBins => Rows * Columns;
+    public int TotalBins => Bins.Count;
     public int OccupiedBins => Bins.Count(b => b.IsOccupied);
     public int AvailableBins => TotalBins - OccupiedBins;
     public double OccupancyPercentage => TotalBins > 0 ? (double)OccupiedBins / TotalBins * 100 : 0;

@@ -369,14 +369,15 @@ public class AssemblyController : Controller
             {
                 if (standardPart.Status == PartStatus.Sorted)
                 {
-                    // Track bin location for emptying
-                    if (!string.IsNullOrEmpty(standardPart.Location))
+                    // Track bin ID for emptying - use direct BinId reference
+                    if (!string.IsNullOrEmpty(standardPart.BinId))
                     {
-                        binsToEmpty.Add(standardPart.Location);
+                        binsToEmpty.Add(standardPart.BinId);
                     }
                     
                     standardPart.Status = PartStatus.Assembled;
                     standardPart.StatusUpdatedDate = DateTime.UtcNow;
+                    standardPart.BinId = null; // Clear bin reference since part is no longer in bin
                     standardPart.Location = null; // Clear location since part is no longer in bin
                     assembledParts++;
 
@@ -414,14 +415,15 @@ public class AssemblyController : Controller
             {
                 if (filteredPart.Status == PartStatus.Sorted)
                 {
-                    // Track bin location for emptying
-                    if (!string.IsNullOrEmpty(filteredPart.Location))
+                    // Track bin ID for emptying - use direct BinId reference
+                    if (!string.IsNullOrEmpty(filteredPart.BinId))
                     {
-                        binsToEmpty.Add(filteredPart.Location);
+                        binsToEmpty.Add(filteredPart.BinId);
                     }
                     
                     filteredPart.Status = PartStatus.Assembled;
                     filteredPart.StatusUpdatedDate = DateTime.UtcNow;
+                    filteredPart.BinId = null; // Clear bin reference since part is no longer in bin
                     filteredPart.Location = null;
                     assembledParts++;
 
@@ -458,28 +460,12 @@ public class AssemblyController : Controller
             );
 
             // Empty the bins that contained the assembled parts
-            foreach (var binLocation in binsToEmpty)
+            foreach (var binId in binsToEmpty)
             {
-                // We know these bins should be empty now, so clear them unconditionally
-                // (same approach as the Clear Bin button in Sorting Station)
-                // Parse the location format "RackName:BinCode" (e.g., "Standard Rack A:A01")
-                var locationParts = binLocation.Split(':', 2);
-                Bin? bin = null;
-                if (locationParts.Length == 2)
-                {
-                    var rackName = locationParts[0];
-                    var binCode = locationParts[1]; // e.g., "A01"
-                    
-                    // Parse bin code: first char is row letter (A=1, B=2, etc), remaining digits are column
-                    if (binCode.Length >= 2 && char.IsLetter(binCode[0]) && int.TryParse(binCode.Substring(1), out var column))
-                    {
-                        var row = char.ToUpper(binCode[0]) - 'A' + 1;
-                        
-                        bin = await _context.Bins
-                            .Include(b => b.StorageRack)
-                            .FirstOrDefaultAsync(b => b.StorageRack.Name == rackName && b.Row == row && b.Column == column);
-                    }
-                }
+                // Direct bin lookup using BinId - no more toxic string parsing!
+                var bin = await _context.Bins
+                    .Include(b => b.StorageRack)
+                    .FirstOrDefaultAsync(b => b.Id == binId);
                 
                 if (bin != null)
                 {
@@ -605,14 +591,15 @@ public class AssemblyController : Controller
             {
                 if (part.Status == PartStatus.Sorted)
                 {
-                    // Track bin location for emptying
-                    if (!string.IsNullOrEmpty(part.Location))
+                    // Track bin ID for emptying - use direct BinId reference
+                    if (!string.IsNullOrEmpty(part.BinId))
                     {
-                        binsToEmpty.Add(part.Location);
+                        binsToEmpty.Add(part.BinId);
                     }
                     
                     part.Status = PartStatus.Assembled;
                     part.StatusUpdatedDate = DateTime.UtcNow;
+                    part.BinId = null; // Clear bin reference since part is no longer in bin
                     part.Location = null; // Clear location since part is no longer in bin
                     updatedParts++;
 
@@ -637,14 +624,15 @@ public class AssemblyController : Controller
             {
                 if (filteredPart.Status == PartStatus.Sorted)
                 {
-                    // Track bin location for emptying
-                    if (!string.IsNullOrEmpty(filteredPart.Location))
+                    // Track bin ID for emptying - use direct BinId reference
+                    if (!string.IsNullOrEmpty(filteredPart.BinId))
                     {
-                        binsToEmpty.Add(filteredPart.Location);
+                        binsToEmpty.Add(filteredPart.BinId);
                     }
                     
                     filteredPart.Status = PartStatus.Assembled;
                     filteredPart.StatusUpdatedDate = DateTime.UtcNow;
+                    filteredPart.BinId = null; // Clear bin reference since part is no longer in bin
                     filteredPart.Location = null;
                     updatedParts++;
 
@@ -681,28 +669,12 @@ public class AssemblyController : Controller
             );
 
             // Empty the bins that contained the assembled parts
-            foreach (var binLocation in binsToEmpty)
+            foreach (var binId in binsToEmpty)
             {
-                // We know these bins should be empty now, so clear them unconditionally
-                // (same approach as the Clear Bin button in Sorting Station)
-                // Parse the location format "RackName:BinCode" (e.g., "Standard Rack A:A01")
-                var locationParts = binLocation.Split(':', 2);
-                Bin? bin = null;
-                if (locationParts.Length == 2)
-                {
-                    var rackName = locationParts[0];
-                    var binCode = locationParts[1]; // e.g., "A01"
-                    
-                    // Parse bin code: first char is row letter (A=1, B=2, etc), remaining digits are column
-                    if (binCode.Length >= 2 && char.IsLetter(binCode[0]) && int.TryParse(binCode.Substring(1), out var column))
-                    {
-                        var row = char.ToUpper(binCode[0]) - 'A' + 1;
-                        
-                        bin = await _context.Bins
-                            .Include(b => b.StorageRack)
-                            .FirstOrDefaultAsync(b => b.StorageRack.Name == rackName && b.Row == row && b.Column == column);
-                    }
-                }
+                // Direct bin lookup using BinId - no more toxic string parsing!
+                var bin = await _context.Bins
+                    .Include(b => b.StorageRack)
+                    .FirstOrDefaultAsync(b => b.Id == binId);
                 
                 if (bin != null)
                 {

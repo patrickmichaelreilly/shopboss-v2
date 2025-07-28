@@ -24,6 +24,7 @@ public class ShopBossDbContext : DbContext
     public DbSet<BackupConfiguration> BackupConfigurations { get; set; }
     public DbSet<BackupStatus> BackupStatuses { get; set; }
     public DbSet<SystemHealthStatus> SystemHealthStatus { get; set; }
+    public DbSet<SortingRule> SortingRules { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -69,6 +70,11 @@ public class ShopBossDbContext : DbContext
                 .WithMany(n => n.Parts)
                 .HasForeignKey(e => e.NestSheetId)
                 .OnDelete(DeleteBehavior.Cascade);
+                
+            entity.HasOne(e => e.Bin)
+                .WithMany()
+                .HasForeignKey(e => e.BinId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<Subassembly>(entity =>
@@ -181,8 +187,6 @@ public class ShopBossDbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
             entity.Property(e => e.Type).IsRequired();
-            entity.Property(e => e.Rows).IsRequired();
-            entity.Property(e => e.Columns).IsRequired();
             entity.Property(e => e.IsActive).IsRequired();
             entity.Property(e => e.CreatedDate).IsRequired();
             
@@ -195,11 +199,9 @@ public class ShopBossDbContext : DbContext
         {
             entity.HasKey(e => e.Id);
             entity.Property(e => e.StorageRackId).IsRequired();
-            entity.Property(e => e.Row).IsRequired();
-            entity.Property(e => e.Column).IsRequired();
             entity.Property(e => e.Status).IsRequired();
+            entity.Property(e => e.BinLabel).IsRequired().HasMaxLength(10);
             entity.Property(e => e.PartsCount).IsRequired();
-            entity.Property(e => e.MaxCapacity).IsRequired();
             
             entity.HasOne(e => e.StorageRack)
                 .WithMany(r => r.Bins)
@@ -222,7 +224,7 @@ public class ShopBossDbContext : DbContext
                 .OnDelete(DeleteBehavior.SetNull);
             
             entity.HasIndex(e => e.StorageRackId);
-            entity.HasIndex(e => new { e.StorageRackId, e.Row, e.Column }).IsUnique();
+            entity.HasIndex(e => new { e.StorageRackId, e.BinLabel }).IsUnique();
             entity.HasIndex(e => e.Status);
             entity.HasIndex(e => e.PartId);
             entity.HasIndex(e => e.ProductId);
@@ -274,6 +276,21 @@ public class ShopBossDbContext : DbContext
             
             entity.HasIndex(e => e.LastHealthCheck);
             entity.HasIndex(e => e.OverallStatus);
+        });
+
+        modelBuilder.Entity<SortingRule>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.Priority).IsRequired();
+            entity.Property(e => e.Keywords).IsRequired().HasMaxLength(500);
+            entity.Property(e => e.TargetRackType).IsRequired();
+            entity.Property(e => e.IsActive).IsRequired();
+            entity.Property(e => e.CreatedDate).IsRequired();
+            
+            entity.HasIndex(e => e.Priority);
+            entity.HasIndex(e => e.IsActive);
+            entity.HasIndex(e => new { e.IsActive, e.Priority });
         });
     }
 }

@@ -17,6 +17,9 @@ public class Part
     [ForeignKey("NestSheet")]
     public string NestSheetId { get; set; } = string.Empty;
     
+    [ForeignKey("Bin")]
+    public string? BinId { get; set; }
+    
     [StringLength(200)]
     public string? Location { get; set; }
     
@@ -51,6 +54,8 @@ public class Part
     public Subassembly? Subassembly { get; set; }
     
     public NestSheet NestSheet { get; set; } = null!;
+    
+    public Bin? Bin { get; set; }
 }
 
 public enum PartCategory

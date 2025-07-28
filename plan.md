@@ -58,7 +58,7 @@ public class SortingRule
 ```
 
 **Implementation:**
-1. Create SortingRule model and DbSet
+1. Create SortingRule model and DbSet. No migration is needed as there is no bin or rack data besided what is seeded.
 2. Update SortingRuleService to check if part name contains any keyword
 3. Keep detached product detection separate (check Parts.Count == 1)
 4. Seed default rules for current behavior
