@@ -27,6 +27,22 @@
         <!-- Header Scanner Button -->
         <partial name="_CompactScanner" />
     </div>
+    
+    <!-- Display Toggle Controls -->
+    <div class="d-flex gap-3 align-items-center">
+        <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="showCutToggle" checked onchange="toggleCutSheets()">
+            <label class="form-check-label" for="showCutToggle">
+                <small>Show Processed Sheets</small>
+            </label>
+        </div>
+        <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="groupByMaterialToggle" onchange="toggleMaterialGrouping()">
+            <label class="form-check-label" for="groupByMaterialToggle">
+                <small>Group by Material</small>
+            </label>
+        </div>
+    </div>
 </div>
 
 @if (!string.IsNullOrEmpty(ViewBag.ErrorMessage))
@@ -47,16 +63,20 @@
 }
 else
 {
-    <div class="row">
-        @foreach (var nestSheet in Model)
-        {
-            var totalParts = nestSheet.Parts.Count;
-            var cutParts = nestSheet.Parts.Count(p => p.Status >= ShopBoss.Web.Models.PartStatus.Cut);
-            var progressPercentage = totalParts > 0 ? (cutParts * 100) / totalParts : 0;
-            var statusBadgeClass = nestSheet.Status == PartStatus.Cut ? "bg-success" : "bg-warning";
-            var statusText = nestSheet.Status == PartStatus.Cut ? "Completed" : "Pending";
+    <div id="nestSheetsContainer">
+        <div class="row" id="nestSheetsRow">
+            @foreach (var nestSheet in Model)
+            {
+                var totalParts = nestSheet.Parts.Count;
+                var cutParts = nestSheet.Parts.Count(p => p.Status >= ShopBoss.Web.Models.PartStatus.Cut);
+                var progressPercentage = totalParts > 0 ? (cutParts * 100) / totalParts : 0;
+                var statusBadgeClass = nestSheet.Status == PartStatus.Cut ? "bg-success" : "bg-warning";
+                var statusText = nestSheet.Status == PartStatus.Cut ? "Completed" : "Pending";
 
-            <div class="col-md-6 col-lg-4 mb-4">
+                <div class="col-md-6 col-lg-4 mb-4 nest-sheet-card" 
+                     data-status="@(nestSheet.Status == PartStatus.Cut ? "cut" : "pending")" 
+                     data-material="@(string.IsNullOrEmpty(nestSheet.Material) ? "unspecified" : nestSheet.Material.Replace(" ", "_").ToLower())"
+                     data-material-display="@(string.IsNullOrEmpty(nestSheet.Material) ? "Not specified" : nestSheet.Material)">
                 <div class="card h-100 @(nestSheet.Status == PartStatus.Cut ? "border-success" : "")">
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <h6 class="card-title mb-0">
@@ -144,6 +164,7 @@ else
                 </div>
             </div>
         }
+        </div>
     </div>
 }
 
@@ -198,6 +219,78 @@ else
     <script src="~/lib/signalr/dist/browser/signalr.js"></script>
     <script src="~/js/universal-scanner.js"></script>
     <script>
+        // Toggle functionality for nest sheet display
+        function toggleCutSheets() {
+            const showProcessed = document.getElementById('showCutToggle').checked;
+            const processedCards = document.querySelectorAll('.nest-sheet-card[data-status="cut"]');
+            
+            processedCards.forEach(card => {
+                card.style.display = showProcessed ? 'block' : 'none';
+            });
+        }
+
+        function toggleMaterialGrouping() {
+            const groupByMaterial = document.getElementById('groupByMaterialToggle').checked;
+            const container = document.getElementById('nestSheetsContainer');
+            const cards = Array.from(document.querySelectorAll('.nest-sheet-card'));
+            
+            if (groupByMaterial) {
+                // Group cards by material
+                const materialGroups = {};
+                
+                cards.forEach(card => {
+                    const material = card.dataset.material;
+                    const materialDisplay = card.dataset.materialDisplay;
+                    if (!materialGroups[material]) {
+                        materialGroups[material] = {
+                            display: materialDisplay,
+                            cards: []
+                        };
+                    }
+                    materialGroups[material].cards.push(card);
+                });
+                
+                // Clear container and rebuild with groups
+                container.innerHTML = '';
+                
+                Object.keys(materialGroups).sort().forEach(material => {
+                    const group = materialGroups[material];
+                    
+                    // Create material header
+                    const materialHeader = document.createElement('div');
+                    materialHeader.className = 'col-12 mb-2';
+                    materialHeader.innerHTML = `
+                        <h5 class="text-primary border-bottom pb-2 mb-3">
+                            <i class="fas fa-layer-group me-2"></i>${group.display}
+                            <span class="badge bg-primary ms-2">${group.cards.length}</span>
+                        </h5>
+                    `;
+                    
+                    // Create row for this material group
+                    const materialRow = document.createElement('div');
+                    materialRow.className = 'row';
+                    
+                    container.appendChild(materialHeader);
+                    container.appendChild(materialRow);
+                    
+                    // Add cards to this group
+                    group.cards.forEach(card => {
+                        materialRow.appendChild(card);
+                    });
+                });
+            } else {
+                // Return to single row layout
+                container.innerHTML = '<div class="row" id="nestSheetsRow"></div>';
+                const row = document.getElementById('nestSheetsRow');
+                cards.forEach(card => {
+                    row.appendChild(card);
+                });
+            }
+            
+            // Reapply processed sheet visibility after regrouping
+            toggleCutSheets();
+        }
+
         console.log('=== CNC SCRIPT EXECUTION START ===', new Date().toISOString());
         if (!window.cncExecutionCount) window.cncExecutionCount = 0;
         window.cncExecutionCount++;

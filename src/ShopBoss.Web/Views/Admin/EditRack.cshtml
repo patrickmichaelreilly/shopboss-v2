@@ -37,7 +37,7 @@
                     <h5 class="mb-0"><i class="fas fa-layer-group me-2"></i>Rack Details</h5>
                 </div>
                 <div class="card-body">
-                    <form asp-action="EditRack" method="post">
+                    <form asp-action="EditRack" method="post" onsubmit="return prepareBinData()">
                         <input asp-for="Id" type="hidden">
                         
                         <div class="row">
@@ -110,11 +110,6 @@
                             </div>
                         </div>
 
-                        <div class="alert alert-info">
-                            <i class="fas fa-info-circle me-2"></i>
-                            <strong>Current Bins:</strong> @Model.TotalBins total bins (@Model.OccupiedBins occupied, @Model.AvailableBins available).
-                            <br><strong>Bin Management:</strong> Individual bins can be added, removed, or modified through the rack management interface.
-                        </div>
 
                         @if (Model.OccupiedBins > 0)
                         {
@@ -127,42 +122,18 @@
 
                         <hr>
 
-                        <h6 class="mb-3"><i class="fas fa-ruler me-2"></i>Physical Dimensions (Optional)</h6>
-                        <div class="row">
-                            <div class="col-md-4">
-                                <div class="mb-3">
-                                    <label asp-for="Length" class="form-label">Length (mm)</label>
-                                    <input asp-for="Length" type="number" class="form-control" min="1">
-                                    <span asp-validation-for="Length" class="text-danger"></span>
+                        <h6 class="mb-3"><i class="fas fa-th me-2"></i>Bin Management</h6>
+                        <div id="binManagementContent">
+                            <div class="text-center">
+                                <div class="spinner-border spinner-border-sm" role="status">
+                                    <span class="visually-hidden">Loading...</span>
                                 </div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="mb-3">
-                                    <label asp-for="Width" class="form-label">Width (mm)</label>
-                                    <input asp-for="Width" type="number" class="form-control" min="1">
-                                    <span asp-validation-for="Width" class="text-danger"></span>
-                                </div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="mb-3">
-                                    <label asp-for="Height" class="form-label">Height (mm)</label>
-                                    <input asp-for="Height" type="number" class="form-control" min="1">
-                                    <span asp-validation-for="Height" class="text-danger"></span>
-                                </div>
+                                <p class="small text-muted mt-2">Loading bins...</p>
                             </div>
                         </div>
 
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="form-check">
-                                    <input asp-for="IsActive" class="form-check-input" type="checkbox">
-                                    <label asp-for="IsActive" class="form-check-label">
-                                        <i class="fas fa-check-circle me-1"></i>Active (available for use)
-                                    </label>
-                                    <div class="form-text">Inactive racks will not be used for new part assignments</div>
-                                </div>
-                            </div>
-                        </div>
+                        <!-- Hidden field to store bin data -->
+                        <input type="hidden" id="binDataField" name="BinData" value="" />
 
                         <hr>
 
@@ -177,31 +148,6 @@
                     </form>
                 </div>
             </div>
-            
-            <!-- Bin Management Section -->
-            <div class="card mt-3">
-                <div class="card-header">
-                    <h5 class="mb-0"><i class="fas fa-th me-2"></i>Bin Management</h5>
-                </div>
-                <div class="card-body">
-                    <div id="binManagementContent">
-                        <div class="text-center">
-                            <div class="spinner-border spinner-border-sm" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
-                            <p class="small text-muted mt-2">Loading bins...</p>
-                        </div>
-                    </div>
-                    <div class="mt-3">
-                        <button type="button" class="btn btn-outline-success btn-sm" onclick="addNewBin()">
-                            <i class="fas fa-plus me-1"></i>Add Bin
-                        </button>
-                        <button type="button" class="btn btn-outline-warning btn-sm" onclick="saveBinChanges()">
-                            <i class="fas fa-save me-1"></i>Save Changes
-                        </button>
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
 </div>
@@ -211,13 +157,10 @@
     
     <script>
         let rackBins = [];
-        let binsModified = false;
 
         // Grid preview update function
         function updateGridPreview() {
-            if (rackBins.length > 0) {
-                displayBins();
-            }
+            displayBins();
         }
 
         // Rack edit form functionality
@@ -229,8 +172,10 @@
         async function loadRackBins() {
             try {
                 const response = await fetch(`/admin/api/racks/@Model.Id/bins`);
+                
                 if (response.ok) {
-                    rackBins = await response.json();
+                    const responseText = await response.text();
+                    rackBins = JSON.parse(responseText);
                     displayBins();
                 } else {
                     throw new Error('Failed to load bins');
@@ -249,6 +194,37 @@
         function displayBins() {
             const content = document.getElementById('binManagementContent');
             
+            // Get current grid dimensions from form inputs
+            const rows = parseInt(document.querySelector('input[name="Rows"]').value) || 4;
+            const cols = parseInt(document.querySelector('input[name="Columns"]').value) || 8;
+            const requiredBins = rows * cols;
+            
+            // Dynamically adjust rackBins array to match required number
+            while (rackBins.length < requiredBins) {
+                const newIndex = rackBins.length;
+                const row = Math.floor(newIndex / cols) + 1;
+                const col = (newIndex % cols) + 1;
+                const binLabel = `${String.fromCharCode('A'.charCodeAt(0) + row - 1)}${col.toString().padStart(2, '0')}`;
+                
+                rackBins.push({
+                    id: `new-${newIndex}`, // Temporary ID for new bins
+                    label: binLabel,
+                    status: 'Empty',
+                    partsCount: 0,
+                    isNew: true
+                });
+            }
+            
+            // Trim excess bins (only if they're empty or new)
+            if (rackBins.length > requiredBins) {
+                const binsToRemove = rackBins.slice(requiredBins);
+                const hasOccupiedBins = binsToRemove.some(bin => bin.status !== 'Empty' && !bin.isNew);
+                
+                if (!hasOccupiedBins) {
+                    rackBins = rackBins.slice(0, requiredBins);
+                }
+            }
+            
             if (rackBins.length === 0) {
                 content.innerHTML = `
                     <div class="text-center text-muted">
@@ -258,21 +234,17 @@
                 `;
                 return;
             }
-
-            // Get current grid dimensions from form inputs
-            const rows = parseInt(document.querySelector('input[name="Rows"]').value) || 4;
-            const cols = parseInt(document.querySelector('input[name="Columns"]').value) || 8;
-            const totalBins = rackBins.length;
             
             // Create CSS Grid with current dimensions
             let html = `<div class="rack-grid-preview" style="grid-template-rows: repeat(${rows}, 1fr); grid-template-columns: repeat(${cols}, 1fr);">`;
             
-            // Generate grid items from flat bin list (left to right, top to bottom)
-            for (let i = 0; i < totalBins; i++) {
-                const bin = rackBins[i];
-                const statusClass = bin.Status === 'Empty' ? 'bin-empty' : 
-                                  bin.Status === 'Partial' ? 'bin-partial' :
-                                  bin.Status === 'Full' ? 'bin-full' : 'bin-occupied';
+            // Generate grid items for all required bins
+            for (let i = 0; i < requiredBins; i++) {
+                const bin = rackBins[i] || { id: `empty-${i}`, label: '', status: 'Empty', partsCount: 0, isNew: true };
+                
+                const statusClass = bin.status === 'Empty' ? 'bin-empty' : 
+                                  bin.status === 'Partial' ? 'bin-partial' :
+                                  bin.status === 'Full' ? 'bin-full' : 'bin-occupied';
                                   
                 html += `
                     <div class="grid-bin-edit ${statusClass}" data-bin-index="${i}">
@@ -280,171 +252,39 @@
                             <div class="bin-label-edit">
                                 <input type="text" 
                                        class="form-control form-control-sm bin-label-input" 
-                                       value="${bin.BinLabel || ''}"
+                                       value="${bin.label || ''}"
                                        onchange="updateBinLabel(${i}, this.value)">
                             </div>
                             <div class="bin-status-info">
-                                <small class="text-muted">${bin.Status}</small>
-                                ${bin.PartsCount > 0 ? `<small class="text-muted">${bin.PartsCount} parts</small>` : ''}
-                            </div>
-                            <div class="bin-actions">
-                                <button type="button" class="btn btn-outline-danger btn-xs" 
-                                        onclick="removeBin(${i})"
-                                        ${bin.Status !== 'Empty' ? 'disabled title="Cannot remove bin with parts"' : ''}>
-                                    <i class="fas fa-trash"></i>
-                                </button>
+                                <small class="text-muted">${bin.status}</small>
+                                ${bin.partsCount > 0 ? `<small class="text-muted">${bin.partsCount} parts</small>` : ''}
                             </div>
                         </div>
                     </div>
                 `;
             }
             
-            // Fill empty grid cells if needed
-            for (let i = totalBins; i < rows * cols; i++) {
-                html += `<div class="grid-bin-edit bin-empty" style="visibility: hidden;"></div>`;
-            }
-            
             html += '</div>';
-            
-            // Add legend
-            html += `
-                <div class="rack-legend mt-3">
-                    <div class="d-flex justify-content-center flex-wrap gap-3">
-                        <div class="legend-item">
-                            <div class="legend-color bin-empty"></div>
-                            <span>Empty</span>
-                        </div>
-                        <div class="legend-item">
-                            <div class="legend-color bin-partial"></div>
-                            <span>Partial</span>
-                        </div>
-                        <div class="legend-item">
-                            <div class="legend-color bin-full"></div>
-                            <span>Full</span>
-                        </div>
-                        <div class="legend-item">
-                            <div class="legend-color bin-occupied"></div>
-                            <span>Occupied</span>
-                        </div>
-                    </div>
-                </div>
-            `;
-            
             content.innerHTML = html;
         }
 
         function updateBinLabel(index, newLabel) {
-            rackBins[index].BinLabel = newLabel;
-            binsModified = true;
-            updateSaveButtonState();
+            rackBins[index].label = newLabel;
         }
 
-        function addNewBin() {
-            // Generate next available label
-            const existingLabels = rackBins.map(b => b.Label);
-            let newLabel = generateNextLabel(existingLabels);
+        function prepareBinData() {
+            // Convert bin data to server format and store in hidden field
+            const binUpdates = rackBins.map(bin => ({
+                Id: bin.id,
+                Label: bin.label
+            }));
             
-            const newBin = {
-                Id: 'new-' + Date.now(), // Temporary ID for new bins
-                BinLabel: newLabel,
-                Status: 'Empty',
-                PartsCount: 0,
-                IsNew: true
-            };
-            
-            rackBins.push(newBin);
-            binsModified = true;
-            displayBins();
-            updateSaveButtonState();
+            document.getElementById('binDataField').value = JSON.stringify(binUpdates);
+            return true; // Allow form submission to continue
         }
 
-        function generateNextLabel(existingLabels) {
-            // Try A01, A02, etc. then B01, B02, etc.
-            for (let row = 0; row < 26; row++) {
-                for (let col = 1; col <= 99; col++) {
-                    const label = String.fromCharCode(65 + row) + col.toString().padStart(2, '0');
-                    if (!existingLabels.includes(label)) {
-                        return label;
-                    }
-                }
-            }
-            return 'Z99'; // Fallback
-        }
 
-        function removeBin(index) {
-            if (rackBins[index].Status !== 'Empty') {
-                alert('Cannot remove bin with assigned parts');
-                return;
-            }
-            
-            if (confirm(`Remove bin "${rackBins[index].BinLabel}"?`)) {
-                rackBins.splice(index, 1);
-                binsModified = true;
-                displayBins();
-                updateSaveButtonState();
-            }
-        }
 
-        function updateSaveButtonState() {
-            const saveButton = document.querySelector('button[onclick="saveBinChanges()"]');
-            if (binsModified) {
-                saveButton.classList.remove('btn-outline-warning');
-                saveButton.classList.add('btn-warning');
-                saveButton.innerHTML = '<i class="fas fa-save me-1"></i>Save Changes *';
-            } else {
-                saveButton.classList.remove('btn-warning');
-                saveButton.classList.add('btn-outline-warning');
-                saveButton.innerHTML = '<i class="fas fa-save me-1"></i>Save Changes';
-            }
-        }
-
-        async function saveBinChanges() {
-            if (!binsModified) return;
-
-            try {
-                const saveButton = document.querySelector('button[onclick="saveBinChanges()"]');
-                saveButton.disabled = true;
-                saveButton.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Saving...';
-
-                const response = await fetch(`/admin/api/racks/@Model.Id/bins`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(rackBins)
-                });
-
-                if (response.ok) {
-                    binsModified = false;
-                    updateSaveButtonState();
-                    // Reload bins to get updated data from server
-                    await loadRackBins();
-                    
-                    // Show success message
-                    const alert = document.createElement('div');
-                    alert.className = 'alert alert-success alert-dismissible fade show mt-2';
-                    alert.innerHTML = `
-                        <i class="fas fa-check me-2"></i>Bin changes saved successfully
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    `;
-                    document.getElementById('binManagementContent').insertAdjacentElement('afterend', alert);
-                    
-                    // Auto-dismiss after 3 seconds
-                    setTimeout(() => {
-                        if (alert.parentNode) alert.remove();
-                    }, 3000);
-                } else {
-                    throw new Error('Failed to save changes');
-                }
-            } catch (error) {
-                console.error('Error saving bins:', error);
-                alert('Failed to save bin changes. Please try again.');
-            } finally {
-                const saveButton = document.querySelector('button[onclick="saveBinChanges()"]');
-                saveButton.disabled = false;
-                updateSaveButtonState();
-            }
-        }
     </script>
 
     <style>
@@ -455,7 +295,7 @@
             gap: 4px;
             width: 100%;
             max-height: 400px;
-            overflow-y: auto;
+            overflow: hidden; /* Prevent all overflow from hover effects */
             /* grid-template-rows and grid-template-columns set dynamically via JavaScript */
         }
 
@@ -472,7 +312,7 @@
         }
 
         .grid-bin-edit:hover {
-            transform: scale(1.05);
+            transform: scale(1.02);
             z-index: 10;
             border-color: #004F00;
         }
@@ -514,16 +354,6 @@
             line-height: 1.1;
         }
 
-        .bin-actions {
-            text-align: center;
-            margin-top: 2px;
-        }
-
-        .btn-xs {
-            padding: 1px 4px;
-            font-size: 0.6rem;
-            line-height: 1.2;
-        }
 
         /* Status colors (matching Sorting station) */
         .grid-bin-edit.bin-empty {
@@ -549,23 +379,5 @@
             color: #664d03;
         }
 
-        /* Legend styles (matching Sorting station) */
-        .rack-legend {
-            text-align: center;
-        }
-
-        .legend-item {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            font-size: 0.8rem;
-        }
-
-        .legend-color {
-            width: 16px;
-            height: 16px;
-            border: 1px solid #dee2e6;
-            border-radius: 3px;
-        }
     </style>
 }

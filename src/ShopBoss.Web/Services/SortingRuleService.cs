@@ -252,8 +252,6 @@ public class SortingRuleService
         return await _context.StorageRacks
             .Include(r => r.Bins)
             .Where(r => r.IsActive)
-            .OrderBy(r => r.Type)
-            .ThenBy(r => r.Name)
             .ToListAsync();
     }
 
@@ -371,6 +369,14 @@ public class SortingRuleService
                 return false;
             }
 
+            // Check if product is already marked as ready (Sorted status)
+            if (product.Status == PartStatus.Sorted)
+            {
+                _logger.LogInformation("Product {ProductId} ({ProductName}) is already marked as ready for assembly", 
+                    product.Id, product.Name);
+                return false; // Already ready, no state change
+            }
+
             // Verify all standard parts are actually sorted (filtered parts processed separately)
             var standardParts = new List<Part>();
             foreach (var part in product.Parts)
@@ -389,10 +395,13 @@ public class SortingRuleService
                 return false;
             }
 
-            // Product readiness tracking is handled via audit trail
+            // Mark product as ready by updating its status
+            product.Status = PartStatus.Sorted;
+            product.StatusUpdatedDate = DateTime.UtcNow;
+            
             await _context.SaveChangesAsync();
 
-            _logger.LogInformation("Product {ProductId} ({ProductName}) marked as ready for assembly", 
+            _logger.LogInformation("Product {ProductId} ({ProductName}) newly marked as ready for assembly", 
                 product.Id, product.Name);
             
             return true;

@@ -811,7 +811,6 @@ public class AdminController : Controller
         {
             var racks = await _context.StorageRacks
                 .Include(r => r.Bins)
-                .OrderBy(r => r.Name)
                 .ToListAsync();
 
             return View(racks);
@@ -891,7 +890,7 @@ public class AdminController : Controller
     }
 
     [HttpPost]
-    public async Task<IActionResult> EditRack(StorageRack rack)
+    public async Task<IActionResult> EditRack(StorageRack rack, string? BinData)
     {
         try
         {
@@ -917,10 +916,123 @@ public class AdminController : Controller
                 existingRack.Location = rack.Location;
                 existingRack.IsActive = rack.IsActive;
                 existingRack.IsPortable = rack.IsPortable;
+                // Check if grid dimensions changed and adjust bins accordingly
+                var originalBinCount = existingRack.Bins.Count;
+                var newBinCount = rack.Rows * rack.Columns;
+                
+                existingRack.Rows = rack.Rows;
+                existingRack.Columns = rack.Columns;
                 existingRack.LastModifiedDate = DateTime.UtcNow;
 
-                // Note: Bins are no longer automatically recreated when updating racks
-                // as they are managed independently with BinLabel
+                // Adjust bins if grid size changed
+                if (originalBinCount != newBinCount)
+                {
+                    _logger.LogInformation("Rack {RackId} grid size changed from {OriginalBins} to {NewBins} bins", 
+                        rack.Id, originalBinCount, newBinCount);
+
+                    if (newBinCount > originalBinCount)
+                    {
+                        // Add new bins - regenerate all bin labels to avoid conflicts
+                        var existingBinLabels = existingRack.Bins.Select(b => b.BinLabel).ToHashSet();
+                        var binsToAdd = newBinCount - originalBinCount;
+                        
+                        // Generate labels for new bins starting from the end
+                        for (int i = originalBinCount; i < newBinCount; i++)
+                        {
+                            var row = i / rack.Columns + 1;
+                            var col = (i % rack.Columns) + 1;
+                            var binLabel = $"{(char)('A' + row - 1)}{col:D2}";
+                            
+                            // Ensure label is unique (shouldn't happen with proper grid logic, but safety check)
+                            int suffix = 1;
+                            var originalLabel = binLabel;
+                            while (existingBinLabels.Contains(binLabel))
+                            {
+                                binLabel = $"{originalLabel}_{suffix}";
+                                suffix++;
+                            }
+                            
+                            var newBin = new Bin
+                            {
+                                StorageRackId = existingRack.Id,
+                                Status = BinStatus.Empty,
+                                BinLabel = binLabel,
+                                LastUpdatedDate = DateTime.UtcNow
+                            };
+                            
+                            existingRack.Bins.Add(newBin);
+                            existingBinLabels.Add(binLabel); // Track new label to avoid duplicates in this batch
+                        }
+                        
+                        _logger.LogInformation("Added {BinsAdded} new bins to rack {RackId}", binsToAdd, rack.Id);
+                    }
+                    else
+                    {
+                        // Remove excess bins (only if they're empty)
+                        var binsToRemove = existingRack.Bins
+                            .Skip(newBinCount)
+                            .Where(b => b.Status == BinStatus.Empty)
+                            .ToList();
+                            
+                        var occupiedBinsToRemove = existingRack.Bins
+                            .Skip(newBinCount)
+                            .Where(b => b.Status != BinStatus.Empty)
+                            .ToList();
+                            
+                        if (occupiedBinsToRemove.Any())
+                        {
+                            TempData["ErrorMessage"] = $"Cannot reduce grid size: {occupiedBinsToRemove.Count} bins beyond the new dimensions contain parts. Please move or remove parts first.";
+                            return RedirectToAction("EditRack", new { id = rack.Id });
+                        }
+                        
+                        foreach (var binToRemove in binsToRemove)
+                        {
+                            existingRack.Bins.Remove(binToRemove);
+                        }
+                        
+                        _logger.LogInformation("Removed {BinsRemoved} empty bins from rack {RackId}", binsToRemove.Count, rack.Id);
+                    }
+                }
+
+                // Update bin labels if provided - use two-phase approach to avoid constraint conflicts
+                if (!string.IsNullOrEmpty(BinData))
+                {
+                    try
+                    {
+                        var binUpdates = System.Text.Json.JsonSerializer.Deserialize<List<BinUpdateModel>>(BinData);
+                        if (binUpdates != null)
+                        {
+                            // Phase 1: Clear all labels that need to be changed to avoid conflicts
+                            var binsToUpdate = new List<(Bin bin, string newLabel)>();
+                            foreach (var binUpdate in binUpdates)
+                            {
+                                var existingBin = existingRack.Bins.FirstOrDefault(b => b.Id == binUpdate.Id);
+                                if (existingBin != null && existingBin.BinLabel != binUpdate.Label)
+                                {
+                                    binsToUpdate.Add((existingBin, binUpdate.Label));
+                                    existingBin.BinLabel = $"TEMP_{existingBin.Id}"; // Temporary unique label
+                                }
+                            }
+                            
+                            // Save temporary changes to avoid constraint violations
+                            if (binsToUpdate.Any())
+                            {
+                                await _context.SaveChangesAsync();
+                                
+                                // Phase 2: Apply the actual labels
+                                foreach (var (bin, newLabel) in binsToUpdate)
+                                {
+                                    bin.BinLabel = newLabel;
+                                    bin.LastUpdatedDate = DateTime.UtcNow;
+                                }
+                            }
+                        }
+                    }
+                    catch (System.Text.Json.JsonException ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to parse bin data for rack {RackId}", rack.Id);
+                    }
+                }
 
                 await _context.SaveChangesAsync();
 
@@ -1018,12 +1130,11 @@ public class AdminController : Controller
     {
         var bins = new List<Bin>();
 
-        // Create a standard set of bins with predefined labels
-        // For simplicity, create 32 bins (4 rows x 8 columns equivalent)
+        // Create bins using the rack's specific row/column configuration
         var binLabels = new List<string>();
-        for (int row = 1; row <= 4; row++)
+        for (int row = 1; row <= rack.Rows; row++)
         {
-            for (int col = 1; col <= 8; col++)
+            for (int col = 1; col <= rack.Columns; col++)
             {
                 binLabels.Add($"{(char)('A' + row - 1)}{col:D2}");
             }
@@ -1363,18 +1474,25 @@ public class AdminController : Controller
     {
         try
         {
-            var bins = await _context.Bins
+            var rawBins = await _context.Bins
                 .Where(b => b.StorageRackId == rackId)
-                .OrderBy(b => b.BinLabel)
-                .Select(b => new
-                {
-                    b.Id,
-                    Label = b.BinLabel,
-                    b.PartId,
-                    b.Status,
-                    b.PartsCount
-                })
                 .ToListAsync();
+
+            _logger.LogInformation("Found {Count} bins for rack {RackId}", rawBins.Count, rackId);
+            if (rawBins.Count > 0)
+            {
+                _logger.LogInformation("First bin: Id={Id}, BinLabel={BinLabel}, Status={Status}", 
+                    rawBins[0].Id, rawBins[0].BinLabel, rawBins[0].Status);
+            }
+
+            var bins = rawBins.Select(b => new
+            {
+                b.Id,
+                Label = b.BinLabel,
+                b.PartId,
+                Status = b.Status.ToString(),
+                b.PartsCount
+            }).ToList();
 
             return Ok(bins);
         }
@@ -1404,82 +1522,37 @@ public class AdminController : Controller
 
             var session = HttpContext.Session.Id;
             var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+            var updatedCount = 0;
 
-            // Process bin updates
+            // Process bin label updates only
             foreach (var binUpdate in binData)
             {
-                if (binUpdate.IsNew)
+                var existingBin = existingBins.FirstOrDefault(b => b.Id == binUpdate.Id);
+                if (existingBin != null && existingBin.BinLabel != binUpdate.Label)
                 {
-                    // Create new bin
-                    var newBin = new Bin
-                    {
-                        Id = Guid.NewGuid().ToString(),
-                        StorageRackId = rackId,
-                        BinLabel = binUpdate.Label,
-                        Status = BinStatus.Empty,
-                        PartsCount = 0,
-                        AssignedDate = DateTime.UtcNow,
-                        LastUpdatedDate = DateTime.UtcNow
-                    };
+                    var oldLabel = existingBin.BinLabel;
+                    existingBin.BinLabel = binUpdate.Label;
+                    existingBin.LastUpdatedDate = DateTime.UtcNow;
+                    updatedCount++;
 
-                    _context.Bins.Add(newBin);
-
-                    await _auditTrailService.LogAsync("BinCreated", "Bin", newBin.Id,
-                        oldValue: null,
-                        newValue: new { newBin.BinLabel, newBin.Status },
-                        station: "Admin", details: $"New bin '{newBin.BinLabel}' created",
+                    await _auditTrailService.LogAsync("BinUpdated", "Bin", existingBin.Id,
+                        oldValue: new { BinLabel = oldLabel },
+                        newValue: new { BinLabel = binUpdate.Label },
+                        station: "Admin", details: $"Bin label changed from '{oldLabel}' to '{binUpdate.Label}'",
                         sessionId: session, ipAddress: ipAddress);
                 }
-                else
-                {
-                    // Update existing bin
-                    var existingBin = existingBins.FirstOrDefault(b => b.Id == binUpdate.Id);
-                    if (existingBin != null && existingBin.BinLabel != binUpdate.Label)
-                    {
-                        var oldLabel = existingBin.BinLabel;
-                        existingBin.BinLabel = binUpdate.Label;
-                        existingBin.LastUpdatedDate = DateTime.UtcNow;
-
-                        await _auditTrailService.LogAsync("BinUpdated", "Bin", existingBin.Id,
-                            oldValue: new { BinLabel = oldLabel },
-                            newValue: new { BinLabel = binUpdate.Label },
-                            station: "Admin", details: $"Bin label changed from '{oldLabel}' to '{binUpdate.Label}'",
-                            sessionId: session, ipAddress: ipAddress);
-                    }
-                }
-            }
-
-            // Handle deleted bins (bins that exist in DB but not in update data)
-            var updatedBinIds = binData.Where(b => !b.IsNew).Select(b => b.Id).ToList();
-            var binsToDelete = existingBins.Where(b => !updatedBinIds.Contains(b.Id)).ToList();
-
-            foreach (var binToDelete in binsToDelete)
-            {
-                if (binToDelete.Status != BinStatus.Empty)
-                {
-                    return BadRequest($"Cannot delete bin '{binToDelete.BinLabel}' - it contains assigned parts");
-                }
-
-                _context.Bins.Remove(binToDelete);
-
-                await _auditTrailService.LogAsync("BinDeleted", "Bin", binToDelete.Id,
-                    oldValue: new { binToDelete.BinLabel, binToDelete.Status },
-                    newValue: null,
-                    station: "Admin", details: $"Bin '{binToDelete.BinLabel}' deleted",
-                    sessionId: session, ipAddress: ipAddress);
             }
 
             await _context.SaveChangesAsync();
 
-            _logger.LogInformation("Bins updated for rack {RackId}: {UpdatedCount} updated, {NewCount} created, {DeletedCount} deleted",
-                rackId, binData.Count(b => !b.IsNew), binData.Count(b => b.IsNew), binsToDelete.Count);
+            _logger.LogInformation("Bin labels updated for rack {RackId}: {UpdatedCount} updated", rackId, updatedCount);
 
-            return Ok(new { success = true, message = "Bins updated successfully" });
+            return Ok(new { success = true, message = "Bin labels updated successfully" });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error saving bins for rack {RackId}", rackId);
-            return StatusCode(500, "An error occurred while saving bins");
+            _logger.LogError(ex, "Error saving bin labels for rack {RackId}", rackId);
+            return StatusCode(500, "An error occurred while saving bin labels");
         }
     }
 
@@ -1537,7 +1610,6 @@ public class AdminController : Controller
     {
         public string Id { get; set; } = string.Empty;
         public string Label { get; set; } = string.Empty;
-        public bool IsNew { get; set; }
     }
 
     #endregion

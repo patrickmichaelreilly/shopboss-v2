@@ -65,10 +65,7 @@
                     }
                 </button>
                 <ul class="dropdown-menu" aria-labelledby="rackDropdown">
-                    @{
-                        var orderedRacks = Model.OrderBy(r => r.Type).ThenBy(r => r.Name).ToList();
-                    }
-                    @foreach (var rack in orderedRacks)
+                    @foreach (var rack in Model)
                     {
                         var rackTypeIcon = rack.Type switch
                         {
@@ -211,6 +208,7 @@ else
     <script>
         let currentRackId = null;
         let currentCutPartsCount = @ViewBag.CutPartsCount;
+        let currentBlinkingBinLabel = null; // Track which bin should be blinking
 
         // Global SignalR connection
         let signalRConnection = null;
@@ -257,14 +255,12 @@ else
                     selectedBadge.textContent = `${occupiedBins}/${totalBins}`;
                 }
             }
-            console.log(`Updated rack ${rackId} badge to ${occupiedBins}/${totalBins}`);
         }
         
         // ===== End Rack Dropdown Functions =====
 
         // Load rack details and display grid
         function loadRackDetails(rackId) {
-            console.log('loadRackDetails called with rackId:', rackId);
             currentRackId = rackId;
             
             if (!rackId) {
@@ -275,11 +271,9 @@ else
             
             fetch(`/Sorting/GetRackDetails/${encodeURIComponent(rackId)}`)
                 .then(response => {
-                    console.log('GetRackDetails response status:', response.status);
                     return response.json();
                 })
                 .then(data => {
-                    console.log('GetRackDetails response data:', data);
                     if (data.success) {
                         displayRackGrid(data.rack);
                     } else {
@@ -294,7 +288,6 @@ else
 
         // Display rack grid visualization
         function displayRackGrid(rack) {
-            console.log('displayRackGrid called with rack:', rack);
             
             const container = document.getElementById('rack-grid-container');
             
@@ -308,27 +301,15 @@ else
                 return;
             }
             
-            // Use rack's configured dimensions if available, otherwise calculate optimal grid
-            const totalBins = rack.bins.length;
-            let rows, cols;
-            
-            if (rack.rows && rack.columns) {
-                // Use the rack's configured grid dimensions
-                rows = rack.rows;
-                cols = rack.columns;
-                console.log(`Using rack configuration: ${rows} rows x ${cols} cols for ${totalBins} bins`);
-            } else {
-                // Fallback to calculated optimal dimensions for legacy racks
-                cols = Math.ceil(Math.sqrt(totalBins * 1.5)); // Slightly wider than square
-                rows = Math.ceil(totalBins / cols);
-                console.log(`Using calculated dimensions: ${rows} rows x ${cols} cols for ${totalBins} bins`);
-            }
+            // Use rack's configured grid dimensions
+            const rows = rack.rows;
+            const cols = rack.columns;
             
             // Create CSS Grid with determined dimensions
             let gridHtml = `<div class="rack-grid" style="grid-template-rows: repeat(${rows}, 1fr); grid-template-columns: repeat(${cols}, 1fr);">`;
             
             // Generate grid items from flat bin list (left to right, top to bottom)
-            for (let i = 0; i < totalBins; i++) {
+            for (let i = 0; i < rack.bins.length; i++) {
                 const bin = rack.bins[i];
                 const row = Math.floor(i / cols);
                 const col = i % cols;
@@ -358,7 +339,7 @@ else
             }
             
             // Fill empty grid cells if needed
-            for (let i = totalBins; i < rows * cols; i++) {
+            for (let i = rack.bins.length; i < rows * cols; i++) {
                 gridHtml += `<div class="grid-bin bin-empty" style="visibility: hidden;"></div>`;
             }
             
@@ -389,6 +370,11 @@ else
             `;
 
             container.innerHTML = gridHtml;
+            
+            // Reapply blinking animation if there's a currently blinking bin
+            if (currentBlinkingBinLabel) {
+                applyBlinkingToBin(currentBlinkingBinLabel);
+            }
         }
 
         function getBinStatusClass(status) {
@@ -588,10 +574,7 @@ else
         document.addEventListener('DOMContentLoaded', function() {
             const selectedRackId = '@ViewBag.SelectedRackId';
             if (selectedRackId) {
-                console.log('DOMContentLoaded: Loading rack', selectedRackId);
                 loadRackDetails(selectedRackId);
-            } else {
-                console.log('DOMContentLoaded: No rack selected');
             }
             
             // Setup SignalR connection for real-time updates
@@ -610,12 +593,10 @@ else
         // First, remove any existing listeners to prevent duplicates
         if (window.sortingScanHandler) {
             document.removeEventListener('scanReceived', window.sortingScanHandler);
-            console.log('Removed existing Sorting scan handler');
         }
         
         window.sortingScanHandler = function(event) {
             const { barcode, containerId } = event.detail;
-            console.log('Sorting Station: Received scan event', { barcode, containerId });
             
             // Get the scanner instance from global registry  
             const scanner = window.universalScanners[containerId];
@@ -625,7 +606,6 @@ else
         };
         
         document.addEventListener('scanReceived', window.sortingScanHandler);
-        console.log('Added Sorting scan handler');
         
         // Clean up event listener when page unloads
         window.addEventListener('beforeunload', function() {
@@ -643,16 +623,11 @@ else
                 
                 // Get currently displayed rack ID
                 const selectedRackId = currentRackId;
-                console.log('DEBUG: Selected rack ID for scan:', selectedRackId);
-                console.log('DEBUG: Current rack ID global:', currentRackId);
                 
                 // Build request body with selected rack context
                 let requestBody = `barcode=${encodeURIComponent(barcode)}`;
                 if (selectedRackId) {
                     requestBody += `&selectedRackId=${encodeURIComponent(selectedRackId)}`;
-                    console.log('DEBUG: Including selectedRackId in request:', selectedRackId);
-                } else {
-                    console.log('DEBUG: No rack selected, using default sorting logic');
                 }
                 
                 // Use existing sorting endpoint with correct Content-Type
@@ -681,7 +656,6 @@ else
                     // Instead of reloading the page, refresh the current rack data
                     setTimeout(() => {
                         if (currentRackId) {
-                            console.log('Refreshing rack after successful scan:', currentRackId);
                             loadRackDetails(currentRackId);
                         }
                         // Update cut parts count
@@ -707,7 +681,6 @@ else
                 .build();
 
             connection.start().then(function () {
-                console.log("SignalR Connected - Sorting Station");
                 
                 // Join sorting station group
                 connection.invoke("JoinGroup", "sorting-station").catch(err => console.error(err));
@@ -726,31 +699,34 @@ else
 
             // Handle part sorted updates
             connection.on("PartSorted", function (data) {
-                console.log("PartSorted event received:", data);
                 // showToast(`Part '${data.partName}' sorted to ${data.binLabel}`, 'success');
                 showBillboard('sorting-billboard', `${data.productName} ${data.partName} sorted to ${data.binLabel}`, 'info', 'Part Sorted');
                 
                 // Always refresh current rack to ensure consistency
                 if (currentRackId) {
-                    console.log(`Refreshing rack ${currentRackId} due to PartSorted event`);
                     loadRackDetails(currentRackId);
+                    
+                    // After a small delay, highlight the bin that was sorted to
+                    setTimeout(() => {
+                        highlightBinByLabel(data.binLabel);
+                    }, 500);
                 }
             });
 
             // Handle rack occupancy updates (real-time badge updates)
             connection.on("RackOccupancyUpdate", function (data) {
-                console.log("RackOccupancyUpdate event received:", data);
                 updateRackBadge(data.rackId, data.occupiedBins, data.totalBins);
             });
 
             // Handle cut parts count updates (real-time count updates)
             connection.on("CutPartsCountUpdate", function (data) {
-                console.log("CutPartsCountUpdate event received:", data);
                 updateCutPartsCount(data.count);
             });
 
             // Handle product ready for assembly notifications
             connection.on("ProductReadyForAssembly", function (data) {
+                console.warn("ProductReadyForAssembly event received at:", new Date().toISOString());
+                console.warn("Product data:", data);
                 showAssemblyReadyNotification(data);
                 
                 // Update assembly readiness button
@@ -758,11 +734,9 @@ else
 
             // Handle status updates with enhanced logging
             connection.on("StatusUpdate", function (data) {
-                console.log("StatusUpdate event received:", data);
                 if (data.type === "part-sorted") {
                     // Force refresh current rack for any part-sorted update
                     if (currentRackId) {
-                        console.log(`Refreshing rack ${currentRackId} due to StatusUpdate`);
                         loadRackDetails(currentRackId);
                     }
                     
@@ -775,20 +749,17 @@ else
 
             // Connection closed handler
             connection.onclose(function () {
-                console.log("SignalR Connection Closed");
                 // showToast("Connection lost - attempting to reconnect...", 'warning');
                 showBillboard('sorting-billboard', "Connection lost - attempting to reconnect...", 'warning', 'Connection Status');
             });
 
             // Reconnection handlers
             connection.onreconnecting(function () {
-                console.log("SignalR Reconnecting...");
                 // showToast("Reconnecting to server...", 'info');
                 showBillboard('sorting-billboard', "Reconnecting to server...", 'info', 'Connection Status');
             });
 
             connection.onreconnected(function () {
-                console.log("SignalR Reconnected");
                 // showToast("Reconnected to server", 'success');
                 showBillboard('sorting-billboard', "Reconnected to server", 'success', 'Connection Status');
                 
@@ -810,6 +781,35 @@ else
             if (countElement) {
                 countElement.textContent = count;
             }
+        }
+
+        function highlightBinByLabel(binLabel) {
+            
+            // Clear previous blinking bin
+            currentBlinkingBinLabel = null;
+            
+            // Set new blinking bin
+            currentBlinkingBinLabel = binLabel;
+            
+            // Apply the blinking animation
+            applyBlinkingToBin(binLabel);
+        }
+
+        function applyBlinkingToBin(binLabel) {
+            
+            // Find all bin elements and clear existing highlights
+            const binElements = document.querySelectorAll('.grid-bin');
+            binElements.forEach(bin => {
+                bin.classList.remove('recently-sorted');
+            });
+            
+            // Find the bin with the matching label and apply blinking
+            binElements.forEach(bin => {
+                const labelElement = bin.querySelector('.bin-label');
+                if (labelElement && labelElement.textContent.trim() === binLabel.trim()) {
+                    bin.classList.add('recently-sorted');
+                }
+            });
         }
 
         function showScanSuccessAnimation(data) {
@@ -1225,7 +1225,7 @@ else
         .bin-content {
             display: flex;
             flex-direction: column;
-            justify-content: center;
+            justify-content: flex-start;
             align-items: center;
             height: 100%;
             padding: 4px;
@@ -1370,6 +1370,43 @@ else
             0% { transform: scale(1); }
             50% { transform: scale(1.1); }
             100% { transform: scale(1); }
+        }
+
+        /* Blinking animation for recently sorted bin - preserves original colors */
+        @@keyframes bin-blink-empty {
+            0%, 100% { background-color: #f8f9fa; }
+            50% { background-color: #ffffff; }
+        }
+
+        @@keyframes bin-blink-partial {
+            0%, 100% { background-color: #cff4fc; }
+            50% { background-color: #f0fbff; }
+        }
+
+        @@keyframes bin-blink-full {
+            0%, 100% { background-color: #d1e7dd; }
+            50% { background-color: #f0f9f2; }
+        }
+
+        @@keyframes bin-blink-blocked {
+            0%, 100% { background-color: #f8d7da; }
+            50% { background-color: #ffffff; }
+        }
+
+        .grid-bin.recently-sorted.bin-empty {
+            animation: bin-blink-empty 1s ease-in-out infinite;
+        }
+
+        .grid-bin.recently-sorted.bin-partial {
+            animation: bin-blink-partial 1s ease-in-out infinite;
+        }
+
+        .grid-bin.recently-sorted.bin-full {
+            animation: bin-blink-full 1s ease-in-out infinite;
+        }
+
+        .grid-bin.recently-sorted.bin-blocked {
+            animation: bin-blink-blocked 1s ease-in-out infinite;
         }
 
         /* Success feedback animations */

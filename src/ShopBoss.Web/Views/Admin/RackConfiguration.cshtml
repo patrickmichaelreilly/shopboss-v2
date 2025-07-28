@@ -159,47 +159,6 @@
         }
     </div>
 
-    <!-- Summary Statistics -->
-    @if (Model.Count > 0)
-    {
-        <div class="row mt-4">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Configuration Summary</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="row text-center">
-                            <div class="col-md-2">
-                                <div class="fw-bold text-primary fs-4">@Model.Count</div>
-                                <small class="text-muted">Total Racks</small>
-                            </div>
-                            <div class="col-md-2">
-                                <div class="fw-bold text-success fs-4">@Model.Count(r => r.IsActive)</div>
-                                <small class="text-muted">Active Racks</small>
-                            </div>
-                            <div class="col-md-2">
-                                <div class="fw-bold text-info fs-4">@Model.Sum(r => r.TotalBins)</div>
-                                <small class="text-muted">Total Bins</small>
-                            </div>
-                            <div class="col-md-2">
-                                <div class="fw-bold text-warning fs-4">@Model.Sum(r => r.OccupiedBins)</div>
-                                <small class="text-muted">Occupied Bins</small>
-                            </div>
-                            <div class="col-md-2">
-                                <div class="fw-bold text-secondary fs-4">@Model.Count(r => r.IsPortable)</div>
-                                <small class="text-muted">Mobile Carts</small>
-                            </div>
-                            <div class="col-md-2">
-                                <div class="fw-bold text-dark fs-4">@Model.GroupBy(r => r.Type).Count()</div>
-                                <small class="text-muted">Rack Types</small>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    }
 </div>
 
 <!-- Delete Confirmation Modal -->

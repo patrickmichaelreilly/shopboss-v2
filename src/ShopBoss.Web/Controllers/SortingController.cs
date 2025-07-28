@@ -104,9 +104,9 @@ public class SortingController : Controller
             // Get active work order from session for cross-work order bin detection
             var activeWorkOrderId = HttpContext.Session.GetString("ActiveWorkOrderId");
 
-            // Create a simple list of bins (no grid layout)
+            // Create a simple list of bins in natural order (preserves creation order)
             var binList = new List<object>();
-            foreach (var bin in rack.Bins.OrderBy(b => b.BinLabel))
+            foreach (var bin in rack.Bins)
             {
                 // Calculate enhanced progress information for this bin
                 var (progressPartsCount, progressTotalNeeded, progressPercentage) = await CalculateBinProgressAsync(bin);
@@ -155,6 +155,8 @@ public class SortingController : Controller
                     description = rack.Description,
                     location = rack.Location,
                     isPortable = rack.IsPortable,
+                    rows = rack.Rows,
+                    columns = rack.Columns,
                     totalBins = rack.TotalBins,
                     occupiedBins = rack.OccupiedBins,
                     availableBins = rack.AvailableBins,
@@ -408,35 +410,44 @@ public class SortingController : Controller
                         var readyProduct = await _context.Products.FindAsync(productId);
                         if (readyProduct != null)
                         {
-                            // Mark product as ready for assembly
-                            await _sortingRules.MarkProductReadyForAssemblyAsync(productId);
+                            // Mark product as ready for assembly - only send notifications if this is a NEW transition to ready
+                            var wasNewlyMarkedReady = await _sortingRules.MarkProductReadyForAssemblyAsync(productId);
                             
-                            // Send assembly readiness notification to all stations
-                            await _hubContext.Clients.Groups($"workorder-{activeWorkOrderId}")
-                                .SendAsync("ProductReadyForAssembly", new
-                                {
-                                    productId = readyProduct.Id,
-                                    productName = readyProduct.Name,
-                                    itemNumber = readyProduct.ItemNumber,
-                                    workOrderId = activeWorkOrderId,
-                                    timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss"),
-                                    sortingStation = station
-                                });
+                            _logger.LogWarning("Product {ProductId} ({ProductName}) ready check: wasNewlyMarkedReady = {WasNewlyMarkedReady}", 
+                                productId, readyProduct.Name, wasNewlyMarkedReady);
+                            
+                            if (wasNewlyMarkedReady)
+                            {
+                                _logger.LogWarning("SENDING ProductReadyForAssembly notification for {ProductId} ({ProductName})", 
+                                    productId, readyProduct.Name);
+                                    
+                                // Send assembly readiness notification to all stations
+                                await _hubContext.Clients.Groups($"workorder-{activeWorkOrderId}")
+                                    .SendAsync("ProductReadyForAssembly", new
+                                    {
+                                        productId = readyProduct.Id,
+                                        productName = readyProduct.Name,
+                                        itemNumber = readyProduct.ItemNumber,
+                                        workOrderId = activeWorkOrderId,
+                                        timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss"),
+                                        sortingStation = station
+                                    });
 
-                            // Send specific notification to assembly station
-                            await _hubContext.Clients.Group("assembly-station")
-                                .SendAsync("NewProductReady", new
-                                {
-                                    productId = readyProduct.Id,
-                                    productName = readyProduct.Name,
+                                // Send specific notification to assembly station
+                                await _hubContext.Clients.Group("assembly-station")
+                                    .SendAsync("NewProductReady", new
+                                    {
+                                        productId = readyProduct.Id,
+                                        productName = readyProduct.Name,
                                     itemNumber = readyProduct.ItemNumber,
                                     workOrderId = activeWorkOrderId,
                                     readyTime = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss"),
                                     message = $"Product '{readyProduct.Name}' is ready for assembly - all parts sorted!"
                                 });
 
-                            _logger.LogInformation("Product {ProductId} ({ProductName}) marked as ready for assembly after sorting part {PartId}", 
-                                readyProduct.Id, readyProduct.Name, part.Id);
+                                _logger.LogInformation("Product {ProductId} ({ProductName}) marked as ready for assembly after sorting part {PartId}", 
+                                    readyProduct.Id, readyProduct.Name, part.Id);
+                            }
                         }
                     }
                 }
