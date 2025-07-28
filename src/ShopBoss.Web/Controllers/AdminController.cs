@@ -1344,8 +1344,8 @@ public class AdminController : Controller
                     r.Id,
                     r.Name,
                     r.Type,
-                    r.Rows,
-                    r.Columns
+                    TotalBins = r.TotalBins,
+                    AvailableBins = r.AvailableBins
                 })
                 .ToListAsync();
 

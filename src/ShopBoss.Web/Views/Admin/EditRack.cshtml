@@ -88,36 +88,10 @@
                             </div>
                         </div>
 
-                        <hr>
-
-                        <h6 class="mb-3"><i class="fas fa-th me-2"></i>Bin Configuration</h6>
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label asp-for="Rows" class="form-label">Number of Rows <span class="text-danger">*</span></label>
-                                    <input asp-for="Rows" type="number" class="form-control" min="1" max="50" required>
-                                    <div class="form-text">Horizontal levels (1-50)</div>
-                                    <span asp-validation-for="Rows" class="text-danger"></span>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label asp-for="Columns" class="form-label">Number of Columns <span class="text-danger">*</span></label>
-                                    <input asp-for="Columns" type="number" class="form-control" min="1" max="50" required>
-                                    <div class="form-text">Vertical positions (1-50)</div>
-                                    <span asp-validation-for="Columns" class="text-danger"></span>
-                                </div>
-                            </div>
-                        </div>
-
                         <div class="alert alert-info">
                             <i class="fas fa-info-circle me-2"></i>
-                            <strong>Total Bins:</strong> <span id="totalBins">@Model.TotalBins</span> bins will be available.
-                            <br><strong>Bin Labels:</strong> New bins will be automatically labeled (A01, A02, B01, B02, etc.) based on row and column positions.
-                            @if (Model.OccupiedBins > 0)
-                            {
-                                @:<br><strong>Current Occupancy:</strong> @Model.OccupiedBins occupied bins will be preserved if dimensions don't change.
-                            }
+                            <strong>Current Bins:</strong> @Model.TotalBins total bins (@Model.OccupiedBins occupied, @Model.AvailableBins available).
+                            <br><strong>Bin Management:</strong> Individual bins can be added, removed, or modified through the rack management interface.
                         </div>
 
                         @if (Model.OccupiedBins > 0)
@@ -125,7 +99,7 @@
                             <div class="alert alert-warning">
                                 <i class="fas fa-exclamation-triangle me-2"></i>
                                 <strong>Warning:</strong> This rack currently has @Model.OccupiedBins bins with assigned parts. 
-                                Changing the row or column count will recreate all bins and clear existing assignments.
+                                Use caution when modifying rack properties to avoid losing part assignments.
                             </div>
                         }
 
@@ -277,18 +251,9 @@
     @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
     
     <script>
-        function updateTotalBins() {
-            const rows = parseInt(document.querySelector('input[name="Rows"]').value) || 0;
-            const columns = parseInt(document.querySelector('input[name="Columns"]').value) || 0;
-            document.getElementById('totalBins').textContent = rows * columns;
-        }
-
+        // Rack edit form functionality
         document.addEventListener('DOMContentLoaded', function() {
-            const rowsInput = document.querySelector('input[name="Rows"]');
-            const columnsInput = document.querySelector('input[name="Columns"]');
-            
-            rowsInput.addEventListener('input', updateTotalBins);
-            columnsInput.addEventListener('input', updateTotalBins);
+            // Form validation and submission logic can be added here
         });
     </script>
 }

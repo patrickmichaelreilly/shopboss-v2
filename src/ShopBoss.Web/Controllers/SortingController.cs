@@ -328,7 +328,7 @@ public class SortingController : Controller
             await _auditTrail.LogScanAsync(cleanBarcode, station, true, 
                 workOrderId: activeWorkOrderId, partsProcessed: 1, 
                 sessionId: sessionId, ipAddress: ipAddress,
-                details: $"Part sorted to rack {rackId} bin {(char)('A' + row.Value - 1)}{column.Value:D2}");
+                details: $"Part sorted to bin {selectedBin?.BinLabel ?? "Unknown"} in rack {selectedBin?.StorageRack?.Name ?? "Unknown"}");
 
             // Log audit trail for part status change
             await _auditTrail.LogAsync("StatusChange", "Part", part.Id, 
@@ -347,8 +347,8 @@ public class SortingController : Controller
                 partId = part.Id,
                 partName = part.Name,
                 productName = productName,
-                rackId = rackId,
-                binLabel = $"{(char)('A' + row.Value - 1)}{column.Value:D2}",
+                rackId = selectedBin?.StorageRackId ?? "Unknown",
+                binLabel = selectedBin?.BinLabel ?? "Unknown",
                 station = station,
                 barcode = cleanBarcode
             };
@@ -362,19 +362,21 @@ public class SortingController : Controller
                     type = "part-sorted",
                     partId = part.Id,
                     partName = part.Name,
-                    rackId = rackId,
+                    rackId = updateData.rackId,
                     binLabel = updateData.binLabel,
                     timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss")
                 });
 
             // Send rack occupancy update for real-time badge refresh
-            var updatedRack = await _sortingRules.GetRackWithBinsAsync(rackId);
+            var updatedRack = selectedBin?.StorageRackId != null 
+                ? await _sortingRules.GetRackWithBinsAsync(selectedBin.StorageRackId)
+                : null;
             if (updatedRack != null)
             {
                 await _hubContext.Clients.Group("sorting-station")
                     .SendAsync("RackOccupancyUpdate", new
                     {
-                        rackId = rackId,
+                        rackId = updatedRack.Id,
                         occupiedBins = updatedRack.OccupiedBins,
                         totalBins = updatedRack.TotalBins,
                         timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss")
@@ -446,7 +448,7 @@ public class SortingController : Controller
             }
 
             _logger.LogInformation("Successfully sorted part {PartId} ({PartName}) to rack {RackId} bin {BinLabel} via barcode {Barcode}", 
-                part.Id, part.Name, rackId, updateData.binLabel, cleanBarcode);
+                part.Id, part.Name, updateData.rackId, updateData.binLabel, cleanBarcode);
 
             // Get remaining cut parts count
             var remainingCutParts = await _context.Parts
@@ -462,13 +464,13 @@ public class SortingController : Controller
                 partId = part.Id,
                 partName = part.Name,
                 productName = productName,
-                rackId = rackId,
+                rackId = updateData.rackId,
                 binLabel = updateData.binLabel,
                 placementMessage = placementMessage,
                 type = "success",
                 updatedRackOccupancy = new
                 {
-                    rackId = rackId,
+                    rackId = updateData.rackId,
                     occupiedBins = updatedRack?.OccupiedBins,
                     totalBins = updatedRack?.TotalBins
                 },
