@@ -189,6 +189,8 @@ public class ShopBossDbContext : DbContext
             entity.Property(e => e.Type).IsRequired();
             entity.Property(e => e.IsActive).IsRequired();
             entity.Property(e => e.CreatedDate).IsRequired();
+            entity.Property(e => e.Rows).IsRequired();
+            entity.Property(e => e.Columns).IsRequired();
             
             entity.HasIndex(e => e.Name);
             entity.HasIndex(e => e.Type);
@@ -200,7 +202,7 @@ public class ShopBossDbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.Property(e => e.StorageRackId).IsRequired();
             entity.Property(e => e.Status).IsRequired();
-            entity.Property(e => e.BinLabel).IsRequired().HasMaxLength(10);
+            entity.Property(e => e.BinLabel);
             entity.Property(e => e.PartsCount).IsRequired();
             
             entity.HasOne(e => e.StorageRack)

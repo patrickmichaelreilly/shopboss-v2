@@ -31,7 +31,7 @@
     }
 
     <div class="row">
-        <div class="col-lg-8">
+        <div class="col-12">
             <div class="card">
                 <div class="card-header">
                     <h5 class="mb-0"><i class="fas fa-layer-group me-2"></i>Rack Details</h5>
@@ -84,6 +84,28 @@
                                     <label asp-for="IsPortable" class="form-check-label">
                                         <i class="fas fa-dolly me-1"></i>Mobile/Portable Rack
                                     </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <h6 class="mb-3"><i class="fas fa-th me-2"></i>Grid Configuration</h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label asp-for="Rows" class="form-label">Rows <span class="text-danger">*</span></label>
+                                    <input asp-for="Rows" type="number" class="form-control" min="1" max="10" required onchange="updateGridPreview()">
+                                    <span asp-validation-for="Rows" class="text-danger"></span>
+                                    <div class="form-text">Number of horizontal rows (1-10)</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label asp-for="Columns" class="form-label">Columns <span class="text-danger">*</span></label>
+                                    <input asp-for="Columns" type="number" class="form-control" min="1" max="12" required onchange="updateGridPreview()">
+                                    <span asp-validation-for="Columns" class="text-danger"></span>
+                                    <div class="form-text">Number of vertical columns (1-12)</div>
                                 </div>
                             </div>
                         </div>
@@ -155,13 +177,11 @@
                     </form>
                 </div>
             </div>
-        </div>
-
-        <div class="col-lg-4">
+            
             <!-- Bin Management Section -->
-            <div class="card mb-3">
+            <div class="card mt-3">
                 <div class="card-header">
-                    <h6 class="mb-0"><i class="fas fa-th me-2"></i>Bin Management</h6>
+                    <h5 class="mb-0"><i class="fas fa-th me-2"></i>Bin Management</h5>
                 </div>
                 <div class="card-body">
                     <div id="binManagementContent">
@@ -182,92 +202,6 @@
                     </div>
                 </div>
             </div>
-
-            <div class="card">
-                <div class="card-header">
-                    <h6 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Current Status</h6>
-                </div>
-                <div class="card-body">
-                    <div class="row text-center">
-                        <div class="col-6">
-                            <div class="fw-bold text-primary fs-4">@Model.TotalBins</div>
-                            <small class="text-muted">Total Bins</small>
-                        </div>
-                        <div class="col-6">
-                            <div class="fw-bold text-success fs-4">@Model.OccupiedBins</div>
-                            <small class="text-muted">Occupied</small>
-                        </div>
-                    </div>
-
-                    <div class="progress mt-3 mb-3" style="height: 10px;">
-                        <div class="progress-bar bg-success" 
-                             style="width: @(Model.OccupancyPercentage)%"
-                             title="@(Model.OccupancyPercentage.ToString("F1"))% occupied">
-                        </div>
-                    </div>
-
-                    <div class="small text-muted">
-                        <div class="d-flex justify-content-between">
-                            <span><strong>Created:</strong></span>
-                            <span>@Model.CreatedDate.ToShortDateString()</span>
-                        </div>
-                        @if (Model.LastModifiedDate != Model.CreatedDate)
-                        {
-                            <div class="d-flex justify-content-between">
-                                <span><strong>Modified:</strong></span>
-                                <span>@Model.LastModifiedDate?.ToShortDateString()</span>
-                            </div>
-                        }
-                        <div class="d-flex justify-content-between">
-                            <span><strong>Status:</strong></span>
-                            <span class="badge bg-@(Model.IsActive ? "success" : "secondary")">
-                                @(Model.IsActive ? "Active" : "Inactive")
-                            </span>
-                        </div>
-                        @if (Model.IsPortable)
-                        {
-                            <div class="d-flex justify-content-between">
-                                <span><strong>Type:</strong></span>
-                                <span class="badge bg-warning text-dark">
-                                    <i class="fas fa-dolly me-1"></i>Mobile
-                                </span>
-                            </div>
-                        }
-                    </div>
-                </div>
-            </div>
-
-            <div class="card mt-3">
-                <div class="card-header">
-                    <h6 class="mb-0"><i class="fas fa-info-circle me-2"></i>Rack Type Guide</h6>
-                </div>
-                <div class="card-body">
-                    <div class="mb-3">
-                        <strong class="text-primary">Standard</strong>
-                        <p class="small mb-2">For general carcass parts (sides, backs, tops, bottoms).</p>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <strong class="text-success">Doors & Drawer Fronts</strong>
-                        <p class="small mb-2">Specialized for doors and drawer front panels.</p>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <strong class="text-info">Adjustable Shelves</strong>
-                        <p class="small mb-2">For adjustable shelf components.</p>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <strong class="text-warning">Hardware</strong>
-                        <p class="small mb-2">For hardware items like hinges and handles.</p>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <strong class="text-secondary">Mobile Cart</strong>
-                        <p class="small mb-2">Portable racks for mobile storage.</p>
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
 </div>
@@ -278,6 +212,13 @@
     <script>
         let rackBins = [];
         let binsModified = false;
+
+        // Grid preview update function
+        function updateGridPreview() {
+            if (rackBins.length > 0) {
+                displayBins();
+            }
+        }
 
         // Rack edit form functionality
         document.addEventListener('DOMContentLoaded', function() {
@@ -318,53 +259,84 @@
                 return;
             }
 
-            let html = '<div class="bin-grid-edit">';
+            // Get current grid dimensions from form inputs
+            const rows = parseInt(document.querySelector('input[name="Rows"]').value) || 4;
+            const cols = parseInt(document.querySelector('input[name="Columns"]').value) || 8;
+            const totalBins = rackBins.length;
             
-            rackBins.forEach((bin, index) => {
+            // Create CSS Grid with current dimensions
+            let html = `<div class="rack-grid-preview" style="grid-template-rows: repeat(${rows}, 1fr); grid-template-columns: repeat(${cols}, 1fr);">`;
+            
+            // Generate grid items from flat bin list (left to right, top to bottom)
+            for (let i = 0; i < totalBins; i++) {
+                const bin = rackBins[i];
                 const statusClass = bin.Status === 'Empty' ? 'bin-empty' : 
                                   bin.Status === 'Partial' ? 'bin-partial' :
                                   bin.Status === 'Full' ? 'bin-full' : 'bin-occupied';
                                   
                 html += `
-                    <div class="bin-item ${statusClass}" data-bin-index="${index}">
-                        <div class="bin-label-edit">
-                            <input type="text" 
-                                   class="form-control form-control-sm bin-label-input" 
-                                   value="${bin.Label}"
-                                   onchange="updateBinLabel(${index}, this.value)"
-                                   pattern="^[A-Z0-9]{1,10}$"
-                                   title="Bin label must contain only uppercase letters and numbers (e.g., A01, B15, ZONE1)"
-                                   maxlength="10">
-                        </div>
-                        <div class="bin-status-info">
-                            <small class="text-muted">${bin.Status}</small>
-                            ${bin.PartsCount > 0 ? `<small class="text-muted">${bin.PartsCount} parts</small>` : ''}
-                        </div>
-                        <div class="bin-actions">
-                            <button type="button" class="btn btn-outline-danger btn-xs" 
-                                    onclick="removeBin(${index})"
-                                    ${bin.Status !== 'Empty' ? 'disabled title="Cannot remove bin with parts"' : ''}>
-                                <i class="fas fa-trash"></i>
-                            </button>
+                    <div class="grid-bin-edit ${statusClass}" data-bin-index="${i}">
+                        <div class="bin-content-edit">
+                            <div class="bin-label-edit">
+                                <input type="text" 
+                                       class="form-control form-control-sm bin-label-input" 
+                                       value="${bin.BinLabel || ''}"
+                                       onchange="updateBinLabel(${i}, this.value)">
+                            </div>
+                            <div class="bin-status-info">
+                                <small class="text-muted">${bin.Status}</small>
+                                ${bin.PartsCount > 0 ? `<small class="text-muted">${bin.PartsCount} parts</small>` : ''}
+                            </div>
+                            <div class="bin-actions">
+                                <button type="button" class="btn btn-outline-danger btn-xs" 
+                                        onclick="removeBin(${i})"
+                                        ${bin.Status !== 'Empty' ? 'disabled title="Cannot remove bin with parts"' : ''}>
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 `;
-            });
+            }
+            
+            // Fill empty grid cells if needed
+            for (let i = totalBins; i < rows * cols; i++) {
+                html += `<div class="grid-bin-edit bin-empty" style="visibility: hidden;"></div>`;
+            }
             
             html += '</div>';
+            
+            // Add legend
+            html += `
+                <div class="rack-legend mt-3">
+                    <div class="d-flex justify-content-center flex-wrap gap-3">
+                        <div class="legend-item">
+                            <div class="legend-color bin-empty"></div>
+                            <span>Empty</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color bin-partial"></div>
+                            <span>Partial</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color bin-full"></div>
+                            <span>Full</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color bin-occupied"></div>
+                            <span>Occupied</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
             content.innerHTML = html;
         }
 
         function updateBinLabel(index, newLabel) {
-            if (newLabel && /^[A-Z0-9]{1,10}$/.test(newLabel)) {
-                rackBins[index].Label = newLabel;
-                binsModified = true;
-                updateSaveButtonState();
-            } else {
-                // Reset to original value if invalid
-                document.querySelector(`[data-bin-index="${index}"] .bin-label-input`).value = rackBins[index].Label;
-                alert('Bin label must contain only uppercase letters and numbers (1-10 characters)');
-            }
+            rackBins[index].BinLabel = newLabel;
+            binsModified = true;
+            updateSaveButtonState();
         }
 
         function addNewBin() {
@@ -374,7 +346,7 @@
             
             const newBin = {
                 Id: 'new-' + Date.now(), // Temporary ID for new bins
-                Label: newLabel,
+                BinLabel: newLabel,
                 Status: 'Empty',
                 PartsCount: 0,
                 IsNew: true
@@ -405,7 +377,7 @@
                 return;
             }
             
-            if (confirm(`Remove bin "${rackBins[index].Label}"?`)) {
+            if (confirm(`Remove bin "${rackBins[index].BinLabel}"?`)) {
                 rackBins.splice(index, 1);
                 binsModified = true;
                 displayBins();
@@ -476,69 +448,124 @@
     </script>
 
     <style>
-        .bin-grid-edit {
+        /* Grid-based rack preview (matches Sorting station) */
+        .rack-grid-preview {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-            gap: 8px;
+            margin: 0 auto;
+            gap: 4px;
+            width: 100%;
             max-height: 400px;
             overflow-y: auto;
+            /* grid-template-rows and grid-template-columns set dynamically via JavaScript */
         }
 
-        .bin-item {
+        .grid-bin-edit {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
             border: 2px solid #dee2e6;
-            border-radius: 4px;
-            padding: 8px;
-            background-color: #f8f9fa;
+            position: relative;
             transition: all 0.2s ease;
-        }
-
-        .bin-item:hover {
-            border-color: #0d6efd;
-        }
-
-        .bin-item.bin-empty {
+            min-height: 80px;
             background-color: #f8f9fa;
-            border-color: #e9ecef;
         }
 
-        .bin-item.bin-partial {
-            background-color: #cff4fc;
-            border-color: #0dcaf0;
+        .grid-bin-edit:hover {
+            transform: scale(1.05);
+            z-index: 10;
+            border-color: #004F00;
         }
 
-        .bin-item.bin-full {
-            background-color: #d1e7dd;
-            border-color: #198754;
+        .bin-content-edit {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            padding: 4px;
+            width: 100%;
         }
 
-        .bin-item.bin-occupied {
-            background-color: #fff3cd;
-            border-color: #ffc107;
+        .bin-label-edit {
+            margin-bottom: 2px;
+            width: 100%;
         }
 
         .bin-label-input {
             font-weight: bold;
             text-align: center;
-            font-size: 0.85rem;
+            font-size: 0.75rem;
+            padding: 2px 4px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            width: 100%;
+            max-width: 60px;
         }
 
         .bin-status-info {
             text-align: center;
-            margin: 4px 0;
+            margin: 2px 0;
         }
 
         .bin-status-info small {
             display: block;
-            font-size: 0.7rem;
+            font-size: 0.65rem;
+            line-height: 1.1;
         }
 
         .bin-actions {
             text-align: center;
+            margin-top: 2px;
         }
 
         .btn-xs {
-            padding: 2px 6px;
-            font-size: 0.7rem;
+            padding: 1px 4px;
+            font-size: 0.6rem;
+            line-height: 1.2;
+        }
+
+        /* Status colors (matching Sorting station) */
+        .grid-bin-edit.bin-empty {
+            background-color: #f8f9fa;
+            border-color: #e9ecef;
+        }
+
+        .grid-bin-edit.bin-partial {
+            background-color: #cff4fc;
+            border-color: #0dcaf0;
+            color: #055160;
+        }
+
+        .grid-bin-edit.bin-full {
+            background-color: #d1e7dd;
+            border-color: #198754;
+            color: #0f5132;
+        }
+
+        .grid-bin-edit.bin-occupied {
+            background-color: #fff3cd;
+            border-color: #ffc107;
+            color: #664d03;
+        }
+
+        /* Legend styles (matching Sorting station) */
+        .rack-legend {
+            text-align: center;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.8rem;
+        }
+
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border: 1px solid #dee2e6;
+            border-radius: 3px;
         }
     </style>
 }

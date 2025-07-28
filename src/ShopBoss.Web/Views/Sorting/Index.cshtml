@@ -308,17 +308,26 @@ else
                 return;
             }
             
-            // Calculate optimal grid dimensions based on number of bins
+            // Use rack's configured dimensions if available, otherwise calculate optimal grid
             const totalBins = rack.bins.length;
-            const cols = Math.ceil(Math.sqrt(totalBins * 1.5)); // Slightly wider than square
-            const rows = Math.ceil(totalBins / cols);
+            let rows, cols;
             
-            console.log(`Creating grid: ${rows} rows x ${cols} cols for ${totalBins} bins`);
+            if (rack.rows && rack.columns) {
+                // Use the rack's configured grid dimensions
+                rows = rack.rows;
+                cols = rack.columns;
+                console.log(`Using rack configuration: ${rows} rows x ${cols} cols for ${totalBins} bins`);
+            } else {
+                // Fallback to calculated optimal dimensions for legacy racks
+                cols = Math.ceil(Math.sqrt(totalBins * 1.5)); // Slightly wider than square
+                rows = Math.ceil(totalBins / cols);
+                console.log(`Using calculated dimensions: ${rows} rows x ${cols} cols for ${totalBins} bins`);
+            }
             
-            // Create CSS Grid with calculated dimensions
+            // Create CSS Grid with determined dimensions
             let gridHtml = `<div class="rack-grid" style="grid-template-rows: repeat(${rows}, 1fr); grid-template-columns: repeat(${cols}, 1fr);">`;
             
-            // Generate grid items from flat bin list
+            // Generate grid items from flat bin list (left to right, top to bottom)
             for (let i = 0; i < totalBins; i++) {
                 const bin = rack.bins[i];
                 const row = Math.floor(i / cols);

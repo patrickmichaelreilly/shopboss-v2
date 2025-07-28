@@ -23,7 +23,9 @@ public static class StorageRackSeedService
                 Description = "Main storage for standard parts",
                 Location = "East Wall",
                 IsActive = true,
-                IsPortable = false
+                IsPortable = false,
+                Rows = 4,
+                Columns = 8
             },
             new StorageRack
             {
@@ -32,7 +34,9 @@ public static class StorageRackSeedService
                 Description = "Secondary storage for standard parts",
                 Location = "East Wall",
                 IsActive = true,
-                IsPortable = false
+                IsPortable = false,
+                Rows = 4,
+                Columns = 8
             },
             new StorageRack
             {
@@ -41,7 +45,9 @@ public static class StorageRackSeedService
                 Description = "Specialized storage for doors and drawer fronts",
                 Location = "North Wall",
                 IsActive = true,
-                IsPortable = false
+                IsPortable = false,
+                Rows = 3,
+                Columns = 6
             },
             new StorageRack
             {
@@ -50,7 +56,9 @@ public static class StorageRackSeedService
                 Description = "Storage for adjustable shelves",
                 Location = "South Wall",
                 IsActive = true,
-                IsPortable = false
+                IsPortable = false,
+                Rows = 5,
+                Columns = 6
             },
             new StorageRack
             {
@@ -59,24 +67,25 @@ public static class StorageRackSeedService
                 Description = "Portable storage cart",
                 Location = "Mobile",
                 IsActive = true,
-                IsPortable = true
+                IsPortable = true,
+                Rows = 2,
+                Columns = 4
             }
         };
 
         context.StorageRacks.AddRange(racks);
         await context.SaveChangesAsync();
 
-        // Create bins for each rack
+        // Create bins for each rack based on its Rows and Columns configuration
         foreach (var rack in racks)
         {
             var bins = new List<Bin>();
             
-            // Create a standard set of bins with predefined labels
-            // For simplicity, create 32 bins (4 rows x 8 columns equivalent)
+            // Create bins using the rack's specific row/column configuration
             var binLabels = new List<string>();
-            for (int row = 1; row <= 4; row++)
+            for (int row = 1; row <= rack.Rows; row++)
             {
-                for (int col = 1; col <= 8; col++)
+                for (int col = 1; col <= rack.Columns; col++)
                 {
                     binLabels.Add($"{(char)('A' + row - 1)}{col:D2}");
                 }

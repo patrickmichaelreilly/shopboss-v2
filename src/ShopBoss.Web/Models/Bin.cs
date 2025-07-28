@@ -38,9 +38,6 @@ public class Bin
     [StringLength(500)]
     public string Notes { get; set; } = string.Empty;
     
-    [Required]
-    [StringLength(10)]
-    [RegularExpression(@"^[A-Z0-9]{1,10}$", ErrorMessage = "Bin label must contain only uppercase letters and numbers (e.g., A01, B15, ZONE1)")]
     public string BinLabel { get; set; } = string.Empty;
     
     // Navigation properties

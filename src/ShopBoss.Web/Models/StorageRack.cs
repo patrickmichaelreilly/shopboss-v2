@@ -36,6 +36,10 @@ public class StorageRack
     public bool IsActive { get; set; } = true;
     public bool IsPortable { get; set; } = false;
     
+    // Grid configuration
+    public int Rows { get; set; } = 4;
+    public int Columns { get; set; } = 8;
+    
     public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
     public DateTime? LastModifiedDate { get; set; }
     
