@@ -95,6 +95,13 @@ using (var scope = app.Services.CreateScope())
     await StorageRackSeedService.SeedDefaultRacksAsync(context);
 }
 
+// Seed default sorting rules
+using (var scope = app.Services.CreateScope())
+{
+    var sortingRuleService = scope.ServiceProvider.GetRequiredService<SortingRuleService>();
+    await sortingRuleService.SeedDefaultSortingRulesAsync();
+}
+
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {

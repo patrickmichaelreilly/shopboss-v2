@@ -1,0 +1,678 @@
+@model List<SortingRule>
+
+@{
+    ViewData["Title"] = "Sorting Rules";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2><i class="fas fa-filter me-2"></i>Sorting Rules Configuration</h2>
+        <small class="text-muted">
+            <i class="fas fa-info-circle me-1"></i>
+            Configure keyword-based routing rules for automatic part sorting to specialized racks
+        </small>
+    </div>
+    <div class="btn-group" role="group">
+        <button type="button" class="btn btn-primary" onclick="showCreateRuleModal()">
+            <i class="fas fa-plus me-2"></i>Add Sorting Rule
+        </button>
+    </div>
+</div>
+
+<!-- Rule Editor Modal -->
+<div class="modal fade" id="ruleEditorModal" tabindex="-1" aria-labelledby="ruleEditorModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="ruleEditorModalLabel">
+                    <i class="fas fa-filter me-2"></i><span id="modalTitle">Add Sorting Rule</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="ruleForm">
+                @Html.AntiForgeryToken()
+                <div class="modal-body">
+                    <input type="hidden" id="ruleId" name="Id" value="0">
+                    
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <label for="ruleName" class="form-label">Rule Name *</label>
+                            <input type="text" class="form-control" id="ruleName" name="Name" required 
+                                   placeholder="Enter descriptive name for this rule">
+                            <div class="invalid-feedback"></div>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="rulePriority" class="form-label">Priority *</label>
+                            <input type="number" class="form-control" id="rulePriority" name="Priority" required min="1">
+                            <div class="form-text">Lower number = higher priority</div>
+                            <div class="invalid-feedback"></div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mt-2">
+                        <div class="col-md-6">
+                            <label for="ruleKeywords" class="form-label">Keywords *</label>
+                            <input type="text" class="form-control" id="ruleKeywords" name="Keywords" required 
+                                   placeholder="Enter comma-separated keywords">
+                            <div class="form-text">Example: DOOR,DRAWER FRONT,CABINET DOOR</div>
+                            <div class="invalid-feedback"></div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="ruleTargetRackType" class="form-label">Target Rack Type *</label>
+                            <select class="form-select" id="ruleTargetRackType" name="TargetRackType" required>
+                                @foreach (var rackType in ViewBag.RackTypes as List<RackType>)
+                                {
+                                    <option value="@((int)rackType)">@rackType</option>
+                                }
+                            </select>
+                            <div class="invalid-feedback"></div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mt-2">
+                        <div class="col-md-12">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="ruleIsActive" name="IsActive" value="true" checked>
+                                <input type="hidden" name="IsActive" value="false">
+                                <label class="form-check-label" for="ruleIsActive">
+                                    Rule is Active
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Real-time Testing Section -->
+                    <div class="mt-4">
+                        <h6 class="border-bottom pb-2 mb-3">
+                            <i class="fas fa-vial me-2"></i>Test Keywords
+                        </h6>
+                        <div class="row g-3">
+                            <div class="col-md-8">
+                                <input type="text" class="form-control" id="modalTestPartName" 
+                                       placeholder="Enter part name to test against keywords...">
+                            </div>
+                            <div class="col-md-4">
+                                <button type="button" class="btn btn-outline-primary" onclick="testCurrentRule()">
+                                    <i class="fas fa-play me-1"></i>Test
+                                </button>
+                            </div>
+                        </div>
+                        <div id="modalTestResult" class="mt-2"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-1"></i><span id="saveButtonText">Save Rule</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Search and Filter Controls -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form asp-action="Index" method="get" class="row g-3">
+            <div class="col-md-4">
+                <label for="search" class="form-label">Search Rules</label>
+                <input type="text" name="search" id="search" class="form-control" 
+                       placeholder="Search by name or keywords..." 
+                       value="@ViewBag.SearchTerm">
+            </div>
+            <div class="col-md-3">
+                <label for="filterType" class="form-label">Rack Type</label>
+                <select name="filterType" id="filterType" class="form-select">
+                    <option value="">All Rack Types</option>
+                    @foreach (var rackType in ViewBag.RackTypes as List<RackType>)
+                    {
+                        var isSelected = ViewBag.FilterType?.ToString() == rackType.ToString();
+                        <option value="@rackType" selected="@isSelected">
+                            @rackType
+                        </option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="activeOnly" class="form-label">Status</label>
+                <select name="activeOnly" id="activeOnly" class="form-select">
+                    <option value="">All Rules</option>
+                    <option value="true" selected="@(ViewBag.ActiveOnly == true)">Active Only</option>
+                    <option value="false" selected="@(ViewBag.ActiveOnly == false)">Inactive Only</option>
+                </select>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="submit" class="btn btn-outline-secondary me-2">
+                    <i class="fas fa-search"></i>
+                </button>
+                @if (!string.IsNullOrEmpty(ViewBag.SearchTerm) || ViewBag.FilterType != null || ViewBag.ActiveOnly != null)
+                {
+                    <a asp-action="Index" class="btn btn-outline-secondary">
+                        <i class="fas fa-times"></i>
+                    </a>
+                }
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Keyword Testing Tool -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h6 class="card-title mb-0">
+            <i class="fas fa-vial me-2"></i>Keyword Testing Tool
+        </h6>
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label for="testKeywords" class="form-label">Keywords to Test</label>
+                <input type="text" id="testKeywords" class="form-control" 
+                       placeholder="Enter comma-separated keywords...">
+                <small class="form-text text-muted">Example: DOOR,DRAWER FRONT</small>
+            </div>
+            <div class="col-md-4">
+                <label for="testPartName" class="form-label">Test Part Name</label>
+                <input type="text" id="testPartName" class="form-control" 
+                       placeholder="Enter part name to test...">
+                <small class="form-text text-muted">Example: DOOR PANEL LEFT</small>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="button" id="testKeywordsBtn" class="btn btn-outline-primary">
+                    <i class="fas fa-play me-1"></i>Test
+                </button>
+            </div>
+            <div class="col-md-2 d-flex align-items-center">
+                <div id="testResult" class="w-100"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (!Model.Any())
+{
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle me-2"></i>
+        No sorting rules found. <a asp-action="Create" class="alert-link">Create your first sorting rule</a> to start customizing part routing.
+    </div>
+}
+else
+{
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h6 class="card-title mb-0">
+                <i class="fas fa-list me-2"></i>Sorting Rules (@Model.Count)
+            </h6>
+            <small class="text-muted">
+                <i class="fas fa-arrows-alt me-1"></i>Drag to reorder priorities
+            </small>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th width="40" class="text-center"></th>
+                            <th width="60" class="text-center">Priority</th>
+                            <th>Name</th>
+                            <th>Keywords</th>
+                            <th>Target Rack Type</th>
+                            <th width="80" class="text-center">Status</th>
+                            <th width="100" class="text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sortableRules">
+                        @foreach (var rule in Model)
+                        {
+                            var statusClass = rule.IsActive ? "bg-success" : "bg-secondary";
+                            var statusText = rule.IsActive ? "Active" : "Inactive";
+                            var rowClass = rule.IsActive ? "" : "table-light text-muted";
+                            
+                            <tr class="@rowClass sortable-row" data-rule-id="@rule.Id">
+                                <td class="text-center align-middle">
+                                    <i class="fas fa-grip-vertical text-muted handle" style="cursor: move;"></i>
+                                </td>
+                                <td class="text-center align-middle">
+                                    <span class="badge bg-primary">@rule.Priority</span>
+                                </td>
+                                <td class="align-middle">
+                                    <div class="fw-bold">@rule.Name</div>
+                                    @if (rule.LastModifiedDate.HasValue)
+                                    {
+                                        <small class="text-muted">
+                                            Modified: @rule.LastModifiedDate.Value.ToString("yyyy-MM-dd HH:mm")
+                                        </small>
+                                    }
+                                    else
+                                    {
+                                        <small class="text-muted">
+                                            Created: @rule.CreatedDate.ToString("yyyy-MM-dd HH:mm")
+                                        </small>
+                                    }
+                                </td>
+                                <td class="align-middle">
+                                    <div class="d-flex flex-wrap gap-1">
+                                        @foreach (var keyword in rule.GetKeywordsList())
+                                        {
+                                            <span class="badge bg-light text-dark border">@keyword</span>
+                                        }
+                                    </div>
+                                </td>
+                                <td class="align-middle">
+                                    <span class="badge bg-info">@rule.TargetRackType</span>
+                                </td>
+                                <td class="text-center align-middle">
+                                    <span class="badge @statusClass">@statusText</span>
+                                </td>
+                                <td class="text-center align-middle">
+                                    <div class="btn-group" role="group">
+                                        <button type="button" class="btn btn-sm btn-outline-warning" 
+                                                onclick="showEditRuleModal(@rule.Id)" title="Edit Rule">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-sm @(rule.IsActive ? "btn-outline-secondary" : "btn-outline-success")" 
+                                                onclick="toggleRuleStatus(@rule.Id, '@rule.Name')" 
+                                                title="@(rule.IsActive ? "Disable" : "Enable") Rule">
+                                            <i class="fas fa-@(rule.IsActive ? "pause" : "play")"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-danger" 
+                                                onclick="deleteRule(@rule.Id, '@rule.Name')" title="Delete Rule">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <script>
+        // Initialize drag-and-drop sorting
+        const sortableList = document.getElementById('sortableRules');
+        if (sortableList) {
+            const sortable = Sortable.create(sortableList, {
+                handle: '.handle',
+                animation: 150,
+                onEnd: function (evt) {
+                    updatePriorities();
+                }
+            });
+        }
+
+        // Update rule priorities after drag-and-drop
+        function updatePriorities() {
+            const rows = document.querySelectorAll('#sortableRules tr[data-rule-id]');
+            const ruleIds = Array.from(rows).map(row => parseInt(row.dataset.ruleId));
+
+            fetch('@Url.Action("UpdatePriorities")', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''
+                },
+                body: JSON.stringify(ruleIds)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Update priority badges
+                    rows.forEach((row, index) => {
+                        const badge = row.querySelector('.badge.bg-primary');
+                        if (badge) {
+                            badge.textContent = index + 1;
+                        }
+                    });
+                    showToast(data.message, 'success');
+                } else {
+                    showToast(data.message, 'error');
+                    location.reload(); // Reload to restore original order
+                }
+            })
+            .catch(error => {
+                console.error('Error updating priorities:', error);
+                showToast('An error occurred while updating priorities.', 'error');
+                location.reload();
+            });
+        }
+
+        // Toggle rule status
+        function toggleRuleStatus(ruleId, ruleName) {
+            const action = confirm(`Are you sure you want to toggle the status of rule "${ruleName}"?`);
+            if (!action) return;
+
+            fetch(`@Url.Action("ToggleStatus")/${ruleId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast(data.message, 'success');
+                    location.reload(); // Reload to update UI
+                } else {
+                    showToast(data.message, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error toggling rule status:', error);
+                showToast('An error occurred while updating the rule status.', 'error');
+            });
+        }
+
+        // Delete rule
+        function deleteRule(ruleId, ruleName) {
+            const confirmation = confirm(`Are you sure you want to delete the sorting rule "${ruleName}"?\n\nThis action cannot be undone and may affect part routing.`);
+            if (!confirmation) return;
+
+            fetch(`@Url.Action("Delete")/${ruleId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast(data.message, 'success');
+                    location.reload(); // Reload to remove the rule from the list
+                } else {
+                    showToast(data.message, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error deleting rule:', error);
+                showToast('An error occurred while deleting the rule.', 'error');
+            });
+        }
+
+        // Show create rule modal
+        function showCreateRuleModal() {
+            resetRuleForm();
+            document.getElementById('modalTitle').textContent = 'Add Sorting Rule';
+            document.getElementById('saveButtonText').textContent = 'Save Rule';
+            document.getElementById('ruleId').value = '0';
+            document.getElementById('rulePriority').value = getNextPriority();
+            
+            const modal = new bootstrap.Modal(document.getElementById('ruleEditorModal'));
+            modal.show();
+        }
+
+        // Show edit rule modal
+        function showEditRuleModal(ruleId) {
+            // Find the rule data from the table
+            const row = document.querySelector(`tr[data-rule-id="${ruleId}"]`);
+            if (!row) return;
+
+            resetRuleForm();
+            document.getElementById('modalTitle').textContent = 'Edit Sorting Rule';
+            document.getElementById('saveButtonText').textContent = 'Update Rule';
+            
+            // Populate form with existing data
+            document.getElementById('ruleId').value = ruleId;
+            
+            // Extract data from the table row (we'll need to get this from the server)
+            fetchRuleData(ruleId);
+            
+            const modal = new bootstrap.Modal(document.getElementById('ruleEditorModal'));
+            modal.show();
+        }
+
+        // Fetch rule data for editing
+        function fetchRuleData(ruleId) {
+            fetch(`@Url.Action("GetRule")/${ruleId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById('ruleName').value = data.rule.name;
+                        document.getElementById('rulePriority').value = data.rule.priority;
+                        document.getElementById('ruleKeywords').value = data.rule.keywords;
+                        document.getElementById('ruleTargetRackType').value = data.rule.targetRackType;
+                        document.getElementById('ruleIsActive').checked = data.rule.isActive;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching rule data:', error);
+                    showToast('Error loading rule data', 'error');
+                });
+        }
+
+        // Reset rule form
+        function resetRuleForm() {
+            document.getElementById('ruleForm').reset();
+            document.getElementById('ruleId').value = '0';
+            document.getElementById('ruleIsActive').checked = true;
+            document.getElementById('modalTestResult').innerHTML = '';
+            clearValidationErrors();
+        }
+
+        // Get next available priority
+        function getNextPriority() {
+            const rows = document.querySelectorAll('#sortableRules tr[data-rule-id]');
+            let maxPriority = 0;
+            rows.forEach(row => {
+                const priorityBadge = row.querySelector('.badge.bg-primary');
+                if (priorityBadge) {
+                    const priority = parseInt(priorityBadge.textContent);
+                    if (priority > maxPriority) {
+                        maxPriority = priority;
+                    }
+                }
+            });
+            return maxPriority + 1;
+        }
+
+        // Handle rule form submission
+        document.getElementById('ruleForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const ruleId = formData.get('Id');
+            const isEditing = ruleId !== '0';
+            const url = isEditing ? `@Url.Action("Edit")/${ruleId}` : '@Url.Action("Create")';
+            
+            fetch(url, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Success
+                    showToast(data.message, 'success');
+                    
+                    // Close modal and reload page
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('ruleEditorModal'));
+                    if (modal) {
+                        modal.hide();
+                    }
+                    
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    // Handle validation errors or other failures
+                    clearValidationErrors();
+                    
+                    if (data.errors) {
+                        // Display field-specific validation errors
+                        Object.keys(data.errors).forEach(fieldName => {
+                            const field = document.querySelector(`[name="${fieldName}"]`);
+                            const errorMessage = data.errors[fieldName].join(', ');
+                            
+                            if (field) {
+                                field.classList.add('is-invalid');
+                                const feedback = field.parentNode.querySelector('.invalid-feedback');
+                                if (feedback) {
+                                    feedback.textContent = errorMessage;
+                                }
+                            }
+                        });
+                        
+                        showToast('Please correct the validation errors highlighted in the form.', 'error');
+                    } else {
+                        // General error message
+                        showToast(data.message || 'An error occurred while saving the rule.', 'error');
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error saving rule:', error);
+                showToast('An error occurred while saving the rule.', 'error');
+            });
+        });
+
+        // Clear validation errors
+        function clearValidationErrors() {
+            document.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+            document.querySelectorAll('.invalid-feedback').forEach(el => el.textContent = '');
+        }
+
+        // Test current rule keywords
+        function testCurrentRule() {
+            const keywords = document.getElementById('ruleKeywords').value.trim();
+            const testPartName = document.getElementById('modalTestPartName').value.trim();
+            const resultDiv = document.getElementById('modalTestResult');
+
+            if (!keywords || !testPartName) {
+                resultDiv.innerHTML = '<div class="alert alert-warning py-2">Enter both keywords and part name to test</div>';
+                return;
+            }
+
+            resultDiv.innerHTML = '<div class="alert alert-info py-2">Testing...</div>';
+
+            fetch('@Url.Action("TestKeywords")', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    keywords: keywords,
+                    testPartName: testPartName,
+                    targetRackType: parseInt(document.getElementById('ruleTargetRackType').value)
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    if (data.matches) {
+                        resultDiv.innerHTML = `
+                            <div class="alert alert-success py-2">
+                                <i class="fas fa-check-circle me-1"></i>
+                                <strong>Match Found!</strong><br>
+                                <small>Matched Keywords: ${data.matchedKeywords.join(', ')}</small><br>
+                                <small>Target Rack: ${data.targetRackType}</small>
+                            </div>
+                        `;
+                    } else {
+                        resultDiv.innerHTML = `
+                            <div class="alert alert-secondary py-2">
+                                <i class="fas fa-times-circle me-1"></i>
+                                <strong>No Match</strong><br>
+                                <small>Part name does not contain any of the specified keywords</small>
+                            </div>
+                        `;
+                    }
+                } else {
+                    resultDiv.innerHTML = '<div class="alert alert-danger py-2">Error testing keywords</div>';
+                }
+            })
+            .catch(error => {
+                console.error('Error testing keywords:', error);
+                resultDiv.innerHTML = '<div class="alert alert-danger py-2">Error occurred during testing</div>';
+            });
+        }
+
+        // Test keywords functionality for main page
+        document.getElementById('testKeywordsBtn').addEventListener('click', function() {
+            const keywords = document.getElementById('testKeywords').value.trim();
+            const testPartName = document.getElementById('testPartName').value.trim();
+            const resultDiv = document.getElementById('testResult');
+
+            if (!keywords || !testPartName) {
+                resultDiv.innerHTML = '<span class="badge bg-warning">Enter both keywords and part name</span>';
+                return;
+            }
+
+            resultDiv.innerHTML = '<span class="badge bg-secondary">Testing...</span>';
+
+            fetch('@Url.Action("TestKeywords")', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    keywords: keywords,
+                    testPartName: testPartName,
+                    targetRackType: 0 // Standard
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    if (data.matches) {
+                        resultDiv.innerHTML = `
+                            <div class="text-success">
+                                <i class="fas fa-check-circle me-1"></i>
+                                <strong>Match!</strong><br>
+                                <small>Keywords: ${data.matchedKeywords.join(', ')}</small>
+                            </div>
+                        `;
+                    } else {
+                        resultDiv.innerHTML = `
+                            <div class="text-muted">
+                                <i class="fas fa-times-circle me-1"></i>
+                                <strong>No Match</strong>
+                            </div>
+                        `;
+                    }
+                } else {
+                    resultDiv.innerHTML = '<span class="badge bg-danger">Error testing</span>';
+                }
+            })
+            .catch(error => {
+                console.error('Error testing keywords:', error);
+                resultDiv.innerHTML = '<span class="badge bg-danger">Error</span>';
+            });
+        });
+
+        // Toast notification function
+        function showToast(message, type = 'info') {
+            const toastContainer = document.getElementById('toast-container') || createToastContainer();
+            const toast = document.createElement('div');
+            toast.className = `toast align-items-center text-white bg-${type === 'success' ? 'success' : type === 'error' ? 'danger' : 'primary'} border-0`;
+            toast.setAttribute('role', 'alert');
+            toast.innerHTML = `
+                <div class="d-flex">
+                    <div class="toast-body">${message}</div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                </div>
+            `;
+            toastContainer.appendChild(toast);
+            const bsToast = new bootstrap.Toast(toast);
+            bsToast.show();
+            
+            // Remove toast element after it's hidden
+            toast.addEventListener('hidden.bs.toast', () => {
+                toast.remove();
+            });
+        }
+
+        function createToastContainer() {
+            const container = document.createElement('div');
+            container.id = 'toast-container';
+            container.className = 'toast-container position-fixed top-0 end-0 p-3';
+            container.style.zIndex = '1055';
+            document.body.appendChild(container);
+            return container;
+        }
+    </script>
+}
