@@ -755,10 +755,7 @@ public class SortingController : Controller
         try
         {
             var activeWorkOrderId = HttpContext.Session.GetString("ActiveWorkOrderId");
-            if (string.IsNullOrEmpty(activeWorkOrderId))
-            {
-                return Json(new { success = false, message = "No active work order selected." });
-            }
+            // Removed validation - clearing bins is allowed at all times
 
             var bin = await _context.Bins
                 .Include(b => b.StorageRack)
@@ -776,8 +773,7 @@ public class SortingController : Controller
             var partsToRemove = await _context.Parts
                 .Include(p => p.NestSheet)
                 .Where(p => p.Location == binLocation && 
-                           p.Status == PartStatus.Sorted &&
-                           p.NestSheet!.WorkOrderId == activeWorkOrderId)
+                           p.Status == PartStatus.Sorted)
                 .ToListAsync();
 
             var partsRemoved = 0;
@@ -825,14 +821,20 @@ public class SortingController : Controller
                 details: $"Bin {bin.BinLabel} cleared - {partsRemoved} parts removed",
                 sessionId: sessionId, ipAddress: ipAddress);
 
-            // Get updated cut parts count
-            var updatedCutPartsCount = await _context.Parts
-                .Include(p => p.NestSheet)
-                .CountAsync(p => p.NestSheet!.WorkOrderId == activeWorkOrderId && p.Status == PartStatus.Cut);
+            // Get updated cut parts count (only if active work order exists)
+            var updatedCutPartsCount = 0;
+            var assemblyReadyCount = 0;
+            
+            if (!string.IsNullOrEmpty(activeWorkOrderId))
+            {
+                updatedCutPartsCount = await _context.Parts
+                    .Include(p => p.NestSheet)
+                    .CountAsync(p => p.NestSheet!.WorkOrderId == activeWorkOrderId && p.Status == PartStatus.Cut);
 
-            // Get updated assembly ready count
-            var readyProducts = await GetProductsReadyForAssembly(activeWorkOrderId);
-            var assemblyReadyCount = readyProducts.Count;
+                // Get updated assembly ready count
+                var readyProducts = await GetProductsReadyForAssembly(activeWorkOrderId);
+                assemblyReadyCount = readyProducts.Count;
+            }
 
             _logger.LogInformation("Bin {BinLabel} cleared - {PartsRemoved} parts removed and changed to Cut status", 
                 bin.BinLabel, partsRemoved);

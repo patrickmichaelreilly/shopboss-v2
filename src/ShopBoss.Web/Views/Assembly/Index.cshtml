@@ -7,46 +7,130 @@
     <style>
         .assembly-card {
             transition: all 0.3s ease;
-            border-left: 4px solid transparent;
-            height: 120px; /* Fixed height to prevent growing when list is short */
-        }
-        
-        .assembly-card.ready {
-            border-left-color: #198754;
-            background-color: #f8fff9;
-        }
-        
-        .assembly-card.completed {
-            border-left-color: #004F00;
-            background-color: #f8f9ff;
-        }
-        
-        .assembly-card.in-progress {
-            border-left-color: #fd7e14;
-            background-color: #fff9f5;
-        }
-        
-        .assembly-card.waiting {
-            border-left-color: #6c757d;
+            border: 3px solid transparent;
+            border-radius: 8px;
             background-color: #f8f9fa;
         }
         
-        .progress-circle {
-            width: 60px;
-            height: 60px;
+        .assembly-card.ready {
+            border-color: #198754;
+            background-color: #e8f5e9;
+        }
+        
+        .assembly-card.completed {
+            border-color: #004F00;
+            background-color: #e3f2fd;
+            opacity: 0.7;
+        }
+        
+        .assembly-card.waiting {
+            border-color: #6c757d;
+            background-color: #f5f5f5;
+            opacity: 0.6;
+        }
+        
+        .assembly-card .card-body {
+            display: flex !important;
+            flex-direction: row !important;
+            align-items: center !important;
+            justify-content: flex-start !important;
+            padding: 12px 20px;
+            min-height: 60px;
+        }
+        
+        .product-id-circle {
+            flex-shrink: 0 !important;
+        }
+        
+        .product-name {
+            flex: 1 !important;
+            margin: 0 20px !important;
+        }
+        
+        .center-column {
+            flex-shrink: 0 !important;
+        }
+        
+        .button-column {
+            flex-shrink: 0 !important;
+            margin-left: 20px !important;
+        }
+        
+        /* Reusable Product ID Circle - for use across stations */
+        .product-id-circle {
+            width: 50px;
+            height: 50px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-weight: bold;
+            font-weight: 600;
+            font-size: 1rem;
+            background-color: #198754;
             color: white;
         }
         
-        .progress-0-25 { background-color: #dc3545; }
-        .progress-26-50 { background-color: #fd7e14; }
-        .progress-51-75 { background-color: #ffc107; color: #000; }
-        .progress-76-99 { background-color: #198754; }
-        .progress-100 { background-color: #004F00; }
+        .product-id-circle.completed {
+            background-color: #004F00;
+        }
+        
+        .product-id-circle.waiting {
+            background-color: #6c757d;
+        }
+        
+        
+        .product-name {
+            font-size: 1.4rem;
+            font-weight: 600;
+            color: #333;
+            margin: 0;
+        }
+        
+        .center-column {
+            display: flex !important;
+            justify-content: center !important;
+            align-items: center !important;
+        }
+        
+        .button-column {
+            display: flex !important;
+            justify-content: center !important;
+            align-items: center !important;
+        }
+        
+        .bin-locations {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+        
+        .bin-location-box {
+            background-color: #f3e5f5;
+            border: 2px solid #7b1fa2;
+            color: #7b1fa2;
+            border-radius: 6px;
+            padding: 8px 14px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            text-align: center;
+            min-width: 70px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .bin-location-box.doors {
+            background-color: #e3f2fd;
+            border-color: #1976d2;
+            color: #1976d2;
+        }
+        
+        .bin-location-box.empty {
+            background-color: #f5f5f5;
+            border-color: #ccc;
+            color: #999;
+        }
         
         /* Assembly Station Layout - match Sorting Station viewport usage */
         main.container-fluid {
@@ -95,47 +179,36 @@
             padding: 15px;
         }
         
-        /* Ensure assembly cards maintain horizontal layout for their internal elements */
-        .assembly-card .row {
-            display: flex !important;
-            flex-direction: row !important;
-            align-items: center !important;
-            margin: 0 !important;
+        /* Remove Bootstrap row/col overrides since we're using flexbox directly */
+        
+        .not-ready-text {
+            font-size: 1.1rem;
+            color: #666;
+            font-style: italic;
         }
         
-        .assembly-card .col-auto {
-            flex: 0 0 auto !important;
-            display: block !important;
-        }
-        
-        .assembly-card .col {
-            flex: 1 1 0% !important;
-            display: block !important;
-        }
-        
-        .part-location {
-            background-color: #e9ecef;
-            border-radius: 4px;
-            padding: 2px 6px;
-            margin: 2px;
-            display: inline-block;
-            font-size: 0.875rem;
-        }
-        
-        .btn-start-assembly {
+        .btn-drop {
             background-color: #198754;
             border-color: #198754;
             color: white;
-            font-weight: bold;
+            font-weight: 600;
+            font-size: 1rem;
             padding: 10px 20px;
+            min-width: 100px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
         }
         
-        .btn-start-assembly:hover {
+        .btn-drop:hover {
             background-color: #157347;
             border-color: #146c43;
+            color: white;
         }
         
-        .btn-start-assembly:disabled {
+        .btn-drop:disabled {
             opacity: 0.6;
             cursor: not-allowed;
         }
@@ -213,88 +286,55 @@
                     @foreach (var product in Model.Products)
                     {
                         var cardClass = product.Product.Status == PartStatus.Assembled ? "completed" : 
-                                       product.IsReadyForAssembly ? "ready" : 
-                                       product.CompletionPercentage > 0 ? "in-progress" : "waiting";
+                                       product.IsReadyForAssembly ? "ready" : "waiting";
                         
-                        var progressClass = product.CompletionPercentage switch
-                        {
-                            <= 25 => "progress-0-25",
-                            <= 50 => "progress-26-50", 
-                            <= 75 => "progress-51-75",
-                            < 100 => "progress-76-99",
-                            _ => "progress-100"
-                        };
+                        var statusClass = product.Product.Status == PartStatus.Assembled ? "completed" : 
+                                         product.IsReadyForAssembly ? "ready" : "waiting";
+
+                        // Get bin labels directly from the simplified properties
+                        string standardBin = product.StandardBinLabel;
+                        string doorBin = product.FilteredBinLabel ?? "-";
 
                         <div class="assembly-card card mb-3 @cardClass" data-product-id="@product.Product.Id">
                             <div class="card-body">
-                                <div class="row align-items-center">
-                                    <div class="col-auto">
-                                        <div class="progress-circle @progressClass">
-                                            @if (product.Product.Status == PartStatus.Assembled)
-                                            {
-                                                <i class="fas fa-check"></i>
-                                            }
-                                            else
-                                            {
-                                                <span>@product.CompletionPercentage%</span>
-                                            }
-                                        </div>
-                                    </div>
-                                    <div class="col">
-                                        <h6 class="card-title mb-1">
-                                            @product.Product.ItemNumber - @product.Product.Name
-                                        </h6>
-                                        <div class="text-muted small mb-2">
-                                            <i class="fas fa-cube me-1"></i>
-                                            @product.SortedStandardPartsCount/@product.StandardPartsCount standard parts sorted
-                                            @if (product.FilteredPartsCount > 0)
-                                            {
-                                                <span class="ms-2">
-                                                    <i class="fas fa-filter me-1"></i>
-                                                    @product.SortedFilteredPartsCount/@product.FilteredPartsCount filtered parts
-                                                </span>
-                                            }
-                                        </div>
-                                        @if (product.PartLocations.Any())
-                                        {
-                                            <div class="small">
-                                                <strong>Locations:</strong>
-                                                @foreach (var location in product.PartLocations.Take(5))
-                                                {
-                                                    <span class="part-location">@location.Location</span>
-                                                }
-                                                @if (product.PartLocations.Count > 5)
-                                                {
-                                                    <span class="text-muted">+@(product.PartLocations.Count - 5) more</span>
-                                                }
+                                <!-- Column 1: Circle -->
+                                <div class="product-id-circle @statusClass">
+                                    @product.Product.ItemNumber
+                                </div>
+                                
+                                <!-- Column 2: Product Name -->
+                                <h3 class="product-name">
+                                    @product.Product.Name
+                                </h3>
+                                
+                                <!-- Column 3: Bin Locations or Status Text -->
+                                <div class="center-column">
+                                    @if (product.IsReadyForAssembly)
+                                    {
+                                        <div class="bin-locations">
+                                            <div class="bin-location-box standard @(standardBin == "-" ? "empty" : "")">
+                                                @standardBin
                                             </div>
-                                        }
-                                    </div>
-                                    <div class="col-auto">
-                                        @if (product.Product.Status == PartStatus.Assembled)
-                                        {
-                                            <span class="badge bg-primary fs-6">
-                                                <i class="fas fa-check-circle me-1"></i>Completed
-                                            </span>
-                                        }
-                                        else if (product.IsReadyForAssembly)
-                                        {
-                                            <button class="btn btn-start-assembly btn-lg me-2" 
-                                                    onclick="startAssembly('@product.Product.Id', '@product.Product.Name')">
-                                                <i class="fas fa-play me-1"></i>Start Assembly
-                                            </button>
-                                        }
-                                        else
-                                        {
-                                            <span class="badge bg-secondary fs-6">
-                                                <i class="fas fa-clock me-1"></i>Waiting
-                                            </span>
-                                        }
-                                        <button class="btn btn-outline-info btn-sm" 
-                                                onclick="showProductDetails('@product.Product.Id')">
-                                            <i class="fas fa-info-circle"></i>
+                                            <div class="bin-location-box doors @(doorBin == "-" ? "empty" : "")">
+                                                @doorBin
+                                            </div>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <span class="not-ready-text">Parts still being sorted...</span>
+                                    }
+                                </div>
+                                
+                                <!-- Column 4: Drop Button or Empty -->
+                                <div class="button-column">
+                                    @if (product.Product.Status != PartStatus.Assembled && product.IsReadyForAssembly)
+                                    {
+                                        <button class="btn btn-drop" 
+                                                onclick="startAssembly('@product.Product.Id', '@product.Product.Name')">
+                                            <i class="fas fa-arrow-down me-2"></i>Drop
                                         </button>
-                                    </div>
+                                    }
                                 </div>
                             </div>
                         </div>
@@ -450,48 +490,63 @@
         function updateProductStatus(productId, status) {
             const productCard = document.querySelector(`[data-product-id="${productId}"]`);
             if (productCard) {
-                const statusElement = productCard.querySelector('.progress-circle');
-                const buttonContainer = productCard.querySelector('.col-auto:last-child');
+                const statusCircle = productCard.querySelector('.product-id-circle');
+                const cardBody = productCard.querySelector('.card-body');
                 
-                if (status === 'completed' && statusElement) {
-                    // Update progress circle to blue (completed)
-                    statusElement.className = 'progress-circle progress-100';
-                    statusElement.innerHTML = '<i class="fas fa-check"></i>';
-                    
-                    // Update card class
-                    productCard.className = productCard.className.replace(/\b(ready|in-progress|waiting)\b/g, '').trim() + ' completed';
-                    
-                    // Update button to show completed state
-                    if (buttonContainer) {
-                        // Find and replace the button/badge area (but preserve the details button)
-                        const statusArea = buttonContainer.querySelector('.badge, .btn-start-assembly');
-                        if (statusArea) {
-                            statusArea.outerHTML = `
-                                <span class="badge bg-primary fs-6">
-                                    <i class="fas fa-check-circle me-1"></i>Completed
-                                </span>
-                            `;
-                        }
+                if (status === 'completed') {
+                    // Update product ID circle to completed
+                    if (statusCircle) {
+                        statusCircle.className = 'product-id-circle completed';
                     }
-                } else if (status === 'ready' && statusElement) {
-                    // Update progress circle to show ready (green)
-                    statusElement.className = 'progress-circle progress-76-99';
                     
                     // Update card class
-                    productCard.className = productCard.className.replace(/\b(completed|in-progress|waiting)\b/g, '').trim() + ' ready';
+                    productCard.className = productCard.className.replace(/\b(ready|waiting)\b/g, '').trim() + ' completed';
                     
-                    // Update button to show ready state
-                    if (buttonContainer) {
-                        const statusArea = buttonContainer.querySelector('.badge');
-                        if (statusArea && !buttonContainer.querySelector('.btn-start-assembly')) {
-                            statusArea.outerHTML = `
-                                <button class="btn btn-start-assembly btn-lg me-2" onclick="startAssembly('${productId}')">
-                                    <i class="fas fa-play me-1"></i>Start Assembly
-                                </button>
-                            `;
+                    // Remove the drop button if it exists
+                    const dropButton = cardBody.querySelector('.btn-drop');
+                    if (dropButton) {
+                        dropButton.remove();
+                    }
+                } else if (status === 'ready') {
+                    // Update product ID circle to ready
+                    if (statusCircle) {
+                        statusCircle.className = 'product-id-circle ready';
+                    }
+                    
+                    // Update card class
+                    productCard.className = productCard.className.replace(/\b(completed|waiting)\b/g, '').trim() + ' ready';
+                    
+                    // Fetch and update live bin location data
+                    updateBinLocations(productId);
+                }
+            }
+        }
+
+        // Function to fetch and update live bin location data
+        async function updateBinLocations(productId) {
+            try {
+                const response = await fetch(`/Assembly/GetProductBinLocations?productId=${productId}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const productCard = document.querySelector(`[data-product-id="${productId}"]`);
+                    if (productCard) {
+                        const standardBinBox = productCard.querySelector('.bin-location-box.standard');
+                        const doorBinBox = productCard.querySelector('.bin-location-box.doors');
+                        
+                        if (standardBinBox) {
+                            standardBinBox.textContent = data.standardBin;
+                            standardBinBox.className = `bin-location-box standard ${data.standardBin === '-' ? 'empty' : ''}`;
+                        }
+                        
+                        if (doorBinBox) {
+                            doorBinBox.textContent = data.filteredBin;
+                            doorBinBox.className = `bin-location-box doors ${data.filteredBin === '-' ? 'empty' : ''}`;
                         }
                     }
                 }
+            } catch (error) {
+                console.error('Error updating bin locations:', error);
             }
         }
 

@@ -71,83 +71,6 @@ public class AssemblyController : Controller
         return View(assemblyData);
     }
 
-    private List<ProductAssemblyStatus> GetProductsWithAssemblyStatus(
-        List<Product> products, 
-        List<string> readyProductIds)
-    {
-        var result = new List<ProductAssemblyStatus>();
-
-        foreach (var product in products)
-        {
-            var standardParts = product.Parts.Where(p => p.Category == PartCategory.Standard).ToList();
-            var filteredParts = product.Parts.Where(p => p.Category != PartCategory.Standard).ToList();
-            
-            var sortedStandardParts = standardParts.Count(p => p.Status == PartStatus.Sorted);
-            var totalStandardParts = standardParts.Count;
-            var sortedFilteredParts = filteredParts.Count(p => p.Status == PartStatus.Sorted);
-            var totalFilteredParts = filteredParts.Count;
-            
-            var isReady = readyProductIds.Contains(product.Id);
-            var isCompleted = product.Status == PartStatus.Assembled;
-
-            // Get simplified rack locations - just standard bin and doors/fronts bin
-            var standardLocation = standardParts
-                .Where(p => p.Status == PartStatus.Sorted && !string.IsNullOrEmpty(p.Location))
-                .Select(p => p.Location)
-                .FirstOrDefault();
-                
-            var doorsLocation = filteredParts
-                .Where(p => p.Status == PartStatus.Sorted && !string.IsNullOrEmpty(p.Location))
-                .Select(p => p.Location)
-                .FirstOrDefault();
-
-            var partLocations = new List<PartLocation>();
-            if (!string.IsNullOrEmpty(standardLocation))
-            {
-                partLocations.Add(new PartLocation
-                {
-                    PartName = "Standard Parts",
-                    Location = standardLocation,
-                    Quantity = sortedStandardParts
-                });
-            }
-            if (!string.IsNullOrEmpty(doorsLocation))
-            {
-                partLocations.Add(new PartLocation
-                {
-                    PartName = "Doors & Fronts",
-                    Location = doorsLocation,
-                    Quantity = sortedFilteredParts
-                });
-            }
-            else if (totalFilteredParts > 0)
-            {
-                partLocations.Add(new PartLocation
-                {
-                    PartName = "Doors & Fronts",
-                    Location = "N/A",
-                    Quantity = 0
-                });
-            }
-
-            result.Add(new ProductAssemblyStatus
-            {
-                Product = product,
-                StandardPartsCount = totalStandardParts,
-                SortedStandardPartsCount = sortedStandardParts,
-                FilteredPartsCount = totalFilteredParts,
-                SortedFilteredPartsCount = sortedFilteredParts,
-                IsReadyForAssembly = isReady,
-                IsCompleted = isCompleted,
-                CompletionPercentage = totalStandardParts > 0 ? (int)((double)sortedStandardParts / totalStandardParts * 100) : 0,
-                PartLocations = partLocations
-            });
-        }
-
-        return result.OrderByDescending(p => p.IsReadyForAssembly)
-                    .ThenByDescending(p => p.CompletionPercentage)
-                    .ToList();
-    }
 
     private List<ProductAssemblyStatus> GetProductsWithAssemblyStatusOptimized(
         List<Product> products,
@@ -161,23 +84,8 @@ public class AssemblyController : Controller
             // Get parts for this product from the optimized part list
             var productParts = allParts.Where(p => p.ProductId == product.Id).ToList();
             
-            // Convert PartSummary to Part objects for filtering service compatibility
-            var convertedParts = productParts.Select(ps => new Part
-            {
-                Id = ps.Id,
-                Name = ps.Name,
-                Status = ps.Status,
-                Qty = ps.Qty,
-                Location = ps.Location,
-                Length = ps.Length,
-                Width = ps.Width,
-                Thickness = ps.Thickness,
-                Material = ps.Material,
-                Category = ps.Category
-            }).ToList();
-
-            var standardParts = convertedParts.Where(p => p.Category == PartCategory.Standard).ToList();
-            var filteredParts = convertedParts.Where(p => p.Category != PartCategory.Standard).ToList();
+            var standardParts = productParts.Where(p => p.Category == PartCategory.Standard).ToList();
+            var filteredParts = productParts.Where(p => p.Category != PartCategory.Standard).ToList();
             
             var sortedStandardParts = standardParts.Count(p => p.Status == PartStatus.Sorted);
             var totalStandardParts = standardParts.Count;
@@ -187,45 +95,16 @@ public class AssemblyController : Controller
             var isReady = readyProductIds.Contains(product.Id);
             var isCompleted = product.Status == PartStatus.Assembled;
 
-            // Get simplified rack locations - just standard bin and doors/fronts bin
-            var standardLocation = standardParts
-                .Where(p => p.Status == PartStatus.Sorted && !string.IsNullOrEmpty(p.Location))
-                .Select(p => p.Location)
+            // Get simplified rack locations using new bin system - no more string splitting
+            var standardBinInfo = standardParts
+                .Where(ps => ps.Status == PartStatus.Sorted && !string.IsNullOrEmpty(ps.BinId))
+                .Select(ps => new { ps.BinLabel, ps.RackName })
                 .FirstOrDefault();
                 
-            var doorsLocation = filteredParts
-                .Where(p => p.Status == PartStatus.Sorted && !string.IsNullOrEmpty(p.Location))
-                .Select(p => p.Location)
+            var doorsBinInfo = filteredParts
+                .Where(ps => ps.Status == PartStatus.Sorted && !string.IsNullOrEmpty(ps.BinId))
+                .Select(ps => new { ps.BinLabel, ps.RackName })
                 .FirstOrDefault();
-
-            var partLocations = new List<PartLocation>();
-            if (!string.IsNullOrEmpty(standardLocation))
-            {
-                partLocations.Add(new PartLocation
-                {
-                    PartName = "Standard Parts",
-                    Location = standardLocation,
-                    Quantity = sortedStandardParts
-                });
-            }
-            if (!string.IsNullOrEmpty(doorsLocation))
-            {
-                partLocations.Add(new PartLocation
-                {
-                    PartName = "Doors & Fronts",
-                    Location = doorsLocation,
-                    Quantity = sortedFilteredParts
-                });
-            }
-            else if (totalFilteredParts > 0)
-            {
-                partLocations.Add(new PartLocation
-                {
-                    PartName = "Doors & Fronts",
-                    Location = "N/A",
-                    Quantity = 0
-                });
-            }
 
             result.Add(new ProductAssemblyStatus
             {
@@ -237,7 +116,8 @@ public class AssemblyController : Controller
                 IsReadyForAssembly = isReady,
                 IsCompleted = isCompleted,
                 CompletionPercentage = totalStandardParts > 0 ? (int)((double)sortedStandardParts / totalStandardParts * 100) : 0,
-                PartLocations = partLocations
+                StandardBinLabel = standardBinInfo?.BinLabel ?? "-",
+                FilteredBinLabel = doorsBinInfo?.BinLabel ?? (totalFilteredParts > 0 ? "-" : null)
             });
         }
 
@@ -743,6 +623,43 @@ public class AssemblyController : Controller
     }
 
     [HttpGet]
+    public async Task<IActionResult> GetProductBinLocations(string productId)
+    {
+        try
+        {
+            var activeWorkOrderId = HttpContext.Session.GetString("ActiveWorkOrderId");
+            if (string.IsNullOrEmpty(activeWorkOrderId))
+            {
+                return Json(new { success = false, message = "No active work order selected" });
+            }
+
+            // Get live bin location data for the product
+            var parts = await _context.Parts
+                .Where(p => p.ProductId == productId && p.Product.WorkOrderId == activeWorkOrderId)
+                .Include(p => p.Bin)
+                    .ThenInclude(b => b.StorageRack)
+                .ToListAsync();
+
+            var standardParts = parts.Where(p => p.Category == PartCategory.Standard && p.Status == PartStatus.Sorted).ToList();
+            var filteredParts = parts.Where(p => p.Category != PartCategory.Standard && p.Status == PartStatus.Sorted).ToList();
+
+            var standardBinLabel = standardParts.FirstOrDefault(p => !string.IsNullOrEmpty(p.BinId))?.Bin?.BinLabel ?? "-";
+            var filteredBinLabel = filteredParts.FirstOrDefault(p => !string.IsNullOrEmpty(p.BinId))?.Bin?.BinLabel ?? "-";
+
+            return Json(new { 
+                success = true, 
+                standardBin = standardBinLabel,
+                filteredBin = filteredBinLabel
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting product bin locations for {ProductId}", productId);
+            return Json(new { success = false, message = "Error loading bin locations" });
+        }
+    }
+
+    [HttpGet]
     public async Task<IActionResult> GetProductDetails(string productId)
     {
         try
@@ -816,15 +733,10 @@ public class ProductAssemblyStatus
     public bool IsReadyForAssembly { get; set; }
     public bool IsCompleted { get; set; } // Computed from Product.Status == "Assembled"
     public int CompletionPercentage { get; set; }
-    public List<PartLocation> PartLocations { get; set; } = new();
+    public string StandardBinLabel { get; set; } = "-";
+    public string? FilteredBinLabel { get; set; }
 }
 
-public class PartLocation
-{
-    public string PartName { get; set; } = string.Empty;
-    public string Location { get; set; } = string.Empty;
-    public int Quantity { get; set; }
-}
 
 public class FilteredPartLocation
 {

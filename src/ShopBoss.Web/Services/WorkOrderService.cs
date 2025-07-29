@@ -210,9 +210,11 @@ public class WorkOrderService
                 .Where(p => p.WorkOrderId == workOrderId)
                 .ToListAsync();
 
-            // Load all parts in a single query for this work order
+            // Load all parts in a single query for this work order with bin information
             var allParts = await _context.Parts
                 .Where(p => p.Product.WorkOrderId == workOrderId)
+                .Include(p => p.Bin)
+                    .ThenInclude(b => b.StorageRack)
                 .Select(p => new PartSummary
                 {
                     Id = p.Id,
@@ -225,7 +227,11 @@ public class WorkOrderService
                     Width = p.Width,
                     Thickness = p.Thickness,
                     Material = p.Material,
-                    Category = p.Category
+                    Category = p.Category,
+                    BinId = p.BinId,
+                    BinLabel = p.Bin != null ? p.Bin.BinLabel : null,
+                    RackName = p.Bin != null && p.Bin.StorageRack != null ? p.Bin.StorageRack.Name : null,
+                    RackType = p.Bin != null && p.Bin.StorageRack != null ? p.Bin.StorageRack.Type : null
                 })
                 .ToListAsync();
 
@@ -491,6 +497,12 @@ public class PartSummary
     public decimal? Thickness { get; set; }
     public string Material { get; set; } = string.Empty;
     public PartCategory Category { get; set; } = PartCategory.Standard;
+    
+    // New bin addressing properties
+    public string? BinId { get; set; }
+    public string? BinLabel { get; set; }
+    public string? RackName { get; set; }
+    public RackType? RackType { get; set; }
 }
 
 public class ShippingStationData
