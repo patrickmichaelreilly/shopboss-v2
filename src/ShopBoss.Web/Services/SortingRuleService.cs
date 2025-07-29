@@ -106,12 +106,6 @@ public class SortingRuleService
                 else
                 {
                     suitableRacks = new List<StorageRack> { specificRack };
-                    
-                    // Check if rack is completely full
-                    if (specificRack.AvailableBins == 0)
-                    {
-                        return (null, $"Rack '{specificRack.Name}' is full - no available bins. Please select a different rack.");
-                    }
                 }
             }
             else
@@ -137,16 +131,7 @@ public class SortingRuleService
                 }
             }
 
-            // Try to group parts by product - look for existing bins with same product
-            if (part.ProductId != null)
-            {
-                var productGroupBin = await FindProductGroupBinAsync(part.ProductId, suitableRacks, part);
-                if (productGroupBin != null)
-                {
-                    return (productGroupBin.Id, $"Grouped with product '{part.Product?.Name}' in bin {productGroupBin.BinLabel}");
-                }
-            }
-
+            // Product grouping logic is now handled in FindBinInRacks to properly handle full bins
             return await FindBinInRacks(suitableRacks, part, "Standard");
         }
         catch (Exception ex)
@@ -154,29 +139,6 @@ public class SortingRuleService
             _logger.LogError(ex, "Error finding optimal bin for part {PartId}", partId);
             return (null, "Error occurred while finding bin placement");
         }
-    }
-
-    private Task<Bin?> FindProductGroupBinAsync(string productId, List<StorageRack> racks, Part newPart)
-    {
-        // Look for existing bins with same product assignment
-        foreach (var rack in racks)
-        {
-            var productBin = rack.Bins
-                .Where(b => b.ProductId == productId && 
-                           b.Status != BinStatus.Full && 
-                           b.Status != BinStatus.Blocked)
-                .OrderBy(b => b.PartsCount) // Prefer bins with fewer parts to balance load
-                .FirstOrDefault();
-
-            if (productBin != null)
-            {
-                _logger.LogInformation("Found existing product group bin {BinLabel} for product {ProductId} (current: {CurrentParts}, adding: {NewParts})", 
-                    productBin.BinLabel, productId, productBin.PartsCount, newPart.Qty);
-                return Task.FromResult<Bin?>(productBin);
-            }
-        }
-
-        return Task.FromResult<Bin?>(null);
     }
 
 
@@ -340,7 +302,7 @@ public class SortingRuleService
                     
                     var totalPartsCount = product.Parts.Count;
                     var filteredPartsCount = totalPartsCount - standardParts.Count;
-                    _logger.LogInformation("Product {ProductId} ({ProductName}) is ready for assembly - all {StandardPartCount} standard parts are sorted. " +
+                    _logger.LogDebug("Product {ProductId} ({ProductName}) is ready for assembly - all {StandardPartCount} standard parts are sorted. " +
                                          "Filtered parts: {FilteredPartCount} (doors/fronts/shelves processed separately)",
                         product.Id, product.Name, standardParts.Count, filteredPartsCount);
                 }
@@ -372,7 +334,7 @@ public class SortingRuleService
             // Check if product is already marked as ready (Sorted status)
             if (product.Status == PartStatus.Sorted)
             {
-                _logger.LogInformation("Product {ProductId} ({ProductName}) is already marked as ready for assembly", 
+                _logger.LogDebug("Product {ProductId} ({ProductName}) is already marked as ready for assembly", 
                     product.Id, product.Name);
                 return false; // Already ready, no state change
             }
@@ -401,7 +363,7 @@ public class SortingRuleService
             
             await _context.SaveChangesAsync();
 
-            _logger.LogInformation("Product {ProductId} ({ProductName}) newly marked as ready for assembly", 
+            _logger.LogDebug("Product {ProductId} ({ProductName}) newly marked as ready for assembly", 
                 product.Id, product.Name);
             
             return true;
@@ -455,16 +417,26 @@ public class SortingRuleService
         List<StorageRack> suitableRacks, Part part, string rackTypeDescription)
     {
         // Try to group parts by product - look for existing bins with same product
+        // This should check ALL bins, not just non-full ones
         if (part.ProductId != null)
         {
-            var productGroupBin = await FindProductGroupBinAsync(part.ProductId, suitableRacks, part);
-            if (productGroupBin != null)
+            // First check if any bin already has parts from this product
+            foreach (var rack in suitableRacks)
             {
-                return (productGroupBin.Id, $"Grouped with product '{part.Product?.Name}' in bin {productGroupBin.BinLabel}");
+                var existingProductBin = rack.Bins
+                    .Where(b => b.ProductId == part.ProductId && 
+                               b.Status != BinStatus.Blocked)
+                    .FirstOrDefault();
+                    
+                if (existingProductBin != null)
+                {
+                    // Found a bin with same product - use it regardless of "full" status
+                    return (existingProductBin.Id, $"Added to existing product '{part.Product?.Name}' in bin {existingProductBin.BinLabel}");
+                }
             }
         }
 
-        // Find first available bin in suitable racks
+        // No existing product bin found - find first available empty bin
         foreach (var rack in suitableRacks)
         {
             var availableBin = rack.Bins

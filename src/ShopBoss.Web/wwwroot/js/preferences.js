@@ -6,7 +6,8 @@ const ShopBossPreferences = {
     Keys: {
         SORTING_SELECTED_RACK: 'shopboss.sorting.selectedRackId',
         CNC_SHOW_PROCESSED: 'shopboss.cnc.showProcessed',
-        CNC_GROUP_BY_MATERIAL: 'shopboss.cnc.groupByMaterial'
+        CNC_GROUP_BY_MATERIAL: 'shopboss.cnc.groupByMaterial',
+        ASSEMBLY_SHOW_BILLBOARD: 'shopboss.assembly.showBillboard'
     },
 
     // Get a preference value with fallback to default
@@ -88,6 +89,15 @@ const ShopBossPreferences = {
         },
         setGroupByMaterial: function(group) {
             return ShopBossPreferences.set(ShopBossPreferences.Keys.CNC_GROUP_BY_MATERIAL, group);
+        }
+    },
+    
+    Assembly: {
+        getShowBillboard: function() {
+            return ShopBossPreferences.get(ShopBossPreferences.Keys.ASSEMBLY_SHOW_BILLBOARD, true); // Default to true
+        },
+        setShowBillboard: function(show) {
+            return ShopBossPreferences.set(ShopBossPreferences.Keys.ASSEMBLY_SHOW_BILLBOARD, show);
         }
     }
 };

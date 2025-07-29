@@ -19,8 +19,7 @@
         
         .assembly-card.completed {
             border-color: #004F00;
-            background-color: #e3f2fd;
-            opacity: 0.7;
+            background-color: #e8f5e9;
         }
         
         .assembly-card.waiting {
@@ -141,6 +140,18 @@
             overflow: hidden;
         }
         
+        /* Billboard hidden state */
+        main.container-fluid.billboard-hidden {
+            height: auto; /* Let content determine height */
+            min-height: calc(100vh - 76px); /* Ensure it fills viewport if content is small */
+        }
+        
+        /* Adjust assembly queue wrapper when billboard is hidden */
+        main.container-fluid.billboard-hidden .assembly-queue-wrapper {
+            overflow-y: visible; /* Remove internal scroll */
+            flex: none; /* Don't stretch to fill */
+        }
+        
         /* Make assembly queue area scrollable and fill remaining height - match Sorting Station */
         .assembly-queue-wrapper {
             flex: 1;
@@ -194,7 +205,7 @@
             font-weight: 600;
             font-size: 1rem;
             padding: 10px 20px;
-            min-width: 100px;
+            width: 120px;
             height: 40px;
             display: flex;
             align-items: center;
@@ -209,8 +220,16 @@
         }
         
         .btn-drop:disabled {
-            opacity: 0.6;
+            background-color: #6c757d;
+            border-color: #6c757d;
             cursor: not-allowed;
+            opacity: 1;
+        }
+        
+        .btn-drop.btn-dropped {
+            background-color: #004F00;
+            border-color: #004F00;
+            opacity: 1;
         }
         
         .toast-container {
@@ -228,14 +247,24 @@
             <h1 class="h2 mb-0">Assembly Station</h1>
             <p class="text-muted mb-0">
                 <i class="fas fa-tools me-2"></i>
-                Active Work Order: <strong>@Model.WorkOrder.Name</strong>
+                Active Work Order: <strong class="text-warning">@Model.WorkOrder.Name</strong>
             </p>
         </div>
         
         <!-- Header Scanner Button -->
         <partial name="_CompactScanner" />
     </div>
-    <div class="text-end">
+    
+    <div class="d-flex align-items-center gap-3">
+        <!-- Billboard Toggle -->
+        <div class="form-check form-switch mb-0">
+            <input class="form-check-input" type="checkbox" id="billboardToggle" checked onchange="toggleBillboard()">
+            <label class="form-check-label" for="billboardToggle">
+                <small>Show Billboard</small>
+            </label>
+        </div>
+        
+        <!-- Statistics Cards -->
         <div class="row g-2">
             <div class="col">
                 <div class="card border-success text-center">
@@ -307,32 +336,37 @@
                                     @product.Product.Name
                                 </h3>
                                 
-                                <!-- Column 3: Bin Locations or Status Text -->
+                                <!-- Column 3: Bin Locations -->
                                 <div class="center-column">
-                                    @if (product.IsReadyForAssembly)
-                                    {
-                                        <div class="bin-locations">
-                                            <div class="bin-location-box standard @(standardBin == "-" ? "empty" : "")">
-                                                @standardBin
-                                            </div>
-                                            <div class="bin-location-box doors @(doorBin == "-" ? "empty" : "")">
-                                                @doorBin
-                                            </div>
+                                    <div class="bin-locations">
+                                        <div class="bin-location-box standard @(standardBin == "-" ? "empty" : "")">
+                                            @standardBin
                                         </div>
-                                    }
-                                    else
-                                    {
-                                        <span class="not-ready-text">Parts still being sorted...</span>
-                                    }
+                                        <div class="bin-location-box doors @(doorBin == "-" ? "empty" : "")">
+                                            @doorBin
+                                        </div>
+                                    </div>
                                 </div>
                                 
-                                <!-- Column 4: Drop Button or Empty -->
+                                <!-- Column 4: Drop Button -->
                                 <div class="button-column">
-                                    @if (product.Product.Status != PartStatus.Assembled && product.IsReadyForAssembly)
+                                    @if (product.Product.Status == PartStatus.Assembled)
+                                    {
+                                        <button class="btn btn-drop btn-dropped" disabled>
+                                            <i class="fas fa-check me-2"></i>Dropped
+                                        </button>
+                                    }
+                                    else if (product.IsReadyForAssembly)
                                     {
                                         <button class="btn btn-drop" 
                                                 onclick="startAssembly('@product.Product.Id', '@product.Product.Name')">
                                             <i class="fas fa-arrow-down me-2"></i>Drop
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <button class="btn btn-drop" disabled>
+                                            <i class="fas fa-clock me-2"></i>Waiting
                                         </button>
                                     }
                                 </div>
@@ -414,6 +448,54 @@
     <script src="~/lib/signalr/dist/browser/signalr.js"></script>
     <script src="~/js/universal-scanner.js"></script>
     <script>
+        // Billboard toggle functionality
+        function toggleBillboard() {
+            const isChecked = document.getElementById('billboardToggle').checked;
+            const mainContainer = document.querySelector('main.container-fluid');
+            const billboardContainer = document.getElementById('assembly-billboard');
+            
+            if (isChecked) {
+                mainContainer.classList.remove('billboard-hidden');
+                if (billboardContainer) {
+                    billboardContainer.style.display = '';
+                }
+            } else {
+                mainContainer.classList.add('billboard-hidden');
+                if (billboardContainer) {
+                    billboardContainer.style.display = 'none';
+                }
+            }
+            
+            // Save preference to localStorage
+            ShopBossPreferences.Assembly.setShowBillboard(isChecked);
+        }
+        
+        // Override the global showBillboard function for Assembly station to respect toggle
+        const originalShowBillboard = window.showBillboard;
+        window.showBillboard = function(containerId, message, type = 'info', title = 'Status') {
+            // Check if this is the Assembly station billboard and if toggle is Off
+            if (containerId === 'assembly-billboard') {
+                const showBillboard = ShopBossPreferences.Assembly.getShowBillboard();
+                if (!showBillboard) {
+                    // Billboard is toggled off - don't show it
+                    return;
+                }
+            }
+            
+            // Call the original function
+            originalShowBillboard(containerId, message, type, title);
+        };
+        
+        // Restore billboard preference on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Restore Billboard toggle state
+            const showBillboard = ShopBossPreferences.Assembly.getShowBillboard();
+            const billboardToggle = document.getElementById('billboardToggle');
+            if (billboardToggle && !showBillboard) {
+                billboardToggle.checked = false;
+                toggleBillboard(); // Apply the restored state
+            }
+        });
         // SignalR connection for real-time updates
         const connection = new signalR.HubConnectionBuilder()
             .withUrl("/hubs/status")
@@ -444,6 +526,7 @@
             showToast(`Product "${data.ProductName}" has been assembled!`, 'success');
             showBillboard('assembly-billboard', `Product "${data.ProductName}" has been assembled!`, 'success', 'Assembly Complete');
             updateProductStatus(data.ProductId, 'completed');
+            clearProductBinLocations(data.ProductId); // Clear bin locations immediately
             updateShippingReadinessStatus(data);
         });
 
@@ -453,6 +536,7 @@
             showToast(`🔧 Product "${data.ProductName}" assembled via scan!`, 'success');
             showBillboard('assembly-billboard', `Product "${data.ProductName}" assembled via scan!`, 'success', 'Scan Assembly Complete');
             updateProductStatus(data.ProductId, 'completed');
+            clearProductBinLocations(data.ProductId); // Clear bin locations immediately
             updateShippingReadinessStatus(data);
             
             // Refresh the page to show updated assembly queue
@@ -474,6 +558,7 @@
             // showToast(`Product "${data.productName}" assembled successfully!`, 'success');
             showBillboard('assembly-billboard', `Product "${data.productName}" assembled successfully!`, 'success', 'Manual Assembly Complete');
             updateProductStatus(data.productId, 'completed');
+            clearProductBinLocations(data.productId); // Clear bin locations immediately
             updateShippingReadinessStatus(data);
         });
 
@@ -502,10 +587,12 @@
                     // Update card class
                     productCard.className = productCard.className.replace(/\b(ready|waiting)\b/g, '').trim() + ' completed';
                     
-                    // Remove the drop button if it exists
+                    // Update the drop button to show "Dropped"
                     const dropButton = cardBody.querySelector('.btn-drop');
                     if (dropButton) {
-                        dropButton.remove();
+                        dropButton.disabled = true;
+                        dropButton.classList.add('btn-dropped');
+                        dropButton.innerHTML = '<i class="fas fa-check me-2"></i>Dropped';
                     }
                 } else if (status === 'ready') {
                     // Update product ID circle to ready
@@ -547,6 +634,25 @@
                 }
             } catch (error) {
                 console.error('Error updating bin locations:', error);
+            }
+        }
+
+        // Function to immediately clear bin locations when product is assembled
+        function clearProductBinLocations(productId) {
+            const productCard = document.querySelector(`[data-product-id="${productId}"]`);
+            if (productCard) {
+                const standardBinBox = productCard.querySelector('.bin-location-box.standard');
+                const doorBinBox = productCard.querySelector('.bin-location-box.doors');
+                
+                if (standardBinBox) {
+                    standardBinBox.textContent = '-';
+                    standardBinBox.className = 'bin-location-box standard empty';
+                }
+                
+                if (doorBinBox) {
+                    doorBinBox.textContent = '-';
+                    doorBinBox.className = 'bin-location-box doors empty';
+                }
             }
         }
 

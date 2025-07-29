@@ -413,9 +413,6 @@ public class SortingController : Controller
                             // Mark product as ready for assembly - only send notifications if this is a NEW transition to ready
                             var wasNewlyMarkedReady = await _sortingRules.MarkProductReadyForAssemblyAsync(productId);
                             
-                            _logger.LogWarning("Product {ProductId} ({ProductName}) ready check: wasNewlyMarkedReady = {WasNewlyMarkedReady}", 
-                                productId, readyProduct.Name, wasNewlyMarkedReady);
-                            
                             if (wasNewlyMarkedReady)
                             {
                                 _logger.LogWarning("SENDING ProductReadyForAssembly notification for {ProductId} ({ProductName})", 
