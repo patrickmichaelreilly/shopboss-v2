@@ -351,7 +351,7 @@ public class ModifyController : ControllerBase
 
             // Update the part
             part.Category = categoryEnum;
-            part.StatusUpdatedDate = DateTime.UtcNow;
+            part.StatusUpdatedDate = DateTime.Now;
             await _context.SaveChangesAsync();
 
             // Log the category change to audit trail

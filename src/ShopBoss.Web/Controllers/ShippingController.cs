@@ -164,7 +164,7 @@ public class ShippingController : Controller
                 .ToListAsync();
 
             var shippedParts = 0;
-            var now = DateTime.UtcNow;
+            var now = DateTime.Now;
             var auditItems = new List<BatchAuditItem>();
             
             foreach (var part in partsToShip)
@@ -215,7 +215,7 @@ public class ShippingController : Controller
                 ScannedBarcode = barcode,
                 ShippedPartsCount = shippedParts,
                 WorkOrderId = activeWorkOrderId,
-                Timestamp = DateTime.UtcNow,
+                Timestamp = DateTime.Now,
                 Status = "Shipped",
                 ShippedProductCount = shippedProductCount,
                 IsWorkOrderFullyShipped = workOrderFullyShipped
@@ -237,7 +237,7 @@ public class ShippingController : Controller
                     WorkOrderId = activeWorkOrderId,
                     ShippedProductCount = shippedProductCount,
                     IsWorkOrderFullyShipped = workOrderFullyShipped,
-                    Timestamp = DateTime.UtcNow
+                    Timestamp = DateTime.Now
                 });
             
             await _hubContext.Clients.Group("all-stations")
@@ -248,7 +248,7 @@ public class ShippingController : Controller
                     productName = product.Name,
                     workOrderId = activeWorkOrderId,
                     station = "Shipping",
-                    timestamp = DateTime.UtcNow,
+                    timestamp = DateTime.Now,
                     shippedProductCount = shippedProductCount,
                     isWorkOrderFullyShipped = workOrderFullyShipped,
                     message = $"Product '{product.Name}' has been shipped"
@@ -347,7 +347,7 @@ public class ShippingController : Controller
                 if (productPart.Status != PartStatus.Shipped)
                 {
                     productPart.Status = PartStatus.Shipped;
-                    productPart.StatusUpdatedDate = DateTime.UtcNow;
+                    productPart.StatusUpdatedDate = DateTime.Now;
                     shippedPartsCount++;
                 }
             }
@@ -422,7 +422,7 @@ public class ShippingController : Controller
 
             // Mark hardware as shipped
             hardware.Status = PartStatus.Shipped;
-            hardware.StatusUpdatedDate = DateTime.UtcNow;
+            hardware.StatusUpdatedDate = DateTime.Now;
 
             await _context.SaveChangesAsync();
 
@@ -437,7 +437,7 @@ public class ShippingController : Controller
                     HardwareName = hardware.Name,
                     ScannedBarcode = barcode,
                     WorkOrderId = activeWorkOrderId,
-                    Timestamp = DateTime.UtcNow,
+                    Timestamp = DateTime.Now,
                     IsWorkOrderFullyShipped = workOrderFullyShipped
                 });
 
@@ -449,7 +449,7 @@ public class ShippingController : Controller
                     hardwareName = hardware.Name,
                     workOrderId = activeWorkOrderId,
                     station = "Shipping",
-                    timestamp = DateTime.UtcNow,
+                    timestamp = DateTime.Now,
                     isWorkOrderFullyShipped = workOrderFullyShipped,
                     message = $"Hardware '{hardware.Name}' has been shipped"
                 });
@@ -532,7 +532,7 @@ public class ShippingController : Controller
 
                 var shippedItems = new List<object>();
                 var groupName = hardwareItems.First().Name; // Group name from first item
-                var now = DateTime.UtcNow;
+                var now = DateTime.Now;
                 var auditItems = new List<BatchAuditItem>();
 
                 // Mark all hardware items as shipped in a single operation
@@ -585,7 +585,7 @@ public class ShippingController : Controller
                         GroupName = groupName,
                         HardwareItems = shippedItems,
                         WorkOrderId = activeWorkOrderId,
-                        Timestamp = DateTime.UtcNow,
+                        Timestamp = DateTime.Now,
                         IsWorkOrderFullyShipped = workOrderFullyShipped
                     });
 
@@ -597,7 +597,7 @@ public class ShippingController : Controller
                         itemCount = shippedItems.Count,
                         workOrderId = activeWorkOrderId,
                         station = "Shipping",
-                        timestamp = DateTime.UtcNow,
+                        timestamp = DateTime.Now,
                         isWorkOrderFullyShipped = workOrderFullyShipped,
                         message = $"Hardware group '{groupName}' shipped ({shippedItems.Count} items)"
                     });
@@ -664,7 +664,7 @@ public class ShippingController : Controller
 
             // Mark detached product as shipped
             detachedProduct.Status = PartStatus.Shipped;
-            detachedProduct.StatusUpdatedDate = DateTime.UtcNow;
+            detachedProduct.StatusUpdatedDate = DateTime.Now;
 
             await _context.SaveChangesAsync();
 
@@ -679,7 +679,7 @@ public class ShippingController : Controller
                     DetachedProductName = detachedProduct.Name,
                     ScannedBarcode = barcode,
                     WorkOrderId = activeWorkOrderId,
-                    Timestamp = DateTime.UtcNow,
+                    Timestamp = DateTime.Now,
                     IsWorkOrderFullyShipped = workOrderFullyShipped
                 });
 
@@ -691,7 +691,7 @@ public class ShippingController : Controller
                     detachedProductName = detachedProduct.Name,
                     workOrderId = activeWorkOrderId,
                     station = "Shipping",
-                    timestamp = DateTime.UtcNow,
+                    timestamp = DateTime.Now,
                     isWorkOrderFullyShipped = workOrderFullyShipped,
                     message = $"Detached product '{detachedProduct.Name}' has been shipped"
                 });
@@ -905,7 +905,7 @@ public class ShippingController : Controller
                     {
                         workOrderId = activeWorkOrderId,
                         workOrderName = workOrder.Name,
-                        completedAt = DateTime.UtcNow,
+                        completedAt = DateTime.Now,
                         station = "Shipping",
                         message = $"Work order '{workOrder.Name}' has been completed"
                     });

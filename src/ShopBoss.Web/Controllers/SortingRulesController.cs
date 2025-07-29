@@ -103,7 +103,7 @@ public class SortingRulesController : Controller
 
                 if (ModelState.IsValid)
                 {
-                    model.CreatedDate = DateTime.UtcNow;
+                    model.CreatedDate = DateTime.Now;
                     _context.SortingRules.Add(model);
                     await _context.SaveChangesAsync();
 
@@ -193,7 +193,7 @@ public class SortingRulesController : Controller
                     existingRule.Keywords = model.Keywords;
                     existingRule.TargetRackType = model.TargetRackType;
                     existingRule.IsActive = model.IsActive;
-                    existingRule.LastModifiedDate = DateTime.UtcNow;
+                    existingRule.LastModifiedDate = DateTime.Now;
 
                     await _context.SaveChangesAsync();
 
@@ -261,7 +261,7 @@ public class SortingRulesController : Controller
             }
 
             rule.IsActive = !rule.IsActive;
-            rule.LastModifiedDate = DateTime.UtcNow;
+            rule.LastModifiedDate = DateTime.Now;
             await _context.SaveChangesAsync();
 
             var status = rule.IsActive ? "enabled" : "disabled";
@@ -308,7 +308,7 @@ public class SortingRulesController : Controller
             for (int i = 0; i < rules.Count; i++)
             {
                 rules[i].Priority = i + 1;
-                rules[i].LastModifiedDate = DateTime.UtcNow;
+                rules[i].LastModifiedDate = DateTime.Now;
             }
 
             await _context.SaveChangesAsync();

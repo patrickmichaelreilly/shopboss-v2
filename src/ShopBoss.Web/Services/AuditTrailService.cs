@@ -173,7 +173,7 @@ public class AuditTrailService
     {
         try
         {
-            var cutoffTime = DateTime.UtcNow.Subtract(timeWindow);
+            var cutoffTime = DateTime.Now.Subtract(timeWindow);
             return await _context.ScanHistory
                 .AnyAsync(s => s.Barcode == barcode && 
                               s.Station == station && 

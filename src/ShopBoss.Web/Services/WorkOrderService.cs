@@ -336,7 +336,7 @@ public class WorkOrderService
             }
 
             workOrder.IsArchived = true;
-            workOrder.ArchivedDate = DateTime.UtcNow;
+            workOrder.ArchivedDate = DateTime.Now;
 
             await _context.SaveChangesAsync();
             _logger.LogInformation("Work order {WorkOrderId} archived successfully", workOrderId);

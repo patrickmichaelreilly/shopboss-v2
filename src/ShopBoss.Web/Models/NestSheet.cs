@@ -23,7 +23,7 @@ public class NestSheet
     
     public string Barcode { get; set; } = string.Empty;
     
-    public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedDate { get; set; } = DateTime.Now;
     
     public PartStatus Status { get; set; } = PartStatus.Pending;
     

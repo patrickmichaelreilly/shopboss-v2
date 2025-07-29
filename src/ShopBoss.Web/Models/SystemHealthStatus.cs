@@ -55,7 +55,7 @@ public class SystemHealthStatus
     /// <summary>
     /// Last health check timestamp
     /// </summary>
-    public DateTime LastHealthCheck { get; set; } = DateTime.UtcNow;
+    public DateTime LastHealthCheck { get; set; } = DateTime.Now;
     
     /// <summary>
     /// Health check error message (if any)

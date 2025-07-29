@@ -217,6 +217,9 @@ else
         
         // Handle rack selection from dropdown
         function selectRackFromDropdown(rackId, rackName, rackIcon, rackColor, occupied, total) {
+            // Save rack selection to localStorage for persistence
+            ShopBossPreferences.Sorting.setSelectedRack(rackId);
+            
             // Navigate to URL with rackId parameter for consistency
             window.location.href = `/Sorting?rackId=${encodeURIComponent(rackId)}`;
         }
@@ -573,6 +576,26 @@ else
         // Auto-load selected rack on page load
         document.addEventListener('DOMContentLoaded', function() {
             const selectedRackId = '@ViewBag.SelectedRackId';
+            const urlParams = new URLSearchParams(window.location.search);
+            const urlRackId = urlParams.get('rackId');
+            
+            // Check if we should redirect to a preferred rack from localStorage
+            if (!urlRackId) {
+                const preferredRackId = ShopBossPreferences.Sorting.getSelectedRack();
+                if (preferredRackId) {
+                    // Check if the preferred rack still exists in the dropdown
+                    const rackExists = document.querySelector(`[data-rack-id="${preferredRackId}"]`);
+                    if (rackExists) {
+                        console.log('Redirecting to preferred rack:', preferredRackId);
+                        window.location.href = `/Sorting?rackId=${encodeURIComponent(preferredRackId)}`;
+                        return; // Don't continue with page setup
+                    } else {
+                        // Clean up invalid preference
+                        ShopBossPreferences.Sorting.setSelectedRack(null);
+                    }
+                }
+            }
+            
             if (selectedRackId) {
                 loadRackDetails(selectedRackId);
             }
@@ -1247,7 +1270,6 @@ else
         .bin-content {
             display: flex;
             flex-direction: column;
-            justify-content: flex-start;
             align-items: center;
             height: 100%;
             padding: 4px;
@@ -1255,24 +1277,24 @@ else
 
         .bin-label {
             font-size: 1.6rem;
-            font-weight: 900;
+            font-weight: 600;
             color: #000;
-            text-shadow: 1px 1px 2px rgba(255,255,255,0.8);
             margin-bottom: 2px;
             text-align: center;
-            line-height: 1;
-            letter-spacing: 0.5px;
+            line-height: 1.2;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
             max-width: 100%;
+            flex-shrink: 0;
         }
 
         .bin-details {
             display: flex;
             flex-direction: column;
             align-items: center;
-            margin-top: 2px;
+            justify-content: center;
+            flex: 1;
         }
 
 
@@ -1345,7 +1367,7 @@ else
             
             .bin-label {
                 font-size: 1.2rem;
-                font-weight: 800;
+                font-weight: 600;
             }
             
             
@@ -1363,7 +1385,7 @@ else
             
             .bin-label {
                 font-size: 1rem;
-                font-weight: 800;
+                font-weight: 600;
             }
             
             

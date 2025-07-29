@@ -40,7 +40,7 @@ public class StorageRack
     public int Rows { get; set; } = 4;
     public int Columns { get; set; } = 8;
     
-    public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedDate { get; set; } = DateTime.Now;
     public DateTime? LastModifiedDate { get; set; }
     
     // Navigation properties

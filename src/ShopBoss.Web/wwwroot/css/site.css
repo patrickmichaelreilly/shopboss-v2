@@ -182,16 +182,18 @@ body {
 }
 
 #workOrderDropdownMenu .dropdown-item.active {
-  background-color: #004F00;
-  color: white;
+  background-color: #ffffff;
+  color: #004F00;
+  font-weight: bold;
 }
 
 #workOrderDropdownMenu .dropdown-item.active:hover {
-  background-color: #003D00;
+  background-color: #f8f9fa;
+  color: #004F00;
 }
 
 #workOrderDropdownMenu .dropdown-item.active .text-muted {
-  color: #cccccc !important;
+  color: #6c757d !important;
 }
 
 /* Ensure proper alignment for the dropdown toggle */
@@ -207,4 +209,33 @@ body {
 .work-order-nav-link::after {
   margin-left: 0;
   flex-shrink: 0;
+}
+
+/* Make all navbar text fully white for better readability against green background */
+.navbar-dark .navbar-nav .nav-link {
+  color: #ffffff !important;
+}
+
+.navbar-dark .navbar-nav .nav-link:hover,
+.navbar-dark .navbar-nav .nav-link:focus {
+  color: #ffffff !important;
+}
+
+.navbar-dark .navbar-nav .dropdown-toggle {
+  color: #ffffff !important;
+}
+
+.navbar-dark .navbar-nav .dropdown-toggle:hover,
+.navbar-dark .navbar-nav .dropdown-toggle:focus {
+  color: #ffffff !important;
+}
+
+/* Keep dropdown menu items black on white background */
+.navbar-nav .dropdown-menu .dropdown-item {
+  color: #000000 !important;
+}
+
+.navbar-nav .dropdown-menu .dropdown-item:hover,
+.navbar-nav .dropdown-menu .dropdown-item:focus {
+  color: #000000 !important;
 }

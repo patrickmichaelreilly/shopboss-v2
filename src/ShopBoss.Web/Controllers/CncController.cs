@@ -150,14 +150,14 @@ public class CncController : Controller
 
             // Mark nest sheet as processed
             nestSheet.Status = PartStatus.Cut;
-            nestSheet.StatusUpdatedDate = DateTime.UtcNow;
+            nestSheet.StatusUpdatedDate = DateTime.Now;
 
             // Mark all parts on this nest sheet as Cut
             var partsToUpdate = nestSheet.Parts.Where(p => p.Status == PartStatus.Pending).ToList();
             foreach (var part in partsToUpdate)
             {
                 part.Status = PartStatus.Cut;
-                part.StatusUpdatedDate = DateTime.UtcNow;
+                part.StatusUpdatedDate = DateTime.Now;
             }
 
             await _context.SaveChangesAsync();
@@ -213,7 +213,7 @@ public class CncController : Controller
                     nestSheetName = nestSheet.Name,
                     partsProcessed = partsToUpdate.Count,
                     material = nestSheet.Material,
-                    timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss")
+                    timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
                 });
 
             // Send progress update to all connected clients

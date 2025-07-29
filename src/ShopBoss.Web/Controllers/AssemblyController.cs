@@ -256,7 +256,7 @@ public class AssemblyController : Controller
                     }
                     
                     standardPart.Status = PartStatus.Assembled;
-                    standardPart.StatusUpdatedDate = DateTime.UtcNow;
+                    standardPart.StatusUpdatedDate = DateTime.Now;
                     standardPart.BinId = null; // Clear bin reference since part is no longer in bin
                     standardPart.Location = null; // Clear location since part is no longer in bin
                     assembledParts++;
@@ -302,7 +302,7 @@ public class AssemblyController : Controller
                     }
                     
                     filteredPart.Status = PartStatus.Assembled;
-                    filteredPart.StatusUpdatedDate = DateTime.UtcNow;
+                    filteredPart.StatusUpdatedDate = DateTime.Now;
                     filteredPart.BinId = null; // Clear bin reference since part is no longer in bin
                     filteredPart.Location = null;
                     assembledParts++;
@@ -324,7 +324,7 @@ public class AssemblyController : Controller
             
             // Mark product as assembled (ready for shipping)
             product.Status = PartStatus.Assembled;
-            product.StatusUpdatedDate = DateTime.UtcNow;
+            product.StatusUpdatedDate = DateTime.Now;
             
             // Log product status change
             await _auditTrailService.LogAsync(
@@ -355,7 +355,7 @@ public class AssemblyController : Controller
                     bin.WorkOrderId = null;
                     bin.PartsCount = 0;
                     bin.Contents = string.Empty;
-                    bin.LastUpdatedDate = DateTime.UtcNow;
+                    bin.LastUpdatedDate = DateTime.Now;
                     
                     await _auditTrailService.LogAsync(
                         action: "BinEmptied",
@@ -387,7 +387,7 @@ public class AssemblyController : Controller
                 AssembledPartsCount = assembledParts,
                 FilteredPartsCount = filteredPartsGuidance.Count,
                 WorkOrderId = activeWorkOrderId,
-                Timestamp = DateTime.UtcNow,
+                Timestamp = DateTime.Now,
                 Status = "Assembled",
                 IsReadyForShipping = false,
                 ReadyForShippingProducts = readyForShippingProducts,
@@ -478,7 +478,7 @@ public class AssemblyController : Controller
                     }
                     
                     part.Status = PartStatus.Assembled;
-                    part.StatusUpdatedDate = DateTime.UtcNow;
+                    part.StatusUpdatedDate = DateTime.Now;
                     part.BinId = null; // Clear bin reference since part is no longer in bin
                     part.Location = null; // Clear location since part is no longer in bin
                     updatedParts++;
@@ -511,7 +511,7 @@ public class AssemblyController : Controller
                     }
                     
                     filteredPart.Status = PartStatus.Assembled;
-                    filteredPart.StatusUpdatedDate = DateTime.UtcNow;
+                    filteredPart.StatusUpdatedDate = DateTime.Now;
                     filteredPart.BinId = null; // Clear bin reference since part is no longer in bin
                     filteredPart.Location = null;
                     updatedParts++;
@@ -533,7 +533,7 @@ public class AssemblyController : Controller
             
             // Mark product as assembled (ready for shipping)
             product.Status = PartStatus.Assembled;
-            product.StatusUpdatedDate = DateTime.UtcNow;
+            product.StatusUpdatedDate = DateTime.Now;
             
             // Log product status change
             await _auditTrailService.LogAsync(
@@ -564,7 +564,7 @@ public class AssemblyController : Controller
                     bin.WorkOrderId = null;
                     bin.PartsCount = 0;
                     bin.Contents = string.Empty;
-                    bin.LastUpdatedDate = DateTime.UtcNow;
+                    bin.LastUpdatedDate = DateTime.Now;
                     
                     await _auditTrailService.LogAsync(
                         action: "BinEmptied",
@@ -593,7 +593,7 @@ public class AssemblyController : Controller
                 ProductName = product.Name,
                 PartsAssembled = updatedParts,
                 WorkOrderId = activeWorkOrderId,
-                Timestamp = DateTime.UtcNow,
+                Timestamp = DateTime.Now,
                 Status = "Assembled",
                 IsReadyForShipping = false,
                 ReadyForShippingProducts = readyForShippingProducts,

@@ -73,7 +73,7 @@ builder.Services.AddScoped<WorkOrderDeletionService>();
 
 // Add background services
 builder.Services.AddHostedService<BackupBackgroundService>();
-builder.Services.AddHostedService<HealthMonitoringService>();
+// HealthMonitoringService removed - health data is now generated on-demand for Health Dashboard only
 
 var app = builder.Build();
 

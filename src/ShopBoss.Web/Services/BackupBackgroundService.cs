@@ -62,9 +62,9 @@ public class BackupBackgroundService : BackgroundService
             }
 
             var lastBackup = await GetLastSuccessfulBackup(backupService);
-            var nextBackupTime = lastBackup?.AddMinutes(config.BackupIntervalMinutes) ?? DateTime.UtcNow.AddMinutes(-1);
+            var nextBackupTime = lastBackup?.AddMinutes(config.BackupIntervalMinutes) ?? DateTime.Now.AddMinutes(-1);
 
-            if (DateTime.UtcNow >= nextBackupTime)
+            if (DateTime.Now >= nextBackupTime)
             {
                 _logger.LogInformation("Starting automatic backup");
                 var backupResult = await backupService.CreateBackupAsync(BackupType.Automatic);

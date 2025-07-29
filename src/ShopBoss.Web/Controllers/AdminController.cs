@@ -474,7 +474,7 @@ public class AdminController : Controller
                     {
                         oldValue = new { Status = part.Status.ToString() };
                         part.Status = newStatus;
-                        part.StatusUpdatedDate = DateTime.UtcNow;
+                        part.StatusUpdatedDate = DateTime.Now;
                         await _context.SaveChangesAsync();
                         success = true;
                     }
@@ -486,7 +486,7 @@ public class AdminController : Controller
                     {
                         oldValue = new { Status = product.Status.ToString() };
                         product.Status = newStatus;
-                        product.StatusUpdatedDate = DateTime.UtcNow;
+                        product.StatusUpdatedDate = DateTime.Now;
 
                         if (cascadeToChildren)
                         {
@@ -498,7 +498,7 @@ public class AdminController : Controller
                             foreach (var productPart in productParts)
                             {
                                 productPart.Status = newStatus;
-                                productPart.StatusUpdatedDate = DateTime.UtcNow;
+                                productPart.StatusUpdatedDate = DateTime.Now;
                             }
 
                             // Update all subassembly parts (including nested subassemblies)
@@ -509,7 +509,7 @@ public class AdminController : Controller
                             foreach (var subPart in subassemblyParts)
                             {
                                 subPart.Status = newStatus;
-                                subPart.StatusUpdatedDate = DateTime.UtcNow;
+                                subPart.StatusUpdatedDate = DateTime.Now;
                             }
 
                             // Update all hardware for this product
@@ -520,7 +520,7 @@ public class AdminController : Controller
                             foreach (var productHardwareItem in productHardware)
                             {
                                 productHardwareItem.Status = newStatus;
-                                productHardwareItem.StatusUpdatedDate = DateTime.UtcNow;
+                                productHardwareItem.StatusUpdatedDate = DateTime.Now;
                             }
                         }
 
@@ -535,7 +535,7 @@ public class AdminController : Controller
                     {
                         oldValue = new { Status = hardware.Status.ToString() };
                         hardware.Status = newStatus;
-                        hardware.StatusUpdatedDate = DateTime.UtcNow;
+                        hardware.StatusUpdatedDate = DateTime.Now;
                         await _context.SaveChangesAsync();
                         success = true;
                     }
@@ -547,7 +547,7 @@ public class AdminController : Controller
                     {
                         oldValue = new { Status = detachedProduct.Status.ToString() };
                         detachedProduct.Status = newStatus;
-                        detachedProduct.StatusUpdatedDate = DateTime.UtcNow;
+                        detachedProduct.StatusUpdatedDate = DateTime.Now;
 
                         if (cascadeToChildren)
                         {
@@ -559,7 +559,7 @@ public class AdminController : Controller
                             foreach (var detachedPart in detachedProductParts)
                             {
                                 detachedPart.Status = newStatus;
-                                detachedPart.StatusUpdatedDate = DateTime.UtcNow;
+                                detachedPart.StatusUpdatedDate = DateTime.Now;
                             }
                         }
 
@@ -574,7 +574,7 @@ public class AdminController : Controller
                     {
                         oldValue = new { Status = nestSheet.Status.ToString() };
                         nestSheet.Status = newStatus;
-                        nestSheet.StatusUpdatedDate = DateTime.UtcNow;
+                        nestSheet.StatusUpdatedDate = DateTime.Now;
 
                         if (cascadeToChildren)
                         {
@@ -587,7 +587,7 @@ public class AdminController : Controller
                             foreach (var nestPart in nestSheetParts)
                             {
                                 nestPart.Status = newStatus;
-                                nestPart.StatusUpdatedDate = DateTime.UtcNow;
+                                nestPart.StatusUpdatedDate = DateTime.Now;
                             }
                             
                             // Additional safety net: Force refresh of entity tracking to ensure all changes are captured
@@ -623,7 +623,7 @@ public class AdminController : Controller
                         ItemType = itemType,
                         NewStatus = newStatus.ToString(),
                         WorkOrderId = workOrderId,
-                        Timestamp = DateTime.UtcNow,
+                        Timestamp = DateTime.Now,
                         Station = "Manual",
                         ChangedBy = "Admin"
                     });
@@ -739,7 +739,7 @@ public class AdminController : Controller
                     {
                         UpdateCount = result.SuccessCount,
                         WorkOrderId = workOrderId,
-                        Timestamp = DateTime.UtcNow,
+                        Timestamp = DateTime.Now,
                         Station = "Manual"
                     });
 
@@ -837,8 +837,8 @@ public class AdminController : Controller
             if (ModelState.IsValid)
             {
                 rack.Id = Guid.NewGuid().ToString();
-                rack.CreatedDate = DateTime.UtcNow;
-                rack.LastModifiedDate = DateTime.UtcNow;
+                rack.CreatedDate = DateTime.Now;
+                rack.LastModifiedDate = DateTime.Now;
 
                 _context.StorageRacks.Add(rack);
                 await _context.SaveChangesAsync();
@@ -922,7 +922,7 @@ public class AdminController : Controller
                 
                 existingRack.Rows = rack.Rows;
                 existingRack.Columns = rack.Columns;
-                existingRack.LastModifiedDate = DateTime.UtcNow;
+                existingRack.LastModifiedDate = DateTime.Now;
 
                 // Adjust bins if grid size changed
                 if (originalBinCount != newBinCount)
@@ -957,7 +957,7 @@ public class AdminController : Controller
                                 StorageRackId = existingRack.Id,
                                 Status = BinStatus.Empty,
                                 BinLabel = binLabel,
-                                LastUpdatedDate = DateTime.UtcNow
+                                LastUpdatedDate = DateTime.Now
                             };
                             
                             existingRack.Bins.Add(newBin);
@@ -1023,7 +1023,7 @@ public class AdminController : Controller
                                 foreach (var (bin, newLabel) in binsToUpdate)
                                 {
                                     bin.BinLabel = newLabel;
-                                    bin.LastUpdatedDate = DateTime.UtcNow;
+                                    bin.LastUpdatedDate = DateTime.Now;
                                 }
                             }
                         }
@@ -1109,7 +1109,7 @@ public class AdminController : Controller
             }
 
             rack.IsActive = !rack.IsActive;
-            rack.LastModifiedDate = DateTime.UtcNow;
+            rack.LastModifiedDate = DateTime.Now;
 
             await _context.SaveChangesAsync();
 
@@ -1149,8 +1149,8 @@ public class AdminController : Controller
                 Status = BinStatus.Empty,
                 BinLabel = label,
                 PartsCount = 0,
-                AssignedDate = DateTime.UtcNow,
-                LastUpdatedDate = DateTime.UtcNow
+                AssignedDate = DateTime.Now,
+                LastUpdatedDate = DateTime.Now
             };
 
             bins.Add(bin);
@@ -1399,7 +1399,7 @@ public class AdminController : Controller
                 overallStatus = "Error",
                 error = "Failed to retrieve health metrics",
                 errorMessage = ex.Message,
-                lastHealthCheck = DateTime.UtcNow
+                lastHealthCheck = DateTime.Now
             });
         }
     }
@@ -1532,7 +1532,7 @@ public class AdminController : Controller
                 {
                     var oldLabel = existingBin.BinLabel;
                     existingBin.BinLabel = binUpdate.Label;
-                    existingBin.LastUpdatedDate = DateTime.UtcNow;
+                    existingBin.LastUpdatedDate = DateTime.Now;
                     updatedCount++;
 
                     await _auditTrailService.LogAsync("BinUpdated", "Bin", existingBin.Id,
@@ -1580,7 +1580,7 @@ public class AdminController : Controller
                 bin.PartId = null;
                 bin.PartsCount = 0;
                 bin.Status = BinStatus.Empty;
-                bin.LastUpdatedDate = DateTime.UtcNow;
+                bin.LastUpdatedDate = DateTime.Now;
                 
                 clearedCount++;
             }

@@ -31,7 +31,7 @@ public class SystemHealthMonitor
     {
         var metrics = new SystemHealthMetrics
         {
-            LastHealthCheck = DateTime.UtcNow
+            LastHealthCheck = DateTime.Now
         };
 
         try
@@ -284,7 +284,7 @@ public class SystemHealthMonitor
                 DiskSpaceStatus = HealthStatusLevel.Healthy,
                 MemoryStatus = HealthStatusLevel.Healthy,
                 ResponseTimeStatus = HealthStatusLevel.Healthy,
-                LastHealthCheck = DateTime.UtcNow,
+                LastHealthCheck = DateTime.Now,
                 ErrorMessage = "Health monitoring table not available - database migration may be needed"
             };
         }

@@ -55,7 +55,7 @@ public class BackupService
                 existingConfig.EnableCompression = configuration.EnableCompression;
                 existingConfig.BackupDirectoryPath = configuration.BackupDirectoryPath;
                 existingConfig.EnableAutomaticBackups = configuration.EnableAutomaticBackups;
-                existingConfig.LastUpdated = DateTime.UtcNow;
+                existingConfig.LastUpdated = DateTime.Now;
             }
 
             await _context.SaveChangesAsync();
@@ -76,7 +76,7 @@ public class BackupService
         var backupStatus = new BackupStatus
         {
             BackupType = backupType,
-            CreatedDate = DateTime.UtcNow
+            CreatedDate = DateTime.Now
         };
 
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
@@ -102,7 +102,7 @@ public class BackupService
             }
 
             // Create backup filename with timestamp
-            var timestamp = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss");
+            var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
             var backupFileName = $"shopboss_backup_{timestamp}.db";
             var backupFilePath = Path.Combine(backupDirectory, backupFileName);
 

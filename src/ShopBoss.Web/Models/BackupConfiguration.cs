@@ -35,5 +35,5 @@ public class BackupConfiguration
     /// <summary>
     /// When this configuration was last updated
     /// </summary>
-    public DateTime LastUpdated { get; set; } = DateTime.UtcNow;
+    public DateTime LastUpdated { get; set; } = DateTime.Now;
 }

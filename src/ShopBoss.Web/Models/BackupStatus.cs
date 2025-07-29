@@ -10,7 +10,7 @@ public class BackupStatus
     /// <summary>
     /// When this backup was created
     /// </summary>
-    public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedDate { get; set; } = DateTime.Now;
     
     /// <summary>
     /// Type of backup (Automatic, Manual)

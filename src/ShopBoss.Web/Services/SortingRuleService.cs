@@ -205,7 +205,7 @@ public class SortingRuleService
                 bin.ProductId = part.ProductId;
                 bin.WorkOrderId = workOrderId;
                 bin.Contents = $"{part.Product?.Name}: {part.Name} (Qty: {part.Qty})";
-                bin.AssignedDate = DateTime.UtcNow;
+                bin.AssignedDate = DateTime.Now;
             }
             else
             {
@@ -226,11 +226,11 @@ public class SortingRuleService
             
             bin.PartsCount = bin.PartsCount + 1;
             bin.Status = BinStatus.Partial; // Always partial when parts are added (full status determined by product completion logic elsewhere)
-            bin.LastUpdatedDate = DateTime.UtcNow;
+            bin.LastUpdatedDate = DateTime.Now;
 
             // Update part status to Sorted and set bin relationship
             part.Status = PartStatus.Sorted;
-            part.StatusUpdatedDate = DateTime.UtcNow;
+            part.StatusUpdatedDate = DateTime.Now;
             part.BinId = bin.Id; // Direct foreign key reference
             part.Location = $"{bin.StorageRack.Name}:{bin.BinLabel}"; // Keep legacy location for compatibility
 
@@ -397,7 +397,7 @@ public class SortingRuleService
 
             // Mark product as ready by updating its status
             product.Status = PartStatus.Sorted;
-            product.StatusUpdatedDate = DateTime.UtcNow;
+            product.StatusUpdatedDate = DateTime.Now;
             
             await _context.SaveChangesAsync();
 
@@ -469,7 +469,6 @@ public class SortingRuleService
         {
             var availableBin = rack.Bins
                 .Where(b => b.IsAvailable)
-                .OrderBy(b => b.BinLabel)
                 .FirstOrDefault();
 
             if (availableBin != null)

@@ -99,13 +99,13 @@ public class ShippingService
                 if (part.Status == PartStatus.Assembled)
                 {
                     part.Status = PartStatus.Shipped;
-                    part.StatusUpdatedDate = DateTime.UtcNow;
+                    part.StatusUpdatedDate = DateTime.Now;
                 }
             }
 
             // Mark the product itself as shipped
             product.Status = PartStatus.Shipped;
-            product.StatusUpdatedDate = DateTime.UtcNow;
+            product.StatusUpdatedDate = DateTime.Now;
 
             // Explicitly mark the product as modified to ensure EF tracks the change
             _context.Products.Update(product);
@@ -160,7 +160,7 @@ public class ShippingService
 
             var oldStatus = part.Status;
             part.Status = newStatus;
-            part.StatusUpdatedDate = DateTime.UtcNow;
+            part.StatusUpdatedDate = DateTime.Now;
 
             await _context.SaveChangesAsync();
 
@@ -203,14 +203,14 @@ public class ShippingService
                 foreach (var part in productParts)
                 {
                     part.Status = newStatus;
-                    part.StatusUpdatedDate = DateTime.UtcNow;
+                    part.StatusUpdatedDate = DateTime.Now;
                 }
 
                 // Update all subassembly parts
                 foreach (var part in subassemblyParts)
                 {
                     part.Status = newStatus;
-                    part.StatusUpdatedDate = DateTime.UtcNow;
+                    part.StatusUpdatedDate = DateTime.Now;
                 }
             }
 
@@ -239,7 +239,7 @@ public class ShippingService
             }
 
             hardware.Status = isShipped ? PartStatus.Shipped : PartStatus.Pending;
-            hardware.StatusUpdatedDate = DateTime.UtcNow;
+            hardware.StatusUpdatedDate = DateTime.Now;
             await _context.SaveChangesAsync();
 
             _logger.LogInformation("Hardware {HardwareId} shipped status updated to {IsShipped}", 
@@ -265,7 +265,7 @@ public class ShippingService
             }
 
             detachedProduct.Status = isShipped ? PartStatus.Shipped : PartStatus.Pending;
-            detachedProduct.StatusUpdatedDate = DateTime.UtcNow;
+            detachedProduct.StatusUpdatedDate = DateTime.Now;
             await _context.SaveChangesAsync();
 
             _logger.LogInformation("Detached product {DetachedProductId} shipped status updated to {IsShipped}", 

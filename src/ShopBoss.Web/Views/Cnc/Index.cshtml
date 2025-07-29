@@ -68,12 +68,10 @@ else
             @foreach (var nestSheet in Model)
             {
                 var totalParts = nestSheet.Parts.Count;
-                var cutParts = nestSheet.Parts.Count(p => p.Status >= ShopBoss.Web.Models.PartStatus.Cut);
-                var progressPercentage = totalParts > 0 ? (cutParts * 100) / totalParts : 0;
                 var statusBadgeClass = nestSheet.Status == PartStatus.Cut ? "bg-success" : "bg-warning";
                 var statusText = nestSheet.Status == PartStatus.Cut ? "Completed" : "Pending";
 
-                <div class="col-md-6 col-lg-4 mb-4 nest-sheet-card" 
+                <div class="col-md-4 col-lg-3 mb-3 nest-sheet-card" 
                      data-status="@(nestSheet.Status == PartStatus.Cut ? "cut" : "pending")" 
                      data-material="@(string.IsNullOrEmpty(nestSheet.Material) ? "unspecified" : nestSheet.Material.Replace(" ", "_").ToLower())"
                      data-material-display="@(string.IsNullOrEmpty(nestSheet.Material) ? "Not specified" : nestSheet.Material)">
@@ -84,23 +82,17 @@ else
                         </h6>
                         <span class="badge @statusBadgeClass">@statusText</span>
                     </div>
-                    <div class="card-body">
-                        <div class="row g-2 mb-3">
-                            <div class="col-6">
-                                <small class="text-muted">Material:</small><br>
-                                <strong>@(string.IsNullOrEmpty(nestSheet.Material) ? "Not specified" : nestSheet.Material)</strong>
-                            </div>
-                            <div class="col-6">
-                                <small class="text-muted">Barcode:</small><br>
-                                <code class="small">@nestSheet.Barcode</code>
-                            </div>
+                    <div class="card-body py-2">
+                        <div class="mb-2">
+                            <small class="text-muted">Material:</small>
+                            <strong class="d-block">@(string.IsNullOrEmpty(nestSheet.Material) ? "Not specified" : nestSheet.Material)</strong>
                         </div>
 
                         @if (nestSheet.Length.HasValue || nestSheet.Width.HasValue || nestSheet.Thickness.HasValue)
                         {
-                            <div class="mb-3">
-                                <small class="text-muted">Dimensions:</small><br>
-                                <span class="small">
+                            <div class="mb-2">
+                                <small class="text-muted">Dimensions:</small>
+                                <div class="small">
                                     @if (nestSheet.Length.HasValue)
                                     {
                                         <span>L: @nestSheet.Length.Value mm</span>
@@ -113,25 +105,18 @@ else
                                     {
                                         <span>@(nestSheet.Length.HasValue || nestSheet.Width.HasValue ? " × " : "")T: @nestSheet.Thickness.Value mm</span>
                                     }
-                                </span>
+                                </div>
                             </div>
                         }
 
-                        <div class="mb-3">
-                            <div class="d-flex justify-content-between align-items-center mb-1">
-                                <small class="text-muted">Parts Progress:</small>
-                                <small class="text-muted">@cutParts / @totalParts parts cut</small>
-                            </div>
-                            <div class="progress" style="height: 6px;">
-                                <div class="progress-bar @(nestSheet.Status == PartStatus.Cut ? "bg-success" : "bg-primary")" 
-                                     role="progressbar" style="width: @progressPercentage%" 
-                                     aria-valuenow="@progressPercentage" aria-valuemin="0" aria-valuemax="100"></div>
-                            </div>
+                        <div class="mb-2">
+                            <small class="text-muted">Parts:</small>
+                            <strong class="d-block">@totalParts parts</strong>
                         </div>
 
                         @if (nestSheet.StatusUpdatedDate.HasValue && nestSheet.Status == PartStatus.Cut)
                         {
-                            <div class="mb-2">
+                            <div class="mb-1">
                                 <small class="text-muted">
                                     <i class="fas fa-check text-success me-1"></i>
                                     Processed: @nestSheet.StatusUpdatedDate.Value.ToString("yyyy-MM-dd HH:mm")
@@ -139,7 +124,7 @@ else
                             </div>
                         }
                         
-                        <div class="mb-2">
+                        <div class="mb-0">
                             <small class="text-muted">
                                 <i class="fas fa-clock me-1"></i>
                                 Created: @nestSheet.CreatedDate.ToString("yyyy-MM-dd HH:mm")
@@ -227,6 +212,9 @@ else
             processedCards.forEach(card => {
                 card.style.display = showProcessed ? 'block' : 'none';
             });
+            
+            // Save preference to localStorage
+            ShopBossPreferences.CNC.setShowProcessed(showProcessed);
         }
 
         function toggleMaterialGrouping() {
@@ -289,7 +277,29 @@ else
             
             // Reapply processed sheet visibility after regrouping
             toggleCutSheets();
+            
+            // Save preference to localStorage
+            ShopBossPreferences.CNC.setGroupByMaterial(groupByMaterial);
         }
+
+        // Restore user preferences from localStorage on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Restore "Show Processed Sheets" toggle state
+            const showProcessed = ShopBossPreferences.CNC.getShowProcessed();
+            const showToggle = document.getElementById('showCutToggle');
+            if (showToggle) {
+                showToggle.checked = showProcessed;
+                toggleCutSheets(); // Apply the restored state
+            }
+            
+            // Restore "Group by Material" toggle state
+            const groupByMaterial = ShopBossPreferences.CNC.getGroupByMaterial();
+            const groupToggle = document.getElementById('groupByMaterialToggle');
+            if (groupToggle) {
+                groupToggle.checked = groupByMaterial;
+                toggleMaterialGrouping(); // Apply the restored state
+            }
+        });
 
         console.log('=== CNC SCRIPT EXECUTION START ===', new Date().toISOString());
         if (!window.cncExecutionCount) window.cncExecutionCount = 0;

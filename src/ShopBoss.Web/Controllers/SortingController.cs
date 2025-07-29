@@ -335,7 +335,7 @@ public class SortingController : Controller
             // Log audit trail for part status change
             await _auditTrail.LogAsync("StatusChange", "Part", part.Id, 
                 new { Status = "Cut", part.StatusUpdatedDate },
-                new { Status = "Sorted", StatusUpdatedDate = DateTime.UtcNow },
+                new { Status = "Sorted", StatusUpdatedDate = DateTime.Now },
                 station: station, workOrderId: activeWorkOrderId,
                 details: $"Part sorted via barcode scan '{cleanBarcode}' to {placementMessage}",
                 sessionId: sessionId, ipAddress: ipAddress);
@@ -366,7 +366,7 @@ public class SortingController : Controller
                     partName = part.Name,
                     rackId = updateData.rackId,
                     binLabel = updateData.binLabel,
-                    timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss")
+                    timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
                 });
 
             // Send rack occupancy update for real-time badge refresh
@@ -381,7 +381,7 @@ public class SortingController : Controller
                         rackId = updatedRack.Id,
                         occupiedBins = updatedRack.OccupiedBins,
                         totalBins = updatedRack.TotalBins,
-                        timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss")
+                        timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
                     });
             }
 
@@ -394,7 +394,7 @@ public class SortingController : Controller
                 .SendAsync("CutPartsCountUpdate", new
                 {
                     count = currentCutParts,
-                    timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss")
+                    timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
                 });
 
             // Check for assembly readiness after successful part sorting
@@ -429,7 +429,7 @@ public class SortingController : Controller
                                         productName = readyProduct.Name,
                                         itemNumber = readyProduct.ItemNumber,
                                         workOrderId = activeWorkOrderId,
-                                        timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss"),
+                                        timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
                                         sortingStation = station
                                     });
 
@@ -441,7 +441,7 @@ public class SortingController : Controller
                                         productName = readyProduct.Name,
                                     itemNumber = readyProduct.ItemNumber,
                                     workOrderId = activeWorkOrderId,
-                                    readyTime = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss"),
+                                    readyTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
                                     message = $"Product '{readyProduct.Name}' is ready for assembly - all parts sorted!"
                                 });
 
@@ -706,12 +706,12 @@ public class SortingController : Controller
                     }
                 }
                 
-                bin.LastUpdatedDate = DateTime.UtcNow;
+                bin.LastUpdatedDate = DateTime.Now;
             }
 
             // Change part status back to Cut and clear location
             part.Status = PartStatus.Cut;
-            part.StatusUpdatedDate = DateTime.UtcNow;
+            part.StatusUpdatedDate = DateTime.Now;
             part.Location = null;
 
             await _context.SaveChangesAsync();
@@ -719,7 +719,7 @@ public class SortingController : Controller
             // Log audit trail
             await _auditTrail.LogAsync("RemoveFromBin", "Part", part.Id,
                 new { Status = "Sorted", part.StatusUpdatedDate },
-                new { Status = "Cut", StatusUpdatedDate = DateTime.UtcNow },
+                new { Status = "Cut", StatusUpdatedDate = DateTime.Now },
                 station: station, workOrderId: activeWorkOrderId,
                 details: $"Part '{part.Name}' removed from bin and status changed back to Cut",
                 sessionId: sessionId, ipAddress: ipAddress);
@@ -782,14 +782,14 @@ public class SortingController : Controller
             foreach (var part in partsToRemove)
             {
                 part.Status = PartStatus.Cut;
-                part.StatusUpdatedDate = DateTime.UtcNow;
+                part.StatusUpdatedDate = DateTime.Now;
                 part.Location = null;
                 partsRemoved++;
 
                 // Log individual part status change
                 await _auditTrail.LogAsync("ClearBin", "Part", part.Id,
                     new { Status = "Sorted", part.StatusUpdatedDate, part.Location },
-                    new { Status = "Cut", StatusUpdatedDate = DateTime.UtcNow, Location = (string?)null },
+                    new { Status = "Cut", StatusUpdatedDate = DateTime.Now, Location = (string?)null },
                     station: station, workOrderId: activeWorkOrderId,
                     details: $"Part '{part.Name}' status changed to Cut and location cleared due to bin clear operation",
                     sessionId: sessionId, ipAddress: ipAddress);
@@ -808,7 +808,7 @@ public class SortingController : Controller
             bin.WorkOrderId = null;
             bin.Contents = string.Empty;
             bin.AssignedDate = null;
-            bin.LastUpdatedDate = DateTime.UtcNow;
+            bin.LastUpdatedDate = DateTime.Now;
 
             await _context.SaveChangesAsync();
 
@@ -925,7 +925,7 @@ public class SortingController : Controller
                     itemNumber = product.ItemNumber,
                     totalParts = totalParts,
                     sortedParts = sortedParts,
-                    completedDate = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm")
+                    completedDate = DateTime.Now.ToString("yyyy-MM-dd HH:mm")
                 };
             }
 
@@ -979,7 +979,7 @@ public class SortingController : Controller
                     workOrderName = (await _context.WorkOrders.FindAsync(workOrderId))?.Name ?? "Unknown",
                     totalPartsCount = totalParts,
                     sortedPartsCount = sortedParts,
-                    completedDate = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm"),
+                    completedDate = DateTime.Now.ToString("yyyy-MM-dd HH:mm"),
                     rackLocations = rackDisplayNames
                 });
             }
