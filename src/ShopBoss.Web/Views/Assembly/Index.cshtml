@@ -446,7 +446,6 @@
 
 @section Scripts {
     <script src="~/lib/signalr/dist/browser/signalr.js"></script>
-    <script src="~/js/universal-scanner.js"></script>
     <script>
         // Billboard toggle functionality
         function toggleBillboard() {
@@ -503,7 +502,6 @@
 
         // Start SignalR connection
         connection.start().then(function () {
-            console.log("Assembly Station SignalR connection established");
             
             // Join assembly station group
             connection.invoke("JoinGroup", "assembly-station");
@@ -522,7 +520,6 @@
 
         // Listen for product assembly notifications
         connection.on("ProductAssembled", function (data) {
-            console.log("ProductAssembled event received:", data);
             showToast(`Product "${data.ProductName}" has been assembled!`, 'success');
             showBillboard('assembly-billboard', `Product "${data.ProductName}" has been assembled!`, 'success', 'Assembly Complete');
             updateProductStatus(data.ProductId, 'completed');
@@ -532,7 +529,6 @@
 
         // Listen for barcode scan assembly notifications
         connection.on("ProductAssembledByScan", function (data) {
-            console.log("ProductAssembledByScan event received:", data);
             showToast(`🔧 Product "${data.ProductName}" assembled via scan!`, 'success');
             showBillboard('assembly-billboard', `Product "${data.ProductName}" assembled via scan!`, 'success', 'Scan Assembly Complete');
             updateProductStatus(data.ProductId, 'completed');
@@ -547,7 +543,6 @@
 
         // Listen for new products ready for assembly (from sorting station)
         connection.on("ProductReadyForAssembly", function (data) {
-            console.log("ProductReadyForAssembly event received:", data);
             showToast(`Product "${data.productName}" is now ready for assembly!`, 'info');
             showBillboard('assembly-billboard', `Product "${data.productName}" is now ready for assembly!`, 'info', 'Ready for Assembly');
             updateProductStatus(data.productId, 'ready');
@@ -863,68 +858,6 @@
 
 
         
-        // Listen for scan events from Universal Scanner (auto-initialized)
-        // First, remove any existing listeners to prevent duplicates
-        if (window.assemblyScanHandler) {
-            document.removeEventListener('scanReceived', window.assemblyScanHandler);
-            console.log('Removed existing Assembly scan handler');
-        }
-        
-        window.assemblyScanHandler = function(event) {
-            const { barcode, containerId } = event.detail;
-            console.log('Assembly Station: Received scan event', { barcode, containerId });
-            
-            // Get the scanner instance from global registry  
-            const scanner = window.universalScanners[containerId];
-            if (scanner) {
-                handleAssemblyScan(barcode, scanner);
-            }
-        };
-        
-        document.addEventListener('scanReceived', window.assemblyScanHandler);
-        console.log('Added Assembly scan handler');
-        
-        // Clean up event listener when page unloads
-        window.addEventListener('beforeunload', function() {
-            if (window.assemblyScanHandler) {
-                document.removeEventListener('scanReceived', window.assemblyScanHandler);
-                window.assemblyScanHandler = null;
-            }
-        });
-        
-        // Assembly scan handler that integrates Universal Scanner with existing logic
-        async function handleAssemblyScan(barcode, scanner) {
-            try {
-                // Show processing status
-                scanner.showScanResult(false, '🔄 Processing assembly scan...', false);
-                
-                // Use existing assembly endpoint with correct Content-Type
-                const response = await fetch('/Assembly/ScanPartForAssembly', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                        'X-Requested-With': 'XMLHttpRequest'
-                    },
-                    body: `barcode=${encodeURIComponent(barcode)}`
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    scanner.showScanResult(true, data.message);
-                    
-                    
-                    // Auto-refresh after 3 seconds to show updated queue
-                    setTimeout(() => {
-                        location.reload();
-                    }, 3000);
-                } else {
-                    scanner.showScanResult(false, data.message || 'Assembly scan failed');
-                }
-            } catch (error) {
-                console.error('Assembly scan error:', error);
-                scanner.showScanResult(false, '❌ Network error. Please try again.');
-            }
-        }
+        // Scan handling is now managed by CompactScanner - no custom handlers needed
     </script>
 }

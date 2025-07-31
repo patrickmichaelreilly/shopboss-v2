@@ -205,3 +205,480 @@
 
 </style>
 
+<script>
+// Self-Contained CompactScanner - Embedded in Compact Scanner Partial
+class UniversalScanner {
+    constructor(containerId, options = {}) {
+        this.containerId = containerId;
+        this.clearOnSuccess = options.clearOnSuccess !== false;
+        this.showRecentScans = options.showRecentScans !== false;
+        
+        this.input = document.getElementById(`scanner-input-${containerId}`);
+        this.submitButton = document.getElementById(`scanner-submit-${containerId}`);
+        this.clearButton = document.getElementById(`scanner-clear-${containerId}`);
+        this.statusDiv = document.getElementById(`scanner-status-${containerId}`);
+        this.resultsDiv = document.getElementById(`scanner-results-${containerId}`);
+        this.recentScansDiv = document.getElementById(`recent-scans-${containerId}`);
+        
+        this.isProcessing = false;
+        this.lastScanTime = 0;
+        this.scanCooldown = 100;
+        
+        this.init();
+    }
+    
+    init() {
+        if (!this.input) {
+            console.error(`Scanner input not found for container: ${this.containerId}`);
+            return;
+        }
+        
+        // Event listeners
+        this.input.addEventListener('keydown', (e) => this.handleKeydown(e));
+        this.input.addEventListener('input', (e) => this.handleInput(e));
+        this.submitButton?.addEventListener('click', () => this.processScan());
+        this.clearButton?.addEventListener('click', () => this.clearInput());
+        
+        // Set up document-level key listener for barcode scanning
+        this.setupDocumentKeyListener();
+        
+        // Initialize health indicator
+        this.updateHealthIndicator('ready', 'Scanner Ready');
+        
+    }
+    
+    handleKeydown(event) {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            this.processScan();
+        } else if (event.key === 'Escape') {
+            event.preventDefault();
+            this.clearInput();
+        }
+    }
+    
+    handleInput(event) {
+        const value = event.target.value.trim();
+        
+        // Auto-submit for certain patterns (like quick barcode scans)
+        if (value.length > 8 && this.looksLikeBarcode(value)) {
+            setTimeout(() => {
+                if (this.input.value === value) {
+                    this.processScan();
+                }
+            }, 100);
+        }
+    }
+    
+    looksLikeBarcode(value) {
+        return /^[A-Z0-9\-:]{8,}$/i.test(value) || 
+               value.includes(':') || 
+               value.includes('-');
+    }
+    
+    async processScan() {
+        const barcode = this.input.value.trim();
+        
+        if (!barcode) {
+            this.showStatus('warning', '⚠️ Please enter a barcode');
+            return;
+        }
+        
+        // Cooldown check
+        const now = Date.now();
+        if (now - this.lastScanTime < this.scanCooldown) {
+            return;
+        }
+        this.lastScanTime = now;
+        
+        if (this.isProcessing) {
+            return;
+        }
+        
+        this.isProcessing = true;
+        this.setProcessingState(true);
+        this.updateHealthIndicator('processing', 'Processing scan...');
+        
+        try {
+            this.lastScannedBarcode = barcode;
+            
+            // Check if this is a command barcode
+            if (this.isCommandBarcode(barcode)) {
+                this.handleCommand(barcode);
+                return;
+            }
+            
+            // Emit scan event for station-specific handling
+            this.emitScanEvent(barcode);
+            
+            // Show basic feedback
+            this.showStatus('info', `📡 Scan received: ${barcode}`, false);
+            
+            // Clear input if configured
+            if (this.clearOnSuccess) {
+                this.clearInput();
+            }
+            
+            // Add to recent scans
+            if (this.showRecentScans) {
+                this.addToRecentScans({
+                    barcode: barcode,
+                    result: 'Forwarded to station handler',
+                    success: true,
+                    timestamp: new Date()
+                });
+            }
+            
+        } catch (error) {
+            console.error('Scan processing error:', error);
+            this.showStatus('danger', '❌ Error processing scan.');
+        } finally {
+            this.isProcessing = false;
+            this.setProcessingState(false);
+            this.updateHealthIndicator('ready', 'Scanner Ready');
+        }
+    }
+    
+    // Command barcode detection and handling
+    isCommandBarcode(barcode) {
+        return barcode.toUpperCase().startsWith('NAV-');
+    }
+    
+    handleCommand(barcode) {
+        const command = barcode.toUpperCase();
+        
+        if (command.startsWith('NAV-')) {
+            this.handleNavigationCommand(command);
+            return;
+        }
+        
+        this.showStatus('warning', `❓ Unknown command: ${barcode}`);
+        this.addToRecentScans({
+            barcode: barcode,
+            result: 'Unknown command',
+            success: false,
+            timestamp: new Date()
+        });
+    }
+    
+    handleNavigationCommand(command) {
+        const destination = command.replace('NAV-', '');
+        let url = null;
+        let stationName = '';
+        
+        switch (destination) {
+            case 'ADMIN':
+                url = '/Admin';
+                stationName = 'Admin Station';
+                break;
+            case 'CNC':
+                url = '/Cnc';
+                stationName = 'CNC Station';
+                break;
+            case 'SORTING':
+                url = '/Sorting';
+                stationName = 'Sorting Station';
+                break;
+            case 'ASSEMBLY':
+                url = '/Assembly';
+                stationName = 'Assembly Station';
+                break;
+            case 'SHIPPING':
+                url = '/Shipping';
+                stationName = 'Shipping Station';
+                break;
+            default:
+                this.showStatus('warning', `❓ Unknown navigation destination: ${destination}`);
+                this.addToRecentScans({
+                    barcode: command,
+                    result: 'Unknown navigation destination',
+                    success: false,
+                    timestamp: new Date()
+                });
+                return;
+        }
+        
+        this.showStatus('success', `🧭 Navigating to ${stationName}...`, false);
+        this.addToRecentScans({
+            barcode: command,
+            result: `Navigating to ${stationName}`,
+            success: true,
+            timestamp: new Date()
+        });
+        
+        setTimeout(() => {
+            window.location.href = url;
+        }, 1500);
+    }
+    
+    emitScanEvent(barcode) {
+        const scanEvent = new CustomEvent('scanReceived', {
+            detail: {
+                barcode: barcode,
+                timestamp: new Date(),
+                containerId: this.containerId,
+                scanner: this
+            },
+            bubbles: true
+        });
+        
+        document.dispatchEvent(scanEvent);
+    }
+    
+    showScanResult(success, message, autoHide = true) {
+        const statusType = success ? 'success' : 'danger';
+        this.showStatus(statusType, message, autoHide);
+    }
+    
+    showStatus(type, message, autoHide = true) {
+        if (!this.statusDiv) return;
+        
+        const alertClass = `alert-${type}`;
+        const alert = this.statusDiv.querySelector('.alert');
+        
+        alert.className = `alert ${alertClass}`;
+        alert.querySelector('.status-message').textContent = message;
+        
+        this.statusDiv.style.display = 'block';
+        
+        if (autoHide && type === 'success') {
+            setTimeout(() => {
+                this.statusDiv.style.display = 'none';
+            }, 3000);
+        }
+    }
+    
+    addToRecentScans(scan) {
+        if (!this.recentScansDiv) return;
+        
+        const tbody = this.recentScansDiv.querySelector('.recent-scans-body');
+        if (!tbody) return;
+        
+        const row = document.createElement('tr');
+        const statusIcon = scan.success ? '✅' : '❌';
+        const timeStr = scan.timestamp.toLocaleTimeString();
+        
+        row.innerHTML = `
+            <td class="text-muted small">${timeStr}</td>
+            <td><code>${this.escapeHtml(scan.barcode)}</code></td>
+            <td class="small">${statusIcon} ${this.escapeHtml(scan.result)}</td>
+        `;
+        
+        tbody.insertBefore(row, tbody.firstChild);
+        
+        // Keep only last 10 scans
+        while (tbody.children.length > 10) {
+            tbody.removeChild(tbody.lastChild);
+        }
+        
+        this.recentScansDiv.style.display = 'block';
+    }
+    
+    clearInput() {
+        if (this.input) {
+            this.input.value = '';
+        }
+        
+        if (this.statusDiv) {
+            this.statusDiv.style.display = 'none';
+        }
+        
+        if (this.resultsDiv) {
+            this.resultsDiv.style.display = 'none';
+        }
+    }
+    
+    setProcessingState(processing) {
+        if (this.submitButton) {
+            this.submitButton.disabled = processing;
+        }
+        
+        if (this.input) {
+            this.input.disabled = processing;
+        }
+        
+        const spinner = this.statusDiv?.querySelector('.spinner-border');
+        if (spinner) {
+            spinner.style.display = processing ? 'inline-block' : 'none';
+        }
+        
+        if (processing) {
+            this.showStatus('info', '🔍 Processing scan...', false);
+        }
+    }
+    
+    setupDocumentKeyListener() {
+        this.barcodeBuffer = '';
+        this.barcodeTimeout = null;
+        
+        this.documentKeyHandler = (e) => {
+            if (e.key === 'Enter') {
+                if (this.barcodeBuffer.trim()) {
+                    const barcode = this.barcodeBuffer.trim();
+                    this.barcodeBuffer = '';
+                    this.emitScanEvent(barcode);
+                }
+                return;
+            }
+            
+            if (e.key.length === 1) {
+                this.barcodeBuffer += e.key;
+                
+                clearTimeout(this.barcodeTimeout);
+                this.barcodeTimeout = setTimeout(() => {
+                    this.barcodeBuffer = '';
+                }, 2000);
+            }
+        };
+        
+        document.addEventListener('keydown', this.documentKeyHandler);
+        
+        window.addEventListener('beforeunload', () => {
+            document.removeEventListener('keydown', this.documentKeyHandler);
+            clearTimeout(this.barcodeTimeout);
+        });
+    }
+    
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    updateHealthIndicator(status = 'ready', message = '') {
+        const healthIndicator = document.getElementById(`scanner-health-${this.containerId}`);
+        if (!healthIndicator) return;
+        
+        healthIndicator.classList.remove('ready', 'not-ready', 'processing');
+        healthIndicator.classList.add('ready');
+        healthIndicator.title = 'Scanner Ready';
+    }
+}
+
+// Station Detection and Handler Registration System
+class StationScanHandler {
+    constructor() {
+        this.stationType = this.detectStationType();
+        this.endpoints = this.getStationEndpoints();
+        this.scanHandler = null;
+        
+        this.setupScanHandler();
+    }
+    
+    detectStationType() {
+        const path = window.location.pathname.toLowerCase();
+        
+        if (path.includes('/sorting')) return 'sorting';
+        if (path.includes('/assembly')) return 'assembly';
+        if (path.includes('/cnc')) return 'cnc';
+        if (path.includes('/shipping')) return 'shipping';
+        
+        return 'unknown';
+    }
+    
+    getStationEndpoints() {
+        const endpoints = {
+            sorting: ['/Sorting/ScanPart'],
+            assembly: ['/Assembly/ScanPartForAssembly'],
+            cnc: ['/Cnc/ScanNestSheet'],
+            shipping: ['/Shipping/ScanProduct', '/Shipping/ScanNestSheet', '/Shipping/ScanPart']
+        };
+        
+        return endpoints[this.stationType] || [];
+    }
+    
+    setupScanHandler() {
+        if (this.stationType === 'unknown' || this.endpoints.length === 0) {
+            return;
+        }
+        
+        // Clean up existing handler
+        if (this.scanHandler) {
+            document.removeEventListener('scanReceived', this.scanHandler);
+        }
+        
+        this.scanHandler = (event) => this.handleStationScan(event);
+        document.addEventListener('scanReceived', this.scanHandler);
+        
+        
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (this.scanHandler) {
+                document.removeEventListener('scanReceived', this.scanHandler);
+            }
+        });
+    }
+    
+    async handleStationScan(event) {
+        const { barcode, containerId, scanner } = event.detail;
+        
+        
+        // Try each endpoint until one succeeds
+        for (const endpoint of this.endpoints) {
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: `barcode=${encodeURIComponent(barcode)}`
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    scanner.showScanResult(true, data.message || 'Scan successful');
+                    scanner.addToRecentScans({
+                        barcode: barcode,
+                        result: data.message || 'Processed successfully',
+                        success: true,
+                        timestamp: new Date()
+                    });
+                    return; // Success - don't try other endpoints
+                } else {
+                    // Continue to next endpoint if this one didn't handle it
+                }
+            } catch (error) {
+                console.error(`Error with endpoint ${endpoint}:`, error);
+                // Continue to next endpoint
+            }
+        }
+        
+        // If we get here, no endpoint handled the scan
+        scanner.showScanResult(false, `No handler found for barcode: ${barcode}`);
+        scanner.addToRecentScans({
+            barcode: barcode,
+            result: 'No matching handler',
+            success: false,
+            timestamp: new Date()
+        });
+    }
+}
+
+// Global scanner instances registry
+window.universalScanners = window.universalScanners || {};
+
+// Auto-initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize station handler
+    window.stationScanHandler = new StationScanHandler();
+    
+    // Find all scanner containers and auto-initialize
+    const scannerInputs = document.querySelectorAll('.universal-scanner-input');
+    
+    scannerInputs.forEach(input => {
+        const containerId = input.dataset.container;
+        
+        if (containerId && !window.universalScanners[containerId]) {
+            const scanner = new UniversalScanner(containerId, {
+                clearOnSuccess: true,
+                showRecentScans: true
+            });
+            window.universalScanners[containerId] = scanner;
+        }
+    });
+    
+});
+</script>
+

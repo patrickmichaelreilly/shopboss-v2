@@ -373,7 +373,6 @@
 @section Scripts {
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/signalr/dist/browser/signalr.js"></script>
-    <script src="~/js/universal-scanner.js"></script>
     <script>
         $(document).ready(function() {
             // Initialize SignalR connection
@@ -385,14 +384,12 @@
             connection.start().then(function () {
                 // Join the shipping station group
                 connection.invoke("JoinGroup", "shipping-station");
-                console.log("Connected to shipping station SignalR hub");
             }).catch(function (err) {
                 console.error("Error connecting to SignalR hub:", err);
             });
 
             // Listen for assembly completions
             connection.on("ProductReadyForShipping", function (data) {
-                console.log("Product ready for shipping:", data);
                 // Update the UI without full page reload
                 updateOverallProgress();
             });
@@ -400,7 +397,6 @@
             // Listen for general status updates
             connection.on("StatusUpdate", function (data) {
                 if (data.type === "product-assembled") {
-                    console.log("Product assembled:", data);
                     // Update the UI without full page reload
                     updateOverallProgress();
                 }
@@ -413,10 +409,8 @@
 
 
             function updateOverallProgress() {
-                console.log('Updating overall progress...');
                 $.get('/Shipping/GetShippingProgress')
                     .done(function(response) {
-                        console.log('Progress response:', response);
                         if (response.success && response.data) {
                             const data = response.data;
                             // Handle both camelCase (from JSON serialization) and PascalCase
@@ -429,7 +423,6 @@
                             
                             const percentage = totalItems > 0 ? Math.round((shippedItems / totalItems) * 100) : 0;
                             
-                            console.log(`Progress: ${shippedItems}/${totalItems} (${percentage}%)`);
                             $('#overallProgressText').text(`${shippedItems}/${totalItems} (${percentage}%)`);
                             
                             const progressRing = $('#overallProgressRing');
@@ -635,80 +628,6 @@
             }
         });
         
-        // Listen for scan events from Universal Scanner (auto-initialized)
-        // First, remove any existing listeners to prevent duplicates
-        if (window.shippingScanHandler) {
-            document.removeEventListener('scanReceived', window.shippingScanHandler);
-            console.log('Removed existing Shipping scan handler');
-        }
-        
-        window.shippingScanHandler = function(event) {
-            const { barcode, containerId } = event.detail;
-            console.log('Shipping Station: Received scan event', { barcode, containerId });
-            
-            // Get the scanner instance from global registry  
-            const scanner = window.universalScanners[containerId];
-            if (scanner) {
-                handleShippingScan(barcode, scanner);
-            }
-        };
-        
-        document.addEventListener('scanReceived', window.shippingScanHandler);
-        console.log('Added Shipping scan handler');
-        
-        // Clean up event listener when page unloads
-        window.addEventListener('beforeunload', function() {
-            if (window.shippingScanHandler) {
-                document.removeEventListener('scanReceived', window.shippingScanHandler);
-                window.shippingScanHandler = null;
-            }
-        });
-        
-        // Shipping scan handler that tries different shipping endpoints in sequence
-        async function handleShippingScan(barcode, scanner) {
-            try {
-                // Show processing status
-                scanner.showScanResult(false, '🔄 Processing shipping scan...', false);
-                
-                // Try shipping endpoints in sequence: Product → Part → Hardware → DetachedProduct
-                const endpoints = [
-                    { url: '/Shipping/ScanProduct', type: 'Product' },
-                    { url: '/Shipping/ScanPart', type: 'Part' },
-                    { url: '/Shipping/ScanHardware', type: 'Hardware' },
-                    { url: '/Shipping/ScanDetachedProduct', type: 'Detached Product' }
-                ];
-                
-                for (const endpoint of endpoints) {
-                    const response = await fetch(endpoint.url, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/x-www-form-urlencoded',
-                            'X-Requested-With': 'XMLHttpRequest'
-                        },
-                        body: `barcode=${encodeURIComponent(barcode)}`
-                    });
-                    
-                    const data = await response.json();
-                    
-                    if (data.success) {
-                        scanner.showScanResult(true, `${endpoint.type}: ${data.message}`);
-                        updateOverallProgress();
-                        
-                        // Refresh page to show updated shipping status
-                        setTimeout(() => {
-                            location.reload();
-                        }, 2000);
-                        return; // Exit on first successful match
-                    }
-                }
-                
-                // If we get here, none of the endpoints recognized the barcode
-                scanner.showScanResult(false, `❌ Barcode '${barcode}' not found in shipping items`);
-                
-            } catch (error) {
-                console.error('Shipping scan error:', error);
-                scanner.showScanResult(false, '❌ Network error. Please try again.');
-            }
-        }
+        // Scan handling is now managed by CompactScanner - no custom handlers needed
     </script>
 }

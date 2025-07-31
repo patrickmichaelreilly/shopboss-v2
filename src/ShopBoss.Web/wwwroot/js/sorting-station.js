@@ -582,8 +582,6 @@ function setupSignalRConnection() {
 
     // Handle product ready for assembly
     connection.on("ProductReadyForAssembly", function (data) {
-        console.warn("ProductReadyForAssembly event received at:", new Date().toISOString());
-        console.warn("Product data:", data);
         showAssemblyReadyNotification(data);
     });
 
@@ -976,7 +974,6 @@ document.addEventListener('DOMContentLoaded', function() {
         if (preferredRackId) {
             const rackExists = document.querySelector(`[data-rack-id="${preferredRackId}"]`);
             if (rackExists) {
-                console.log('Redirecting to preferred rack:', preferredRackId);
                 window.location.href = `/Sorting?rackId=${encodeURIComponent(preferredRackId)}`;
                 return;
             } else {
@@ -1001,27 +998,4 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // ===== Scanner Event Listeners =====
-
-// Listen for scan events from Universal Scanner
-if (window.sortingScanHandler) {
-    document.removeEventListener('scanReceived', window.sortingScanHandler);
-}
-
-window.sortingScanHandler = function(event) {
-    const { barcode, containerId } = event.detail;
-    
-    const scanner = window.universalScanners[containerId];
-    if (scanner) {
-        handleSortingScan(barcode, scanner);
-    }
-};
-
-document.addEventListener('scanReceived', window.sortingScanHandler);
-
-// Clean up event listener when page unloads
-window.addEventListener('beforeunload', function() {
-    if (window.sortingScanHandler) {
-        document.removeEventListener('scanReceived', window.sortingScanHandler);
-        window.sortingScanHandler = null;
-    }
-});
+// Scan handling is now managed by CompactScanner - no custom handlers needed

@@ -202,7 +202,6 @@ else
 
 @section Scripts {
     <script src="~/lib/signalr/dist/browser/signalr.js"></script>
-    <script src="~/js/universal-scanner.js"></script>
     <script>
         // Toggle functionality for nest sheet display
         function toggleCutSheets() {
@@ -301,10 +300,6 @@ else
             }
         });
 
-        console.log('=== CNC SCRIPT EXECUTION START ===', new Date().toISOString());
-        if (!window.cncExecutionCount) window.cncExecutionCount = 0;
-        window.cncExecutionCount++;
-        console.log('CNC script execution #', window.cncExecutionCount);
         // Initialize SignalR connection
         const connection = new signalR.HubConnectionBuilder()
             .withUrl("/hubs/status")
@@ -312,7 +307,6 @@ else
 
         // Start SignalR connection
         connection.start().then(function () {
-            console.log("SignalR connected");
             
             // Join CNC station group for real-time updates
             connection.invoke("JoinCncGroup");
@@ -597,80 +591,6 @@ else
             loadRecentScans();
         });
         
-        // Listen for scan events from Universal Scanner (auto-initialized)
-        // First, remove any existing listeners to prevent duplicates
-        if (window.cncScanHandler) {
-            document.removeEventListener('scanReceived', window.cncScanHandler);
-            console.log('Removed existing CNC scan handler');
-        }
-        
-        window.cncScanHandler = function(event) {
-            const { barcode, containerId } = event.detail;
-            console.log('CNC Station: Received scan event', { barcode, containerId });
-            
-            // Get the scanner instance from global registry  
-            const scanner = window.universalScanners[containerId];
-            if (scanner) {
-                handleCncScan(barcode, scanner);
-            }
-        };
-        
-        document.addEventListener('scanReceived', window.cncScanHandler);
-        console.log('Added CNC scan handler');
-        
-        // Debug: Check if getEventListeners is available and inspect listeners
-        setTimeout(() => {
-            if (typeof getEventListeners === 'function') {
-                const listeners = getEventListeners(document);
-                console.log('All document event listeners:', listeners);
-                if (listeners.scanReceived) {
-                    console.log('scanReceived listeners count:', listeners.scanReceived.length);
-                }
-            } else {
-                console.log('getEventListeners not available - try in dev tools console');
-            }
-        }, 1000);
-        
-        // Clean up event listener when page unloads
-        window.addEventListener('beforeunload', function() {
-            if (window.cncScanHandler) {
-                document.removeEventListener('scanReceived', window.cncScanHandler);
-                window.cncScanHandler = null;
-            }
-        });
-        
-        // CNC scan handler that integrates Universal Scanner with existing logic
-        async function handleCncScan(barcode, scanner) {
-            try {
-                // Show processing status
-                scanner.showScanResult(false, '🔄 Processing nest sheet scan...', false);
-                
-                // Use existing CNC endpoint
-                const response = await fetch('/Cnc/ProcessNestSheet', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                        'X-Requested-With': 'XMLHttpRequest'
-                    },
-                    body: `barcode=${encodeURIComponent(barcode)}`
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    scanner.showScanResult(true, data.message);
-                    
-                    // Refresh page to show updated nest sheets
-                    setTimeout(() => {
-                        location.reload();
-                    }, 2000);
-                } else {
-                    scanner.showScanResult(false, data.message || 'Nest sheet scan failed');
-                }
-            } catch (error) {
-                console.error('CNC scan error:', error);
-                scanner.showScanResult(false, '❌ Network error. Please try again.');
-            }
-        }
+        // Scan handling is now managed by CompactScanner - no custom handlers needed
     </script>
 }

@@ -118,7 +118,6 @@
             fetch('/Admin/GetAllWorkOrders')
                 .then(response => response.json())
                 .then(data => {
-                    console.log('Work orders response:', data); // Debug logging
                     if (data.success) {
                         updateWorkOrderDropdown(data.workOrders, data.activeWorkOrderId);
                     } else {
@@ -159,7 +158,6 @@
                 `;
             } else {
                 workOrders.forEach(workOrder => {
-                    console.log('Processing work order:', workOrder); // Debug logging
                     
                     // Safe property access with fallbacks (using lowercase property names)
                     const workOrderId = workOrder.id || '';
