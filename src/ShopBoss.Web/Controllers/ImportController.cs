@@ -273,7 +273,6 @@ public class ImportController : Controller
                 return BadRequest(new { 
                     error = "Import conversion failed", 
                     details = result.Errors,
-                    duplicateInfo = result.DuplicateInfo,
                     debugInfo = new { 
                         sessionId = request.SessionId,
                         errorCount = result.Errors?.Count ?? 0,
