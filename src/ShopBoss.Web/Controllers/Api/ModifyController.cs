@@ -202,7 +202,7 @@ public class ModifyController : ControllerBase
 
                 foreach (var detachedProduct in workOrderData.DetachedProducts)
                 {
-                    string statusDisplay = null;
+                    string? statusDisplay = null;
                     if (includeStatus)
                     {
                         // Calculate EffectiveStatus from DetachedProduct's Parts (same as regular Products)
@@ -311,7 +311,7 @@ public class ModifyController : ControllerBase
             .ToListAsync();
         
         var subassemblyParts = await _context.Parts
-            .Where(p => p.Subassembly.ProductId == productId)
+            .Where(p => p.Subassembly != null && p.Subassembly.ProductId == productId)
             .ToListAsync();
         
         // Combine all parts like WorkOrderService does

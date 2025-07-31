@@ -502,7 +502,7 @@ public class AdminController : Controller
 
             bool success = false;
             string entityType = itemType;
-            object oldValue = null;
+            object? oldValue = null;
             object newValue = new { Status = newStatus.ToString() };
 
             switch (itemType.ToLower())
@@ -542,7 +542,7 @@ public class AdminController : Controller
 
                             // Update all subassembly parts (including nested subassemblies)
                             var subassemblyParts = await _context.Parts
-                                .Where(p => p.Subassembly.ProductId == itemId)
+                                .Where(p => p.Subassembly != null && p.Subassembly.ProductId == itemId)
                                 .ToListAsync();
 
                             foreach (var subPart in subassemblyParts)
@@ -1612,7 +1612,7 @@ public class AdminController : Controller
                 // Nuclear bin clearing - always clear regardless of current state
                 await _auditTrailService.LogAsync("BinCleared", "Bin", bin.Id,
                     new { PartId = bin.PartId, PartsCount = bin.PartsCount },
-                    new { PartId = (string)null, PartsCount = 0 },
+                    new { PartId = (string?)null, PartsCount = 0 },
                     station: "Admin", workOrderId: activeWorkOrderId,
                     details: $"Nuclear bin clear - was: PartId={bin.PartId}, PartsCount={bin.PartsCount}");
 

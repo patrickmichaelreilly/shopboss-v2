@@ -48,9 +48,9 @@ public class WorkOrderImportService
 
             // Transform data with proper entity relationships
             await TransformProductsAsync(rawData, workOrder);
-            await TransformDetachedProductsAsync(rawData, workOrder);
-            await TransformHardwareAsync(rawData, workOrder);
-            await TransformNestSheetsAsync(rawData, workOrder);
+            TransformDetachedProducts(rawData, workOrder);
+            TransformHardware(rawData, workOrder);
+            TransformNestSheets(rawData, workOrder);
 
             // Establish nest sheet relationships using OptimizationResults (same as existing system)
             await EstablishNestSheetRelationshipsAsync(rawData, workOrder);
@@ -342,11 +342,10 @@ public class WorkOrderImportService
     /// Transform detached products - Note: DetachedProducts are not in SDF data
     /// They are identified and converted from single-part Products by ProcessSinglePartProductsAsDetached
     /// </summary>
-    private async Task TransformDetachedProductsAsync(ImportData rawData, WorkOrder workOrder)
+    private void TransformDetachedProducts(ImportData rawData, WorkOrder workOrder)
     {
         // DetachedProducts are not present in SDF data
         // They are created by converting single-part Products in ProcessSinglePartProductsAsDetached()
-        await Task.CompletedTask;
     }
 
     /// <summary>
@@ -414,7 +413,7 @@ public class WorkOrderImportService
     /// <summary>
     /// Transform hardware entities
     /// </summary>
-    private async Task TransformHardwareAsync(ImportData rawData, WorkOrder workOrder)
+    private void TransformHardware(ImportData rawData, WorkOrder workOrder)
     {
         if (rawData.Hardware == null) return;
 
@@ -434,7 +433,7 @@ public class WorkOrderImportService
     /// <summary>
     /// Transform nest sheets
     /// </summary>
-    private async Task TransformNestSheetsAsync(ImportData rawData, WorkOrder workOrder)
+    private void TransformNestSheets(ImportData rawData, WorkOrder workOrder)
     {
         if (rawData.NestSheets == null) return;
 

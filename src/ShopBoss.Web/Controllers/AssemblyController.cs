@@ -446,7 +446,7 @@ public class AssemblyController : Controller
                                     (EF.Functions.Collate(p.Id, "NOCASE") == EF.Functions.Collate(barcode, "NOCASE") || 
                                      EF.Functions.Collate(p.Name, "NOCASE") == EF.Functions.Collate(barcode, "NOCASE") || 
                                      EF.Functions.Like(EF.Functions.Collate(p.Id, "NOCASE"), EF.Functions.Collate(barcode + "_%", "NOCASE"))) &&
-                                    p.Product.Status != PartStatus.Assembled);
+                                    p.Product != null && p.Product.Status != PartStatus.Assembled);
 
             if (part == null)
             {
@@ -457,7 +457,7 @@ public class AssemblyController : Controller
             }
 
             // Use the common assembly processing method
-            var result = await ProcessProductAssemblyAsync(part.Product.Id, barcode, part.Name);
+            var result = await ProcessProductAssemblyAsync(part.Product!.Id, barcode, part.Name);
             
             return Json(new { 
                 success = result.success, 
@@ -510,9 +510,9 @@ public class AssemblyController : Controller
 
             // Get live bin location data for the product
             var parts = await _context.Parts
-                .Where(p => p.ProductId == productId && p.Product.WorkOrderId == activeWorkOrderId)
+                .Where(p => p.ProductId == productId && p.Product != null && p.Product.WorkOrderId == activeWorkOrderId)
                 .Include(p => p.Bin)
-                    .ThenInclude(b => b.StorageRack)
+                    .ThenInclude(b => b!.StorageRack)
                 .ToListAsync();
 
             var standardParts = parts.Where(p => p.Category == PartCategory.Standard && p.Status == PartStatus.Sorted).ToList();

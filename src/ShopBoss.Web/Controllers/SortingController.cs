@@ -26,7 +26,7 @@ public class SortingController : Controller
         _sortingRules = sortingRules;
     }
 
-    public async Task<IActionResult> Index(string rackId = null)
+    public async Task<IActionResult> Index(string? rackId = null)
     {
         try
         {
@@ -67,7 +67,7 @@ public class SortingController : Controller
             ViewBag.CutParts = sortedCutParts;
 
             // Determine which rack to select
-            string selectedRackId = null;
+            string? selectedRackId = null;
             if (!string.IsNullOrEmpty(rackId) && racks.Any(r => r.Id == rackId))
             {
                 // Use provided rack if valid

@@ -25,9 +25,15 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(optio
 builder.Services.AddHttpContextAccessor();
 
 // Configure Data Protection for Windows Service compatibility
-builder.Services.AddDataProtection()
+var dataProtection = builder.Services.AddDataProtection()
     .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(builder.Environment.ContentRootPath, "keys")))
     .SetApplicationName("ShopBoss");
+
+// Use DPAPI for key encryption on Windows only
+if (OperatingSystem.IsWindows())
+{
+    dataProtection.ProtectKeysWithDpapi();
+}
 
 // Add session support
 builder.Services.AddDistributedMemoryCache();

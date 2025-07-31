@@ -28,7 +28,9 @@ public class BackupService
 
     public async Task<BackupConfiguration> GetBackupConfigurationAsync()
     {
-        var config = await _context.BackupConfigurations.FirstOrDefaultAsync();
+        var config = await _context.BackupConfigurations
+            .OrderBy(c => c.Id)
+            .FirstOrDefaultAsync();
         if (config == null)
         {
             // Create default configuration
@@ -43,7 +45,9 @@ public class BackupService
     {
         try
         {
-            var existingConfig = await _context.BackupConfigurations.FirstOrDefaultAsync();
+            var existingConfig = await _context.BackupConfigurations
+                .OrderBy(c => c.Id)
+                .FirstOrDefaultAsync();
             if (existingConfig == null)
             {
                 _context.BackupConfigurations.Add(configuration);

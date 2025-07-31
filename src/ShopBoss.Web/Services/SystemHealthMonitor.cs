@@ -262,7 +262,9 @@ public class SystemHealthMonitor
     {
         try
         {
-            var healthStatus = await _context.SystemHealthStatus.FirstOrDefaultAsync();
+            var healthStatus = await _context.SystemHealthStatus
+                .OrderBy(h => h.Id)
+                .FirstOrDefaultAsync();
             
             if (healthStatus == null)
             {

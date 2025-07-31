@@ -126,7 +126,7 @@ public class ShippingService
         {
             // Use optimized query to check if all parts in work order are assembled
             var totalParts = await _context.Parts
-                .Where(p => p.Product.WorkOrderId == workOrderId)
+                .Where(p => p.Product != null && p.Product.WorkOrderId == workOrderId)
                 .CountAsync();
 
             if (totalParts == 0)
@@ -135,7 +135,7 @@ public class ShippingService
             }
 
             var assembledParts = await _context.Parts
-                .Where(p => p.Product.WorkOrderId == workOrderId && p.Status == PartStatus.Assembled)
+                .Where(p => p.Product != null && p.Product.WorkOrderId == workOrderId && p.Status == PartStatus.Assembled)
                 .CountAsync();
 
             return assembledParts == totalParts;
@@ -196,7 +196,7 @@ public class ShippingService
                     .ToListAsync();
 
                 var subassemblyParts = await _context.Parts
-                    .Where(p => p.Subassembly.ProductId == productId)
+                    .Where(p => p.Subassembly != null && p.Subassembly.ProductId == productId)
                     .ToListAsync();
 
                 // Update all direct parts

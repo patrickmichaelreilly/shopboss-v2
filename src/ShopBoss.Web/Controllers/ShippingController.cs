@@ -291,11 +291,11 @@ public class ShippingController : Controller
             // Find the part by barcode (ID or name)
             var part = await _context.Parts
                 .Include(p => p.Product)
-                .FirstOrDefaultAsync(p => p.Product.WorkOrderId == activeWorkOrderId &&
+                .FirstOrDefaultAsync(p => p.Product != null && p.Product.WorkOrderId == activeWorkOrderId &&
                                         (EF.Functions.Collate(p.Id, "NOCASE") == EF.Functions.Collate(barcode, "NOCASE") || 
                                          EF.Functions.Collate(p.Name, "NOCASE") == EF.Functions.Collate(barcode, "NOCASE") || 
                                          EF.Functions.Like(EF.Functions.Collate(p.Id, "NOCASE"), EF.Functions.Collate(barcode + "_%", "NOCASE"))) &&
-                                        p.Product.Status != PartStatus.Shipped);
+                                        p.Product!.Status != PartStatus.Shipped);
 
             if (part == null)
             {
@@ -309,7 +309,7 @@ public class ShippingController : Controller
             }
 
             // Business logic: Scanning any part from a product marks the entire product as shipped
-            var product = part.Product;
+            var product = part.Product!;
             
             // Mark ALL parts in the product as shipped
             var allPartsInProduct = await _context.Parts
@@ -337,7 +337,7 @@ public class ShippingController : Controller
                 workOrderId: activeWorkOrderId,
                 partsProcessed: shippedPartsCount,
                 sessionId: HttpContext.Session.Id,
-                details: $"Product '{product.Name}' shipped via part scan '{part.Name}' - {shippedPartsCount} parts marked as Shipped"
+                details: $"Product '{product.Name}' shipped via part scan '{part!.Name}' - {shippedPartsCount} parts marked as Shipped"
             );
 
             _logger.LogInformation("Product {ProductId} ({ProductName}) shipped via part barcode scan '{Barcode}' - {ShippedParts} parts marked as Shipped",
@@ -346,8 +346,8 @@ public class ShippingController : Controller
             return Json(new { 
                 success = true, 
                 message = $"✅ Product '{product.Name}' shipped successfully! ({shippedPartsCount} parts shipped)",
-                partId = part.Id,
-                partName = part.Name,
+                partId = part!.Id,
+                partName = part!.Name,
                 productName = product.Name,
                 productFullyShipped = true,
                 shippedPartsCount = shippedPartsCount
@@ -752,7 +752,7 @@ public class ShippingController : Controller
             // Optimized approach: Use COUNT queries instead of loading all data into memory
             
             // Check parts (product parts)
-            var productPartsQuery = _context.Parts.Where(p => p.Product.WorkOrderId == workOrderId);
+            var productPartsQuery = _context.Parts.Where(p => p.Product != null && p.Product.WorkOrderId == workOrderId);
             var totalParts = await productPartsQuery.CountAsync();
             if (totalParts > 0)
             {

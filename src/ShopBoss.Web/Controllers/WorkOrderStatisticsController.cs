@@ -205,7 +205,7 @@ namespace ShopBoss.Web.Controllers
         private void IncrementStatusCount(Dictionary<string, int> statusDict, string status)
         {
             var statusKey = status?.ToLower();
-            if (statusDict.ContainsKey(statusKey))
+            if (statusKey != null && statusDict.ContainsKey(statusKey))
             {
                 statusDict[statusKey]++;
             }
@@ -214,7 +214,7 @@ namespace ShopBoss.Web.Controllers
         private void IncrementHardwareStatusCount(Dictionary<string, int> statusDict, string status)
         {
             var statusKey = status?.ToLower();
-            if (statusDict.ContainsKey(statusKey))
+            if (statusKey != null && statusDict.ContainsKey(statusKey))
             {
                 statusDict[statusKey]++;
             }

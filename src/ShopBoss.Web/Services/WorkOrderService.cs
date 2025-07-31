@@ -35,16 +35,16 @@ public class WorkOrderService
                 .ToListAsync();
 
             var parts = await _context.Parts
-                .Where(p => p.Product.WorkOrderId == workOrderId)
+                .Where(p => p.Product != null && p.Product.WorkOrderId == workOrderId)
                 .Include(p => p.Product)
                 .ToListAsync();
 
             var subassemblies = await _context.Subassemblies
-                .Where(s => s.Product.WorkOrderId == workOrderId)
+                .Where(s => s.Product != null && s.Product.WorkOrderId == workOrderId)
                 .ToListAsync();
 
             var subassemblyParts = await _context.Parts
-                .Where(p => p.Subassembly.Product.WorkOrderId == workOrderId)
+                .Where(p => p.Subassembly != null && p.Subassembly.Product != null && p.Subassembly.Product.WorkOrderId == workOrderId)
                 .Include(p => p.Subassembly)
                 .ToListAsync();
 
@@ -61,7 +61,7 @@ public class WorkOrderService
                 .ToListAsync();
 
             var nestSheetParts = await _context.Parts
-                .Where(p => p.NestSheet.WorkOrderId == workOrderId)
+                .Where(p => p.NestSheet != null && p.NestSheet.WorkOrderId == workOrderId)
                 .Include(p => p.NestSheet)
                 .ToListAsync();
 
@@ -212,9 +212,9 @@ public class WorkOrderService
 
             // Load all parts in a single query for this work order with bin information
             var allParts = await _context.Parts
-                .Where(p => p.Product.WorkOrderId == workOrderId)
+                .Where(p => p.Product != null && p.Product.WorkOrderId == workOrderId)
                 .Include(p => p.Bin)
-                    .ThenInclude(b => b.StorageRack)
+                    .ThenInclude(b => b!.StorageRack)
                 .Select(p => new PartSummary
                 {
                     Id = p.Id,
@@ -281,7 +281,7 @@ public class WorkOrderService
 
             // Load all parts with status counts in a single optimized query
             var partStatusSummaries = await _context.Parts
-                .Where(p => p.Product.WorkOrderId == workOrderId)
+                .Where(p => p.Product != null && p.Product.WorkOrderId == workOrderId)
                 .GroupBy(p => new { p.ProductId, p.Status })
                 .Select(g => new PartStatusSummary
                 {
@@ -386,7 +386,7 @@ public class WorkOrderService
         {
             // A work order is considered active if it has any parts that are not in their final state
             var hasActiveParts = await _context.Parts
-                .Where(p => p.Product.WorkOrderId == workOrderId && p.Status != PartStatus.Shipped)
+                .Where(p => p.Product != null && p.Product.WorkOrderId == workOrderId && p.Status != PartStatus.Shipped)
                 .AnyAsync();
 
             var hasActiveDetachedProducts = await _context.DetachedProducts

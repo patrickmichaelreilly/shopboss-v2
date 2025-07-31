@@ -43,7 +43,7 @@ public class SortingRuleService
                         
                     if (cartRacks.Any())
                     {
-                        return await FindBinInRacks(cartRacks, part, "Cart (detached product)");
+                        return FindBinInRacks(cartRacks, part, "Cart (detached product)");
                     }
                     
                     _logger.LogWarning("No Cart racks available for detached product {PartName}", part.Name);
@@ -72,7 +72,7 @@ public class SortingRuleService
                     return (null, $"No {preferredRackType} racks available. Please configure appropriate specialized racks.");
                 }
                 
-                return await FindBinInRacks(suitableRacks, part, $"{preferredRackType} (keyword match)");
+                return FindBinInRacks(suitableRacks, part, $"{preferredRackType} (keyword match)");
             }
             else if (!string.IsNullOrEmpty(preferredRackId))
             {
@@ -132,7 +132,7 @@ public class SortingRuleService
             }
 
             // Product grouping logic is now handled in FindBinInRacks to properly handle full bins
-            return await FindBinInRacks(suitableRacks, part, "Standard");
+            return FindBinInRacks(suitableRacks, part, "Standard");
         }
         catch (Exception ex)
         {
@@ -413,7 +413,7 @@ public class SortingRuleService
     /// <summary>
     /// Finds an available bin in the provided racks, with product grouping logic
     /// </summary>
-    private async Task<(string? BinId, string Message)> FindBinInRacks(
+    private (string? BinId, string Message) FindBinInRacks(
         List<StorageRack> suitableRacks, Part part, string rackTypeDescription)
     {
         // Try to group parts by product - look for existing bins with same product

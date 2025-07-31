@@ -60,7 +60,7 @@
                         <div class="col-md-6">
                             <label for="ruleTargetRackType" class="form-label">Target Rack Type *</label>
                             <select class="form-select" id="ruleTargetRackType" name="TargetRackType" required>
-                                @foreach (var rackType in ViewBag.RackTypes as List<RackType>)
+                                @foreach (var rackType in (ViewBag.RackTypes as List<RackType>) ?? new List<RackType>())
                                 {
                                     <option value="@((int)rackType)">@rackType</option>
                                 }
@@ -125,7 +125,7 @@
                 <label for="filterType" class="form-label">Rack Type</label>
                 <select name="filterType" id="filterType" class="form-select">
                     <option value="">All Rack Types</option>
-                    @foreach (var rackType in ViewBag.RackTypes as List<RackType>)
+                    @foreach (var rackType in (ViewBag.RackTypes as List<RackType>) ?? new List<RackType>())
                     {
                         var isSelected = ViewBag.FilterType?.ToString() == rackType.ToString();
                         <option value="@rackType" selected="@isSelected">

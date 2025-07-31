@@ -349,7 +349,7 @@ public class ImportController : Controller
                     var detachedProductToRemove = session.WorkOrderEntities.DetachedProducts?.FirstOrDefault(dp => dp.Id.ToString() == itemId);
                     if (detachedProductToRemove != null)
                     {
-                        session.WorkOrderEntities.DetachedProducts.Remove(detachedProductToRemove);
+                        session.WorkOrderEntities.DetachedProducts?.Remove(detachedProductToRemove);
                         deleted = true;
                         message = $"Detached product '{detachedProductToRemove.Name}' removed from import session";
                     }
@@ -362,7 +362,7 @@ public class ImportController : Controller
                         var partInProduct = product.Parts?.FirstOrDefault(p => p.Id.ToString() == itemId);
                         if (partInProduct != null)
                         {
-                            product.Parts.Remove(partInProduct);
+                            product.Parts?.Remove(partInProduct);
                             deleted = true;
                             message = $"Part '{partInProduct.Name}' removed from import session";
                             break;
@@ -376,7 +376,7 @@ public class ImportController : Controller
                                 var partInSubassembly = subassembly.Parts?.FirstOrDefault(p => p.Id.ToString() == itemId);
                                 if (partInSubassembly != null)
                                 {
-                                    subassembly.Parts.Remove(partInSubassembly);
+                                    subassembly.Parts?.Remove(partInSubassembly);
                                     deleted = true;
                                     message = $"Part '{partInSubassembly.Name}' removed from import session";
                                     break;
@@ -393,7 +393,7 @@ public class ImportController : Controller
                         var subassemblyToRemove = product.Subassemblies?.FirstOrDefault(s => s.Id.ToString() == itemId);
                         if (subassemblyToRemove != null)
                         {
-                            product.Subassemblies.Remove(subassemblyToRemove);
+                            product.Subassemblies?.Remove(subassemblyToRemove);
                             deleted = true;
                             message = $"Subassembly '{subassemblyToRemove.Name}' removed from import session";
                             break;
@@ -407,7 +407,7 @@ public class ImportController : Controller
                         var hardwareToRemove = product.Hardware?.FirstOrDefault(h => h.Id.ToString() == itemId);
                         if (hardwareToRemove != null)
                         {
-                            product.Hardware.Remove(hardwareToRemove);
+                            product.Hardware?.Remove(hardwareToRemove);
                             deleted = true;
                             message = $"Hardware '{hardwareToRemove.Name}' removed from import session";
                             break;
@@ -419,7 +419,7 @@ public class ImportController : Controller
                     var nestSheetToRemove = session.WorkOrderEntities.NestSheets?.FirstOrDefault(ns => ns.Id.ToString() == itemId);
                     if (nestSheetToRemove != null)
                     {
-                        session.WorkOrderEntities.NestSheets.Remove(nestSheetToRemove);
+                        session.WorkOrderEntities.NestSheets?.Remove(nestSheetToRemove);
                         deleted = true;
                         message = $"Nest sheet '{nestSheetToRemove.Name}' removed from import session";
                     }
