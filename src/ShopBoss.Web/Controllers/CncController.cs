@@ -61,6 +61,12 @@ public class CncController : Controller
     // ProcessScan method removed - using event-based Universal Scanner architecture
 
     [HttpPost]
+    public async Task<IActionResult> ScanNestSheet(string barcode)
+    {
+        return await ProcessNestSheet(barcode);
+    }
+
+    [HttpPost]
     public async Task<IActionResult> ProcessNestSheet(string barcode)
     {
         var sessionId = HttpContext.Session.Id;

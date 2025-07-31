@@ -471,9 +471,9 @@
                 }
                 
                 $.ajax({
-                    url: '/Shipping/ScanProduct',
+                    url: '/Shipping/ShipProduct',
                     method: 'POST',
-                    data: { barcode: productId },
+                    data: { productId: productId },
                     dataType: 'json'
                 })
                 .done(function(response) {
@@ -523,9 +523,9 @@
                 }
                 
                 $.ajax({
-                    url: '/Shipping/ScanDetachedProduct',
+                    url: '/Shipping/ShipDetachedProduct',
                     method: 'POST',
-                    data: { barcode: detachedProductId },
+                    data: { detachedProductId: detachedProductId },
                     dataType: 'json'
                 })
                 .done(function(response) {

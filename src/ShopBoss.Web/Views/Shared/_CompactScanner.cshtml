@@ -581,7 +581,7 @@ class StationScanHandler {
             sorting: ['/Sorting/ScanPart'],
             assembly: ['/Assembly/ScanPartForAssembly'],
             cnc: ['/Cnc/ScanNestSheet'],
-            shipping: ['/Shipping/ScanProduct', '/Shipping/ScanNestSheet', '/Shipping/ScanPart']
+            shipping: ['/Shipping/ScanPart']
         };
         
         return endpoints[this.stationType] || [];

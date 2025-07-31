@@ -83,7 +83,7 @@ public class ShippingController : Controller
     }
 
     [HttpPost]
-    public async Task<IActionResult> ScanProduct(string barcode)
+    public async Task<IActionResult> ShipProduct(string productId)
     {
         try
         {
@@ -93,39 +93,26 @@ public class ShippingController : Controller
                 return Json(new { success = false, message = "No active work order selected" });
             }
 
-            // Validate barcode input
-            if (string.IsNullOrWhiteSpace(barcode))
+            // Validate product ID input
+            if (string.IsNullOrWhiteSpace(productId))
             {
-                return Json(new { success = false, message = "Please enter a valid barcode" });
+                return Json(new { success = false, message = "Product ID is required" });
             }
 
-            barcode = barcode.Trim();
+            productId = productId.Trim();
 
-            // Log the scan attempt
-            await _auditTrailService.LogScanAsync(
-                barcode: barcode,
-                station: "Shipping",
-                isSuccessful: false, // Will be updated to true if successful
-                workOrderId: activeWorkOrderId,
-                sessionId: HttpContext.Session.Id,
-                details: "Shipping station barcode scan attempt"
-            );
-
-            // Find the product by barcode (consistent with other scan methods)
+            // Find the product by ID
             var product = await _context.Products
                 .Include(p => p.Parts)
                 .FirstOrDefaultAsync(p => p.WorkOrderId == activeWorkOrderId && 
-                                    (EF.Functions.Collate(p.Id, "NOCASE") == EF.Functions.Collate(barcode, "NOCASE") || 
-                                     EF.Functions.Collate(p.Name, "NOCASE") == EF.Functions.Collate(barcode, "NOCASE") || 
-                                     EF.Functions.Collate(p.ItemNumber, "NOCASE") == EF.Functions.Collate(barcode, "NOCASE") || 
-                                     EF.Functions.Like(EF.Functions.Collate(p.Id, "NOCASE"), EF.Functions.Collate(barcode + "_%", "NOCASE"))) &&
+                                    p.Id == productId && 
                                     p.Status != PartStatus.Shipped);
 
             if (product == null)
             {
                 return Json(new { 
                     success = false, 
-                    message = $"Product with barcode '{barcode}' not found in active work order" 
+                    message = $"Product with ID '{productId}' not found in active work order or already shipped" 
                 });
             }
 
@@ -176,12 +163,12 @@ public class ShippingController : Controller
                 // Prepare audit item for batch logging
                 auditItems.Add(new BatchAuditItem
                 {
-                    Action = "PartScannedForShipping",
+                    Action = "PartShippedViaProduct",
                     EntityType = "Part",
                     EntityId = part.Id,
                     OldValue = "Assembled",
                     NewValue = "Shipped",
-                    Details = $"Part '{part.Name}' status changed from Assembled to Shipped via product barcode scan (scanned: {barcode})"
+                    Details = $"Part '{part.Name}' status changed from Assembled to Shipped via product shipping (Product ID: {productId})"
                 });
             }
 
@@ -212,7 +199,6 @@ public class ShippingController : Controller
             {
                 ProductId = product.Id,
                 ProductName = product.Name,
-                ScannedBarcode = barcode,
                 ShippedPartsCount = shippedParts,
                 WorkOrderId = activeWorkOrderId,
                 Timestamp = DateTime.Now,
@@ -223,7 +209,7 @@ public class ShippingController : Controller
 
             // Notify all stations about the shipping completion
             await _hubContext.Clients.Group($"WorkOrder_{activeWorkOrderId}")
-                .SendAsync("ProductShippedByScan", shippingCompletionData);
+                .SendAsync("ProductShipped", shippingCompletionData);
 
             // Send specific notifications to each station
             await _hubContext.Clients.Group("assembly-station")
@@ -254,19 +240,8 @@ public class ShippingController : Controller
                     message = $"Product '{product.Name}' has been shipped"
                 });
 
-            // Log successful scan
-            await _auditTrailService.LogScanAsync(
-                barcode: barcode,
-                station: "Shipping",
-                isSuccessful: true,
-                workOrderId: activeWorkOrderId,
-                partsProcessed: shippedParts,
-                sessionId: HttpContext.Session.Id,
-                details: $"Shipping completed for product '{product.Name}' - {shippedParts} parts marked as Shipped"
-            );
-
-            _logger.LogInformation("Product {ProductId} ({ProductName}) shipped via barcode scan '{Barcode}' - {ShippedParts} parts marked as Shipped",
-                product.Id, product.Name, barcode, shippedParts);
+            _logger.LogInformation("Product {ProductId} ({ProductName}) shipped - {ShippedParts} parts marked as Shipped",
+                product.Id, product.Name, shippedParts);
 
             return Json(new { 
                 success = true, 
@@ -279,7 +254,7 @@ public class ShippingController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error processing barcode scan for shipping: {Barcode}", barcode);
+            _logger.LogError(ex, "Error processing product shipping: {ProductId}", productId);
             return Json(new { success = false, message = "An error occurred while processing the scan" });
         }
     }
@@ -627,7 +602,7 @@ public class ShippingController : Controller
     }
 
     [HttpPost]
-    public async Task<IActionResult> ScanDetachedProduct(string barcode)
+    public async Task<IActionResult> ShipDetachedProduct(string detachedProductId)
     {
         try
         {
@@ -637,28 +612,25 @@ public class ShippingController : Controller
                 return Json(new { success = false, message = "No active work order selected" });
             }
 
-            // Validate barcode input
-            if (string.IsNullOrWhiteSpace(barcode))
+            // Validate detached product ID input
+            if (string.IsNullOrWhiteSpace(detachedProductId))
             {
-                return Json(new { success = false, message = "Please enter a valid barcode" });
+                return Json(new { success = false, message = "Detached product ID is required" });
             }
 
-            barcode = barcode.Trim();
+            detachedProductId = detachedProductId.Trim();
 
-            // Find the detached product by barcode (ID or name)
+            // Find the detached product by ID
             var detachedProduct = await _context.DetachedProducts
                 .FirstOrDefaultAsync(d => d.WorkOrderId == activeWorkOrderId && 
-                                    (EF.Functions.Collate(d.Id, "NOCASE") == EF.Functions.Collate(barcode, "NOCASE") || 
-                                     EF.Functions.Collate(d.Name, "NOCASE") == EF.Functions.Collate(barcode, "NOCASE") || 
-                                     EF.Functions.Collate(d.ItemNumber, "NOCASE") == EF.Functions.Collate(barcode, "NOCASE") || 
-                                     EF.Functions.Like(EF.Functions.Collate(d.Id, "NOCASE"), EF.Functions.Collate(barcode + "_%", "NOCASE"))) &&
+                                    d.Id == detachedProductId &&
                                     d.Status != PartStatus.Shipped);
 
             if (detachedProduct == null)
             {
                 return Json(new { 
                     success = false, 
-                    message = $"Detached product with barcode '{barcode}' not found in active work order" 
+                    message = $"Detached product with ID '{detachedProductId}' not found in active work order or already shipped" 
                 });
             }
 
@@ -673,11 +645,10 @@ public class ShippingController : Controller
 
             // Send SignalR notifications
             await _hubContext.Clients.Group($"WorkOrder_{activeWorkOrderId}")
-                .SendAsync("DetachedProductShippedByScan", new
+                .SendAsync("DetachedProductShipped", new
                 {
                     DetachedProductId = detachedProduct.Id,
                     DetachedProductName = detachedProduct.Name,
-                    ScannedBarcode = barcode,
                     WorkOrderId = activeWorkOrderId,
                     Timestamp = DateTime.Now,
                     IsWorkOrderFullyShipped = workOrderFullyShipped
@@ -698,19 +669,19 @@ public class ShippingController : Controller
 
             // Log the status change
             await _auditTrailService.LogAsync(
-                action: "DetachedProductScannedForShipping",
+                action: "DetachedProductShipped",
                 entityType: "DetachedProduct",
                 entityId: detachedProduct.Id,
                 oldValue: "Pending",
                 newValue: "Shipped",
                 station: "Shipping",
                 workOrderId: activeWorkOrderId,
-                details: $"Detached product status changed to Shipped via barcode scan (scanned: {barcode})",
+                details: $"Detached product status changed to Shipped via button click (ID: {detachedProductId})",
                 sessionId: HttpContext.Session.Id
             );
 
-            _logger.LogInformation("Detached product {DetachedProductId} ({DetachedProductName}) shipped via barcode scan '{Barcode}'",
-                detachedProduct.Id, detachedProduct.Name, barcode);
+            _logger.LogInformation("Detached product {DetachedProductId} ({DetachedProductName}) shipped",
+                detachedProduct.Id, detachedProduct.Name);
 
             return Json(new { 
                 success = true, 
@@ -722,7 +693,7 @@ public class ShippingController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error processing detached product barcode scan for shipping: {Barcode}", barcode);
+            _logger.LogError(ex, "Error processing detached product shipping: {DetachedProductId}", detachedProductId);
             return Json(new { success = false, message = "An error occurred while processing the scan" });
         }
     }

@@ -326,10 +326,8 @@ else
                 // Show toast notification
                 showToast(`Nest sheet "${data.nestSheetName}" processed successfully! ${data.partsProcessed} parts marked as Cut.`, 'success');
                 
-                // Refresh the page to show updated status
-                setTimeout(() => {
-                    location.reload();
-                }, 2000);
+                // Refresh immediately without delay
+                location.reload();
             }
         });
 
