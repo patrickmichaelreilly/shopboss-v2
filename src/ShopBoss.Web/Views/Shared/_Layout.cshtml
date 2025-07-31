@@ -104,6 +104,7 @@
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/preferences.js" asp-append-version="true"></script>
+    <script src="~/js/session-manager.js" asp-append-version="true"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
     
     <!-- SignalR -->
@@ -211,6 +212,11 @@
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
+                    // Save to localStorage for session recovery
+                    if (typeof ShopBossSession !== 'undefined') {
+                        ShopBossSession.saveActiveWorkOrder(data.workOrderId, data.workOrderName);
+                    }
+                    
                     // Show success message briefly
                     activeNameSpan.textContent = data.workOrderName;
                     activeNameSpan.className = 'work-order-name ms-2';

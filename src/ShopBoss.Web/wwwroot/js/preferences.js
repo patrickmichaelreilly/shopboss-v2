@@ -7,7 +7,8 @@ const ShopBossPreferences = {
         SORTING_SELECTED_RACK: 'shopboss.sorting.selectedRackId',
         CNC_SHOW_PROCESSED: 'shopboss.cnc.showProcessed',
         CNC_GROUP_BY_MATERIAL: 'shopboss.cnc.groupByMaterial',
-        ASSEMBLY_SHOW_BILLBOARD: 'shopboss.assembly.showBillboard'
+        ASSEMBLY_SHOW_BILLBOARD: 'shopboss.assembly.showBillboard',
+        LAST_ACTIVE_WORK_ORDER: 'shopboss.global.lastActiveWorkOrder'
     },
 
     // Get a preference value with fallback to default
@@ -98,6 +99,18 @@ const ShopBossPreferences = {
         },
         setShowBillboard: function(show) {
             return ShopBossPreferences.set(ShopBossPreferences.Keys.ASSEMBLY_SHOW_BILLBOARD, show);
+        }
+    },
+
+    Global: {
+        getLastActiveWorkOrder: function() {
+            return ShopBossPreferences.get(ShopBossPreferences.Keys.LAST_ACTIVE_WORK_ORDER);
+        },
+        setLastActiveWorkOrder: function(workOrderData) {
+            return ShopBossPreferences.set(ShopBossPreferences.Keys.LAST_ACTIVE_WORK_ORDER, workOrderData);
+        },
+        clearLastActiveWorkOrder: function() {
+            return ShopBossPreferences.remove(ShopBossPreferences.Keys.LAST_ACTIVE_WORK_ORDER);
         }
     }
 };

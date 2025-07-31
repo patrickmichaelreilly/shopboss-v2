@@ -1181,4 +1181,177 @@ public class SortingController : Controller
             return (0, 0, 0.0);
         }
     }
+
+    [HttpPost]
+    public async Task<IActionResult> MoveBin(string sourceBinId, string destinationBinId)
+    {
+        var sessionId = HttpContext.Session.Id;
+        var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+        var station = "Sorting";
+
+        try
+        {
+            var activeWorkOrderId = HttpContext.Session.GetString("ActiveWorkOrderId");
+
+            // Get source and destination bins
+            var sourceBin = await _context.Bins
+                .Include(b => b.StorageRack)
+                .FirstOrDefaultAsync(b => b.Id == sourceBinId);
+            
+            var destinationBin = await _context.Bins
+                .Include(b => b.StorageRack) 
+                .FirstOrDefaultAsync(b => b.Id == destinationBinId);
+
+            if (sourceBin == null)
+            {
+                return Json(new { success = false, message = "Source bin not found." });
+            }
+
+            if (destinationBin == null)
+            { 
+                return Json(new { success = false, message = "Destination bin not found." });
+            }
+
+            // Validate source bin has contents
+            if (sourceBin.Status == BinStatus.Empty)
+            {
+                return Json(new { success = false, message = "Source bin is empty - nothing to move." });
+            }
+
+            // Validate destination bin is empty
+            if (destinationBin.Status != BinStatus.Empty)
+            {
+                return Json(new { success = false, message = "Destination bin is not empty. Please select an empty bin." });
+            }
+
+            // Validate source bin belongs to active work order
+            if (sourceBin.WorkOrderId != activeWorkOrderId)
+            {
+                return Json(new { success = false, message = "Source bin does not belong to the active work order and cannot be moved." });
+            }
+
+            // Get all parts in the source bin using modern BinId system
+            var partsToMove = await _context.Parts
+                .Where(p => p.BinId == sourceBinId && p.Status == PartStatus.Sorted)
+                .ToListAsync();
+
+            if (!partsToMove.Any())
+            {
+                return Json(new { success = false, message = "No parts found in source bin." });
+            }
+
+            // Store original bin states for audit
+            var originalSourceBin = new { 
+                sourceBin.Status, sourceBin.PartsCount, sourceBin.PartId, sourceBin.ProductId, 
+                sourceBin.WorkOrderId, sourceBin.Contents, sourceBin.AssignedDate 
+            };
+            var originalDestinationBin = new { 
+                destinationBin.Status, destinationBin.PartsCount, destinationBin.PartId, destinationBin.ProductId, 
+                destinationBin.WorkOrderId, destinationBin.Contents, destinationBin.AssignedDate 
+            };
+
+            // Move all parts to destination bin (reusing existing AssignPartToBinAsync logic)
+            var moveCount = 0;
+            foreach (var part in partsToMove)
+            {
+                // Use existing proven assignment logic
+                var assignmentSuccess = await _sortingRules.AssignPartToBinAsync(part.Id, destinationBinId, activeWorkOrderId ?? "");
+                
+                if (assignmentSuccess)
+                {
+                    moveCount++;
+                    
+                    // Log individual part move for audit trail
+                    await _auditTrail.LogAsync("MoveBin", "Part", part.Id,
+                        new { Location = sourceBin.BinLabel },
+                        new { Location = destinationBin.BinLabel },
+                        station: station, workOrderId: activeWorkOrderId,
+                        details: $"Part '{part.Name}' moved from bin {sourceBin.BinLabel} to bin {destinationBin.BinLabel}",
+                        sessionId: sessionId, ipAddress: ipAddress);
+                }
+            }
+
+            if (moveCount == 0)
+            {
+                return Json(new { success = false, message = "Failed to move any parts to destination bin." });
+            }
+
+            // Clear source bin (reusing existing proven clear logic)
+            sourceBin.Status = BinStatus.Empty;
+            sourceBin.PartsCount = 0;
+            sourceBin.PartId = null;
+            sourceBin.ProductId = null;
+            sourceBin.WorkOrderId = null;
+            sourceBin.Contents = string.Empty;
+            sourceBin.AssignedDate = null;
+            sourceBin.LastUpdatedDate = DateTime.Now;
+
+            await _context.SaveChangesAsync();
+
+            // Log bin move operation
+            await _auditTrail.LogAsync("MoveBin", "Bin", sourceBinId,
+                originalSourceBin,
+                new { sourceBin.Status, sourceBin.PartsCount, sourceBin.PartId, sourceBin.ProductId, 
+                     sourceBin.WorkOrderId, sourceBin.Contents, sourceBin.AssignedDate },
+                station: station, workOrderId: activeWorkOrderId,
+                details: $"Moved {moveCount} parts from bin {sourceBin.BinLabel} to bin {destinationBin.BinLabel}",
+                sessionId: sessionId, ipAddress: ipAddress);
+
+            // Send real-time updates via SignalR
+            await _hubContext.Clients.Group("sorting-station")
+                .SendAsync("StatusUpdate", new
+                {
+                    type = "bin-moved",
+                    sourceBinId = sourceBinId,
+                    destinationBinId = destinationBinId,
+                    partsCount = moveCount,
+                    timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+                });
+
+            // Update rack occupancy for both source and destination racks
+            if (sourceBin.StorageRackId != null)
+            {
+                var sourceRack = await _sortingRules.GetRackWithBinsAsync(sourceBin.StorageRackId);
+                if (sourceRack != null)
+                {
+                    await _hubContext.Clients.Group("sorting-station")
+                        .SendAsync("RackOccupancyUpdate", new
+                        {
+                            rackId = sourceRack.Id,
+                            occupiedBins = sourceRack.OccupiedBins,
+                            totalBins = sourceRack.TotalBins
+                        });
+                }
+            }
+
+            if (destinationBin.StorageRackId != null && destinationBin.StorageRackId != sourceBin.StorageRackId)
+            {
+                var destinationRack = await _sortingRules.GetRackWithBinsAsync(destinationBin.StorageRackId);
+                if (destinationRack != null)
+                {
+                    await _hubContext.Clients.Group("sorting-station")
+                        .SendAsync("RackOccupancyUpdate", new
+                        {
+                            rackId = destinationRack.Id,
+                            occupiedBins = destinationRack.OccupiedBins,
+                            totalBins = destinationRack.TotalBins
+                        });
+                }
+            }
+
+            _logger.LogInformation("Moved {PartsCount} parts from bin {SourceBin} to bin {DestinationBin}", 
+                moveCount, sourceBin.BinLabel, destinationBin.BinLabel);
+
+            return Json(new { 
+                success = true, 
+                message = $"Successfully moved {moveCount} part{(moveCount == 1 ? "" : "s")} from bin {sourceBin.BinLabel} to bin {destinationBin.BinLabel}",
+                partsCount = moveCount
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error moving bin contents from {SourceBinId} to {DestinationBinId}", sourceBinId, destinationBinId);
+            return Json(new { success = false, message = "An error occurred while moving bin contents." });
+        }
+    }
 }

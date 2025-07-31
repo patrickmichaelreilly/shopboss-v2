@@ -384,6 +384,45 @@ public class AdminController : Controller
         }
     }
 
+    [HttpPost]
+    public async Task<IActionResult> RestoreActiveWorkOrder(string workOrderId)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(workOrderId))
+            {
+                return Json(new { success = false, message = "Work order ID is required." });
+            }
+
+            // Verify the work order exists and is not archived
+            var workOrder = await _context.WorkOrders.FindAsync(workOrderId);
+            if (workOrder == null)
+            {
+                return Json(new { success = false, message = "Work order not found." });
+            }
+
+            if (workOrder.IsArchived)
+            {
+                return Json(new { success = false, message = "Cannot restore archived work order." });
+            }
+
+            // Restore the session
+            HttpContext.Session.SetString("ActiveWorkOrderId", workOrderId);
+
+            return Json(new { 
+                success = true, 
+                message = "Work order session restored.",
+                activeWorkOrderId = workOrder.Id,
+                activeWorkOrderName = workOrder.Name
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error restoring active work order session for {WorkOrderId}", workOrderId);
+            return Json(new { success = false, message = "An error occurred while restoring the work order session." });
+        }
+    }
+
     public async Task<IActionResult> GetAllWorkOrders()
     {
         try
