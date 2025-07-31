@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code when working with code in this repository.
 
 Claude Code is a surgical precision advanced expert senior coder with a profound sense for elegance and adherance to architectural principles.
 
@@ -80,20 +80,6 @@ dotnet ef database update --project src/ShopBoss.Web
 dotnet ef database drop --project src/ShopBoss.Web
 ```
 
-### Deployment and Testing
-```bash
-# Development build (Claude Code environment)
-dotnet build src/ShopBoss.Web/ShopBoss.Web.csproj
-
-# Runtime execution (for local testing only)
-dotnet run --project src/ShopBoss.Web
-
-# Windows deployment (USER ONLY - Claude NEVER runs this)
-./deploy.sh --preserve-data    # Default: preserve existing data
-./deploy.sh --clean-all        # Full clean deployment
-./deploy.sh --reset-db         # Reset database, keep uploads
-```
-
 ### Testing Handoff Protocol
 ```bash
 # 1. Claude does the work and builds the application
@@ -154,32 +140,6 @@ dotnet run --project src/ShopBoss.Web
 - **Storage Management**: StorageRack → Bins with capacity tracking
 - **Audit System**: Complete audit trail for all operations
 
-## Core Architecture Patterns
-
-### Service Layer Architecture
-- **Dependency Injection**: All services registered as scoped in Program.cs
-- **Service Categories**: Domain services (WorkOrderService), Import services (FastImportService), System services (BackupService)
-- **Async/Await**: All service methods use proper async patterns
-- **Constructor Injection**: Services follow consistent injection pattern with DbContext and ILogger
-
-### SignalR Hub Patterns
-- **StatusHub**: Station-specific group management (`cnc-station`, `sorting-station`, etc.)
-- **ImportProgressHub**: Dedicated import progress tracking
-- **Group Management**: Station groups and work order groups for targeted updates
-- **Hub Integration**: Controllers inject `IHubContext<StatusHub>` for real-time notifications
-
-### Controller Patterns
-- **Thin Controllers**: Business logic delegated to services
-- **Session Management**: Active work order stored in session across stations
-- **Error Handling**: Consistent try-catch blocks with logging and TempData
-- **API Separation**: API controllers in Controllers/Api/ namespace
-
-### Frontend JavaScript Architecture
-- **Universal Scanner System**: Event-driven scanner component with station detection
-- **Component-Based Design**: Each station has dedicated JS files
-- **SignalR Integration**: Real-time updates with connection management
-- **Session Recovery**: Client-side session restoration with localStorage backup
-
 ## Critical Development Rules
 
 ### Database Migration Rules
@@ -194,19 +154,11 @@ dotnet run --project src/ShopBoss.Web
 - **Service Layer**: Keep controllers thin, logic in services
 - **Audit Everything**: All status changes must be audited
 
-### Key Entity Relationships
-- **WorkOrder**: Root aggregate containing Products, Hardware, DetachedProducts, NestSheets
-- **Part.ProductId**: Flexible field supporting both Product and DetachedProduct relationships
-- **Status Flow**: Parts flow through PartStatus enum (Pending → Cut → Sorted → Assembled → Shipped)
-- **Storage System**: StorageRack → Bins with capacity management and Part associations
-
 ### File Modification Guidelines
 - **Never modify ShopBossDbContextModelSnapshot.cs manually**
 - **Always preserve Microvellum ID fields when refactoring**
 - **Maintain backward compatibility during status refactoring**
 - **Test build after every significant change**
-- **Follow existing service registration patterns in Program.cs**
-- **Maintain SignalR group naming conventions** (station-name, WorkOrder_{id})
 
 ## Quality Standards
 
@@ -248,32 +200,19 @@ dotnet run --project src/ShopBoss.Web
 - **Never modify architecture** based on deployment-only problems
 - **Ask for clarification** when error source is unclear
 
-## Development Workflow Best Practices
+### ⚠️ EMERGENCY: Migration Crisis (2025-07-15)
 
-### New Feature Development
-1. **Understand Entity Relationships**: Study the hierarchical WorkOrder → Products → Parts structure
-2. **Follow Service Patterns**: Create services following existing dependency injection patterns
-3. **Add SignalR Integration**: Use StatusHub for real-time updates with proper group management
-4. **Implement Audit Trail**: Use AuditTrailService for all data modifications
-5. **Test Across Stations**: Verify functionality works in multi-station environment
+**CRITICAL ISSUE:** Import system is broken due to migration conflicts. Phase M1.x marked as complete but ZERO testing completed.
 
-### Debugging Guidelines
-- **Use Audit Logs**: AuditTrailService tracks all entity changes with timestamps
-- **SignalR Connection Issues**: Check group membership and hub registration in Program.cs
-- **Database Issues**: Verify EnsureCreated vs Migration strategy in Program.cs:88
-- **Import Issues**: Check FastSdfReader.exe tool and external process execution
-- **Session Issues**: Verify session configuration and localStorage backup patterns
+**Current Error:** `table NestSheets has no column named Status`
 
-### Common Patterns to Follow
-- **Service Registration**: Add new services as scoped in Program.cs services section
-- **Controller Actions**: Follow async patterns with try-catch and TempData messaging
-- **SignalR Usage**: Use hub context injection and appropriate group targeting
-- **Entity Updates**: Always use services for data modifications to ensure audit trail
-- **Status Changes**: Use PartStatus enum and trigger SignalR notifications
+**Root Cause:** 25+ migrations create conflicting schema changes - NestSheets table created with IsProcessed/ProcessedDate but later migrations try to add Status column and fail.
 
-## Database Migrations and Data Management
+**Solution:** Controlled migration consolidation (see Phases.md M1.x-EMERGENCY):
+1. Extract all Up() methods from migrations
+2. Organize by table 
+3. Eliminate cancelling operations
+4. Create single InitialCreate migration matching DbContext
+5. Test import before any other work
 
-### Migrations Strategy
-- **We never need data migrations unless noted otherwise**
-- **There is no data to protect**
-- **Do not try to create or run any migrations**
+**Priority:** Must resolve before any other development work. Token consumption crisis threatens project completion.

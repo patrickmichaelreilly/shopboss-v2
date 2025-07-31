@@ -1,4 +1,5 @@
 # Project Entity Implementation Plan
+# CRITICAL:::: THERE IS NO DATA TO MIGRATE. DON'T CREATE OR RUN MIGRATIONS. 
 
 ## Overview
 Introduce a new top-level **Project** entity that contains Work Orders and file attachments, providing better organization for real-world job management.
@@ -8,19 +9,36 @@ Introduce a new top-level **Project** entity that contains Work Orders and file 
 ### 1.1 Create Project Entity
 **File:** `src/ShopBoss.Web/Models/Project.cs`
 ```
-- Id (string, Primary Key)
-- Name (string)
-- JobNumber (string, nullable)
-- Address (string, nullable) 
-- ContactName (string, nullable)
-- ContactPhone (string, nullable)
-- ContactEmail (string, nullable)
-- Description (string, nullable)
+- Id (string, Primary Key) - GUID for internal use
+- ProjectId (string) - User-entered project number (e.g., "J001", "J123")
+- ProjectName (string)
+- BidRequestDate (DateTime?, nullable)
+- ProjectAddress (string, nullable) 
+- ProjectContact (string, nullable)
+- ProjectContactPhone (string, nullable)
+- ProjectContactEmail (string, nullable)
+- GeneralContractor (string, nullable)
+- ProjectManager (string, nullable)
+- TargetInstallDate (DateTime?, nullable)
+- ProjectCategory (ProjectCategory enum)
+- Installer (string, nullable)
+- Notes (string, nullable)
 - CreatedDate (DateTime)
 - IsArchived (bool)
 - ArchivedDate (DateTime?, nullable)
 - List<WorkOrder> WorkOrders (Navigation)
 - List<ProjectAttachment> Attachments (Navigation)
+```
+
+### 1.1.1 Create ProjectCategory Enum
+**File:** `src/ShopBoss.Web/Models/ProjectCategory.cs`
+```
+public enum ProjectCategory
+{
+    StandardProducts,
+    CustomProducts,
+    SmallProject
+}
 ```
 
 ### 1.2 Create ProjectAttachment Entity  
@@ -48,38 +66,38 @@ Introduce a new top-level **Project** entity that contains Work Orders and file 
 - Add `DbSet<Project> Projects`
 - Add `DbSet<ProjectAttachment> ProjectAttachments`
 - Configure relationships in OnModelCreating
+- Add unique index on ProjectId to prevent duplicates
 
-### 1.5 Create Migration
-- Generate migration for new Project tables and WorkOrder.ProjectId column
-- Handle existing WorkOrders (leave ProjectId null initially)
+### 1.5 Migration
+- No data migration required - all data will be wiped upon release of this feature.
 
 ## Phase 2: Backend Services & Controllers (High Priority)
 
 ### 2.1 Create ProjectService
 **File:** `src/ShopBoss.Web/Services/ProjectService.cs`
 ```
-- GetProjectSummariesAsync(search, includeArchived)
+- GetProjectSummariesAsync(search, includeArchived, projectCategory)
 - GetProjectByIdAsync(id) 
 - CreateProjectAsync(project)
 - UpdateProjectAsync(project)
 - ArchiveProjectAsync(id)
 - UnarchiveProjectAsync(id)
 - DeleteProjectAsync(id)
-- AttachWorkOrderToProjectAsync(workOrderId, projectId)
+- AttachWorkOrdersToProjectAsync(workOrderIds, projectId)
 - DetachWorkOrderFromProjectAsync(workOrderId)
 ```
 
 ### 2.2 Create ProjectController
 **File:** `src/ShopBoss.Web/Controllers/ProjectController.cs`
-- Index (GET) - Project list view
-- Create (GET/POST) - Create new project
-- Edit (GET/POST) - Edit project details
-- Details (GET) - Project details with work orders
-- Archive/Unarchive (POST)
-- Delete (POST)
-- BulkDelete (POST)
-- AttachWorkOrder (POST)
-- DetachWorkOrder (POST)
+- Index (GET) - Main expandable project list view
+- Create (POST) - Create new project (AJAX)
+- Update (POST) - Update project details (AJAX)
+- Archive/Unarchive (POST) - Toggle archive status
+- Delete (POST) - Delete project
+- AttachWorkOrders (POST) - Attach multiple work orders (AJAX)
+- DetachWorkOrder (POST) - Remove work order association
+- UploadFile (POST) - Handle file uploads
+- DownloadFile (GET) - Serve file downloads
 
 ### 2.3 Create ProjectAttachmentService
 **File:** `src/ShopBoss.Web/Services/ProjectAttachmentService.cs`
@@ -96,100 +114,56 @@ Introduce a new top-level **Project** entity that contains Work Orders and file 
 
 ## Phase 3: Frontend Views & UI (High Priority)
 
-### 3.1 Create Project Management Views
-**Files:** `src/ShopBoss.Web/Views/Project/`
+### 3.1 Create Unified Project Management View
+**File:** `src/ShopBoss.Web/Views/Project/Index.cshtml`
+- Tree-structured project list with expandable rows (based on Admin/Index.cshtml)
+  - Collapsed: Shows Project ID, Project Name, Project Category, Target Install Date, Work Order Count, File Count
+  - Expanded: Shows inline details card with three sections:
+    1. **Project Info**: All Smart Sheet fields in editable form (bid date, project address, contacts, contractor, PM, install date, category, installer, notes)
+    2. **Work Orders**: List of associated orders + \"Associate Work Orders\" button
+    3. **Files**: Attachment list + upload area with category dropdown
+- Search projects by Project ID, name, project address, contact, contractor
+- Filter by Project Category and Archive status
+- Actions: Create New (modal), Save (when editing inline), Archive, Delete
 
-**Index.cshtml** - Main project list (based on Admin/Index.cshtml)
-- Project table with expandable/collapsible Work Order rows
-- Search projects by name, job number, contact
-- Archive toggle, bulk operations
-- Actions: Create, Edit, View Details, Archive, Delete
+### 3.2 Create Shared Project Form Component
+**File:** `src/ShopBoss.Web/Views/Project/_ProjectForm.cshtml`
+- Reusable form partial for both Create modal and inline editing
+- All Smart Sheet fields: Project ID, Project Name, Bid Request Date, Project Address, Project Contact (name/phone/email), General Contractor, Project Manager, Target Install Date, Project Category dropdown, Installer, Notes
+- Form layout modeled after Import Preview/Modify pattern
+- Date pickers for Bid Request Date and Target Install Date
+- Project Category as dropdown with Standard Products/Custom Products/Small Project options
 
-**Create.cshtml** - New project form
-- Project details form
-- Option to immediately attach existing unassigned work orders
+### 3.3 Work Order Association (Inline)
+- Simple dropdown/modal within expanded project card
+- List unassigned work orders with checkbox selection
+- One-click association without leaving the page
 
-**Edit.cshtml** - Edit project form  
-- Update project details
-- Manage work order associations
-- File attachment management
-
-**Details.cshtml** - Project details view
-- Project information display
-- Work Orders table (nested within project)
-- File attachments section with upload/download
-
-### 3.2 Create Work Order Association Interface
-**Partial:** `src/ShopBoss.Web/Views/Shared/_WorkOrderAssociation.cshtml`
-- Modal or inline interface for attaching/detaching work orders
-- Search available unassigned work orders
-- Current project work orders list
-
-### 3.3 Create File Attachment Interface  
-**Partial:** `src/ShopBoss.Web/Views/Shared/_ProjectAttachments.cshtml`
-- File upload with drag-and-drop
-- Category selection (dropdown)
-- Attachments list with download/delete actions
-- File type validation (PDF focus)
-
-### 3.4 Update Work Order Views
-- Show project association in work order details
-- Add "Change Project" option in work order edit
+### 3.4 File Attachments (Inline)
+- Upload area within expanded project card
+- Simple file list with download links
+- Direct file system access via logical folder structure
 
 ## Phase 4: File Management & Storage (Medium Priority)
 
 ### 4.1 Create File Storage Structure
-- Directory: `wwwroot/uploads/projects/{projectId}/`
-- Secure file naming and validation
-- File size limits and type restrictions
+- Directory: `{AppRoot}/ProjectFiles/{ProjectId}/{Category}/`
+- Logical folder structure accessible via network file shares
+- Simple file naming (preserve original names where possible)  
+- No file size limits (internal tool)
+- Users can browse/copy files directly via Windows Explorer or network drive
 
 ### 4.2 Implement File Operations
-- Secure upload endpoint with validation
-- Download endpoint with access control  
-- File deletion with cascade to attachments
-- Cleanup orphaned files
-
-## Phase 5: Integration & Testing (Medium Priority)
-
-### 5.1 Update Import Workflow
-- Option to assign imported work orders to projects
-- Auto-assignment based on naming patterns (optional)
-
-### 5.2 Update Admin Workflows
-- Project-based work order management
-- Statistics and reporting by project
-- Archive/delete with project considerations
-
-### 5.3 Data Migration Support
-- Tool to bulk-assign existing work orders to projects
-- Import/export project data
-
-## Phase 6: Advanced Features (Low Priority)
-
-### 6.1 Enhanced Project Features
-- Project templates
-- Project status tracking  
-- Due dates and milestones
-- Project notes and comments
-
-### 6.2 Advanced File Management
-- File versioning
-- Preview for certain file types
-- File organization within projects
-
-### 6.3 Reporting & Analytics
-- Project completion reports
-- File usage analytics
-- Project timeline views
+- Simple upload endpoint (leverage LAN speed)
+- Direct file serving for downloads (utilize file:// links if possible)
+- Basic file deletion
+- Folder cleanup on project deletion
 
 ## Implementation Order
-1. **Database & Models** (Phase 1) - Foundation
-2. **Core Backend Services** (Phase 2.1-2.2) - Business logic
-3. **Basic Project Views** (Phase 3.1) - UI foundation  
-4. **Work Order Association** (Phase 2.4, 3.2) - Core functionality
-5. **File Attachments** (Phase 2.3, 3.3, 4) - File management
-6. **Integration** (Phase 5) - Polish and testing
-7. **Advanced Features** (Phase 6) - Future enhancements
+1. **Database & Models** (Phase 1) - Add Project and ProjectAttachment entities with Smart Sheet fields
+2. **Core Services** (Phase 2) - ProjectService and ProjectAttachmentService  
+3. **Single View UI** (Phase 3) - Expandable Project Index with inline everything
+4. **File Storage** (Phase 4) - Simple folder-based storage
 
 ## Dependencies
 - Current Admin Work Order List implementation (template)
@@ -197,16 +171,28 @@ Introduce a new top-level **Project** entity that contains Work Orders and file 
 - Existing WorkOrder and AdminController patterns
 - Bootstrap 5 UI components
 
-## Database Migration Strategy
-- New tables: Projects, ProjectAttachments
-- Add nullable ProjectId to WorkOrders
-- Existing WorkOrders remain unassigned (ProjectId = null)
-- Provide tools to assign work orders to projects post-migration
+## Key Design Principles
+- **Minimal Changes**: Confine changes to new files only (except WorkOrder model)
+- **Single Page Experience**: Everything happens in the expandable Project Index view
+- **Component Reuse**: Share form components between Create/Edit (like Import Preview/Modify pattern)
+- **Simple File Access**: Direct file system folders for easy external access
+- **LAN Optimized**: Leverage local network for fast file transfers
+- **MVP Focus**: Skip error handling, edge cases, animations - just core functionality
 
-## File Storage Considerations
-- Store files outside wwwroot for security
-- Implement proper access control
-- Consider cloud storage for production
-- File cleanup on project deletion
+## File Storage Strategy
+- Store in accessible folder structure: `ProjectFiles/{ProjectId}/{Category}/`
+- Users can browse files directly via network shares
+- Simple file serving without complex access controls (internal tool)
+- Leverage LAN for fast transfers
 
-This plan provides a comprehensive, phased approach to implementing the Project entity while maintaining system stability and following existing architectural patterns.
+This streamlined plan focuses on delivering core Project functionality with minimal disruption to existing code, using a single expandable view pattern to reduce complexity.
+
+## What We're NOT Doing (MVP Approach)
+- No separate Details/Edit/Create views - everything inline
+- No complex error handling or edge cases
+- No animations or fancy UI transitions  
+- No file preview or versioning
+- No complex access controls (internal LAN tool)
+- No Work Order changes except adding ProjectId field
+- No modifications to Import or Modify Work Order interfaces (we'll integrate after MVP)
+- No separate integration phase - jump straight to full Work Order integration once MVP works

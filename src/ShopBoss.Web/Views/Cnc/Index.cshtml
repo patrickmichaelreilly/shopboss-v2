@@ -63,6 +63,12 @@
 }
 else
 {
+    <!-- Message for when no pending sheets are visible -->
+    <div id="noPendingSheetsMessage" class="alert alert-success text-center" style="display: none;">
+        <i class="fas fa-check-circle me-2"></i>
+        All nest sheets have been processed! Toggle "Show Processed Sheets" to view completed work.
+    </div>
+
     <div id="nestSheetsContainer">
         <div class="row" id="nestSheetsRow">
             @foreach (var nestSheet in Model)
@@ -207,10 +213,19 @@ else
         function toggleCutSheets() {
             const showProcessed = document.getElementById('showCutToggle').checked;
             const processedCards = document.querySelectorAll('.nest-sheet-card[data-status="cut"]');
+            const pendingCards = document.querySelectorAll('.nest-sheet-card[data-status="pending"]');
+            const noPendingMessage = document.getElementById('noPendingSheetsMessage');
             
             processedCards.forEach(card => {
                 card.style.display = showProcessed ? 'block' : 'none';
             });
+            
+            // Show message if no pending sheets are visible and processed sheets are hidden
+            if (noPendingMessage) {
+                const hasPendingCards = pendingCards.length > 0;
+                const shouldShowMessage = !showProcessed && !hasPendingCards && processedCards.length > 0;
+                noPendingMessage.style.display = shouldShowMessage ? 'block' : 'none';
+            }
             
             // Save preference to localStorage
             ShopBossPreferences.CNC.setShowProcessed(showProcessed);

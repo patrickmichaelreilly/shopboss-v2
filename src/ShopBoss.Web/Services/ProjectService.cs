@@ -87,6 +87,11 @@ public class ProjectService
             _logger.LogInformation("Created new project: {ProjectId} - {ProjectName}", project.ProjectId, project.ProjectName);
             return project;
         }
+        catch (Microsoft.EntityFrameworkCore.DbUpdateException ex) when (ex.InnerException is Microsoft.Data.Sqlite.SqliteException sqliteEx && sqliteEx.SqliteErrorCode == 19)
+        {
+            _logger.LogWarning("Duplicate project ID attempted: {ProjectId}", project.ProjectId);
+            throw new InvalidOperationException($"A project with ID '{project.ProjectId}' already exists. Please use a different Project ID.");
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error creating project: {ProjectId}", project.ProjectId);

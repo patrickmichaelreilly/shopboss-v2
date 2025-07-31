@@ -35,9 +35,17 @@ function filterByCategory(category) {
     window.location.href = url.toString();
 }
 
+// Clear project form
+function clearProjectForm() {
+    const form = document.getElementById('createProjectForm');
+    if (form) {
+        form.reset();
+    }
+}
+
 // Project CRUD operations
 function saveProject() {
-    const form = document.getElementById('projectForm');
+    const form = document.getElementById('createProjectForm');
     const formData = new FormData(form);
     
     const projectCategoryValue = formData.get('ProjectCategory');
@@ -68,6 +76,9 @@ function saveProject() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
+            // Clear the form
+            document.getElementById('createProjectForm').reset();
+            // Hide the modal
             bootstrap.Modal.getInstance(document.getElementById('createProjectModal')).hide();
             location.reload();
         } else {
@@ -97,7 +108,7 @@ function cancelProjectEdit(projectId) {
 }
 
 function saveProjectEdit(projectId) {
-    const form = document.querySelector(`#edit-${projectId} form`);
+    const form = document.getElementById(`projectForm-${projectId}`);
     const formData = new FormData(form);
     
     const project = {

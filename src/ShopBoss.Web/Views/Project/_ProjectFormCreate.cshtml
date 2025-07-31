@@ -1,0 +1,77 @@
+<form id="createProjectForm">
+    <input type="hidden" name="Id" value="" />
+    
+    <div class="row g-3">
+        <!-- Basic Information -->
+        <div class="col-md-6">
+            <label class="form-label">Project ID <span class="text-danger">*</span></label>
+            <input name="ProjectId" class="form-control" placeholder="e.g., J001, J123" required />
+        </div>
+        
+        <div class="col-md-6">
+            <label class="form-label">Project Name <span class="text-danger">*</span></label>
+            <input name="ProjectName" class="form-control" placeholder="Enter project name" required />
+        </div>
+        
+        <div class="col-md-6">
+            <label class="form-label">Project Category <span class="text-danger">*</span></label>
+            <select name="ProjectCategory" class="form-select" required>
+                <option value="">Select Category</option>
+                <option value="0">Standard Products</option>
+                <option value="1">Custom Products</option>
+                <option value="2">Small Project</option>
+            </select>
+        </div>
+        
+        <div class="col-md-6">
+            <label class="form-label">Bid Request Date</label>
+            <input name="BidRequestDate" type="date" class="form-control" />
+        </div>
+        
+        <!-- Project Details -->
+        <div class="col-12">
+            <label class="form-label">Project Address</label>
+            <textarea name="ProjectAddress" class="form-control" rows="2" placeholder="Enter project address"></textarea>
+        </div>
+        
+        <div class="col-md-6">
+            <label class="form-label">Project Contact</label>
+            <input name="ProjectContact" class="form-control" placeholder="Contact person name" />
+        </div>
+        
+        <div class="col-md-6">
+            <label class="form-label">Contact Phone</label>
+            <input name="ProjectContactPhone" type="tel" class="form-control" placeholder="(555) 123-4567" />
+        </div>
+        
+        <div class="col-md-6">
+            <label class="form-label">Contact Email</label>
+            <input name="ProjectContactEmail" type="email" class="form-control" placeholder="contact@example.com" />
+        </div>
+        
+        <div class="col-md-6">
+            <label class="form-label">General Contractor</label>
+            <input name="GeneralContractor" class="form-control" placeholder="Contractor name" />
+        </div>
+        
+        <div class="col-md-6">
+            <label class="form-label">Project Manager</label>
+            <input name="ProjectManager" class="form-control" placeholder="PM name" />
+        </div>
+        
+        <div class="col-md-6">
+            <label class="form-label">Target Install Date</label>
+            <input name="TargetInstallDate" type="date" class="form-control" />
+        </div>
+        
+        <div class="col-md-6">
+            <label class="form-label">Installer</label>
+            <input name="Installer" class="form-control" placeholder="Installer name" />
+        </div>
+        
+        <div class="col-12">
+            <label class="form-label">Notes</label>
+            <textarea name="Notes" class="form-control" rows="3" placeholder="Additional project notes..."></textarea>
+        </div>
+    </div>
+</form>

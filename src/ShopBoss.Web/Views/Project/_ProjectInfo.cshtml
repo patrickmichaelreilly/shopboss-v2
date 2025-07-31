@@ -1,81 +1,64 @@
 @model ShopBoss.Web.Models.Project
 
 <div class="project-info-display" id="display-@Model.Id">
-    <div class="row g-2">
-        <div class="col-12">
-            <strong>Project ID:</strong> @Model.ProjectId
-        </div>
-        <div class="col-12">
-            <strong>Category:</strong> 
-            <span class="badge bg-secondary">@Model.ProjectCategory</span>
+    <div class="row g-1">
+        <div class="col-md-6">
+            <small><strong>Category:</strong> <span class="badge bg-secondary">@Model.ProjectCategory</span></small>
         </div>
         @if (Model.BidRequestDate.HasValue)
         {
-            <div class="col-12">
-                <strong>Bid Date:</strong> @Model.BidRequestDate.Value.ToShortDateString()
+            <div class="col-md-6">
+                <small><strong>Bid Date:</strong> @Model.BidRequestDate.Value.ToString("MM/dd/yy")</small>
             </div>
         }
         @if (!string.IsNullOrEmpty(Model.ProjectAddress))
         {
             <div class="col-12">
-                <strong>Address:</strong><br>
-                <small>@Model.ProjectAddress</small>
+                <small><strong>Address:</strong> @Model.ProjectAddress</small>
             </div>
         }
         @if (!string.IsNullOrEmpty(Model.ProjectContact))
         {
-            <div class="col-12">
-                <strong>Contact:</strong> @Model.ProjectContact
-                @if (!string.IsNullOrEmpty(Model.ProjectContactPhone))
-                {
-                    <br><small class="text-muted">@Model.ProjectContactPhone</small>
-                }
-                @if (!string.IsNullOrEmpty(Model.ProjectContactEmail))
-                {
-                    <br><small class="text-muted">@Model.ProjectContactEmail</small>
-                }
+            <div class="col-md-4">
+                <small><strong>Contact:</strong> @Model.ProjectContact</small>
+            </div>
+        }
+        @if (!string.IsNullOrEmpty(Model.ProjectContactPhone))
+        {
+            <div class="col-md-4">
+                <small><strong>Phone:</strong> @Model.ProjectContactPhone</small>
+            </div>
+        }
+        @if (!string.IsNullOrEmpty(Model.ProjectContactEmail))
+        {
+            <div class="col-md-4">
+                <small><strong>Email:</strong> @Model.ProjectContactEmail</small>
             </div>
         }
         @if (!string.IsNullOrEmpty(Model.GeneralContractor))
         {
-            <div class="col-12">
-                <strong>Contractor:</strong> @Model.GeneralContractor
+            <div class="col-md-6">
+                <small><strong>Contractor:</strong> @Model.GeneralContractor</small>
             </div>
         }
         @if (!string.IsNullOrEmpty(Model.ProjectManager))
         {
-            <div class="col-12">
-                <strong>PM:</strong> @Model.ProjectManager
-            </div>
-        }
-        @if (Model.TargetInstallDate.HasValue)
-        {
-            <div class="col-12">
-                <strong>Install Date:</strong> @Model.TargetInstallDate.Value.ToShortDateString()
+            <div class="col-md-6">
+                <small><strong>PM:</strong> @Model.ProjectManager</small>
             </div>
         }
         @if (!string.IsNullOrEmpty(Model.Installer))
         {
-            <div class="col-12">
-                <strong>Installer:</strong> @Model.Installer
+            <div class="col-md-6">
+                <small><strong>Installer:</strong> @Model.Installer</small>
             </div>
         }
         @if (!string.IsNullOrEmpty(Model.Notes))
         {
             <div class="col-12">
-                <strong>Notes:</strong><br>
-                <small>@Model.Notes</small>
+                <small><strong>Notes:</strong> @Model.Notes</small>
             </div>
         }
-        <div class="col-12 mt-2">
-            <small class="text-muted">
-                Created: @Model.CreatedDate.ToShortDateString()
-                @if (Model.IsArchived && Model.ArchivedDate.HasValue)
-                {
-                    <text><br/>Archived: @Model.ArchivedDate.Value.ToShortDateString()</text>
-                }
-            </small>
-        </div>
     </div>
 </div>
 

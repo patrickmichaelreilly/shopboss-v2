@@ -58,6 +58,11 @@ public class ProjectController : Controller
             var createdProject = await _projectService.CreateProjectAsync(project);
             return Json(new { success = true, project = createdProject });
         }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning("Business logic error creating project: {Message}", ex.Message);
+            return Json(new { success = false, message = ex.Message });
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error creating project");
