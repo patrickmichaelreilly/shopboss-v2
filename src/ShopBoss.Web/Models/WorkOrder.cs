@@ -22,4 +22,9 @@ public class WorkOrder
     public List<DetachedProduct> DetachedProducts { get; set; } = new();
     
     public List<NestSheet> NestSheets { get; set; } = new();
+    
+    // Project relationship
+    public string? ProjectId { get; set; }
+    
+    public Project? Project { get; set; }
 }

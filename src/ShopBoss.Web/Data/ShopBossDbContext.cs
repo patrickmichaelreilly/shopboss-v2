@@ -25,6 +25,8 @@ public class ShopBossDbContext : DbContext
     public DbSet<BackupStatus> BackupStatuses { get; set; }
     public DbSet<SystemHealthStatus> SystemHealthStatus { get; set; }
     public DbSet<SortingRule> SortingRules { get; set; }
+    public DbSet<Project> Projects { get; set; }
+    public DbSet<ProjectAttachment> ProjectAttachments { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -293,6 +295,51 @@ public class ShopBossDbContext : DbContext
             entity.HasIndex(e => e.Priority);
             entity.HasIndex(e => e.IsActive);
             entity.HasIndex(e => new { e.IsActive, e.Priority });
+        });
+
+        modelBuilder.Entity<Project>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.ProjectId).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.ProjectName).IsRequired().HasMaxLength(200);
+            entity.Property(e => e.ProjectCategory).IsRequired();
+            entity.Property(e => e.CreatedDate).IsRequired();
+            entity.Property(e => e.IsArchived).IsRequired();
+            
+            entity.HasIndex(e => e.ProjectId).IsUnique();
+            entity.HasIndex(e => e.ProjectName);
+            entity.HasIndex(e => e.ProjectCategory);
+            entity.HasIndex(e => e.IsArchived);
+            entity.HasIndex(e => e.CreatedDate);
+        });
+
+        modelBuilder.Entity<ProjectAttachment>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.ProjectId).IsRequired();
+            entity.Property(e => e.FileName).IsRequired().HasMaxLength(500);
+            entity.Property(e => e.OriginalFileName).IsRequired().HasMaxLength(500);
+            entity.Property(e => e.FileSize).IsRequired();
+            entity.Property(e => e.ContentType).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.Category).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.UploadedDate).IsRequired();
+            
+            entity.HasOne(e => e.Project)
+                .WithMany(p => p.Attachments)
+                .HasForeignKey(e => e.ProjectId)
+                .OnDelete(DeleteBehavior.Cascade);
+                
+            entity.HasIndex(e => e.ProjectId);
+            entity.HasIndex(e => e.Category);
+            entity.HasIndex(e => e.UploadedDate);
+        });
+
+        modelBuilder.Entity<WorkOrder>(entity =>
+        {
+            entity.HasOne(e => e.Project)
+                .WithMany(p => p.WorkOrders)
+                .HasForeignKey(e => e.ProjectId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
     }
 }

@@ -1,0 +1,344 @@
+@model IEnumerable<ShopBoss.Web.Models.Project>
+
+@{
+    ViewData["Title"] = "Projects";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2>Projects</h2>
+        <small class="text-muted">
+            <i class="fas fa-folder-open me-1"></i>
+            Manage project information, work orders, and file attachments
+        </small>
+    </div>
+    <div class="btn-group" role="group">
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createProjectModal">
+            <i class="fas fa-plus me-2"></i>Create New Project
+        </button>
+    </div>
+</div>
+
+<!-- Search and Filter Controls -->
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-6">
+                <form asp-action="Index" method="get" class="d-flex">
+                    <input type="text" name="search" class="form-control me-2" 
+                           placeholder="Search by project ID, name, address, contact, or contractor..." 
+                           value="@ViewBag.Search">
+                    <input type="hidden" name="includeArchived" value="@ViewBag.IncludeArchived" />
+                    <input type="hidden" name="projectCategory" value="@ViewBag.ProjectCategory" />
+                    <button type="submit" class="btn btn-outline-secondary">
+                        <i class="fas fa-search"></i>
+                    </button>
+                    @if (!string.IsNullOrEmpty(ViewBag.Search))
+                    {
+                        <a asp-action="Index" asp-route-includeArchived="@ViewBag.IncludeArchived" 
+                           asp-route-projectCategory="@ViewBag.ProjectCategory" class="btn btn-outline-secondary ms-2">
+                            <i class="fas fa-times"></i>
+                        </a>
+                    }
+                </form>
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" onchange="filterByCategory(this.value)">
+                    <option value="">All Categories</option>
+                    @{
+                        var selectedCategory = ViewBag.ProjectCategory?.ToString();
+                    }
+                    @if (selectedCategory == "0")
+                    {
+                        <option value="0" selected>Standard Products</option>
+                    }
+                    else
+                    {
+                        <option value="0">Standard Products</option>
+                    }
+                    @if (selectedCategory == "1")
+                    {
+                        <option value="1" selected>Custom Products</option>
+                    }
+                    else
+                    {
+                        <option value="1">Custom Products</option>
+                    }
+                    @if (selectedCategory == "2")
+                    {
+                        <option value="2" selected>Small Project</option>
+                    }
+                    else
+                    {
+                        <option value="2">Small Project</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="includeArchivedToggle" 
+                           onchange="toggleArchiveFilter()" @(ViewBag.IncludeArchived == true ? "checked" : "")>
+                    <label class="form-check-label" for="includeArchivedToggle">
+                        <i class="fas fa-archive me-1"></i>Show Archived
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (!Model.Any())
+{
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle me-2"></i>
+        No projects found. <button type="button" class="btn btn-link p-0 alert-link" data-bs-toggle="modal" data-bs-target="#createProjectModal">Create your first project</button> to get started.
+    </div>
+}
+else
+{
+    <div class="project-list">
+        @foreach (var project in Model)
+        {
+            <div class="card mb-3 project-card" data-project-id="@project.Id">
+                <!-- Collapsed Project Row -->
+                <div class="card-header d-flex justify-content-between align-items-center project-header" 
+                     style="cursor: pointer;" onclick="toggleProject('@project.Id')">
+                    <div class="d-flex align-items-center flex-grow-1">
+                        <i class="fas fa-chevron-right me-3 expand-icon" id="expand-icon-@project.Id"></i>
+                        <div class="row w-100">
+                            <div class="col-md-2">
+                                <strong>@project.ProjectId</strong>
+                            </div>
+                            <div class="col-md-3">
+                                @project.ProjectName
+                            </div>
+                            <div class="col-md-2">
+                                <span class="badge bg-secondary">@project.ProjectCategory</span>
+                            </div>
+                            <div class="col-md-2">
+                                @if (project.TargetInstallDate.HasValue)
+                                {
+                                    <small class="text-muted">@project.TargetInstallDate.Value.ToShortDateString()</small>
+                                }
+                                else
+                                {
+                                    <small class="text-muted">No date set</small>
+                                }
+                            </div>
+                            <div class="col-md-1">
+                                <span class="badge bg-info">@project.WorkOrders.Count WO</span>
+                            </div>
+                            <div class="col-md-1">
+                                <span class="badge bg-success">@project.Attachments.Count Files</span>
+                            </div>
+                            <div class="col-md-1 text-end">
+                                @if (project.IsArchived)
+                                {
+                                    <i class="fas fa-archive text-muted"></i>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Expanded Project Details -->
+                <div class="card-body project-details d-none" id="details-@project.Id">
+                    <div class="row">
+                        <!-- Project Information Column -->
+                        <div class="col-md-4">
+                            <h6 class="fw-bold mb-3">
+                                <i class="fas fa-info-circle me-2"></i>Project Information
+                                <button type="button" class="btn btn-sm btn-outline-primary ms-2" 
+                                        onclick="editProject('@project.Id')">
+                                    <i class="fas fa-edit"></i> Edit
+                                </button>
+                            </h6>
+                            <div id="project-info-@project.Id">
+                                @await Html.PartialAsync("_ProjectInfo", project)
+                            </div>
+                        </div>
+
+                        <!-- Work Orders Column -->
+                        <div class="col-md-4">
+                            <h6 class="fw-bold mb-3">
+                                <i class="fas fa-briefcase me-2"></i>Work Orders (@project.WorkOrders.Count)
+                                <button type="button" class="btn btn-sm btn-outline-success ms-2" 
+                                        onclick="showAssociateWorkOrders('@project.Id')">
+                                    <i class="fas fa-plus"></i> Associate
+                                </button>
+                            </h6>
+                            <div id="work-orders-@project.Id">
+                                @if (project.WorkOrders.Any())
+                                {
+                                    @foreach (var workOrder in project.WorkOrders)
+                                    {
+                                        <div class="d-flex justify-content-between align-items-center border-bottom py-2">
+                                            <div>
+                                                <strong>@workOrder.Name</strong>
+                                                <br><small class="text-muted">Imported: @workOrder.ImportedDate.ToShortDateString()</small>
+                                            </div>
+                                            <button type="button" class="btn btn-sm btn-outline-danger" 
+                                                    onclick="detachWorkOrder('@workOrder.Id', '@project.Id')">
+                                                <i class="fas fa-unlink"></i>
+                                            </button>
+                                        </div>
+                                    }
+                                }
+                                else
+                                {
+                                    <p class="text-muted">No work orders associated</p>
+                                }
+                            </div>
+                        </div>
+
+                        <!-- Files Column -->
+                        <div class="col-md-4">
+                            <h6 class="fw-bold mb-3">
+                                <i class="fas fa-paperclip me-2"></i>Files (@project.Attachments.Count)
+                            </h6>
+                            <div id="files-@project.Id">
+                                <!-- File Upload Area -->
+                                <div class="border border-dashed p-3 mb-3 text-center" style="border-style: dashed !important;">
+                                    <i class="fas fa-cloud-upload-alt fa-2x text-muted mb-2"></i>
+                                    <div>
+                                        <input type="file" class="form-control mb-2" id="fileInput-@project.Id" multiple 
+                                               onchange="toggleUploadButton('@project.Id')">
+                                        <select class="form-select mb-2" id="categorySelect-@project.Id">
+                                            <option value="Schematic">Schematic</option>
+                                            <option value="Correspondence">Correspondence</option>
+                                            <option value="Invoice">Invoice</option>
+                                            <option value="Proof">Proof</option>
+                                            <option value="Other">Other</option>
+                                        </select>
+                                        <button type="button" class="btn btn-sm btn-primary" id="uploadBtn-@project.Id"
+                                                onclick="uploadFiles('@project.Id')" disabled>
+                                            <i class="fas fa-upload me-1"></i>Upload
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- File List -->
+                                <div class="file-list">
+                                    @if (project.Attachments.Any())
+                                    {
+                                        @foreach (var attachment in project.Attachments.OrderByDescending(a => a.UploadedDate))
+                                        {
+                                            <div class="d-flex justify-content-between align-items-center border-bottom py-2">
+                                                <div class="flex-grow-1">
+                                                    <div class="d-flex align-items-center">
+                                                        <i class="fas fa-file me-2"></i>
+                                                        <div>
+                                                            <a href="@Url.Action("DownloadFile", new { id = attachment.Id })" 
+                                                               class="text-decoration-none">
+                                                                @attachment.OriginalFileName
+                                                            </a>
+                                                            <br>
+                                                            <small class="text-muted">
+                                                                @attachment.Category | @(attachment.FileSize / 1024) KB | @attachment.UploadedDate.ToString("MM/dd/yy")
+                                                            </small>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <button type="button" class="btn btn-sm btn-outline-danger" 
+                                                        onclick="deleteFile('@attachment.Id', '@project.Id')">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <p class="text-muted">No files uploaded</p>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Project Actions -->
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <div class="btn-group" role="group">
+                                @if (project.IsArchived)
+                                {
+                                    <button type="button" class="btn btn-outline-success" onclick="unarchiveProject('@project.Id')">
+                                        <i class="fas fa-box-open me-2"></i>Unarchive
+                                    </button>
+                                }
+                                else
+                                {
+                                    <button type="button" class="btn btn-outline-warning" onclick="archiveProject('@project.Id')">
+                                        <i class="fas fa-archive me-2"></i>Archive
+                                    </button>
+                                }
+                                <button type="button" class="btn btn-outline-danger" onclick="deleteProject('@project.Id', this)" data-project-name="@project.ProjectName">
+                                    <i class="fas fa-trash me-2"></i>Delete
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+<!-- Create Project Modal -->
+<div class="modal fade" id="createProjectModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Create New Project</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                @await Html.PartialAsync("_ProjectForm", new ShopBoss.Web.Models.Project())
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveProject()">Create Project</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Associate Work Orders Modal -->
+<div class="modal fade" id="associateWorkOrdersModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Associate Work Orders</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="unassignedWorkOrdersList">
+                    @if (ViewBag.UnassignedWorkOrders != null && ((List<ShopBoss.Web.Models.WorkOrder>)ViewBag.UnassignedWorkOrders).Any())
+                    {
+                        @foreach (var workOrder in (List<ShopBoss.Web.Models.WorkOrder>)ViewBag.UnassignedWorkOrders)
+                        {
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" value="@workOrder.Id" id="wo-@workOrder.Id">
+                                <label class="form-check-label" for="wo-@workOrder.Id">
+                                    <strong>@workOrder.Name</strong>
+                                    <br><small class="text-muted">Imported: @workOrder.ImportedDate.ToShortDateString()</small>
+                                </label>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <p class="text-muted">No unassigned work orders available</p>
+                    }
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="associateSelectedWorkOrders()">Associate</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/js/project-management.js" asp-append-version="true"></script>
+}

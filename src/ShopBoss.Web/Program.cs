@@ -81,6 +81,8 @@ builder.Services.AddScoped<BackupService>();
 builder.Services.AddScoped<SystemHealthMonitor>();
 builder.Services.AddScoped<WorkOrderImportService>();
 builder.Services.AddScoped<WorkOrderDeletionService>();
+builder.Services.AddScoped<ProjectService>();
+builder.Services.AddScoped<ProjectAttachmentService>();
 // UniversalScannerService removed - using event-based architecture instead
 
 // Add background services
