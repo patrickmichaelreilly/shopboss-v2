@@ -80,6 +80,7 @@ public class SortingController : Controller
             }
             
             ViewBag.SelectedRackId = selectedRackId;
+            ViewBag.RackIds = racks.Select(r => r.Id).ToArray();
             
             return View(racks);
         }
@@ -87,6 +88,7 @@ public class SortingController : Controller
         {
             _logger.LogError(ex, "Error retrieving sorting station data");
             TempData["ErrorMessage"] = "An error occurred while loading the sorting station.";
+            ViewBag.RackIds = new string[0];
             return View(new List<StorageRack>());
         }
     }

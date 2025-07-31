@@ -311,3 +311,23 @@ main.container-fluid {
 .different-work-order-modal .modal-header .btn-close {
     filter: invert(1);
 }
+
+/* Touch-friendly improvements */
+#rack-grid-container {
+    touch-action: pan-y; /* Allow vertical scrolling but handle horizontal gestures */
+    user-select: none; /* Prevent text selection during swipes */
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+}
+
+/* Improve touch targets for mobile */
+@media (max-width: 768px) {
+    .card-body {
+        touch-action: pan-y;
+        user-select: none;
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+    }
+}

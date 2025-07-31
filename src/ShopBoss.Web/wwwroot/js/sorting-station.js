@@ -11,6 +11,14 @@ let currentBinDetails = null;
 let isMoveMode = false;
 let selectedSourceBin = null;
 
+// Swipe/touch state
+let touchStartX = null;
+let touchStartY = null;
+let touchStartTime = null;
+let swipeThreshold = 50; // minimum distance for swipe
+let swipeVelocityThreshold = 0.3; // minimum velocity (pixels per ms)
+let isSwipeInProgress = false;
+
 // ===== Rack Dropdown Functions =====
 
 function selectRackFromDropdown(rackId, rackName, rackIcon, rackColor, occupied, total) {
@@ -19,6 +27,50 @@ function selectRackFromDropdown(rackId, rackName, rackIcon, rackColor, occupied,
     
     // Navigate to URL with rackId parameter for consistency
     window.location.href = `/Sorting?rackId=${encodeURIComponent(rackId)}`;
+}
+
+// ===== Rack Cycling Functions =====
+
+function getRackIds() {
+    return window.rackIds || [];
+}
+
+function getCurrentRackIndex() {
+    const rackIds = getRackIds();
+    const currentId = currentRackId || document.getElementById('selectedRackId')?.value;
+    return rackIds.indexOf(currentId);
+}
+
+function cycleToNextRack() {
+    if (isSwipeInProgress) return; // Prevent multiple rapid swipes
+    
+    const rackIds = getRackIds();
+    if (rackIds.length <= 1) return; // No other racks to cycle to
+    
+    const currentIndex = getCurrentRackIndex();
+    if (currentIndex === -1) return; // Current rack not found
+    
+    const nextIndex = (currentIndex + 1) % rackIds.length;
+    const nextRackId = rackIds[nextIndex];
+    
+    // Instant navigation - no delay, no visual feedback
+    window.location.href = `/Sorting?rackId=${encodeURIComponent(nextRackId)}`;
+}
+
+function cycleToPreviousRack() {
+    if (isSwipeInProgress) return; // Prevent multiple rapid swipes
+    
+    const rackIds = getRackIds();
+    if (rackIds.length <= 1) return; // No other racks to cycle to
+    
+    const currentIndex = getCurrentRackIndex();
+    if (currentIndex === -1) return; // Current rack not found
+    
+    const prevIndex = currentIndex === 0 ? rackIds.length - 1 : currentIndex - 1;
+    const prevRackId = rackIds[prevIndex];
+    
+    // Instant navigation - no delay, no visual feedback
+    window.location.href = `/Sorting?rackId=${encodeURIComponent(prevRackId)}`;
 }
 
 function updateRackBadge(rackId, occupiedBins, totalBins) {
@@ -954,6 +1006,83 @@ function clearEntireBin() {
     });
 }
 
+// ===== Touch/Swipe Event Handlers =====
+
+function handleTouchStart(e) {
+    // Don't interfere with move mode or modal interactions
+    if (isMoveMode || document.querySelector('.modal.show')) return;
+    
+    // Only handle single touch
+    if (e.touches.length !== 1) return;
+    
+    const touch = e.touches[0];
+    touchStartX = touch.clientX;
+    touchStartY = touch.clientY;
+    touchStartTime = Date.now();
+}
+
+function handleTouchEnd(e) {
+    // Don't interfere with move mode or modal interactions
+    if (isMoveMode || document.querySelector('.modal.show')) return;
+    
+    // Must have valid touch start
+    if (touchStartX === null || touchStartY === null || touchStartTime === null) {
+        resetTouchState();
+        return;
+    }
+    
+    // Only handle single touch
+    if (e.changedTouches.length !== 1) {
+        resetTouchState();
+        return;
+    }
+    
+    const touch = e.changedTouches[0];
+    const touchEndX = touch.clientX;
+    const touchEndY = touch.clientY;
+    const touchEndTime = Date.now();
+    
+    // Calculate swipe distance and time
+    const deltaX = touchEndX - touchStartX;
+    const deltaY = touchEndY - touchStartY;
+    const deltaTime = touchEndTime - touchStartTime;
+    
+    // Reset touch state
+    resetTouchState();
+    
+    // Check if this is a horizontal swipe (more horizontal than vertical movement)
+    const absDeltaX = Math.abs(deltaX);
+    const absDeltaY = Math.abs(deltaY);
+    
+    if (absDeltaX < swipeThreshold || absDeltaY > absDeltaX) {
+        return; // Not a horizontal swipe or too small
+    }
+    
+    // Check swipe velocity (minimum speed)
+    const velocity = absDeltaX / deltaTime;
+    if (velocity < swipeVelocityThreshold) {
+        return; // Too slow
+    }
+    
+    // Determine swipe direction and cycle racks
+    if (deltaX > 0) {
+        // Swipe right - go to previous rack
+        cycleToPreviousRack();
+    } else {
+        // Swipe left - go to next rack
+        cycleToNextRack();
+    }
+    
+    // Prevent default to avoid scrolling
+    e.preventDefault();
+}
+
+function resetTouchState() {
+    touchStartX = null;
+    touchStartY = null;
+    touchStartTime = null;
+}
+
 // ===== Initialization =====
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -995,6 +1124,22 @@ document.addEventListener('DOMContentLoaded', function() {
         currentBinDetails = null;
         cleanupModalState();
     });
+    
+    // Add touch event listeners for swipe functionality
+    const rackContainer = document.getElementById('rack-grid-container');
+    if (rackContainer) {
+        rackContainer.addEventListener('touchstart', handleTouchStart, { passive: false });
+        rackContainer.addEventListener('touchend', handleTouchEnd, { passive: false });
+        
+        // Also add touch event listeners to the card body for better coverage
+        const cardBody = rackContainer.closest('.card-body');
+        if (cardBody) {
+            cardBody.addEventListener('touchstart', handleTouchStart, { passive: false });
+            cardBody.addEventListener('touchend', handleTouchEnd, { passive: false });
+        }
+        
+        // No additional setup needed for simplified swipe functionality
+    }
 });
 
 // ===== Scanner Event Listeners =====

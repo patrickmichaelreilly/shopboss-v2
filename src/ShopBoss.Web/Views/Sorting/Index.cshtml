@@ -215,6 +215,10 @@ else
     <input type="hidden" id="selectedRackId" value="@ViewBag.SelectedRackId" />
     <input type="hidden" id="activeWorkOrderId" value="@ViewBag.ActiveWorkOrderId" />
     <input type="hidden" id="initialCutPartsCount" value="@ViewBag.CutPartsCount" />
+    
+    <script>
+        window.rackIds = @Html.Raw(Json.Serialize(ViewBag.RackIds));
+    </script>
 
 }
 
