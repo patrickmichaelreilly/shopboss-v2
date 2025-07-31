@@ -21,6 +21,12 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(optio
     options.MultipartHeadersLengthLimit = int.MaxValue;
 });
 
+// Configure Kestrel to allow large request bodies
+builder.WebHost.ConfigureKestrel(serverOptions =>
+{
+    serverOptions.Limits.MaxRequestBodySize = null; // null = unlimited
+});
+
 // Add HTTP context accessor for services that need access to the current HTTP context
 builder.Services.AddHttpContextAccessor();
 

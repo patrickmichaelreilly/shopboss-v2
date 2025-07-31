@@ -52,6 +52,7 @@ public class ImportController : Controller
     /// Route: /admin/import/upload
     /// </summary>
     [HttpPost("admin/import/upload")]
+    [DisableRequestSizeLimit] // Allow unlimited file size
     public async Task<IActionResult> UploadFile(IFormFile file)
     {
         if (file == null || file.Length == 0)
