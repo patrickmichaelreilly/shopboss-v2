@@ -47,7 +47,7 @@ public class ProjectService
             }
 
             return await query
-                .OrderByDescending(p => p.CreatedDate)
+                .OrderBy(p => p.ProjectId)
                 .ToListAsync();
         }
         catch (Exception ex)

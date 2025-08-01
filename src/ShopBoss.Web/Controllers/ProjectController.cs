@@ -11,6 +11,7 @@ public class ProjectController : Controller
     private readonly ProjectAttachmentService _attachmentService;
     private readonly PurchaseOrderService _purchaseOrderService;
     private readonly CustomWorkOrderService _customWorkOrderService;
+    private readonly SmartSheetImportService _smartSheetImportService;
     private readonly ILogger<ProjectController> _logger;
 
     public ProjectController(
@@ -18,12 +19,14 @@ public class ProjectController : Controller
         ProjectAttachmentService attachmentService,
         PurchaseOrderService purchaseOrderService,
         CustomWorkOrderService customWorkOrderService,
+        SmartSheetImportService smartSheetImportService,
         ILogger<ProjectController> logger)
     {
         _projectService = projectService;
         _attachmentService = attachmentService;
         _purchaseOrderService = purchaseOrderService;
         _customWorkOrderService = customWorkOrderService;
+        _smartSheetImportService = smartSheetImportService;
         _logger = logger;
     }
 
@@ -416,6 +419,89 @@ public class ProjectController : Controller
         }
     }
 
+    [HttpGet]
+    public async Task<IActionResult> GetPurchaseOrder(string id)
+    {
+        try
+        {
+            var purchaseOrder = await _purchaseOrderService.GetPurchaseOrderByIdAsync(id);
+            if (purchaseOrder != null)
+            {
+                return Json(new { success = true, purchaseOrder = purchaseOrder });
+            }
+            
+            return Json(new { success = false, message = "Purchase order not found" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting purchase order {PurchaseOrderId}", id);
+            return Json(new { success = false, message = "Error loading purchase order" });
+        }
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> GetCustomWorkOrder(string id)
+    {
+        try
+        {
+            var customWorkOrder = await _customWorkOrderService.GetCustomWorkOrderByIdAsync(id);
+            if (customWorkOrder != null)
+            {
+                return Json(new { success = true, customWorkOrder = customWorkOrder });
+            }
+            
+            return Json(new { success = false, message = "Custom work order not found" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting custom work order {CustomWorkOrderId}", id);
+            return Json(new { success = false, message = "Error loading custom work order" });
+        }
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> ListSmartSheets()
+    {
+        try
+        {
+            var sheets = await _smartSheetImportService.ListAvailableSheetsAsync();
+            return Json(new { success = true, sheets = sheets });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error listing SmartSheet sheets");
+            return Json(new { success = false, message = "Error loading SmartSheet sheets" });
+        }
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> ImportFromSmartSheet()
+    {
+        try
+        {
+            var result = await _smartSheetImportService.ImportProjectsFromMasterListAsync();
+            
+            if (result.Success)
+            {
+                return Json(new 
+                { 
+                    success = true, 
+                    message = $"Import completed successfully. Created: {result.ProjectsCreated}, Skipped: {result.ProjectsSkipped}, Errors: {result.ProjectsWithErrors}",
+                    result = result
+                });
+            }
+            else
+            {
+                return Json(new { success = false, message = result.ErrorMessage });
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during SmartSheet import");
+            return Json(new { success = false, message = "Error during import process" });
+        }
+    }
+
     public class AttachWorkOrdersRequest
     {
         public List<string> WorkOrderIds { get; set; } = new();
@@ -427,4 +513,5 @@ public class ProjectController : Controller
         public string Id { get; set; } = string.Empty;
         public string Category { get; set; } = string.Empty;
     }
+
 }

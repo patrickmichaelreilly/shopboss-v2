@@ -731,10 +731,40 @@ function editPurchaseOrder(purchaseOrderId, projectId) {
     currentPurchaseOrderId = purchaseOrderId;
     currentProjectId = projectId;
     
-    // TODO: Load purchase order data and populate edit form
-    // For now, just show the modal
-    const modal = new bootstrap.Modal(document.getElementById('editPurchaseOrderModal'));
-    modal.show();
+    // Load purchase order data
+    fetch(`/Project/GetPurchaseOrder?id=${purchaseOrderId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.purchaseOrder) {
+                const po = data.purchaseOrder;
+                const form = document.getElementById('editPurchaseOrderModal').querySelector('#purchaseOrderForm');
+                
+                // Populate form fields
+                form.querySelector('input[name="Id"]').value = po.id;
+                form.querySelector('input[name="ProjectId"]').value = po.projectId;
+                form.querySelector('input[name="PurchaseOrderNumber"]').value = po.purchaseOrderNumber || '';
+                form.querySelector('input[name="VendorName"]').value = po.vendorName || '';
+                form.querySelector('input[name="VendorContact"]').value = po.vendorContact || '';
+                form.querySelector('input[name="VendorPhone"]').value = po.vendorPhone || '';
+                form.querySelector('input[name="VendorEmail"]').value = po.vendorEmail || '';
+                form.querySelector('textarea[name="Description"]').value = po.description || '';
+                form.querySelector('input[name="OrderDate"]').value = po.orderDate ? po.orderDate.split('T')[0] : '';
+                form.querySelector('input[name="ExpectedDeliveryDate"]').value = po.expectedDeliveryDate ? po.expectedDeliveryDate.split('T')[0] : '';
+                form.querySelector('input[name="ActualDeliveryDate"]').value = po.actualDeliveryDate ? po.actualDeliveryDate.split('T')[0] : '';
+                form.querySelector('input[name="TotalAmount"]').value = po.totalAmount || '';
+                form.querySelector('select[name="Status"]').value = po.status || 0;
+                form.querySelector('textarea[name="Notes"]').value = po.notes || '';
+                
+                const modal = new bootstrap.Modal(document.getElementById('editPurchaseOrderModal'));
+                modal.show();
+            } else {
+                showNotification('Error loading purchase order data', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showNotification('Network error occurred', 'error');
+        });
 }
 
 function savePurchaseOrder() {
@@ -896,10 +926,38 @@ function editCustomWorkOrder(customWorkOrderId, projectId) {
     currentCustomWorkOrderId = customWorkOrderId;
     currentProjectId = projectId;
     
-    // TODO: Load custom work order data and populate edit form
-    // For now, just show the modal
-    const modal = new bootstrap.Modal(document.getElementById('editCustomWorkOrderModal'));
-    modal.show();
+    // Load custom work order data
+    fetch(`/Project/GetCustomWorkOrder?id=${customWorkOrderId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.customWorkOrder) {
+                const cwo = data.customWorkOrder;
+                const form = document.getElementById('editCustomWorkOrderModal').querySelector('#customWorkOrderForm');
+                
+                // Populate form fields
+                form.querySelector('input[name="Id"]').value = cwo.id;
+                form.querySelector('input[name="ProjectId"]').value = cwo.projectId;
+                form.querySelector('input[name="Name"]').value = cwo.name || '';
+                form.querySelector('select[name="WorkOrderType"]').value = cwo.workOrderType || 0;
+                form.querySelector('textarea[name="Description"]').value = cwo.description || '';
+                form.querySelector('input[name="AssignedTo"]').value = cwo.assignedTo || '';
+                form.querySelector('input[name="EstimatedHours"]').value = cwo.estimatedHours || '';
+                form.querySelector('input[name="ActualHours"]').value = cwo.actualHours || '';
+                form.querySelector('select[name="Status"]').value = cwo.status || 0;
+                form.querySelector('input[name="StartDate"]').value = cwo.startDate ? cwo.startDate.split('T')[0] : '';
+                form.querySelector('input[name="CompletedDate"]').value = cwo.completedDate ? cwo.completedDate.split('T')[0] : '';
+                form.querySelector('textarea[name="Notes"]').value = cwo.notes || '';
+                
+                const modal = new bootstrap.Modal(document.getElementById('editCustomWorkOrderModal'));
+                modal.show();
+            } else {
+                showNotification('Error loading custom work order data', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showNotification('Network error occurred', 'error');
+        });
 }
 
 function saveCustomWorkOrder() {
@@ -1117,6 +1175,76 @@ function updateCustomWorkOrderInDOM(customWorkOrder, projectId) {
 function updatePurchaseOrderCountInTable(projectId, delta) {
     // TODO: Update purchase order count in table header if needed
     console.log('Update PO count', projectId, delta);
+}
+
+// SmartSheet Import Functions
+function showSmartSheetImport() {
+    // Reset modal state
+    document.getElementById('smartSheetSelection').classList.remove('d-none');
+    document.getElementById('smartSheetLoadingState').classList.add('d-none');
+    document.getElementById('smartSheetImporting').classList.add('d-none');
+    document.getElementById('smartSheetResults').classList.add('d-none');
+    document.getElementById('startImportBtn').disabled = false; // Enable immediately
+    
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('smartSheetImportModal'));
+    modal.show();
+}
+
+
+function startSmartSheetImport() {
+    
+    // Show importing state
+    document.getElementById('smartSheetSelection').classList.add('d-none');
+    document.getElementById('smartSheetImporting').classList.remove('d-none');
+    document.getElementById('startImportBtn').disabled = true;
+    
+    // Start import
+    fetch('/Project/ImportFromSmartSheet', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        // No body needed - the service will find the Master Project List sheet directly
+    })
+    .then(response => response.json())
+    .then(data => {
+        document.getElementById('smartSheetImporting').classList.add('d-none');
+        
+        if (data.success) {
+            document.getElementById('smartSheetResults').classList.remove('d-none');
+            document.getElementById('importResultsText').innerHTML = `
+                <div><strong>Import Summary:</strong></div>
+                <ul class="mb-0">
+                    <li>Projects Created: <strong>${data.result.projectsCreated}</strong></li>
+                    <li>Projects Skipped (already exist): <strong>${data.result.projectsSkipped}</strong></li>
+                    <li>Projects with Errors: <strong>${data.result.projectsWithErrors}</strong></li>
+                    <li>Total Rows Processed: <strong>${data.result.totalRowsProcessed}</strong></li>
+                </ul>
+                ${data.result.projectsCreated > 0 ? '<p class="mt-2 mb-0"><em>Page will refresh to show imported projects...</em></p>' : ''}
+            `;
+            
+            showNotification(data.message, 'success');
+            
+            // Refresh page after a short delay if projects were created
+            if (data.result.projectsCreated > 0) {
+                setTimeout(() => {
+                    location.reload();
+                }, 3000);
+            }
+        } else {
+            document.getElementById('smartSheetSelection').classList.remove('d-none');
+            document.getElementById('startImportBtn').disabled = false;
+            showNotification(data.message || 'Error during SmartSheet import', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error during SmartSheet import:', error);
+        document.getElementById('smartSheetImporting').classList.add('d-none');
+        document.getElementById('smartSheetSelection').classList.remove('d-none');
+        document.getElementById('startImportBtn').disabled = false;
+        showNotification('Network error during SmartSheet import', 'error');
+    });
 }
 
 // Notification system

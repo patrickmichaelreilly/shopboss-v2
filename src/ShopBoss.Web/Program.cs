@@ -85,6 +85,7 @@ builder.Services.AddScoped<ProjectService>();
 builder.Services.AddScoped<ProjectAttachmentService>();
 builder.Services.AddScoped<PurchaseOrderService>();
 builder.Services.AddScoped<CustomWorkOrderService>();
+builder.Services.AddScoped<SmartSheetImportService>();
 // UniversalScannerService removed - using event-based architecture instead
 
 // Add background services
