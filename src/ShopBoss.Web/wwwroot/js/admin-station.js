@@ -513,6 +513,28 @@ function initializeImportPage() {
 // ===== Initialization =====
 
 document.addEventListener('DOMContentLoaded', function() {
+    // Listen for active work order changes from the dropdown
+    window.addEventListener('activeWorkOrderChanged', function(event) {
+        const { workOrderName } = event.detail;
+        
+        // Update the active work order display on the admin page
+        const activeWorkOrderElement = document.querySelector('small.text-muted strong');
+        if (activeWorkOrderElement) {
+            activeWorkOrderElement.textContent = workOrderName;
+            activeWorkOrderElement.className = workOrderName !== 'None' ? 'text-warning' : '';
+            
+            // Update the icon color too
+            const iconElement = document.querySelector('small.text-muted i.fas.fa-star');
+            if (iconElement) {
+                if (workOrderName !== 'None') {
+                    iconElement.classList.add('text-warning');
+                } else {
+                    iconElement.classList.remove('text-warning');
+                }
+            }
+        }
+    });
+
     // Initialize select all checkbox functionality
     const selectAllCheckbox = document.getElementById('selectAll');
     if (selectAllCheckbox) {

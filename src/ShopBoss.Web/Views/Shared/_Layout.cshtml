@@ -222,6 +222,12 @@
                     activeNameSpan.textContent = data.workOrderName;
                     activeNameSpan.className = 'work-order-name ms-2';
                     
+                    // Close the dropdown on all pages
+                    const dropdown = bootstrap.Dropdown.getInstance(document.getElementById('activeWorkOrderDropdown'));
+                    if (dropdown) {
+                        dropdown.hide();
+                    }
+                    
                     // Check if we're on the admin page
                     if (window.location.pathname === '/Admin' || window.location.pathname === '/Admin/Index' || window.location.pathname.startsWith('/Admin?')) {
                         // For admin work orders page, just reload the work order dropdown and update the active work order display
@@ -235,8 +241,17 @@
                             }
                         }, 500);
                     } else {
+                        // Emit custom event that pages can listen to if they need to respond to work order changes
+                        // No page reload to avoid collapsing expanded views
                         setTimeout(() => {
-                            window.location.reload();
+                            const event = new CustomEvent('activeWorkOrderChanged', {
+                                detail: {
+                                    workOrderId: data.workOrderId,
+                                    workOrderName: data.workOrderName
+                                }
+                            });
+                            window.dispatchEvent(event);
+                            loadWorkOrderDropdown(); // Update dropdown display
                         }, 500);
                     }
                 } else {

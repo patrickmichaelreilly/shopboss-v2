@@ -165,9 +165,13 @@ function saveProjectEdit(projectId) {
         if (data.success) {
             showNotification('Project updated successfully', 'success');
             
-            // Update the project name in the table row if it changed
+            // Update the project ID and name in the table row if they changed
             const projectRow = document.getElementById(`expand-icon-${projectId}`).closest('tr');
+            const projectIdCell = projectRow.querySelector('td:nth-child(2)');
             const projectNameCell = projectRow.querySelector('td:nth-child(3) strong');
+            if (projectIdCell) {
+                projectIdCell.textContent = project.ProjectId;
+            }
             if (projectNameCell) {
                 projectNameCell.textContent = project.ProjectName;
             }
@@ -1147,8 +1151,6 @@ function addCustomWorkOrderToDOM(customWorkOrder, projectId) {
             <i class="fas fa-wrench text-info me-2" style="font-size: 0.8em;" title="Custom Work Order"></i>
             <div style="font-size: 0.9em;">
                 <span class="fw-bold">${customWorkOrder.name}</span>
-                <small class="text-muted ms-2">• ${customWorkOrder.workOrderType}</small>
-                <small class="text-muted ms-2">• <span class="badge bg-secondary" style="font-size: 0.7em;">${customWorkOrder.status}</span></small>
                 <small class="text-muted ms-2">• Created: ${new Date(customWorkOrder.createdDate).toLocaleDateString('en-US', {month: '2-digit', day: '2-digit', year: '2-digit'})}</small>
             </div>
         </div>

@@ -1086,6 +1086,26 @@ function resetTouchState() {
 // ===== Initialization =====
 
 document.addEventListener('DOMContentLoaded', function() {
+    // Listen for active work order changes from the dropdown
+    window.addEventListener('activeWorkOrderChanged', function(event) {
+        const { workOrderId, workOrderName } = event.detail;
+        
+        // Update SignalR groups for real-time updates
+        if (signalRConnection && signalRConnection.state === signalR.HubConnectionState.Connected) {
+            // Leave previous work order group and join new one
+            if (window.currentWorkOrderId) {
+                signalRConnection.invoke("LeaveWorkOrderGroup", window.currentWorkOrderId);
+            }
+            if (workOrderId) {
+                signalRConnection.invoke("JoinWorkOrderGroup", workOrderId);
+                window.currentWorkOrderId = workOrderId;
+            }
+        }
+        
+        // Reload the page to show parts for the new work order
+        location.reload();
+    });
+
     // Initialize from ViewBag values
     const selectedRackId = document.getElementById('selectedRackId')?.value;
     const urlParams = new URLSearchParams(window.location.search);

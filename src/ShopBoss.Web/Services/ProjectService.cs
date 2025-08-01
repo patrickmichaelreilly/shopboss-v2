@@ -22,6 +22,8 @@ public class ProjectService
             var query = _context.Projects
                 .Include(p => p.WorkOrders)
                 .Include(p => p.Attachments)
+                .Include(p => p.PurchaseOrders)
+                .Include(p => p.CustomWorkOrders)
                 .AsQueryable();
 
             if (!includeArchived)
