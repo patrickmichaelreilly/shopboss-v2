@@ -27,6 +27,8 @@ public class ShopBossDbContext : DbContext
     public DbSet<SortingRule> SortingRules { get; set; }
     public DbSet<Project> Projects { get; set; }
     public DbSet<ProjectAttachment> ProjectAttachments { get; set; }
+    public DbSet<PurchaseOrder> PurchaseOrders { get; set; }
+    public DbSet<CustomWorkOrder> CustomWorkOrders { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -340,6 +342,49 @@ public class ShopBossDbContext : DbContext
                 .WithMany(p => p.WorkOrders)
                 .HasForeignKey(e => e.ProjectId)
                 .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<PurchaseOrder>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.ProjectId).IsRequired();
+            entity.Property(e => e.PurchaseOrderNumber).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.VendorName).IsRequired().HasMaxLength(200);
+            entity.Property(e => e.Description).IsRequired().HasMaxLength(500);
+            entity.Property(e => e.Status).IsRequired();
+            entity.Property(e => e.OrderDate).IsRequired();
+            entity.Property(e => e.CreatedDate).IsRequired();
+            
+            entity.HasOne(e => e.Project)
+                .WithMany(p => p.PurchaseOrders)
+                .HasForeignKey(e => e.ProjectId)
+                .OnDelete(DeleteBehavior.Cascade);
+                
+            entity.HasIndex(e => e.ProjectId);
+            entity.HasIndex(e => e.PurchaseOrderNumber);
+            entity.HasIndex(e => e.Status);
+            entity.HasIndex(e => e.OrderDate);
+        });
+
+        modelBuilder.Entity<CustomWorkOrder>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.ProjectId).IsRequired();
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(200);
+            entity.Property(e => e.WorkOrderType).IsRequired();
+            entity.Property(e => e.Description).IsRequired().HasMaxLength(500);
+            entity.Property(e => e.Status).IsRequired();
+            entity.Property(e => e.CreatedDate).IsRequired();
+            
+            entity.HasOne(e => e.Project)
+                .WithMany(p => p.CustomWorkOrders)
+                .HasForeignKey(e => e.ProjectId)
+                .OnDelete(DeleteBehavior.Cascade);
+                
+            entity.HasIndex(e => e.ProjectId);
+            entity.HasIndex(e => e.WorkOrderType);
+            entity.HasIndex(e => e.Status);
+            entity.HasIndex(e => e.CreatedDate);
         });
     }
 }

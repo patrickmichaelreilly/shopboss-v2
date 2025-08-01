@@ -9,15 +9,21 @@ public class ProjectController : Controller
 {
     private readonly ProjectService _projectService;
     private readonly ProjectAttachmentService _attachmentService;
+    private readonly PurchaseOrderService _purchaseOrderService;
+    private readonly CustomWorkOrderService _customWorkOrderService;
     private readonly ILogger<ProjectController> _logger;
 
     public ProjectController(
         ProjectService projectService,
         ProjectAttachmentService attachmentService,
+        PurchaseOrderService purchaseOrderService,
+        CustomWorkOrderService customWorkOrderService,
         ILogger<ProjectController> logger)
     {
         _projectService = projectService;
         _attachmentService = attachmentService;
+        _purchaseOrderService = purchaseOrderService;
+        _customWorkOrderService = customWorkOrderService;
         _logger = logger;
     }
 
@@ -273,6 +279,140 @@ public class ProjectController : Controller
         {
             _logger.LogError(ex, "Error updating file category {FileId}", request.Id);
             return Json(new { success = false, message = "Error updating file category" });
+        }
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> CreatePurchaseOrder([FromBody] PurchaseOrder purchaseOrder)
+    {
+        try
+        {
+            if (!ModelState.IsValid)
+            {
+                var errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage);
+                _logger.LogWarning("Model validation failed for purchase order: {Errors}", string.Join(", ", errors));
+                return Json(new { success = false, message = $"Invalid purchase order data: {string.Join(", ", errors)}" });
+            }
+
+            var createdPurchaseOrder = await _purchaseOrderService.CreatePurchaseOrderAsync(purchaseOrder);
+            return Json(new { success = true, purchaseOrder = createdPurchaseOrder });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating purchase order for project {ProjectId}", purchaseOrder.ProjectId);
+            return Json(new { success = false, message = "Error creating purchase order" });
+        }
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> UpdatePurchaseOrder([FromBody] PurchaseOrder purchaseOrder)
+    {
+        try
+        {
+            if (!ModelState.IsValid)
+            {
+                return Json(new { success = false, message = "Invalid purchase order data" });
+            }
+
+            var updatedPurchaseOrder = await _purchaseOrderService.UpdatePurchaseOrderAsync(purchaseOrder);
+            if (updatedPurchaseOrder != null)
+            {
+                return Json(new { success = true, purchaseOrder = updatedPurchaseOrder });
+            }
+            
+            return Json(new { success = false, message = "Purchase order not found" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating purchase order {PurchaseOrderId}", purchaseOrder.Id);
+            return Json(new { success = false, message = "Error updating purchase order" });
+        }
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> DeletePurchaseOrder(string id)
+    {
+        try
+        {
+            var success = await _purchaseOrderService.DeletePurchaseOrderAsync(id);
+            if (success)
+            {
+                return Json(new { success = true });
+            }
+            
+            return Json(new { success = false, message = "Purchase order not found" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting purchase order {PurchaseOrderId}", id);
+            return Json(new { success = false, message = "Error deleting purchase order" });
+        }
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> CreateCustomWorkOrder([FromBody] CustomWorkOrder customWorkOrder)
+    {
+        try
+        {
+            if (!ModelState.IsValid)
+            {
+                var errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage);
+                _logger.LogWarning("Model validation failed for custom work order: {Errors}", string.Join(", ", errors));
+                return Json(new { success = false, message = $"Invalid custom work order data: {string.Join(", ", errors)}" });
+            }
+
+            var createdCustomWorkOrder = await _customWorkOrderService.CreateCustomWorkOrderAsync(customWorkOrder);
+            return Json(new { success = true, customWorkOrder = createdCustomWorkOrder });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating custom work order for project {ProjectId}", customWorkOrder.ProjectId);
+            return Json(new { success = false, message = "Error creating custom work order" });
+        }
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> UpdateCustomWorkOrder([FromBody] CustomWorkOrder customWorkOrder)
+    {
+        try
+        {
+            if (!ModelState.IsValid)
+            {
+                return Json(new { success = false, message = "Invalid custom work order data" });
+            }
+
+            var updatedCustomWorkOrder = await _customWorkOrderService.UpdateCustomWorkOrderAsync(customWorkOrder);
+            if (updatedCustomWorkOrder != null)
+            {
+                return Json(new { success = true, customWorkOrder = updatedCustomWorkOrder });
+            }
+            
+            return Json(new { success = false, message = "Custom work order not found" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating custom work order {CustomWorkOrderId}", customWorkOrder.Id);
+            return Json(new { success = false, message = "Error updating custom work order" });
+        }
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> DeleteCustomWorkOrder(string id)
+    {
+        try
+        {
+            var success = await _customWorkOrderService.DeleteCustomWorkOrderAsync(id);
+            if (success)
+            {
+                return Json(new { success = true });
+            }
+            
+            return Json(new { success = false, message = "Custom work order not found" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting custom work order {CustomWorkOrderId}", id);
+            return Json(new { success = false, message = "Error deleting custom work order" });
         }
     }
 

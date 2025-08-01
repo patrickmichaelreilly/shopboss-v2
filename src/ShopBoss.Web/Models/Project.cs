@@ -43,4 +43,8 @@ public class Project
     public List<WorkOrder> WorkOrders { get; set; } = new();
     
     public List<ProjectAttachment> Attachments { get; set; } = new();
+    
+    public List<PurchaseOrder> PurchaseOrders { get; set; } = new();
+    
+    public List<CustomWorkOrder> CustomWorkOrders { get; set; } = new();
 }

@@ -83,6 +83,8 @@ builder.Services.AddScoped<WorkOrderImportService>();
 builder.Services.AddScoped<WorkOrderDeletionService>();
 builder.Services.AddScoped<ProjectService>();
 builder.Services.AddScoped<ProjectAttachmentService>();
+builder.Services.AddScoped<PurchaseOrderService>();
+builder.Services.AddScoped<CustomWorkOrderService>();
 // UniversalScannerService removed - using event-based architecture instead
 
 // Add background services
