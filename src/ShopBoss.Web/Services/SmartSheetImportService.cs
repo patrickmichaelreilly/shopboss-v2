@@ -178,31 +178,11 @@ public class SmartSheetImportService
                     break;
                     
                 case "Status":
-                    // Map Status to IsArchived - SmartSheet Status = isActive, our IsArchived = isInactive
-                    // So we need to invert: Active in SmartSheet = false in IsArchived
-                    switch (value.ToLower().Trim())
-                    {
-                        case "active":
-                        case "in progress":
-                        case "in-progress":
-                        case "ongoing":
-                        case "current":
-                            project.IsArchived = false; // Active projects are not archived
-                            break;
-                        case "complete":
-                        case "completed":
-                        case "finished":
-                        case "done":
-                        case "cancelled":
-                        case "canceled":
-                        case "closed":
-                        case "inactive":
-                            project.IsArchived = true; // Inactive/completed projects are archived
-                            break;
-                        default:
-                            project.IsArchived = false; // Default to active (not archived)
-                            break;
-                    }
+                    // Status values: "Yes" = active (not archived), "No" = inactive (archived), null = archived
+                    if (value == "Yes")
+                        project.IsArchived = false;
+                    else // "No" or null
+                        project.IsArchived = true;
                     break;
                     
                 case "Project Name":
