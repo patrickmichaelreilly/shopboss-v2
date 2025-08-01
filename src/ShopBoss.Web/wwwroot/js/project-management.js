@@ -754,7 +754,7 @@ function savePurchaseOrder() {
         ExpectedDeliveryDate: formData.get('ExpectedDeliveryDate') || null,
         ActualDeliveryDate: formData.get('ActualDeliveryDate') || null,
         TotalAmount: formData.get('TotalAmount') ? parseFloat(formData.get('TotalAmount')) : null,
-        Status: formData.get('Status'),
+        Status: parseInt(formData.get('Status')) || 0,
         Notes: formData.get('Notes') || null
     };
 
@@ -803,7 +803,7 @@ function savePurchaseOrderEdit() {
         ExpectedDeliveryDate: formData.get('ExpectedDeliveryDate') || null,
         ActualDeliveryDate: formData.get('ActualDeliveryDate') || null,
         TotalAmount: formData.get('TotalAmount') ? parseFloat(formData.get('TotalAmount')) : null,
-        Status: formData.get('Status'),
+        Status: parseInt(formData.get('Status')) || 0,
         Notes: formData.get('Notes') || null
     };
 
@@ -910,12 +910,12 @@ function saveCustomWorkOrder() {
         Id: formData.get('Id') || '',
         ProjectId: formData.get('ProjectId'),
         Name: formData.get('Name'),
-        WorkOrderType: formData.get('WorkOrderType'),
+        WorkOrderType: parseInt(formData.get('WorkOrderType')) || 0,
         Description: formData.get('Description'),
         AssignedTo: formData.get('AssignedTo') || null,
         EstimatedHours: formData.get('EstimatedHours') ? parseFloat(formData.get('EstimatedHours')) : null,
         ActualHours: formData.get('ActualHours') ? parseFloat(formData.get('ActualHours')) : null,
-        Status: formData.get('Status'),
+        Status: parseInt(formData.get('Status')) || 0,
         StartDate: formData.get('StartDate') || null,
         CompletedDate: formData.get('CompletedDate') || null,
         Notes: formData.get('Notes') || null
@@ -957,12 +957,12 @@ function saveCustomWorkOrderEdit() {
         Id: currentCustomWorkOrderId,
         ProjectId: currentProjectId,
         Name: formData.get('Name'),
-        WorkOrderType: formData.get('WorkOrderType'),
+        WorkOrderType: parseInt(formData.get('WorkOrderType')) || 0,
         Description: formData.get('Description'),
         AssignedTo: formData.get('AssignedTo') || null,
         EstimatedHours: formData.get('EstimatedHours') ? parseFloat(formData.get('EstimatedHours')) : null,
         ActualHours: formData.get('ActualHours') ? parseFloat(formData.get('ActualHours')) : null,
-        Status: formData.get('Status'),
+        Status: parseInt(formData.get('Status')) || 0,
         StartDate: formData.get('StartDate') || null,
         CompletedDate: formData.get('CompletedDate') || null,
         Notes: formData.get('Notes') || null

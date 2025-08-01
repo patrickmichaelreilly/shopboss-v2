@@ -17,10 +17,15 @@
                 <label for="Status" class="form-label">Status <span class="text-danger">*</span></label>
                 <select class="form-select" name="Status" required>
                     @{
-                        var statusOptions = new[] { "Pending", "Ordered", "Received", "Cancelled" };
+                        var statusOptions = new[] { 
+                            new { Value = 0, Name = "Pending", Text = "Pending" },
+                            new { Value = 1, Name = "Ordered", Text = "Ordered" },
+                            new { Value = 2, Name = "Received", Text = "Received" },
+                            new { Value = 3, Name = "Cancelled", Text = "Cancelled" }
+                        };
                         foreach (var status in statusOptions)
                         {
-                            <option value="@status" selected="@(Model.Status.ToString() == status)">@status</option>
+                            <option value="@status.Value" selected="@((int)Model.Status == status.Value)">@status.Text</option>
                         }
                     }
                 </select>

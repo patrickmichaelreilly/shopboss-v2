@@ -18,15 +18,15 @@
                 <select class="form-select" name="WorkOrderType" required>
                     @{
                         var typeOptions = new[] { 
-                            new { Value = "Layup", Text = "Layup" },
-                            new { Value = "Finishing", Text = "Finishing" },
-                            new { Value = "CustomFabrication", Text = "Custom Fabrication" },
-                            new { Value = "Welding", Text = "Welding" },
-                            new { Value = "Other", Text = "Other" }
+                            new { Value = 0, Name = "Layup", Text = "Layup" },
+                            new { Value = 1, Name = "Finishing", Text = "Finishing" },
+                            new { Value = 2, Name = "CustomFabrication", Text = "Custom Fabrication" },
+                            new { Value = 3, Name = "Welding", Text = "Welding" },
+                            new { Value = 4, Name = "Other", Text = "Other" }
                         };
                         foreach (var type in typeOptions)
                         {
-                            <option value="@type.Value" selected="@(Model.WorkOrderType.ToString() == type.Value)">@type.Text</option>
+                            <option value="@type.Value" selected="@((int)Model.WorkOrderType == type.Value)">@type.Text</option>
                         }
                     }
                 </select>
@@ -46,14 +46,14 @@
                 <select class="form-select" name="Status" required>
                     @{
                         var statusOptions = new[] { 
-                            new { Value = "Pending", Text = "Pending" },
-                            new { Value = "InProgress", Text = "In Progress" },
-                            new { Value = "Completed", Text = "Completed" },
-                            new { Value = "Cancelled", Text = "Cancelled" }
+                            new { Value = 0, Name = "Pending", Text = "Pending" },
+                            new { Value = 1, Name = "InProgress", Text = "In Progress" },
+                            new { Value = 2, Name = "Completed", Text = "Completed" },
+                            new { Value = 3, Name = "Cancelled", Text = "Cancelled" }
                         };
                         foreach (var status in statusOptions)
                         {
-                            <option value="@status.Value" selected="@(Model.Status.ToString() == status.Value)">@status.Text</option>
+                            <option value="@status.Value" selected="@((int)Model.Status == status.Value)">@status.Text</option>
                         }
                     }
                 </select>
