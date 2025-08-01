@@ -196,54 +196,37 @@ else
                                         <div id="project-display-@project.Id">
                                             <table class="table table-sm table-borderless mb-0">
                                                 <tbody>
-                                                    <!-- Internal Information -->
+                                                    <!-- Left: Customer Info, Right: Internal Info -->
                                                     <tr>
-                                                        <td width="120" class="text-muted ps-3">Category:</td>
-                                                        <td><span class="badge bg-secondary">@project.ProjectCategory</span></td>
+                                                        <td width="120" class="text-muted ps-3">Address:</td>
+                                                        <td>@(project.ProjectAddress ?? "-")</td>
                                                         <td width="120" class="text-muted">Bid Date:</td>
                                                         <td>@(project.BidRequestDate?.ToString("MM/dd/yy") ?? "-")</td>
                                                     </tr>
                                                     <tr>
-                                                        <td class="text-muted ps-3">PM:</td>
+                                                        <td class="text-muted ps-3">Contractor:</td>
+                                                        <td>@(project.GeneralContractor ?? "-")</td>
+                                                        <td class="text-muted">PM:</td>
                                                         <td>@(project.ProjectManager ?? "-")</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td class="text-muted ps-3">Contact:</td>
+                                                        <td>@(project.ProjectContact ?? "-")</td>
                                                         <td class="text-muted">Installer:</td>
                                                         <td>@(project.Installer ?? "-")</td>
                                                     </tr>
-                                                    
-                                                    <!-- Customer Information -->
-                                                    @if (!string.IsNullOrEmpty(project.ProjectAddress) || !string.IsNullOrEmpty(project.ProjectContact) || 
-                                                         !string.IsNullOrEmpty(project.ProjectContactPhone) || !string.IsNullOrEmpty(project.ProjectContactEmail) || 
-                                                         !string.IsNullOrEmpty(project.GeneralContractor))
-                                                    {
-                                                        <tr><td colspan="4" class="py-2"></td></tr>
-                                                        @if (!string.IsNullOrEmpty(project.ProjectAddress))
-                                                        {
-                                                            <tr>
-                                                                <td class="text-muted ps-3">Address:</td>
-                                                                <td colspan="3">@project.ProjectAddress</td>
-                                                            </tr>
-                                                        }
-                                                        <tr>
-                                                            <td class="text-muted ps-3">Contact:</td>
-                                                            <td>@(project.ProjectContact ?? "-")</td>
-                                                            <td class="text-muted">Phone:</td>
-                                                            <td>@(project.ProjectContactPhone ?? "-")</td>
-                                                        </tr>
-                                                        @if (!string.IsNullOrEmpty(project.ProjectContactEmail))
-                                                        {
-                                                            <tr>
-                                                                <td class="text-muted ps-3">Email:</td>
-                                                                <td colspan="3">@project.ProjectContactEmail</td>
-                                                            </tr>
-                                                        }
-                                                        @if (!string.IsNullOrEmpty(project.GeneralContractor))
-                                                        {
-                                                            <tr>
-                                                                <td class="text-muted ps-3">Contractor:</td>
-                                                                <td colspan="3">@project.GeneralContractor</td>
-                                                            </tr>
-                                                        }
-                                                    }
+                                                    <tr>
+                                                        <td class="text-muted ps-3">Email:</td>
+                                                        <td>@(project.ProjectContactEmail ?? "-")</td>
+                                                        <td class="text-muted">Category:</td>
+                                                        <td><span class="badge bg-secondary">@project.ProjectCategory</span></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td class="text-muted ps-3">Phone:</td>
+                                                        <td>@(project.ProjectContactPhone ?? "-")</td>
+                                                        <td></td>
+                                                        <td></td>
+                                                    </tr>
                                                     
                                                     @if (!string.IsNullOrEmpty(project.Notes))
                                                     {

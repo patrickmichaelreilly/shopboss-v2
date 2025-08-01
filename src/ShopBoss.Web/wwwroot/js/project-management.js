@@ -196,48 +196,37 @@ function updateProjectDisplayContent(projectId, project) {
     displayContainer.innerHTML = `
         <table class="table table-sm table-borderless mb-0">
             <tbody>
-                <!-- Internal Information -->
+                <!-- Left: Customer Info, Right: Internal Info -->
                 <tr>
-                    <td width="120" class="text-muted ps-3">Category:</td>
-                    <td><span class="badge bg-secondary">${categoryBadges[project.ProjectCategory] || 'Unknown'}</span></td>
+                    <td width="120" class="text-muted ps-3">Address:</td>
+                    <td>${project.ProjectAddress || '-'}</td>
                     <td width="120" class="text-muted">Bid Date:</td>
                     <td>${project.BidRequestDate ? new Date(project.BidRequestDate).toLocaleDateString('en-US', {month: '2-digit', day: '2-digit', year: '2-digit'}) : '-'}</td>
                 </tr>
                 <tr>
-                    <td class="text-muted ps-3">PM:</td>
+                    <td class="text-muted ps-3">Contractor:</td>
+                    <td>${project.GeneralContractor || '-'}</td>
+                    <td class="text-muted">PM:</td>
                     <td>${project.ProjectManager || '-'}</td>
-                    <td class="text-muted">Installer:</td>
-                    <td>${project.Installer || '-'}</td>
                 </tr>
-                
-                ${(project.ProjectAddress || project.ProjectContact || project.ProjectContactPhone || project.ProjectContactEmail || project.GeneralContractor) ? `
-                <!-- Customer Information -->
-                <tr><td colspan="4" class="py-2"></td></tr>
-                ${project.ProjectAddress ? `
-                <tr>
-                    <td class="text-muted ps-3">Address:</td>
-                    <td colspan="3">${project.ProjectAddress}</td>
-                </tr>
-                ` : ''}
                 <tr>
                     <td class="text-muted ps-3">Contact:</td>
                     <td>${project.ProjectContact || '-'}</td>
-                    <td class="text-muted">Phone:</td>
-                    <td>${project.ProjectContactPhone || '-'}</td>
+                    <td class="text-muted">Installer:</td>
+                    <td>${project.Installer || '-'}</td>
                 </tr>
-                ${project.ProjectContactEmail ? `
                 <tr>
                     <td class="text-muted ps-3">Email:</td>
-                    <td colspan="3">${project.ProjectContactEmail}</td>
+                    <td>${project.ProjectContactEmail || '-'}</td>
+                    <td class="text-muted">Category:</td>
+                    <td><span class="badge bg-secondary">${categoryBadges[project.ProjectCategory] || 'Unknown'}</span></td>
                 </tr>
-                ` : ''}
-                ${project.GeneralContractor ? `
                 <tr>
-                    <td class="text-muted ps-3">Contractor:</td>
-                    <td colspan="3">${project.GeneralContractor}</td>
+                    <td class="text-muted ps-3">Phone:</td>
+                    <td>${project.ProjectContactPhone || '-'}</td>
+                    <td></td>
+                    <td></td>
                 </tr>
-                ` : ''}
-                ` : ''}
                 
                 ${project.Notes ? `
                 <tr><td colspan="4" class="py-2"></td></tr>
