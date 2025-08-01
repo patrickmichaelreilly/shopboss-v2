@@ -708,6 +708,417 @@ function updateFileCountInTable(projectId, delta) {
     }
 }
 
+// Purchase Order Management
+let currentPurchaseOrderId = null;
+
+function showCreatePurchaseOrder(projectId) {
+    currentProjectId = projectId;
+    
+    // Clear the form
+    const form = document.getElementById('purchaseOrderForm');
+    if (form) {
+        form.reset();
+        form.querySelector('input[name="ProjectId"]').value = projectId;
+        form.querySelector('input[name="Id"]').value = '';
+        form.querySelector('input[name="OrderDate"]').value = new Date().toISOString().split('T')[0];
+    }
+    
+    const modal = new bootstrap.Modal(document.getElementById('createPurchaseOrderModal'));
+    modal.show();
+}
+
+function editPurchaseOrder(purchaseOrderId, projectId) {
+    currentPurchaseOrderId = purchaseOrderId;
+    currentProjectId = projectId;
+    
+    // TODO: Load purchase order data and populate edit form
+    // For now, just show the modal
+    const modal = new bootstrap.Modal(document.getElementById('editPurchaseOrderModal'));
+    modal.show();
+}
+
+function savePurchaseOrder() {
+    const form = document.getElementById('purchaseOrderForm');
+    const formData = new FormData(form);
+    
+    const purchaseOrder = {
+        Id: formData.get('Id') || '',
+        ProjectId: formData.get('ProjectId'),
+        PurchaseOrderNumber: formData.get('PurchaseOrderNumber'),
+        VendorName: formData.get('VendorName'),
+        VendorContact: formData.get('VendorContact') || null,
+        VendorPhone: formData.get('VendorPhone') || null,
+        VendorEmail: formData.get('VendorEmail') || null,
+        Description: formData.get('Description'),
+        OrderDate: formData.get('OrderDate'),
+        ExpectedDeliveryDate: formData.get('ExpectedDeliveryDate') || null,
+        ActualDeliveryDate: formData.get('ActualDeliveryDate') || null,
+        TotalAmount: formData.get('TotalAmount') ? parseFloat(formData.get('TotalAmount')) : null,
+        Status: formData.get('Status'),
+        Notes: formData.get('Notes') || null
+    };
+
+    fetch('/Project/CreatePurchaseOrder', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(purchaseOrder)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('Purchase order created successfully', 'success');
+            bootstrap.Modal.getInstance(document.getElementById('createPurchaseOrderModal')).hide();
+            
+            // Add purchase order to DOM
+            addPurchaseOrderToDOM(data.purchaseOrder, currentProjectId);
+            
+            // Update purchase order count
+            updatePurchaseOrderCountInTable(currentProjectId, 1);
+        } else {
+            showNotification(data.message || 'Error creating purchase order', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('Network error occurred', 'error');
+    });
+}
+
+function savePurchaseOrderEdit() {
+    const form = document.getElementById('editPurchaseOrderModal').querySelector('#purchaseOrderForm');
+    const formData = new FormData(form);
+    
+    const purchaseOrder = {
+        Id: currentPurchaseOrderId,
+        ProjectId: currentProjectId,
+        PurchaseOrderNumber: formData.get('PurchaseOrderNumber'),
+        VendorName: formData.get('VendorName'),
+        VendorContact: formData.get('VendorContact') || null,
+        VendorPhone: formData.get('VendorPhone') || null,
+        VendorEmail: formData.get('VendorEmail') || null,
+        Description: formData.get('Description'),
+        OrderDate: formData.get('OrderDate'),
+        ExpectedDeliveryDate: formData.get('ExpectedDeliveryDate') || null,
+        ActualDeliveryDate: formData.get('ActualDeliveryDate') || null,
+        TotalAmount: formData.get('TotalAmount') ? parseFloat(formData.get('TotalAmount')) : null,
+        Status: formData.get('Status'),
+        Notes: formData.get('Notes') || null
+    };
+
+    fetch('/Project/UpdatePurchaseOrder', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(purchaseOrder)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('Purchase order updated successfully', 'success');
+            bootstrap.Modal.getInstance(document.getElementById('editPurchaseOrderModal')).hide();
+            
+            // Update purchase order in DOM
+            updatePurchaseOrderInDOM(data.purchaseOrder, currentProjectId);
+        } else {
+            showNotification(data.message || 'Error updating purchase order', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('Network error occurred', 'error');
+    });
+}
+
+function deletePurchaseOrder(purchaseOrderId, projectId) {
+    if (confirm('Are you sure you want to delete this purchase order?')) {
+        fetch('/Project/DeletePurchaseOrder', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `id=${purchaseOrderId}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification('Purchase order deleted successfully', 'success');
+                
+                // Remove purchase order from DOM
+                const deleteButton = document.querySelector(`button[onclick*="deletePurchaseOrder('${purchaseOrderId}'"]`);
+                if (deleteButton) {
+                    const purchaseOrderElement = deleteButton.closest('.d-flex.justify-content-between');
+                    if (purchaseOrderElement) {
+                        purchaseOrderElement.remove();
+                        
+                        // Update purchase order count
+                        updatePurchaseOrderCountInTable(projectId, -1);
+                        
+                        // Check if no purchase orders left
+                        const poContainer = document.getElementById(`purchase-orders-${projectId}`);
+                        if (poContainer && poContainer.children.length === 0) {
+                            poContainer.innerHTML = '<div class="text-center text-muted py-3"><small>No purchase orders created</small></div>';
+                        }
+                    }
+                }
+            } else {
+                showNotification(data.message || 'Error deleting purchase order', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showNotification('Network error occurred', 'error');
+        });
+    }
+}
+
+// Custom Work Order Management
+let currentCustomWorkOrderId = null;
+
+function showCreateCustomWorkOrder(projectId) {
+    currentProjectId = projectId;
+    
+    // Clear the form
+    const form = document.getElementById('customWorkOrderForm');
+    if (form) {
+        form.reset();
+        form.querySelector('input[name="ProjectId"]').value = projectId;
+        form.querySelector('input[name="Id"]').value = '';
+    }
+    
+    const modal = new bootstrap.Modal(document.getElementById('createCustomWorkOrderModal'));
+    modal.show();
+}
+
+function editCustomWorkOrder(customWorkOrderId, projectId) {
+    currentCustomWorkOrderId = customWorkOrderId;
+    currentProjectId = projectId;
+    
+    // TODO: Load custom work order data and populate edit form
+    // For now, just show the modal
+    const modal = new bootstrap.Modal(document.getElementById('editCustomWorkOrderModal'));
+    modal.show();
+}
+
+function saveCustomWorkOrder() {
+    const form = document.getElementById('customWorkOrderForm');
+    const formData = new FormData(form);
+    
+    const customWorkOrder = {
+        Id: formData.get('Id') || '',
+        ProjectId: formData.get('ProjectId'),
+        Name: formData.get('Name'),
+        WorkOrderType: formData.get('WorkOrderType'),
+        Description: formData.get('Description'),
+        AssignedTo: formData.get('AssignedTo') || null,
+        EstimatedHours: formData.get('EstimatedHours') ? parseFloat(formData.get('EstimatedHours')) : null,
+        ActualHours: formData.get('ActualHours') ? parseFloat(formData.get('ActualHours')) : null,
+        Status: formData.get('Status'),
+        StartDate: formData.get('StartDate') || null,
+        CompletedDate: formData.get('CompletedDate') || null,
+        Notes: formData.get('Notes') || null
+    };
+
+    fetch('/Project/CreateCustomWorkOrder', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(customWorkOrder)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('Custom work order created successfully', 'success');
+            bootstrap.Modal.getInstance(document.getElementById('createCustomWorkOrderModal')).hide();
+            
+            // Add custom work order to DOM
+            addCustomWorkOrderToDOM(data.customWorkOrder, currentProjectId);
+            
+            // Update work order count
+            updateWorkOrderCountInTable(currentProjectId, 1);
+        } else {
+            showNotification(data.message || 'Error creating custom work order', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('Network error occurred', 'error');
+    });
+}
+
+function saveCustomWorkOrderEdit() {
+    const form = document.getElementById('editCustomWorkOrderModal').querySelector('#customWorkOrderForm');
+    const formData = new FormData(form);
+    
+    const customWorkOrder = {
+        Id: currentCustomWorkOrderId,
+        ProjectId: currentProjectId,
+        Name: formData.get('Name'),
+        WorkOrderType: formData.get('WorkOrderType'),
+        Description: formData.get('Description'),
+        AssignedTo: formData.get('AssignedTo') || null,
+        EstimatedHours: formData.get('EstimatedHours') ? parseFloat(formData.get('EstimatedHours')) : null,
+        ActualHours: formData.get('ActualHours') ? parseFloat(formData.get('ActualHours')) : null,
+        Status: formData.get('Status'),
+        StartDate: formData.get('StartDate') || null,
+        CompletedDate: formData.get('CompletedDate') || null,
+        Notes: formData.get('Notes') || null
+    };
+
+    fetch('/Project/UpdateCustomWorkOrder', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(customWorkOrder)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('Custom work order updated successfully', 'success');
+            bootstrap.Modal.getInstance(document.getElementById('editCustomWorkOrderModal')).hide();
+            
+            // Update custom work order in DOM
+            updateCustomWorkOrderInDOM(data.customWorkOrder, currentProjectId);
+        } else {
+            showNotification(data.message || 'Error updating custom work order', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('Network error occurred', 'error');
+    });
+}
+
+function deleteCustomWorkOrder(customWorkOrderId, projectId) {
+    if (confirm('Are you sure you want to delete this custom work order?')) {
+        fetch('/Project/DeleteCustomWorkOrder', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `id=${customWorkOrderId}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification('Custom work order deleted successfully', 'success');
+                
+                // Remove custom work order from DOM
+                const deleteButton = document.querySelector(`button[onclick*="deleteCustomWorkOrder('${customWorkOrderId}'"]`);
+                if (deleteButton) {
+                    const customWorkOrderElement = deleteButton.closest('.d-flex.justify-content-between');
+                    if (customWorkOrderElement) {
+                        customWorkOrderElement.remove();
+                        
+                        // Update work order count
+                        updateWorkOrderCountInTable(projectId, -1);
+                        
+                        // Check if no work orders left
+                        const woContainer = document.getElementById(`work-orders-${projectId}`);
+                        if (woContainer && woContainer.children.length === 0) {
+                            woContainer.innerHTML = '<div class="text-center text-muted py-3"><small>No work orders associated</small></div>';
+                        }
+                    }
+                }
+            } else {
+                showNotification(data.message || 'Error deleting custom work order', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showNotification('Network error occurred', 'error');
+        });
+    }
+}
+
+// Helper functions for DOM manipulation
+function addPurchaseOrderToDOM(purchaseOrder, projectId) {
+    const poContainer = document.getElementById(`purchase-orders-${projectId}`);
+    const noMsg = poContainer.querySelector('.text-center.text-muted');
+    if (noMsg) {
+        noMsg.remove();
+    }
+    
+    const poElement = document.createElement('div');
+    poElement.className = 'd-flex justify-content-between align-items-center border-bottom py-1';
+    poElement.innerHTML = `
+        <div class="d-flex align-items-center flex-grow-1">
+            <i class="fas fa-file-invoice text-muted me-2" style="font-size: 0.9em;"></i>
+            <div style="font-size: 0.9em;">
+                <strong>${purchaseOrder.purchaseOrderNumber}</strong>
+                <small class="text-muted ms-2">• ${purchaseOrder.vendorName}</small>
+                <small class="text-muted ms-2">• <span class="badge bg-secondary" style="font-size: 0.7em;">${purchaseOrder.status}</span></small>
+                <small class="text-muted ms-2">• ${new Date(purchaseOrder.orderDate).toLocaleDateString('en-US', {month: '2-digit', day: '2-digit', year: '2-digit'})}</small>
+            </div>
+        </div>
+        <div class="d-flex">
+            <button type="button" class="btn btn-sm btn-link text-primary p-0 me-2" 
+                    onclick="editPurchaseOrder('${purchaseOrder.id}', '${projectId}')" title="Edit">
+                <i class="fas fa-edit"></i>
+            </button>
+            <button type="button" class="btn btn-sm btn-link text-danger p-0" 
+                    onclick="deletePurchaseOrder('${purchaseOrder.id}', '${projectId}')" title="Delete">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    `;
+    
+    poContainer.insertBefore(poElement, poContainer.firstChild);
+}
+
+function updatePurchaseOrderInDOM(purchaseOrder, projectId) {
+    // TODO: Implement update logic for existing purchase order in DOM
+    console.log('Update purchase order in DOM', purchaseOrder);
+}
+
+function addCustomWorkOrderToDOM(customWorkOrder, projectId) {
+    const woContainer = document.getElementById(`work-orders-${projectId}`);
+    const noMsg = woContainer.querySelector('.text-center.text-muted');
+    if (noMsg) {
+        noMsg.remove();
+    }
+    
+    const woElement = document.createElement('div');
+    woElement.className = 'd-flex justify-content-between align-items-center border-bottom py-1';
+    woElement.innerHTML = `
+        <div class="d-flex align-items-center">
+            <i class="fas fa-wrench text-info me-2" style="font-size: 0.8em;" title="Custom Work Order"></i>
+            <div style="font-size: 0.9em;">
+                <span class="fw-bold">${customWorkOrder.name}</span>
+                <small class="text-muted ms-2">• ${customWorkOrder.workOrderType}</small>
+                <small class="text-muted ms-2">• <span class="badge bg-secondary" style="font-size: 0.7em;">${customWorkOrder.status}</span></small>
+                <small class="text-muted ms-2">• Created: ${new Date(customWorkOrder.createdDate).toLocaleDateString('en-US', {month: '2-digit', day: '2-digit', year: '2-digit'})}</small>
+            </div>
+        </div>
+        <div class="d-flex">
+            <button type="button" class="btn btn-sm btn-link text-primary p-0 me-2" 
+                    onclick="editCustomWorkOrder('${customWorkOrder.id}', '${projectId}')" title="Edit">
+                <i class="fas fa-edit"></i>
+            </button>
+            <button type="button" class="btn btn-sm btn-link text-danger p-0" 
+                    onclick="deleteCustomWorkOrder('${customWorkOrder.id}', '${projectId}')" title="Delete">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    `;
+    
+    woContainer.appendChild(woElement);
+}
+
+function updateCustomWorkOrderInDOM(customWorkOrder, projectId) {
+    // TODO: Implement update logic for existing custom work order in DOM
+    console.log('Update custom work order in DOM', customWorkOrder);
+}
+
+function updatePurchaseOrderCountInTable(projectId, delta) {
+    // TODO: Update purchase order count in table header if needed
+    console.log('Update PO count', projectId, delta);
+}
+
 // Notification system
 function showNotification(message, type) {
     const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';

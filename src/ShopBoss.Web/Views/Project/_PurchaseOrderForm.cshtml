@@ -1,0 +1,103 @@
+@model ShopBoss.Web.Models.PurchaseOrder
+
+<form id="purchaseOrderForm">
+    <input type="hidden" name="Id" value="@Model.Id" />
+    <input type="hidden" name="ProjectId" value="@Model.ProjectId" />
+    <input type="hidden" name="CreatedDate" value="@Model.CreatedDate" />
+    
+    <div class="row">
+        <div class="col-md-6">
+            <div class="mb-3">
+                <label for="PurchaseOrderNumber" class="form-label">PO Number <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" name="PurchaseOrderNumber" value="@Model.PurchaseOrderNumber" required>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="mb-3">
+                <label for="Status" class="form-label">Status <span class="text-danger">*</span></label>
+                <select class="form-select" name="Status" required>
+                    @{
+                        var statusOptions = new[] { "Pending", "Ordered", "Received", "Cancelled" };
+                        foreach (var status in statusOptions)
+                        {
+                            <option value="@status" selected="@(Model.Status.ToString() == status)">@status</option>
+                        }
+                    }
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="mb-3">
+                <label for="VendorName" class="form-label">Vendor Name <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" name="VendorName" value="@Model.VendorName" required>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="mb-3">
+                <label for="VendorContact" class="form-label">Vendor Contact</label>
+                <input type="text" class="form-control" name="VendorContact" value="@Model.VendorContact">
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="mb-3">
+                <label for="VendorPhone" class="form-label">Vendor Phone</label>
+                <input type="tel" class="form-control" name="VendorPhone" value="@Model.VendorPhone">
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="mb-3">
+                <label for="VendorEmail" class="form-label">Vendor Email</label>
+                <input type="email" class="form-control" name="VendorEmail" value="@Model.VendorEmail">
+            </div>
+        </div>
+    </div>
+
+    <div class="mb-3">
+        <label for="Description" class="form-label">Description <span class="text-danger">*</span></label>
+        <textarea class="form-control" name="Description" rows="3" required>@Model.Description</textarea>
+    </div>
+
+    <div class="row">
+        <div class="col-md-4">
+            <div class="mb-3">
+                <label for="OrderDate" class="form-label">Order Date <span class="text-danger">*</span></label>
+                <input type="date" class="form-control" name="OrderDate" value="@(Model.OrderDate == default ? DateTime.Today.ToString("yyyy-MM-dd") : Model.OrderDate.ToString("yyyy-MM-dd"))" required>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="mb-3">
+                <label for="ExpectedDeliveryDate" class="form-label">Expected Delivery</label>
+                <input type="date" class="form-control" name="ExpectedDeliveryDate" value="@(Model.ExpectedDeliveryDate?.ToString("yyyy-MM-dd"))">
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="mb-3">
+                <label for="ActualDeliveryDate" class="form-label">Actual Delivery</label>
+                <input type="date" class="form-control" name="ActualDeliveryDate" value="@(Model.ActualDeliveryDate?.ToString("yyyy-MM-dd"))">
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="mb-3">
+                <label for="TotalAmount" class="form-label">Total Amount</label>
+                <div class="input-group">
+                    <span class="input-group-text">$</span>
+                    <input type="number" class="form-control" name="TotalAmount" step="0.01" min="0" value="@Model.TotalAmount">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mb-3">
+        <label for="Notes" class="form-label">Notes</label>
+        <textarea class="form-control" name="Notes" rows="2">@Model.Notes</textarea>
+    </div>
+</form>

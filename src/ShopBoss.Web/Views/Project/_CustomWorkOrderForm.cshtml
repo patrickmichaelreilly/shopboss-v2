@@ -1,0 +1,104 @@
+@model ShopBoss.Web.Models.CustomWorkOrder
+
+<form id="customWorkOrderForm">
+    <input type="hidden" name="Id" value="@Model.Id" />
+    <input type="hidden" name="ProjectId" value="@Model.ProjectId" />
+    <input type="hidden" name="CreatedDate" value="@Model.CreatedDate" />
+    
+    <div class="row">
+        <div class="col-md-6">
+            <div class="mb-3">
+                <label for="Name" class="form-label">Work Order Name <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" name="Name" value="@Model.Name" required>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="mb-3">
+                <label for="WorkOrderType" class="form-label">Type <span class="text-danger">*</span></label>
+                <select class="form-select" name="WorkOrderType" required>
+                    @{
+                        var typeOptions = new[] { 
+                            new { Value = "Layup", Text = "Layup" },
+                            new { Value = "Finishing", Text = "Finishing" },
+                            new { Value = "CustomFabrication", Text = "Custom Fabrication" },
+                            new { Value = "Welding", Text = "Welding" },
+                            new { Value = "Other", Text = "Other" }
+                        };
+                        foreach (var type in typeOptions)
+                        {
+                            <option value="@type.Value" selected="@(Model.WorkOrderType.ToString() == type.Value)">@type.Text</option>
+                        }
+                    }
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div class="mb-3">
+        <label for="Description" class="form-label">Description <span class="text-danger">*</span></label>
+        <textarea class="form-control" name="Description" rows="3" required>@Model.Description</textarea>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="mb-3">
+                <label for="Status" class="form-label">Status <span class="text-danger">*</span></label>
+                <select class="form-select" name="Status" required>
+                    @{
+                        var statusOptions = new[] { 
+                            new { Value = "Pending", Text = "Pending" },
+                            new { Value = "InProgress", Text = "In Progress" },
+                            new { Value = "Completed", Text = "Completed" },
+                            new { Value = "Cancelled", Text = "Cancelled" }
+                        };
+                        foreach (var status in statusOptions)
+                        {
+                            <option value="@status.Value" selected="@(Model.Status.ToString() == status.Value)">@status.Text</option>
+                        }
+                    }
+                </select>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="mb-3">
+                <label for="AssignedTo" class="form-label">Assigned To</label>
+                <input type="text" class="form-control" name="AssignedTo" value="@Model.AssignedTo">
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="mb-3">
+                <label for="EstimatedHours" class="form-label">Estimated Hours</label>
+                <input type="number" class="form-control" name="EstimatedHours" step="0.25" min="0" value="@Model.EstimatedHours">
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="mb-3">
+                <label for="ActualHours" class="form-label">Actual Hours</label>
+                <input type="number" class="form-control" name="ActualHours" step="0.25" min="0" value="@Model.ActualHours">
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="mb-3">
+                <label for="StartDate" class="form-label">Start Date</label>
+                <input type="date" class="form-control" name="StartDate" value="@(Model.StartDate?.ToString("yyyy-MM-dd"))">
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="mb-3">
+                <label for="CompletedDate" class="form-label">Completed Date</label>
+                <input type="date" class="form-control" name="CompletedDate" value="@(Model.CompletedDate?.ToString("yyyy-MM-dd"))">
+            </div>
+        </div>
+    </div>
+
+    <div class="mb-3">
+        <label for="Notes" class="form-label">Notes</label>
+        <textarea class="form-control" name="Notes" rows="2">@Model.Notes</textarea>
+    </div>
+</form>
