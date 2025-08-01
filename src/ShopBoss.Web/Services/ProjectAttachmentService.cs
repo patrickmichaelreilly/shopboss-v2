@@ -141,6 +141,42 @@ public class ProjectAttachmentService
         }
     }
 
+    public async Task<bool> UpdateAttachmentCategoryAsync(string attachmentId, string newCategory)
+    {
+        try
+        {
+            var attachment = await _context.ProjectAttachments.FindAsync(attachmentId);
+            if (attachment == null) return false;
+
+            // Move file to new category directory if category changed
+            if (attachment.Category != newCategory)
+            {
+                var oldPath = Path.Combine(_fileStorageRoot, attachment.ProjectId, attachment.Category, attachment.FileName);
+                var newCategoryDir = Path.Combine(_fileStorageRoot, attachment.ProjectId, newCategory);
+                Directory.CreateDirectory(newCategoryDir);
+                var newPath = Path.Combine(newCategoryDir, attachment.FileName);
+
+                if (File.Exists(oldPath))
+                {
+                    File.Move(oldPath, newPath);
+                }
+
+                // Update database record
+                attachment.Category = newCategory;
+                await _context.SaveChangesAsync();
+
+                _logger.LogInformation("Updated attachment {AttachmentId} category to {Category}", attachmentId, newCategory);
+            }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating attachment {AttachmentId} category", attachmentId);
+            throw;
+        }
+    }
+
     public Task CleanupProjectFilesAsync(string projectId)
     {
         try

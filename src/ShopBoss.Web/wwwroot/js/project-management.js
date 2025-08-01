@@ -5,15 +5,26 @@ let currentProjectId = null;
 function toggleProject(projectId) {
     const details = document.getElementById(`details-${projectId}`);
     const icon = document.getElementById(`expand-icon-${projectId}`);
+    const table = document.getElementById('projects-table');
     
     if (details.classList.contains('d-none')) {
         details.classList.remove('d-none');
         icon.classList.remove('fa-chevron-right');
         icon.classList.add('fa-chevron-down');
+        
+        // Remove hover effect from table when any project is expanded
+        table.classList.remove('table-hover');
     } else {
         details.classList.add('d-none');
         icon.classList.remove('fa-chevron-down');
         icon.classList.add('fa-chevron-right');
+        
+        // Check if any other projects are still expanded
+        const anyExpanded = document.querySelector('tr[id^="details-"]:not(.d-none)');
+        if (!anyExpanded) {
+            // Re-add hover effect if no projects are expanded
+            table.classList.add('table-hover');
+        }
     }
 }
 
@@ -92,19 +103,33 @@ function saveProject() {
 }
 
 function editProject(projectId) {
-    const display = document.getElementById(`display-${projectId}`);
-    const edit = document.getElementById(`edit-${projectId}`);
+    const displayContent = document.getElementById(`project-display-${projectId}`);
+    const editContent = document.getElementById(`project-edit-${projectId}`);
+    const displayButtons = document.getElementById(`display-buttons-${projectId}`);
+    const editButtons = document.getElementById(`edit-buttons-${projectId}`);
     
-    display.classList.add('d-none');
-    edit.classList.remove('d-none');
+    // Hide display, show edit
+    displayContent.classList.add('d-none');
+    editContent.classList.remove('d-none');
+    
+    // Switch buttons
+    displayButtons.classList.add('d-none');
+    editButtons.classList.remove('d-none');
 }
 
 function cancelProjectEdit(projectId) {
-    const display = document.getElementById(`display-${projectId}`);
-    const edit = document.getElementById(`edit-${projectId}`);
+    const displayContent = document.getElementById(`project-display-${projectId}`);
+    const editContent = document.getElementById(`project-edit-${projectId}`);
+    const displayButtons = document.getElementById(`display-buttons-${projectId}`);
+    const editButtons = document.getElementById(`edit-buttons-${projectId}`);
     
-    edit.classList.add('d-none');
-    display.classList.remove('d-none');
+    // Hide edit, show display
+    editContent.classList.add('d-none');
+    displayContent.classList.remove('d-none');
+    
+    // Switch buttons
+    editButtons.classList.add('d-none');
+    displayButtons.classList.remove('d-none');
 }
 
 function saveProjectEdit(projectId) {
@@ -138,7 +163,20 @@ function saveProjectEdit(projectId) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            location.reload();
+            showNotification('Project updated successfully', 'success');
+            
+            // Update the project name in the table row if it changed
+            const projectRow = document.getElementById(`expand-icon-${projectId}`).closest('tr');
+            const projectNameCell = projectRow.querySelector('td:nth-child(3) strong');
+            if (projectNameCell) {
+                projectNameCell.textContent = project.ProjectName;
+            }
+            
+            // Update the display content with new values
+            updateProjectDisplayContent(projectId, project);
+            
+            // Switch back to display mode
+            cancelProjectEdit(projectId);
         } else {
             showNotification(data.message || 'Error updating project', 'error');
         }
@@ -147,6 +185,70 @@ function saveProjectEdit(projectId) {
         console.error('Error:', error);
         showNotification('Network error occurred', 'error');
     });
+}
+
+// Helper function to update the display content after save
+function updateProjectDisplayContent(projectId, project) {
+    const displayContainer = document.getElementById(`project-display-${projectId}`);
+    const categoryBadges = {0: 'Standard Products', 1: 'Custom Products', 2: 'Small Project'};
+    
+    // Update the display table with new values
+    displayContainer.innerHTML = `
+        <table class="table table-sm table-borderless mb-0">
+            <tbody>
+                <!-- Internal Information -->
+                <tr>
+                    <td width="120" class="text-muted ps-3">Category:</td>
+                    <td><span class="badge bg-secondary">${categoryBadges[project.ProjectCategory] || 'Unknown'}</span></td>
+                    <td width="120" class="text-muted">Bid Date:</td>
+                    <td>${project.BidRequestDate ? new Date(project.BidRequestDate).toLocaleDateString('en-US', {month: '2-digit', day: '2-digit', year: '2-digit'}) : '-'}</td>
+                </tr>
+                <tr>
+                    <td class="text-muted ps-3">PM:</td>
+                    <td>${project.ProjectManager || '-'}</td>
+                    <td class="text-muted">Installer:</td>
+                    <td>${project.Installer || '-'}</td>
+                </tr>
+                
+                ${(project.ProjectAddress || project.ProjectContact || project.ProjectContactPhone || project.ProjectContactEmail || project.GeneralContractor) ? `
+                <!-- Customer Information -->
+                <tr><td colspan="4" class="py-2"></td></tr>
+                ${project.ProjectAddress ? `
+                <tr>
+                    <td class="text-muted ps-3">Address:</td>
+                    <td colspan="3">${project.ProjectAddress}</td>
+                </tr>
+                ` : ''}
+                <tr>
+                    <td class="text-muted ps-3">Contact:</td>
+                    <td>${project.ProjectContact || '-'}</td>
+                    <td class="text-muted">Phone:</td>
+                    <td>${project.ProjectContactPhone || '-'}</td>
+                </tr>
+                ${project.ProjectContactEmail ? `
+                <tr>
+                    <td class="text-muted ps-3">Email:</td>
+                    <td colspan="3">${project.ProjectContactEmail}</td>
+                </tr>
+                ` : ''}
+                ${project.GeneralContractor ? `
+                <tr>
+                    <td class="text-muted ps-3">Contractor:</td>
+                    <td colspan="3">${project.GeneralContractor}</td>
+                </tr>
+                ` : ''}
+                ` : ''}
+                
+                ${project.Notes ? `
+                <tr><td colspan="4" class="py-2"></td></tr>
+                <tr>
+                    <td class="text-muted align-top ps-3">Notes:</td>
+                    <td colspan="3">${project.Notes}</td>
+                </tr>
+                ` : ''}
+            </tbody>
+        </table>
+    `;
 }
 
 function archiveProject(projectId) {
@@ -208,12 +310,7 @@ function deleteProject(projectId, buttonElement) {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                // Remove the project card from the DOM
-                const projectCard = document.querySelector(`[data-project-id="${projectId}"]`);
-                if (projectCard) {
-                    projectCard.remove();
-                }
-                showNotification('Project deleted successfully', 'success');
+                location.reload();
             } else {
                 showNotification(data.message || 'Error deleting project', 'error');
             }
@@ -257,7 +354,47 @@ function associateSelectedWorkOrders() {
     .then(data => {
         if (data.success) {
             bootstrap.Modal.getInstance(document.getElementById('associateWorkOrdersModal')).hide();
-            location.reload();
+            showNotification('Work orders associated successfully', 'success');
+            
+            // Add work orders to DOM
+            const workOrderContainer = document.getElementById(`work-orders-${currentProjectId}`);
+            const noWoMsg = workOrderContainer.querySelector('.text-center.text-muted');
+            if (noWoMsg) {
+                noWoMsg.remove();
+            }
+            
+            // Get selected work order details and add them
+            checkboxes.forEach(checkbox => {
+                const label = checkbox.nextElementSibling;
+                const woName = label.querySelector('strong').textContent;
+                const importDate = label.querySelector('small').textContent.replace('Imported: ', '');
+                
+                const woElement = document.createElement('div');
+                woElement.className = 'd-flex justify-content-between align-items-center border-bottom py-1';
+                woElement.innerHTML = `
+                    <div>
+                        <div style="font-size: 0.9em;">
+                            <a href="/Admin/ModifyWorkOrder?id=${checkbox.value}" class="text-decoration-none fw-bold">${woName}</a>
+                            <small class="text-muted ms-2">• Imported: ${importDate}</small>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-link text-danger p-0" 
+                            onclick="detachWorkOrder('${checkbox.value}', '${currentProjectId}')" title="Remove">
+                        <i class="fas fa-times"></i>
+                    </button>
+                `;
+                
+                workOrderContainer.appendChild(woElement);
+                
+                // Remove from modal list
+                checkbox.closest('.form-check').remove();
+            });
+            
+            // Update work order count
+            updateWorkOrderCountInTable(currentProjectId, workOrderIds.length);
+            
+            // Clear selections
+            checkboxes.forEach(cb => cb.checked = false);
         } else {
             showNotification(data.message || 'Error associating work orders', 'error');
         }
@@ -280,7 +417,25 @@ function detachWorkOrder(workOrderId, projectId) {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                location.reload();
+                showNotification('Work order detached successfully', 'success');
+                
+                // Remove work order from DOM
+                const detachButton = document.querySelector(`button[onclick*="detachWorkOrder('${workOrderId}'"`);
+                if (detachButton) {
+                    const workOrderElement = detachButton.closest('.d-flex.justify-content-between');
+                    if (workOrderElement) {
+                        workOrderElement.remove();
+                        
+                        // Update work order count
+                        updateWorkOrderCountInTable(projectId, -1);
+                        
+                        // Check if no work orders left
+                        const workOrderContainer = document.getElementById(`work-orders-${projectId}`);
+                        if (workOrderContainer && workOrderContainer.children.length === 0) {
+                            workOrderContainer.innerHTML = '<div class="text-center text-muted py-3"><small>No work orders associated</small></div>';
+                        }
+                    }
+                }
             } else {
                 showNotification(data.message || 'Error detaching work order', 'error');
             }
@@ -292,20 +447,130 @@ function detachWorkOrder(workOrderId, projectId) {
     }
 }
 
-// Toggle upload button based on file selection
-function toggleUploadButton(projectId) {
-    const fileInput = document.getElementById(`fileInput-${projectId}`);
-    const uploadBtn = document.getElementById(`uploadBtn-${projectId}`);
-    
-    if (fileInput.files.length > 0) {
-        uploadBtn.disabled = false;
-        uploadBtn.classList.remove('btn-secondary');
-        uploadBtn.classList.add('btn-primary');
-    } else {
-        uploadBtn.disabled = true;
-        uploadBtn.classList.remove('btn-primary');
-        uploadBtn.classList.add('btn-secondary');
+// Helper function to update work order count in table
+function updateWorkOrderCountInTable(projectId, delta) {
+    // Find the row by looking for the expand icon with the project ID
+    const expandIcon = document.getElementById(`expand-icon-${projectId}`);
+    if (expandIcon) {
+        const row = expandIcon.closest('tr');
+        if (row) {
+            const woCountBadge = row.querySelector('.badge.bg-info');
+            if (woCountBadge) {
+                const currentCount = parseInt(woCountBadge.textContent);
+                const newCount = Math.max(0, currentCount + delta);
+                woCountBadge.textContent = newCount;
+            }
+        }
     }
+    
+    // Also update count in section header
+    const woHeader = document.querySelector(`#work-orders-${projectId}`)?.closest('.card')?.querySelector('small.fw-bold');
+    if (woHeader) {
+        const match = woHeader.textContent.match(/Work Orders \((\d+)\)/);
+        if (match) {
+            const currentCount = parseInt(match[1]);
+            const newCount = Math.max(0, currentCount + delta);
+            woHeader.textContent = `Work Orders (${newCount})`;
+        }
+    }
+}
+
+// Direct file upload without filename preview
+function uploadFilesDirectly(projectId, fileInput) {
+    if (fileInput.files.length === 0) {
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('projectId', projectId);
+    formData.append('category', 'Other'); // Auto-assign to 'Other' category
+    
+    for (let i = 0; i < fileInput.files.length; i++) {
+        formData.append('file', fileInput.files[i]);
+    }
+
+    fetch('/Project/UploadFile', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('File uploaded successfully', 'success');
+            fileInput.value = ''; // Clear the file input
+            
+            // Add file to DOM instead of reloading
+            const fileContainer = document.getElementById(`files-${projectId}`);
+            const noFilesMsg = fileContainer.querySelector('.text-center.text-muted');
+            if (noFilesMsg) {
+                noFilesMsg.remove();
+            }
+            
+            const attachment = data.attachment;
+            const fileElement = document.createElement('div');
+            fileElement.className = 'd-flex justify-content-between align-items-center border-bottom py-1';
+            fileElement.innerHTML = `
+                <div class="d-flex align-items-center flex-grow-1">
+                    <i class="fas fa-file text-muted me-2" style="font-size: 0.9em;"></i>
+                    <a href="/Project/DownloadFile?id=${attachment.id}" 
+                       class="text-decoration-none me-2" style="font-size: 0.9em;">
+                        ${attachment.originalFileName}
+                    </a>
+                    <select class="form-select form-select-sm d-inline-block w-auto" 
+                            onchange="updateFileCategory('${attachment.id}', this.value)" 
+                            style="font-size: 0.8em;">
+                        <option value="Schematic">Schematic</option>
+                        <option value="Correspondence">Correspondence</option>
+                        <option value="Invoice">Invoice</option>
+                        <option value="Proof">Proof</option>
+                        <option value="Other" selected>Other</option>
+                    </select>
+                    <small class="text-muted ms-2">
+                        ${Math.round(attachment.fileSize / 1024)} KB • ${new Date().toLocaleDateString('en-US', {month: '2-digit', day: '2-digit', year: '2-digit'})}
+                    </small>
+                </div>
+                <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-2" 
+                        onclick="deleteFile('${attachment.id}', '${projectId}')" title="Delete">
+                    <i class="fas fa-times"></i>
+                </button>
+            `;
+            
+            // Insert at the beginning
+            fileContainer.insertBefore(fileElement, fileContainer.firstChild);
+            
+            // Update file count in table
+            updateFileCountInTable(projectId, 1);
+        } else {
+            showNotification(data.message || 'Error uploading files', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('Network error occurred', 'error');
+    });
+}
+
+// Update file category
+function updateFileCategory(fileId, category) {
+    fetch('/Project/UpdateFileCategory', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id: fileId, category: category })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('Category updated', 'success');
+        } else {
+            showNotification(data.message || 'Error updating category', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('Network error occurred', 'error');
+    });
 }
 
 // File Management
@@ -387,57 +652,70 @@ function uploadFiles(projectId) {
 }
 
 function deleteFile(fileId, projectId) {
-    if (confirm('Are you sure you want to delete this file?')) {
-        fetch('/Project/DeleteFile', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: `id=${fileId}`
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showNotification('File deleted successfully', 'success');
-                
-                // Find and remove the file element from DOM
-                const deleteButton = document.querySelector(`button[onclick*="deleteFile('${fileId}'"]`);
-                if (deleteButton) {
-                    const fileElement = deleteButton.closest('.d-flex.justify-content-between');
-                    if (fileElement) {
-                        fileElement.remove();
-                        
-                        // Update file count in header
-                        updateFileCount(projectId, -1);
-                        
-                        // Check if no files left, show "No files uploaded" message
-                        const fileList = document.querySelector(`#files-${projectId} .file-list`);
-                        if (fileList && fileList.children.length === 0) {
-                            const noFilesMsg = document.createElement('p');
-                            noFilesMsg.className = 'text-muted';
-                            noFilesMsg.textContent = 'No files uploaded';
-                            fileList.appendChild(noFilesMsg);
-                        }
+    fetch('/Project/DeleteFile', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `id=${fileId}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('File deleted successfully', 'success');
+            
+            // Remove file from DOM
+            const deleteButton = document.querySelector(`button[onclick*="deleteFile('${fileId}'"`);
+            if (deleteButton) {
+                const fileElement = deleteButton.closest('.d-flex.justify-content-between');
+                if (fileElement) {
+                    fileElement.remove();
+                    
+                    // Update file count
+                    updateFileCountInTable(projectId, -1);
+                    
+                    // Check if no files left
+                    const fileContainer = document.getElementById(`files-${projectId}`);
+                    if (fileContainer && fileContainer.children.length === 0) {
+                        fileContainer.innerHTML = '<div class="text-center text-muted py-3"><small>No files uploaded</small></div>';
                     }
                 }
-            } else {
-                showNotification(data.message || 'Error deleting file', 'error');
             }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            showNotification('Network error occurred', 'error');
-        });
-    }
+        } else {
+            showNotification(data.message || 'Error deleting file', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('Network error occurred', 'error');
+    });
 }
 
-// Helper function to update file count badges
-function updateFileCount(projectId, delta) {
-    const fileCountBadge = document.querySelector(`[data-project-id="${projectId}"] .badge.bg-success`);
-    if (fileCountBadge) {
-        const currentCount = parseInt(fileCountBadge.textContent.match(/\d+/)[0]);
-        const newCount = Math.max(0, currentCount + delta);
-        fileCountBadge.textContent = `${newCount} Files`;
+// Helper function to update file count in table
+function updateFileCountInTable(projectId, delta) {
+    // Find the row by looking for the expand icon with the project ID
+    const expandIcon = document.getElementById(`expand-icon-${projectId}`);
+    if (expandIcon) {
+        const row = expandIcon.closest('tr');
+        if (row) {
+            const fileCountBadge = row.querySelector('.badge.bg-success');
+            if (fileCountBadge) {
+                const currentCount = parseInt(fileCountBadge.textContent);
+                const newCount = Math.max(0, currentCount + delta);
+                fileCountBadge.textContent = newCount;
+            }
+        }
+    }
+    
+    // Also update count in section header
+    const filesHeader = document.querySelector(`#files-${projectId}`)?.closest('.card')?.querySelector('small.fw-bold');
+    if (filesHeader) {
+        const match = filesHeader.textContent.match(/Files \((\d+)\)/);
+        if (match) {
+            const currentCount = parseInt(match[1]);
+            const newCount = Math.max(0, currentCount + delta);
+            filesHeader.textContent = `Files (${newCount})`;
+        }
     }
 }
 

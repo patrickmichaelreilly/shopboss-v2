@@ -96,192 +96,281 @@
 }
 else
 {
-    <div class="project-list">
-        @foreach (var project in Model)
-        {
-            <div class="card mb-2 project-card" data-project-id="@project.Id">
-                <!-- Compact Collapsed Project Row -->
-                <div class="card-header py-2 d-flex justify-content-between align-items-center project-header" 
-                     style="cursor: pointer;" onclick="toggleProject('@project.Id')">
-                    <div class="d-flex align-items-center">
-                        <i class="fas fa-chevron-right me-2 expand-icon" id="expand-icon-@project.Id"></i>
-                        <strong class="me-3">@project.ProjectId</strong>
-                        <span class="me-3">"@project.ProjectName"</span>
-                        @if (project.IsArchived)
-                        {
-                            <i class="fas fa-archive text-muted me-2"></i>
-                        }
-                        <small class="text-muted me-2">
+    <div class="table-responsive">
+        <table class="table table-striped table-hover" id="projects-table">
+            <thead class="table-dark">
+                <tr>
+                    <th width="50"></th>
+                    <th width="100">ID</th>
+                    <th>Project Name</th>
+                    <th width="120">Install Date</th>
+                    <th width="80">WO</th>
+                    <th width="80">Files</th>
+                    <th width="150">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var project in Model)
+                {
+                    var rowClass = project.IsArchived ? "table-secondary" : "";
+                    <tr class="@rowClass">
+                        <td class="text-center">
+                            <i class="fas fa-chevron-right expand-icon" id="expand-icon-@project.Id" 
+                               onclick="toggleProject('@project.Id')" style="cursor: pointer;"></i>
+                        </td>
+                        <td class="text-muted small">@project.ProjectId</td>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                @if (project.IsArchived)
+                                {
+                                    <i class="fas fa-archive text-muted me-2" title="Archived Project"></i>
+                                }
+                                <strong>@project.ProjectName</strong>
+                            </div>
+                        </td>
+                        <td>
                             @if (project.TargetInstallDate.HasValue)
                             {
-                                <span>Install: @project.TargetInstallDate.Value.ToString("MM/dd/yy")</span>
+                                @project.TargetInstallDate.Value.ToString("MM/dd/yy")
                             }
-                        </small>
-                        <span class="badge bg-info me-1">WO: @project.WorkOrders.Count</span>
-                        <span class="badge bg-success me-1">Files: @project.Attachments.Count</span>
-                    </div>
-                    <div class="d-flex align-items-center">
-                        @if (project.IsArchived)
-                        {
-                            <button type="button" class="btn btn-sm btn-outline-success me-1" onclick="event.stopPropagation(); unarchiveProject('@project.Id')">
-                                <i class="fas fa-box-open"></i>
-                            </button>
-                        }
-                        else
-                        {
-                            <button type="button" class="btn btn-sm btn-outline-warning me-1" onclick="event.stopPropagation(); archiveProject('@project.Id')">
-                                <i class="fas fa-archive"></i>
-                            </button>
-                        }
-                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="event.stopPropagation(); deleteProject('@project.Id', this)" data-project-name="@project.ProjectName">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Expanded Project View -->
-                <div class="card-body project-details d-none p-3" id="details-@project.Id">
-                    
-                    <!-- Compact Project Details Section -->
-                    <div class="bg-light p-2 mb-3 rounded">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div class="d-flex align-items-center">
-                                <i class="fas fa-info-circle me-2 text-muted"></i>
-                                <small class="fw-bold">Project Details</small>
-                            </div>
-                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="editProject('@project.Id')">
-                                <i class="fas fa-edit me-1"></i>Edit
-                            </button>
-                        </div>
-                        <div id="project-info-@project.Id" class="mt-2">
-                            @await Html.PartialAsync("_ProjectInfo", project)
-                        </div>
-                    </div>
-
-                    <!-- Main 2-Column Layout: Work Orders | Files -->
-                    <div class="row">
-                        <!-- Work Orders Column -->
-                        <div class="col-md-6">
-                            <div class="border-end pe-3">
-                                <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <h6 class="fw-bold mb-0">
-                                        <i class="fas fa-briefcase me-2"></i>Work Orders (@project.WorkOrders.Count)
-                                    </h6>
-                                    <button type="button" class="btn btn-sm btn-outline-success" onclick="showAssociateWorkOrders('@project.Id')">
-                                        <i class="fas fa-plus me-1"></i>Add
+                            else
+                            {
+                                <span class="text-muted">-</span>
+                            }
+                        </td>
+                        <td>
+                            <span class="badge bg-info">@project.WorkOrders.Count</span>
+                        </td>
+                        <td>
+                            <span class="badge bg-success">@project.Attachments.Count</span>
+                        </td>
+                        <td>
+                            <div class="btn-group" role="group">
+                                @if (project.IsArchived)
+                                {
+                                    <button type="button" class="btn btn-sm btn-outline-success" onclick="unarchiveProject('@project.Id')" title="Unarchive">
+                                        <i class="fas fa-box-open"></i>
                                     </button>
-                                </div>
-                                
-                                <div id="work-orders-@project.Id" style="max-height: 400px; overflow-y: auto;">
-                                    @if (project.WorkOrders.Any())
-                                    {
-                                        @foreach (var workOrder in project.WorkOrders)
-                                        {
-                                            <div class="d-flex justify-content-between align-items-start border-bottom py-2">
-                                                <div class="flex-grow-1">
-                                                    <div class="fw-bold">@workOrder.Name</div>
-                                                    <small class="text-muted">Imported: @workOrder.ImportedDate.ToString("MM/dd/yy")</small>
-                                                </div>
-                                                <button type="button" class="btn btn-sm btn-outline-danger ms-2" 
-                                                        onclick="detachWorkOrder('@workOrder.Id', '@project.Id')" title="Remove from project">
-                                                    <i class="fas fa-times"></i>
-                                                </button>
-                                            </div>
-                                        }
-                                    }
-                                    else
-                                    {
-                                        <div class="text-center text-muted py-4">
-                                            <i class="fas fa-briefcase fa-2x mb-2 opacity-50"></i>
-                                            <p class="mb-0">No work orders associated</p>
-                                            <small>Click "Add" to associate work orders</small>
-                                        </div>
-                                    }
-                                </div>
+                                }
+                                else
+                                {
+                                    <button type="button" class="btn btn-sm btn-outline-warning" onclick="archiveProject('@project.Id')" title="Archive">
+                                        <i class="fas fa-archive"></i>
+                                    </button>
+                                }
+                                <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteProject('@project.Id', this)" 
+                                        data-project-name="@project.ProjectName" title="Delete">
+                                    <i class="fas fa-trash"></i>
+                                </button>
                             </div>
-                        </div>
+                        </td>
+                    </tr>
 
-                        <!-- Files Column -->
-                        <div class="col-md-6">
-                            <div class="ps-3">
-                                <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <h6 class="fw-bold mb-0">
-                                        <i class="fas fa-paperclip me-2"></i>Files (@project.Attachments.Count)
-                                    </h6>
-                                </div>
-
-                                <div id="files-@project.Id">
-                                    <!-- Compact File Upload Area -->
-                                    <div class="border border-dashed p-2 mb-3 rounded" style="border-style: dashed !important;">
-                                        <div class="row g-2 align-items-end">
-                                            <div class="col-6">
-                                                <input type="file" class="form-control form-control-sm" id="fileInput-@project.Id" multiple 
-                                                       onchange="toggleUploadButton('@project.Id')">
-                                            </div>
-                                            <div class="col-4">
-                                                <select class="form-select form-select-sm" id="categorySelect-@project.Id">
-                                                    <option value="Schematic">Schematic</option>
-                                                    <option value="Correspondence">Correspondence</option>
-                                                    <option value="Invoice">Invoice</option>
-                                                    <option value="Proof">Proof</option>
-                                                    <option value="Other">Other</option>
-                                                </select>
-                                            </div>
-                                            <div class="col-2">
-                                                <button type="button" class="btn btn-sm btn-primary w-100" id="uploadBtn-@project.Id"
-                                                        onclick="uploadFiles('@project.Id')" disabled>
-                                                    <i class="fas fa-upload"></i>
-                                                </button>
-                                            </div>
+                    <!-- Expanded Project View -->
+                    <tr class="d-none no-hover" id="details-@project.Id">
+                        <td class="no-hover"></td>
+                        <td class="no-hover"></td>
+                        <td colspan="5" class="p-0 no-hover">
+                            <div class="bg-light border-start border-end border-bottom p-3">
+                    
+                                <!-- Project Details Section -->
+                                <div class="card mb-3">
+                                    <div class="card-body p-2 position-relative">
+                                        <!-- Display Mode Buttons -->
+                                        <div id="display-buttons-@project.Id" class="position-absolute" style="top: 8px; right: 8px;">
+                                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="editProject('@project.Id')">
+                                                <i class="fas fa-edit me-1"></i>Edit
+                                            </button>
+                                        </div>
+                                        <!-- Edit Mode Buttons -->
+                                        <div id="edit-buttons-@project.Id" class="position-absolute d-none" style="top: 8px; right: 8px;">
+                                            <button type="button" class="btn btn-sm btn-success me-1" onclick="saveProjectEdit('@project.Id')">
+                                                <i class="fas fa-save me-1"></i>Save
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-secondary" onclick="cancelProjectEdit('@project.Id')">
+                                                <i class="fas fa-times me-1"></i>Cancel
+                                            </button>
+                                        </div>
+                                        
+                                        <!-- Display Mode -->
+                                        <div id="project-display-@project.Id">
+                                            <table class="table table-sm table-borderless mb-0">
+                                                <tbody>
+                                                    <!-- Internal Information -->
+                                                    <tr>
+                                                        <td width="120" class="text-muted ps-3">Category:</td>
+                                                        <td><span class="badge bg-secondary">@project.ProjectCategory</span></td>
+                                                        <td width="120" class="text-muted">Bid Date:</td>
+                                                        <td>@(project.BidRequestDate?.ToString("MM/dd/yy") ?? "-")</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td class="text-muted ps-3">PM:</td>
+                                                        <td>@(project.ProjectManager ?? "-")</td>
+                                                        <td class="text-muted">Installer:</td>
+                                                        <td>@(project.Installer ?? "-")</td>
+                                                    </tr>
+                                                    
+                                                    <!-- Customer Information -->
+                                                    @if (!string.IsNullOrEmpty(project.ProjectAddress) || !string.IsNullOrEmpty(project.ProjectContact) || 
+                                                         !string.IsNullOrEmpty(project.ProjectContactPhone) || !string.IsNullOrEmpty(project.ProjectContactEmail) || 
+                                                         !string.IsNullOrEmpty(project.GeneralContractor))
+                                                    {
+                                                        <tr><td colspan="4" class="py-2"></td></tr>
+                                                        @if (!string.IsNullOrEmpty(project.ProjectAddress))
+                                                        {
+                                                            <tr>
+                                                                <td class="text-muted ps-3">Address:</td>
+                                                                <td colspan="3">@project.ProjectAddress</td>
+                                                            </tr>
+                                                        }
+                                                        <tr>
+                                                            <td class="text-muted ps-3">Contact:</td>
+                                                            <td>@(project.ProjectContact ?? "-")</td>
+                                                            <td class="text-muted">Phone:</td>
+                                                            <td>@(project.ProjectContactPhone ?? "-")</td>
+                                                        </tr>
+                                                        @if (!string.IsNullOrEmpty(project.ProjectContactEmail))
+                                                        {
+                                                            <tr>
+                                                                <td class="text-muted ps-3">Email:</td>
+                                                                <td colspan="3">@project.ProjectContactEmail</td>
+                                                            </tr>
+                                                        }
+                                                        @if (!string.IsNullOrEmpty(project.GeneralContractor))
+                                                        {
+                                                            <tr>
+                                                                <td class="text-muted ps-3">Contractor:</td>
+                                                                <td colspan="3">@project.GeneralContractor</td>
+                                                            </tr>
+                                                        }
+                                                    }
+                                                    
+                                                    @if (!string.IsNullOrEmpty(project.Notes))
+                                                    {
+                                                        <tr><td colspan="4" class="py-2"></td></tr>
+                                                        <tr>
+                                                            <td class="text-muted align-top ps-3">Notes:</td>
+                                                            <td colspan="3">@project.Notes</td>
+                                                        </tr>
+                                                    }
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        
+                                        <!-- Edit Mode -->
+                                        <div id="project-edit-@project.Id" class="d-none">
+                                            @await Html.PartialAsync("_ProjectForm", project)
                                         </div>
                                     </div>
+                                </div>
 
-                                    <!-- File List -->
-                                    <div class="file-list" style="max-height: 350px; overflow-y: auto;">
+                                <!-- Files Section -->
+                                <div class="card mb-3">
+                                    <div class="card-body p-2">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <div class="d-flex align-items-center">
+                                            <i class="fas fa-paperclip me-2 text-muted"></i>
+                                            <small class="fw-bold">Files (@project.Attachments.Count)</small>
+                                        </div>
+                                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="document.getElementById('fileInputHidden-@project.Id').click();">
+                                            <i class="fas fa-upload me-1"></i>Upload
+                                        </button>
+                                        <input type="file" id="fileInputHidden-@project.Id" class="d-none" multiple 
+                                               onchange="uploadFilesDirectly('@project.Id', this)">
+                                    </div>
+                                    
+                                    <div id="files-@project.Id" style="max-height: 300px; overflow-y: auto;">
                                         @if (project.Attachments.Any())
                                         {
                                             @foreach (var attachment in project.Attachments.OrderByDescending(a => a.UploadedDate))
                                             {
-                                                <div class="d-flex justify-content-between align-items-start border-bottom py-2">
-                                                    <div class="flex-grow-1">
-                                                        <div class="d-flex align-items-center">
-                                                            <i class="fas fa-file me-2 text-muted"></i>
-                                                            <div>
-                                                                <a href="@Url.Action("DownloadFile", new { id = attachment.Id })" 
-                                                                   class="text-decoration-none fw-bold">
-                                                                    @attachment.OriginalFileName
-                                                                </a>
-                                                                <br>
-                                                                <small class="text-muted">
-                                                                    <span class="badge badge-sm bg-secondary me-1">@attachment.Category</span>
-                                                                    @(attachment.FileSize / 1024) KB • @attachment.UploadedDate.ToString("MM/dd/yy")
-                                                                </small>
-                                                            </div>
-                                                        </div>
+                                                <div class="d-flex justify-content-between align-items-center border-bottom py-1">
+                                                    <div class="d-flex align-items-center flex-grow-1">
+                                                        <i class="fas fa-file text-muted me-2" style="font-size: 0.9em;"></i>
+                                                        <a href="@Url.Action("DownloadFile", new { id = attachment.Id })" 
+                                                           class="text-decoration-none me-2" style="font-size: 0.9em;">
+                                                            @attachment.OriginalFileName
+                                                        </a>
+                                                        <select class="form-select form-select-sm d-inline-block w-auto" 
+                                                                onchange="updateFileCategory('@attachment.Id', this.value)" 
+                                                                style="font-size: 0.8em;">
+                                                            @{
+                                                                var categories = new[] { "Schematic", "Correspondence", "Invoice", "Proof", "Other" };
+                                                                foreach (var cat in categories)
+                                                                {
+                                                                    <option value="@cat" selected="@(attachment.Category == cat)">@cat</option>
+                                                                }
+                                                            }
+                                                        </select>
+                                                        <small class="text-muted ms-2">
+                                                            @(attachment.FileSize / 1024) KB • @attachment.UploadedDate.ToString("MM/dd/yy")
+                                                        </small>
                                                     </div>
-                                                    <button type="button" class="btn btn-sm btn-outline-danger ms-2" 
-                                                            onclick="deleteFile('@attachment.Id', '@project.Id')" title="Delete file">
-                                                        <i class="fas fa-trash"></i>
+                                                    <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-2" 
+                                                            onclick="deleteFile('@attachment.Id', '@project.Id')" title="Delete">
+                                                        <i class="fas fa-times"></i>
                                                     </button>
                                                 </div>
                                             }
                                         }
                                         else
                                         {
-                                            <div class="text-center text-muted py-4">
-                                                <i class="fas fa-file fa-2x mb-2 opacity-50"></i>
-                                                <p class="mb-0">No files uploaded</p>
-                                                <small>Select files above to upload</small>
+                                            <div class="text-center text-muted py-3">
+                                                <small>No files uploaded</small>
                                             </div>
                                         }
                                     </div>
+                                    </div>
+                                </div>
+
+                                <!-- Work Orders Section -->
+                                <div class="card">
+                                    <div class="card-body p-2">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <div class="d-flex align-items-center">
+                                            <i class="fas fa-briefcase me-2 text-muted"></i>
+                                            <small class="fw-bold">Work Orders (@project.WorkOrders.Count)</small>
+                                        </div>
+                                        <button type="button" class="btn btn-sm btn-outline-success" onclick="showAssociateWorkOrders('@project.Id')">
+                                            <i class="fas fa-plus me-1"></i>Add
+                                        </button>
+                                    </div>
+                                    
+                                    <div id="work-orders-@project.Id" style="max-height: 300px; overflow-y: auto;">
+                                        @if (project.WorkOrders.Any())
+                                        {
+                                            @foreach (var workOrder in project.WorkOrders)
+                                            {
+                                                <div class="d-flex justify-content-between align-items-center border-bottom py-1">
+                                                    <div>
+                                                        <div style="font-size: 0.9em;">
+                                                            <a href="@Url.Action("ModifyWorkOrder", "Admin", new { id = workOrder.Id })" 
+                                                               class="text-decoration-none fw-bold">@workOrder.Name</a>
+                                                            <small class="text-muted ms-2">• Imported: @workOrder.ImportedDate.ToString("MM/dd/yy")</small>
+                                                        </div>
+                                                    </div>
+                                                    <button type="button" class="btn btn-sm btn-link text-danger p-0" 
+                                                            onclick="detachWorkOrder('@workOrder.Id', '@project.Id')" title="Remove">
+                                                        <i class="fas fa-times"></i>
+                                                    </button>
+                                                </div>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <div class="text-center text-muted py-3">
+                                                <small>No work orders associated</small>
+                                            </div>
+                                        }
+                                    </div>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
     </div>
 }
 
@@ -344,3 +433,34 @@ else
 @section Scripts {
     <script src="~/js/project-management.js" asp-append-version="true"></script>
 }
+
+<style>
+    /* Complete hover suppression for expanded project rows */
+    .table-hover tbody tr.no-hover:hover,
+    .table-hover tbody tr.no-hover:hover td,
+    .table-hover tbody tr.no-hover:hover > td,
+    .table-hover tbody tr.no-hover td.no-hover,
+    .table-hover tbody tr.no-hover td.no-hover:hover,
+    .table-hover tbody tr:hover > td.no-hover,
+    .table tbody tr.no-hover:hover,
+    .table tbody tr.no-hover:hover td,
+    .table tbody tr.no-hover td.no-hover,
+    .table tbody tr.no-hover td.no-hover:hover {
+        background-color: transparent !important;
+        background: transparent !important;
+    }
+    
+    /* Target the specific Bootstrap table hover behavior */
+    .table-striped.table-hover tbody tr.no-hover:hover,
+    .table-striped.table-hover tbody tr.no-hover:hover > td,
+    .table-striped.table-hover tbody tr.no-hover:hover > th {
+        background-color: transparent !important;
+    }
+    
+    /* Most specific rule to override Bootstrap's .table-hover tbody tr:hover > * */
+    .table.table-striped.table-hover tbody tr.no-hover:hover > td.no-hover,
+    .table.table-striped.table-hover tbody tr.no-hover:hover > td {
+        background-color: transparent !important;
+        background-image: none !important;
+    }
+</style>

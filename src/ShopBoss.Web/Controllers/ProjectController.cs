@@ -256,9 +256,35 @@ public class ProjectController : Controller
         }
     }
 
+    [HttpPost]
+    public async Task<IActionResult> UpdateFileCategory([FromBody] UpdateFileCategoryRequest request)
+    {
+        try
+        {
+            var success = await _attachmentService.UpdateAttachmentCategoryAsync(request.Id, request.Category);
+            if (success)
+            {
+                return Json(new { success = true });
+            }
+            
+            return Json(new { success = false, message = "File not found" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating file category {FileId}", request.Id);
+            return Json(new { success = false, message = "Error updating file category" });
+        }
+    }
+
     public class AttachWorkOrdersRequest
     {
         public List<string> WorkOrderIds { get; set; } = new();
         public string ProjectId { get; set; } = string.Empty;
+    }
+
+    public class UpdateFileCategoryRequest
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Category { get; set; } = string.Empty;
     }
 }
