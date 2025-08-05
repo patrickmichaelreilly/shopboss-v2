@@ -47,4 +47,6 @@ public class Project
     public List<PurchaseOrder> PurchaseOrders { get; set; } = new();
     
     public List<CustomWorkOrder> CustomWorkOrders { get; set; } = new();
+    
+    public List<ProjectEvent> Events { get; set; } = new();
 }

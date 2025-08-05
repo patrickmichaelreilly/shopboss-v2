@@ -29,6 +29,7 @@ public class ShopBossDbContext : DbContext
     public DbSet<ProjectAttachment> ProjectAttachments { get; set; }
     public DbSet<PurchaseOrder> PurchaseOrders { get; set; }
     public DbSet<CustomWorkOrder> CustomWorkOrders { get; set; }
+    public DbSet<ProjectEvent> ProjectEvents { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -385,6 +386,25 @@ public class ShopBossDbContext : DbContext
             entity.HasIndex(e => e.WorkOrderType);
             entity.HasIndex(e => e.Status);
             entity.HasIndex(e => e.CreatedDate);
+        });
+
+        modelBuilder.Entity<ProjectEvent>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.ProjectId).IsRequired();
+            entity.Property(e => e.EventDate).IsRequired();
+            entity.Property(e => e.EventType).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.Description).IsRequired();
+            entity.Property(e => e.CreatedBy).HasMaxLength(100);
+            
+            entity.HasOne(e => e.Project)
+                .WithMany(p => p.Events)
+                .HasForeignKey(e => e.ProjectId)
+                .OnDelete(DeleteBehavior.Cascade);
+                
+            entity.HasIndex(e => e.ProjectId);
+            entity.HasIndex(e => e.EventDate);
+            entity.HasIndex(e => e.EventType);
         });
     }
 }

@@ -15,8 +15,9 @@
     <header>
         <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
             <div class="container-fluid">
-                <a class="navbar-brand" asp-controller="Admin" asp-action="Index">
-                    <img src="~/Dog.svg" alt="ShopBoss Logo" style="height: 40px; width: auto; margin-right: 8px;">ShopBoss
+                <a class="navbar-brand d-flex align-items-center" asp-controller="Admin" asp-action="Index">
+                    <img src="~/Dog.svg" alt="ShopBoss Logo" style="height: 40px; width: auto; margin-right: 8px;">
+                    <span>ShopBoss</span>
                 </a>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" 
                         aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
@@ -24,8 +25,14 @@
                 </button>
                 <div class="collapse navbar-collapse" id="navbarNav">
                     <ul class="navbar-nav me-auto">
-                        <li class="nav-item">
-                            <a class="nav-link" asp-controller="Project" asp-action="Index">Projects</a>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                Dashboards
+                            </a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" asp-controller="Admin" asp-action="Index">Work Orders</a></li>
+                                <li><a class="dropdown-item" asp-controller="Project" asp-action="Index">Projects</a></li>
+                            </ul>
                         </li>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">

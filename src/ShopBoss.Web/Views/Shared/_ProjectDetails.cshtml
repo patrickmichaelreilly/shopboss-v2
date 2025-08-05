@@ -1,0 +1,206 @@
+@model ShopBoss.Web.Models.Project
+
+<!-- Files Section -->
+<div class="card mb-3">
+    <div class="card-body p-2">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <div class="d-flex align-items-center">
+            <i class="fas fa-paperclip me-2 text-muted"></i>
+            <small class="fw-bold">Files (@Model.Attachments.Count)</small>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-primary" onclick="document.getElementById('fileInputHidden-@Model.Id').click();">
+            <i class="fas fa-upload me-1"></i>Upload
+        </button>
+        <input type="file" id="fileInputHidden-@Model.Id" class="d-none" multiple 
+               onchange="uploadFilesDirectly('@Model.Id', this)">
+    </div>
+    
+    <div id="files-@Model.Id" style="max-height: 300px; overflow-y: auto;">
+        @if (Model.Attachments.Any())
+        {
+            @foreach (var attachment in Model.Attachments.OrderByDescending(a => a.UploadedDate))
+            {
+                <div class="d-flex justify-content-between align-items-center border-bottom py-1">
+                    <div class="d-flex align-items-center flex-grow-1">
+                        <i class="fas fa-file text-muted me-2" style="font-size: 0.9em;"></i>
+                        <a href="@Url.Action("DownloadFile", new { id = attachment.Id })" 
+                           class="text-decoration-none me-2" style="font-size: 0.9em;">
+                            @attachment.OriginalFileName
+                        </a>
+                        <select class="form-select form-select-sm d-inline-block w-auto" 
+                                onchange="updateFileCategory('@attachment.Id', this.value)" 
+                                style="font-size: 0.8em;">
+                            @{
+                                var categories = new[] { "Schematic", "Correspondence", "Invoice", "Proof", "Other" };
+                                foreach (var cat in categories)
+                                {
+                                    <option value="@cat" selected="@(attachment.Category == cat)">@cat</option>
+                                }
+                            }
+                        </select>
+                        <small class="text-muted ms-2">
+                            @(attachment.FileSize / 1024) KB • @attachment.UploadedDate.ToString("MM/dd/yy")
+                        </small>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-2" 
+                            onclick="deleteFile('@attachment.Id', '@Model.Id')" title="Delete">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            }
+        }
+        else
+        {
+            <div class="text-center text-muted py-3">
+                <small>No files uploaded</small>
+            </div>
+        }
+    </div>
+    </div>
+</div>
+
+<!-- Purchase Orders Section -->
+<div class="card mb-3">
+    <div class="card-body p-2">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <div class="d-flex align-items-center">
+            <i class="fas fa-shopping-cart me-2 text-muted"></i>
+            <small class="fw-bold">Purchase Orders (@Model.PurchaseOrders.Count)</small>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-primary" onclick="showCreatePurchaseOrder('@Model.Id')">
+            <i class="fas fa-plus me-1"></i>Add
+        </button>
+    </div>
+    
+    <div id="purchase-orders-@Model.Id" style="max-height: 300px; overflow-y: auto;">
+        @if (Model.PurchaseOrders.Any())
+        {
+            @foreach (var purchaseOrder in Model.PurchaseOrders)
+            {
+                <div class="d-flex justify-content-between align-items-center border-bottom py-1">
+                    <div class="d-flex align-items-center flex-grow-1">
+                        <i class="fas fa-file-invoice text-muted me-2" style="font-size: 0.9em;"></i>
+                        <div style="font-size: 0.9em;">
+                            <strong>@purchaseOrder.PurchaseOrderNumber</strong>
+                            <small class="text-muted ms-2">• @purchaseOrder.VendorName</small>
+                            <small class="text-muted ms-2">• <span class="badge bg-secondary" style="font-size: 0.7em;">@purchaseOrder.Status</span></small>
+                            <small class="text-muted ms-2">• @purchaseOrder.OrderDate.ToString("MM/dd/yy")</small>
+                        </div>
+                    </div>
+                    <div class="d-flex">
+                        <button type="button" class="btn btn-sm btn-link text-primary p-0 me-2" 
+                                onclick="editPurchaseOrder('@purchaseOrder.Id', '@Model.Id')" title="Edit">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-link text-danger p-0" 
+                                onclick="deletePurchaseOrder('@purchaseOrder.Id', '@Model.Id')" title="Delete">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+            }
+        }
+        else
+        {
+            <div class="text-center text-muted py-3">
+                <small>No purchase orders created</small>
+            </div>
+        }
+    </div>
+    </div>
+</div>
+
+<!-- Project Timeline Section -->
+<div class="card mb-3">
+    <div class="card-body p-2">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-history me-2 text-muted"></i>
+                <small class="fw-bold">Project Timeline (@Model.Events.Count)</small>
+            </div>
+        </div>
+        
+        @{
+            ViewData["TimelineId"] = $"timeline-{Model.Id}";
+            ViewData["ProjectId"] = Model.Id;
+        }
+        @await Html.PartialAsync("_ProjectTimeline", Model.Events)
+    </div>
+</div>
+
+<!-- Work Orders Section -->
+<div class="card">
+    <div class="card-body p-2">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <div class="d-flex align-items-center">
+            <i class="fas fa-briefcase me-2 text-muted"></i>
+            <small class="fw-bold">Work Orders (@(Model.WorkOrders.Count + Model.CustomWorkOrders.Count))</small>
+        </div>
+        <div class="btn-group" role="group">
+            <button type="button" class="btn btn-sm btn-outline-success" onclick="showAssociateWorkOrders('@Model.Id')" title="Add Manufacturing Work Order">
+                <i class="fas fa-plus me-1"></i>Add WO
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-info" onclick="showCreateCustomWorkOrder('@Model.Id')" title="Add Custom Work Order">
+                <i class="fas fa-plus me-1"></i>Custom
+            </button>
+        </div>
+    </div>
+    
+    <div id="work-orders-@Model.Id" style="max-height: 300px; overflow-y: auto;">
+        @{
+            var hasAnyWorkOrders = Model.WorkOrders.Any() || Model.CustomWorkOrders.Any();
+        }
+        @if (hasAnyWorkOrders)
+        {
+            @* Regular Manufacturing Work Orders *@
+            @foreach (var workOrder in Model.WorkOrders)
+            {
+                <div class="d-flex justify-content-between align-items-center border-bottom py-1">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-cog text-primary me-2" style="font-size: 0.8em;" title="Manufacturing Work Order"></i>
+                        <div style="font-size: 0.9em;">
+                            <a href="@Url.Action("ModifyWorkOrder", "Admin", new { id = workOrder.Id })" 
+                               class="text-decoration-none fw-bold">@workOrder.Name</a>
+                            <small class="text-muted ms-2">• Imported: @workOrder.ImportedDate.ToString("MM/dd/yy")</small>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-link text-danger p-0" 
+                            onclick="detachWorkOrder('@workOrder.Id', '@Model.Id')" title="Remove">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            }
+            
+            @* Custom Work Orders *@
+            @foreach (var customWorkOrder in Model.CustomWorkOrders)
+            {
+                <div class="d-flex justify-content-between align-items-center border-bottom py-1">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-wrench text-info me-2" style="font-size: 0.8em;" title="Custom Work Order"></i>
+                        <div style="font-size: 0.9em;">
+                            <span class="fw-bold">@customWorkOrder.Name</span>
+                            <small class="text-muted ms-2">• Created: @customWorkOrder.CreatedDate.ToString("MM/dd/yy")</small>
+                        </div>
+                    </div>
+                    <div class="d-flex">
+                        <button type="button" class="btn btn-sm btn-link text-primary p-0 me-2" 
+                                onclick="editCustomWorkOrder('@customWorkOrder.Id', '@Model.Id')" title="Edit">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-link text-danger p-0" 
+                                onclick="deleteCustomWorkOrder('@customWorkOrder.Id', '@Model.Id')" title="Delete">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+            }
+        }
+        else
+        {
+            <div class="text-center text-muted py-3">
+                <small>No work orders associated</small>
+            </div>
+        }
+    </div>
+    </div>
+</div>

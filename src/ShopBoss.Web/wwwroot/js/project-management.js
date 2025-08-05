@@ -318,8 +318,47 @@ function deleteProject(projectId, buttonElement) {
 // Work Order Association
 function showAssociateWorkOrders(projectId) {
     currentProjectId = projectId;
-    const modal = new bootstrap.Modal(document.getElementById('associateWorkOrdersModal'));
-    modal.show();
+    
+    // Fetch fresh unassigned work orders
+    fetch('/Project/GetUnassignedWorkOrders')
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const unassignedList = document.getElementById('unassignedWorkOrdersList');
+            
+            // Clear existing content
+            unassignedList.innerHTML = '';
+            
+            if (data.workOrders && data.workOrders.length > 0) {
+                // Populate with fresh work orders
+                data.workOrders.forEach(workOrder => {
+                    const workOrderDiv = document.createElement('div');
+                    workOrderDiv.className = 'form-check';
+                    workOrderDiv.innerHTML = `
+                        <input class="form-check-input" type="checkbox" value="${workOrder.id}" id="wo-${workOrder.id}">
+                        <label class="form-check-label" for="wo-${workOrder.id}">
+                            <strong>${workOrder.name}</strong>
+                            <br><small class="text-muted">Imported: ${new Date(workOrder.importedDate).toLocaleDateString('en-US', {month: '2-digit', day: '2-digit', year: '2-digit'})}</small>
+                        </label>
+                    `;
+                    unassignedList.appendChild(workOrderDiv);
+                });
+            } else {
+                // No unassigned work orders
+                unassignedList.innerHTML = '<p class="text-muted">No unassigned work orders available</p>';
+            }
+            
+            // Show the modal
+            const modal = new bootstrap.Modal(document.getElementById('associateWorkOrdersModal'));
+            modal.show();
+        } else {
+            showNotification(data.message || 'Error loading unassigned work orders', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('Network error occurred', 'error');
+    });
 }
 
 function associateSelectedWorkOrders() {
@@ -365,7 +404,8 @@ function associateSelectedWorkOrders() {
                 const woElement = document.createElement('div');
                 woElement.className = 'd-flex justify-content-between align-items-center border-bottom py-1';
                 woElement.innerHTML = `
-                    <div>
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-cog text-primary me-2" style="font-size: 0.8em;" title="Manufacturing Work Order"></i>
                         <div style="font-size: 0.9em;">
                             <a href="/Admin/ModifyWorkOrder?id=${checkbox.value}" class="text-decoration-none fw-bold">${woName}</a>
                             <small class="text-muted ms-2">• Imported: ${importDate}</small>

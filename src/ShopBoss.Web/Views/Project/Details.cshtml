@@ -1,0 +1,71 @@
+@model ShopBoss.Web.Models.Project
+
+@{
+    ViewData["Title"] = $"Project Details - {Model.ProjectName}";
+}
+
+<div class="container-fluid">
+    <!-- Back to Projects Link -->
+    <div class="mb-3">
+        <a href="@Url.Action("Index")" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i>Back to Projects
+        </a>
+    </div>
+
+    <!-- Project Header -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="d-flex align-items-center mb-2">
+                        @if (Model.IsArchived)
+                        {
+                            <i class="fas fa-archive text-muted me-2" title="Archived Project"></i>
+                        }
+                        <h3 class="mb-0">@Model.ProjectName</h3>
+                        <span class="badge bg-secondary ms-3">@Model.ProjectCategory</span>
+                    </div>
+                    <p class="text-muted mb-2">
+                        <strong>Project ID:</strong> @Model.ProjectId
+                    </p>
+                    @if (!string.IsNullOrEmpty(Model.ProjectAddress))
+                    {
+                        <p class="text-muted mb-0">
+                            <i class="fas fa-map-marker-alt me-1"></i>@Model.ProjectAddress
+                        </p>
+                    }
+                </div>
+                <div class="col-md-4 text-end">
+                    <div class="mb-2">
+                        @if (Model.TargetInstallDate.HasValue)
+                        {
+                            <span class="text-muted">Install Date:</span>
+                            <strong>@Model.TargetInstallDate.Value.ToString("MM/dd/yyyy")</strong>
+                        }
+                        else
+                        {
+                            <span class="text-muted">Install Date: Not Set</span>
+                        }
+                    </div>
+                    <div class="d-flex justify-content-end gap-2">
+                        <span class="badge bg-info">@Model.WorkOrders.Count WO</span>
+                        <span class="badge bg-success">@Model.Attachments.Count Files</span>
+                        <span class="badge bg-warning">@Model.PurchaseOrders.Count PO</span>
+                        <span class="badge bg-secondary">@Model.Events.Count Events</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Project Details Content -->
+    @await Html.PartialAsync("_ProjectDetails", Model)
+</div>
+
+@section Scripts {
+    <!-- Include the same JavaScript as the Index page for file uploads, etc. -->
+    <script>
+        // Include necessary JavaScript functions for the project details functionality
+        // This ensures file uploads, purchase order management, etc. work on the details page
+    </script>
+}

@@ -52,6 +52,27 @@ public class ProjectController : Controller
         }
     }
 
+    public async Task<IActionResult> Details(string id)
+    {
+        try
+        {
+            var project = await _projectService.GetProjectByIdAsync(id);
+            if (project == null)
+            {
+                TempData["Error"] = "Project not found.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            return View(project);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error loading project details for {ProjectId}", id);
+            TempData["Error"] = "Error loading project details. Please try again.";
+            return RedirectToAction(nameof(Index));
+        }
+    }
+
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] Project project)
     {
@@ -460,47 +481,20 @@ public class ProjectController : Controller
     }
 
     [HttpGet]
-    public async Task<IActionResult> ListSmartSheets()
+    public async Task<IActionResult> GetUnassignedWorkOrders()
     {
         try
         {
-            var sheets = await _smartSheetImportService.ListAvailableSheetsAsync();
-            return Json(new { success = true, sheets = sheets });
+            var unassignedWorkOrders = await _projectService.GetUnassignedWorkOrdersAsync();
+            return Json(new { success = true, workOrders = unassignedWorkOrders });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error listing SmartSheet sheets");
-            return Json(new { success = false, message = "Error loading SmartSheet sheets" });
+            _logger.LogError(ex, "Error getting unassigned work orders");
+            return Json(new { success = false, message = "Error loading unassigned work orders" });
         }
     }
 
-    [HttpPost]
-    public async Task<IActionResult> ImportFromSmartSheet()
-    {
-        try
-        {
-            var result = await _smartSheetImportService.ImportProjectsFromMasterListAsync();
-            
-            if (result.Success)
-            {
-                return Json(new 
-                { 
-                    success = true, 
-                    message = $"Import completed successfully. Created: {result.ProjectsCreated}, Skipped: {result.ProjectsSkipped}, Errors: {result.ProjectsWithErrors}",
-                    result = result
-                });
-            }
-            else
-            {
-                return Json(new { success = false, message = result.ErrorMessage });
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error during SmartSheet import");
-            return Json(new { success = false, message = "Error during import process" });
-        }
-    }
 
     public class AttachWorkOrdersRequest
     {

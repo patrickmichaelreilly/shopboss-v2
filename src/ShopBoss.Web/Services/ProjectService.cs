@@ -24,6 +24,7 @@ public class ProjectService
                 .Include(p => p.Attachments)
                 .Include(p => p.PurchaseOrders)
                 .Include(p => p.CustomWorkOrders)
+                .Include(p => p.Events)
                 .AsQueryable();
 
             if (!includeArchived)
@@ -49,7 +50,7 @@ public class ProjectService
             }
 
             return await query
-                .OrderBy(p => p.ProjectId)
+                .OrderBy(p => p.ProjectId.ToLower())
                 .ToListAsync();
         }
         catch (Exception ex)
@@ -66,6 +67,9 @@ public class ProjectService
             return await _context.Projects
                 .Include(p => p.WorkOrders)
                 .Include(p => p.Attachments)
+                .Include(p => p.PurchaseOrders)
+                .Include(p => p.CustomWorkOrders)
+                .Include(p => p.Events)
                 .FirstOrDefaultAsync(p => p.Id == id);
         }
         catch (Exception ex)
