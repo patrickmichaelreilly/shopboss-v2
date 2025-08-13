@@ -1,417 +1,132 @@
-# SmartSheet Migration Tool - MVP
+# ShopBoss Part Labels - Fixes and Enhancements
 
-## Overview
-Build a lightweight, manual validation tool for exploring SmartSheet data and importing projects one at a time into ShopBoss. This is an isolated exploration tool that will not affect any existing ShopBoss functionality.
+## Issues Identified
 
-## MVP Approach
-- **Manual Process**: User reviews and approves all data before import
-- **Simple UI**: The interface itself IS the validation system
-- **Minimal Error Handling**: Basic try/catch only - user handles edge cases
-- **No Automation**: No retry logic, progress tracking, or complex error recovery
-- **Completely Isolated**: Zero changes to existing ShopBoss code
+### 1. Work Order Deletion Not Using Proper Cascading
+- `AdminController.DeleteWorkOrder()` only deletes WorkOrder entity directly
+- Does NOT use existing `WorkOrderDeletionService` that properly cascades to all children
+- Results in orphaned Parts, PartLabels, and other child entities
 
-## Primary Goals
-1. View all data available through SmartSheet SDK
-2. Display project timelines reconstructed from comments/attachments
-3. Allow user to manually review and correct data before import
-4. Test attachment download and storage process
+### 2. Part Label Matching Fails Due to ID Suffixing  
+- Labels stored with original barcode: `PartId = "PART123"`
+- Parts created with suffixed IDs: `Id = "PART123_1"` (for quantity expansion)
+- `GetPartLabel()` searches for exact match: `l.PartId == partId` 
+- No match found → "Label not available" errors
 
-## Required New Components
+### 3. Label Absolute Positioning Issue (FIXED but not yet tested by User)
+- ✅ Labels displayed with excessive whitespace from original composite sheet positioning
+- ✅ Fixed by normalizing absolute positioning in `LabelParserService.WrapLabelForDisplay()`
 
-### 1. ProjectEvent Model
+## Implementation Plan
+
+### Phase 1: Fix Work Order Deletion
+**Modify AdminController to use WorkOrderDeletionService:**
+1. Add `WorkOrderDeletionService` to AdminController constructor
+2. Replace direct EF deletion with comprehensive service-based deletion
+3. Handle both individual and bulk delete operations
+4. Ensure all child entities (Parts, PartLabels, Products, etc.) are properly removed
+
+### Phase 2: Implement Elegant 3-Tier Label Assignment During Import
+**Use pool consumption pattern (mirrors existing nest sheet assignment logic):**
+
+**Key Insights:**
+- Microvellum already generates individual labels for each part instance (natural 1:1 correspondence)
+- Edge case: Multiple quantity product with same parts on same nest sheet
+- Need pool consumption to prevent duplicate assignments
+
+**3-Tier Assignment Strategy:**
+1. **Easy Match**: Single part for barcode → Direct assignment
+2. **NestSheet Disambiguation**: Multiple parts but NestSheetId narrows to 1 → Direct assignment  
+3. **Pool Consumption**: Multiple parts with same barcode AND NestSheetId → Take first available, remove from pool
+
+### Phase 3: Simplify Label Lookup (After Import Fix)
+**Since each part gets its own PartLabel during import:**
+1. Simple exact matching: `l.PartId == partId` (no more complex logic needed)
+2. Optional NestSheetId validation for additional context
+
+## Solution Code Snippets
+
+### 3-Tier Label Assignment During Import (Pool Consumption Pattern)
 ```csharp
-public class ProjectEvent
+// In WorkOrderImportService.ImportLabelsAsync()
+var assignedPartIds = new HashSet<string>(); // Track consumed parts
+
+foreach (var label in parsedLabels)
 {
-    public string Id { get; set; } = Guid.NewGuid().ToString();
-    public string ProjectId { get; set; }
-    public DateTime EventDate { get; set; }
-    public string EventType { get; set; } // "comment", "attachment", "status_change"
-    public string Description { get; set; }
-    public string CreatedBy { get; set; }
-    public Project Project { get; set; }
-}
-```
-
-## Implementation Structure
-
-### 1. SmartSheetMigrationController
-Simple controller with no authorization needed.
-
-```csharp
-public class SmartSheetMigrationController : Controller
-{
-    private readonly SmartSheetImportService _service;
+    var barcode = label.Key.Trim('*'); // Clean barcode
+    var labelHtml = label.Value;
     
-    public async Task<IActionResult> Index()
+    // Tier 1: Easy match - single part for barcode
+    var matchingParts = await _context.Parts
+        .Where(p => (p.Id == barcode || ExtractOriginalPartId(p.Id) == barcode) && 
+                   p.WorkOrderId == workOrderId &&
+                   !assignedPartIds.Contains(p.Id))
+        .ToListAsync();
+    
+    if (matchingParts.Count == 1)
     {
-        try 
-        {
-            var workspaces = await _service.GetWorkspacesAsync();
-            return View(workspaces);
-        }
-        catch (Exception ex)
-        {
-            ViewBag.Error = $"Failed to load workspaces: {ex.Message}";
-            return View();
-        }
-    }
-}
-```
-
-### 2. Service Extensions
-Extend existing SmartSheetImportService with minimal new methods:
-
-```csharp
-// Add these methods to SmartSheetImportService:
-
-public async Task<WorkspaceListResult> GetWorkspacesAsync()
-{
-    // List sheets from "Active Jobs" and "_Archived Jobs" workspaces
-    // Return simple object with two lists
-}
-
-public async Task<SheetDetailsResult> GetSheetDetailsAsync(long sheetId)
-{
-    // Fetch all available data:
-    // - Sheet Summary fields
-    // - Attachments list
-    // - Comments/discussions
-    // Return everything for UI display
-}
-
-public async Task<ImportResult> ImportProjectAsync(ImportRequest request)
-{
-    // Create Project entity
-    // Create ProjectEvent entities from timeline
-    // Download attachments if requested
-    // Save everything in a transaction
-    // Return success/failure with project ID
-}
-```
-
-### 3. View Layout: `/Views/SmartSheetMigration/Index.cshtml`
-
-```html
-@model SmartSheetMigrationViewModel
-
-<div class="container-fluid">
-    <h2>SmartSheet Project Migration Tool</h2>
-    
-    <!-- Section 1: Sheet Selection -->
-    <div class="card mb-3">
-        <div class="card-header">
-            <h4>1. Select Source Sheet</h4>
-        </div>
-        <div class="card-body">
-            <div class="row">
-                <div class="col-md-6">
-                    <h5>Active Jobs</h5>
-                    <div id="activeJobsList" class="list-group" style="max-height: 300px; overflow-y: auto;">
-                        <!-- Populate with sheets from Active Jobs workspace -->
-                    </div>
-                </div>
-                <div class="col-md-6">
-                    <h5>Archived Jobs</h5>
-                    <div id="archivedJobsList" class="list-group" style="max-height: 300px; overflow-y: auto;">
-                        <!-- Populate with sheets from _Archived Jobs workspace -->
-                    </div>
-                </div>
-            </div>
-            <button class="btn btn-primary mt-3" onclick="loadSheetDetails()">
-                Load Selected Sheet
-            </button>
-        </div>
-    </div>
-    
-    <!-- Section 2: Sheet Analysis -->
-    <div class="card mb-3" id="sheetAnalysis" style="display: none;">
-        <div class="card-header">
-            <h4>2. Sheet Analysis</h4>
-        </div>
-        <div class="card-body">
-            <div class="row">
-                <div class="col-md-4">
-                    <h5>Sheet Summary</h5>
-                    <div id="sheetSummary">
-                        <!-- Display Sheet Summary fields -->
-                        <!-- Highlight Job ID field -->
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <h5>Attachments (<span id="attachmentCount">0</span>)</h5>
-                    <div id="attachmentList" style="max-height: 200px; overflow-y: auto;">
-                        <!-- List all attachments with sizes -->
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <h5>Comments/History (<span id="commentCount">0</span>)</h5>
-                    <div id="commentList" style="max-height: 200px; overflow-y: auto;">
-                        <!-- Show comment timeline -->
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Timeline Reconstruction Preview -->
-            <div class="mt-3">
-                <h5>Reconstructed Timeline</h5>
-                <div id="timelinePreview" class="timeline-container">
-                    <!-- Show interpreted events from comments/changes -->
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Section 3: Project Creation Form -->
-    <div class="card mb-3" id="projectCreation" style="display: none;">
-        <div class="card-header">
-            <h4>3. Create ShopBoss Project</h4>
-        </div>
-        <div class="card-body">
-            <!-- Reuse existing _ProjectForm partial but with pre-filled data -->
-            <div id="projectFormContainer">
-                @await Html.PartialAsync("_ProjectForm", new Project())
-            </div>
-            
-            <!-- Migration-specific options -->
-            <div class="mt-3 p-3 bg-light">
-                <h5>Migration Options</h5>
-                <div class="form-check">
-                    <input class="form-check-input" type="checkbox" id="downloadAttachments" checked>
-                    <label class="form-check-label" for="downloadAttachments">
-                        Download and attach all files
-                    </label>
-                </div>
-                <div class="form-check">
-                    <input class="form-check-input" type="checkbox" id="createTimeline" checked>
-                    <label class="form-check-label" for="createTimeline">
-                        Create timeline events from comments
-                    </label>
-                </div>
-                <div class="form-check">
-                    <input class="form-check-input" type="checkbox" id="linkMasterList" checked>
-                    <label class="form-check-label" for="linkMasterList">
-                        Link to Master Project List entry
-                    </label>
-                </div>
-            </div>
-            
-            <button class="btn btn-success mt-3" onclick="importProject()">
-                Import Project to ShopBoss
-            </button>
-        </div>
-    </div>
-    
-    <!-- Section 4: Import Results -->
-    <div class="card" id="importResults" style="display: none;">
-        <div class="card-header">
-            <h4>4. Import Results</h4>
-        </div>
-        <div class="card-body">
-            <div id="resultsContent">
-                <!-- Show what was imported successfully -->
-                <!-- List any errors or warnings -->
-                <!-- Provide links to view in ShopBoss -->
-            </div>
-        </div>
-    </div>
-</div>
-```
-
-### 4. JavaScript Support: `smartsheet-migration.js`
-
-```javascript
-let selectedSheetId = null;
-let sheetDetails = null;
-let preparedProjectData = null;
-
-async function loadWorkspaces() {
-    const response = await fetch('/SmartSheetMigration/GetWorkspaces');
-    const data = await response.json();
-    
-    // Populate Active Jobs list
-    data.activeJobs.forEach(sheet => {
-        $('#activeJobsList').append(
-            `<a href="#" class="list-group-item list-group-item-action" 
-                data-sheet-id="${sheet.id}" onclick="selectSheet(${sheet.id}, '${sheet.name}')">
-                ${sheet.name}
-                <small class="text-muted d-block">Modified: ${sheet.modifiedAt}</small>
-            </a>`
-        );
-    });
-    
-    // Populate Archived Jobs list
-    data.archivedJobs.forEach(sheet => {
-        $('#archivedJobsList').append(
-            `<a href="#" class="list-group-item list-group-item-action" 
-                data-sheet-id="${sheet.id}" onclick="selectSheet(${sheet.id}, '${sheet.name}')">
-                ${sheet.name}
-                <small class="text-muted d-block">Modified: ${sheet.modifiedAt}</small>
-            </a>`
-        );
-    });
-}
-
-async function loadSheetDetails() {
-    if (!selectedSheetId) {
-        alert('Please select a sheet first');
-        return;
+        CreatePartLabel(matchingParts[0], labelHtml, workOrderId);
+        assignedPartIds.Add(matchingParts[0].Id);
+        continue;
     }
     
-    // Show loading state
-    $('#sheetAnalysis').show();
-    
-    const response = await fetch(`/SmartSheetMigration/GetSheetDetails?sheetId=${selectedSheetId}`);
-    sheetDetails = await response.json();
-    
-    // Display Sheet Summary
-    displaySheetSummary(sheetDetails.summary);
-    
-    // Display Attachments
-    displayAttachments(sheetDetails.attachments);
-    
-    // Display Comments
-    displayComments(sheetDetails.comments);
-    
-    // Build Timeline
-    buildTimeline(sheetDetails);
-    
-    // Prepare Project Form
-    prepareProjectForm();
-}
-
-function buildTimeline(details) {
-    const events = [];
-    
-    // Extract events from comments
-    details.comments.forEach(comment => {
-        events.push({
-            date: comment.createdAt,
-            type: 'comment',
-            description: comment.text,
-            user: comment.createdBy
-        });
-    });
-    
-    // Extract events from attachments
-    details.attachments.forEach(attachment => {
-        events.push({
-            date: attachment.createdAt,
-            type: 'attachment',
-            description: `File uploaded: ${attachment.name}`,
-            user: attachment.attachedBy
-        });
-    });
-    
-    // Sort by date and display
-    events.sort((a, b) => new Date(a.date) - new Date(b.date));
-    
-    const timeline = $('#timelinePreview');
-    timeline.empty();
-    events.forEach(event => {
-        timeline.append(`
-            <div class="timeline-event">
-                <span class="badge bg-${event.type === 'comment' ? 'info' : 'secondary'}">${event.type}</span>
-                <small>${event.date}</small>
-                <p>${event.description}</p>
-                <small class="text-muted">by ${event.user}</small>
-            </div>
-        `);
-    });
-}
-
-async function importProject() {
-    const projectData = {
-        ...preparedProjectData,
-        downloadAttachments: $('#downloadAttachments').is(':checked'),
-        createTimeline: $('#createTimeline').is(':checked'),
-        linkMasterList: $('#linkMasterList').is(':checked')
-    };
-    
-    const response = await fetch('/SmartSheetMigration/ImportProject', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(projectData)
-    });
-    
-    const result = await response.json();
-    
-    // Show results
-    $('#importResults').show();
-    $('#resultsContent').html(`
-        <div class="alert alert-${result.success ? 'success' : 'danger'}">
-            ${result.message}
-        </div>
-        ${result.projectId ? `
-            <a href="/Project/Details/${result.projectId}" class="btn btn-primary">
-                View Imported Project
-            </a>
-        ` : ''}
-    `);
-}
-```
-
-### 5. Key Data Mappings
-
-```csharp
-// SmartSheet → ShopBoss Project
-public class SheetToProjectMapper
-{
-    public Project MapSheetToProject(SheetDetailedInfo sheet)
+    // Tier 2: NestSheet disambiguation (if we can extract nest sheet context from label)
+    if (TryExtractNestSheetFromLabel(labelHtml, out var nestSheetId))
     {
-        return new Project
+        var nestSheetMatch = matchingParts.FirstOrDefault(p => p.NestSheetId == nestSheetId);
+        if (nestSheetMatch != null)
         {
-            // From Sheet Summary
-            ProjectId = sheet.Summary["Job ID"],
-            ProjectName = sheet.Name,
-            CustomerName = sheet.Summary["Customer"],
-            ProjectManager = sheet.Summary["PM"],
-            
-            // From Master List (via Job ID lookup)
-            Address = masterListEntry.Address,
-            InstallDate = masterListEntry.InstallDate,
-            ContractAmount = masterListEntry.ContractAmount,
-            
-            // Generated from timeline
-            CreatedDate = sheet.CreatedAt,
-            LastModifiedDate = sheet.ModifiedAt,
-            
-            // New timeline events from comments/attachments
-            ProjectEvents = BuildEventsFromHistory(sheet)
-        };
+            CreatePartLabel(nestSheetMatch, labelHtml, workOrderId);
+            assignedPartIds.Add(nestSheetMatch.Id);
+            continue;
+        }
+    }
+    
+    // Tier 3: Pool consumption - take first available
+    var firstAvailable = matchingParts.FirstOrDefault();
+    if (firstAvailable != null)
+    {
+        CreatePartLabel(firstAvailable, labelHtml, workOrderId);
+        assignedPartIds.Add(firstAvailable.Id);
     }
 }
 ```
 
-### 6. UI Flow
-
-1. **Select Sheet**: User browses workspace lists and selects a sheet
-2. **View Data**: System displays ALL available data from SmartSheet
-3. **Manual Review**: User reviews and corrects any issues in the form
-4. **Import**: User clicks import, system creates Project + ProjectEvents
-5. **Result**: Success/failure message with link to view imported project
-
-## What This Tool Does NOT Do
-
-- ❌ No automatic data correction or validation
-- ❌ No progress tracking or complex UI updates  
-- ❌ No authorization or access control
-- ❌ No retry logic or error recovery
-- ❌ No duplicate detection (existing ShopBoss validation handles this)
-- ❌ No modification of existing ShopBoss code
-
-## File Structure
-
-```
-/Controllers/SmartSheetMigrationController.cs  (new)
-/Models/ProjectEvent.cs                        (new)  
-/Views/SmartSheetMigration/Index.cshtml       (new)
-/wwwroot/js/smartsheet-migration.js           (new)
-/Services/SmartSheetImportService.cs          (extend existing)
+### Simplified Label Lookup (After Import Fix)
+```csharp
+// In CncController.GetPartLabel() - Simple exact match since import creates 1:1
+var label = await _context.PartLabels
+    .FirstOrDefaultAsync(l => l.PartId == partId && l.WorkOrderId == activeWorkOrderId);
 ```
 
-## Success Criteria
+### Work Order Deletion Fix
+```csharp
+// Replace AdminController.DeleteWorkOrder() method
+private readonly WorkOrderDeletionService _workOrderDeletionService;
 
-- View all SmartSheet data in the UI
-- Successfully import a project with timeline events
-- Download and attach files from SmartSheet
-- No changes to existing ShopBoss functionality
+public async Task<IActionResult> DeleteWorkOrder(string id)
+{
+    // Use comprehensive deletion service instead of direct EF removal
+    var result = await _workOrderDeletionService.DeleteWorkOrderAsync(id);
+    
+    if (result.Success)
+        TempData["SuccessMessage"] = result.Message;
+    else
+        TempData["ErrorMessage"] = result.Message;
+        
+    return RedirectToAction(nameof(Index));
+}
+```
+
+## Files to Modify
+1. `Controllers/AdminController.cs` - Use WorkOrderDeletionService for proper cascading
+2. `Services/WorkOrderDeletionService.cs` - Add comprehensive work order deletion method
+3. `Services/WorkOrderImportService.cs` - Implement 3-tier label assignment with pool consumption
+4. `Models/PartLabel.cs` - Add optional NestSheetId foreign key for context
+5. `Data/ShopBossDbContext.cs` - Add NestSheetId relationship configuration
+
+## Expected Results
+- ✅ Work orders fully delete all child entities when deleted
+- ✅ Part labels display correctly for both original and suffixed part IDs  
+- ✅ Reimporting work orders works cleanly without orphaned data
+- ✅ Label buttons work for quantity-expanded parts

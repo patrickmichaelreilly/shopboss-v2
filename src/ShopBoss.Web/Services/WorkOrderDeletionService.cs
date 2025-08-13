@@ -496,6 +496,145 @@ public class WorkOrderDeletionService
             };
         }
     }
+
+    /// <summary>
+    /// Delete a complete work order and all its children with comprehensive cascade deletion and audit logging
+    /// </summary>
+    public async Task<DeletionResult> DeleteWorkOrderAsync(string workOrderId, string station = "Manual")
+    {
+        try
+        {
+            var workOrder = await _context.WorkOrders
+                .Include(w => w.Products)
+                    .ThenInclude(p => p.Parts)
+                .Include(w => w.Products)
+                    .ThenInclude(p => p.Subassemblies)
+                        .ThenInclude(s => s.Parts)
+                .Include(w => w.Products)
+                    .ThenInclude(p => p.Hardware)
+                .Include(w => w.DetachedProducts)
+                    .ThenInclude(dp => dp.Parts)
+                .Include(w => w.NestSheets)
+                    .ThenInclude(n => n.Parts)
+                .Include(w => w.Hardware)
+                .FirstOrDefaultAsync(w => w.Id == workOrderId);
+
+            if (workOrder == null)
+            {
+                return new DeletionResult 
+                { 
+                    Success = false, 
+                    Message = $"Work order '{workOrderId}' not found." 
+                };
+            }
+
+            var totalDeletedItems = 0;
+
+            _logger.LogInformation("Starting comprehensive deletion of work order {WorkOrderId} ({WorkOrderName})", workOrderId, workOrder.Name);
+
+            // Delete all Products (which cascades to their Parts, Subassemblies, and Hardware)
+            foreach (var product in workOrder.Products.ToList())
+            {
+                var productResult = await DeleteProductAsync(product.Id, workOrderId, station);
+                if (productResult.Success)
+                {
+                    totalDeletedItems += productResult.ItemsDeleted;
+                }
+            }
+
+            // Delete all DetachedProducts
+            foreach (var detachedProduct in workOrder.DetachedProducts.ToList())
+            {
+                var detachedResult = await DeleteDetachedProductAsync(detachedProduct.Id, workOrderId, station);
+                if (detachedResult.Success)
+                {
+                    totalDeletedItems += detachedResult.ItemsDeleted;
+                }
+            }
+
+            // Delete all NestSheets (which cascades to their Parts)
+            foreach (var nestSheet in workOrder.NestSheets.ToList())
+            {
+                var nestSheetResult = await DeleteNestSheetAsync(nestSheet.Id, workOrderId, station);
+                if (nestSheetResult.Success)
+                {
+                    totalDeletedItems += nestSheetResult.ItemsDeleted;
+                }
+            }
+
+            // Delete standalone Hardware
+            foreach (var hardware in workOrder.Hardware.ToList())
+            {
+                var hardwareResult = await DeleteHardwareAsync(hardware.Id, workOrderId, station);
+                if (hardwareResult.Success)
+                {
+                    totalDeletedItems += hardwareResult.ItemsDeleted;
+                }
+            }
+
+            // Delete any remaining PartLabels (should be cascaded, but ensure cleanup)
+            var remainingLabels = await _context.PartLabels.Where(pl => pl.WorkOrderId == workOrderId).ToListAsync();
+            if (remainingLabels.Any())
+            {
+                _context.PartLabels.RemoveRange(remainingLabels);
+                _logger.LogWarning("Cleaned up {Count} remaining PartLabels for work order {WorkOrderId}", remainingLabels.Count, workOrderId);
+            }
+
+            // Store old values for audit trail
+            var oldValue = new 
+            { 
+                Id = workOrder.Id,
+                Name = workOrder.Name,
+                ProductsCount = workOrder.Products.Count,
+                DetachedProductsCount = workOrder.DetachedProducts.Count,
+                NestSheetsCount = workOrder.NestSheets.Count,
+                HardwareCount = workOrder.Hardware.Count,
+                IsArchived = workOrder.IsArchived,
+                ImportedDate = workOrder.ImportedDate
+            };
+
+            // Finally, remove the work order itself
+            _context.WorkOrders.Remove(workOrder);
+            await _context.SaveChangesAsync();
+
+            // Log the comprehensive work order deletion
+            await _auditTrailService.LogAsync(
+                action: "DeleteWorkOrder",
+                entityType: "WorkOrder",
+                entityId: workOrderId,
+                oldValue: oldValue,
+                newValue: null,
+                station: station,
+                workOrderId: workOrderId,
+                details: $"Work order '{workOrder.Name}' and all children deleted completely. " +
+                        $"Products: {oldValue.ProductsCount}, DetachedProducts: {oldValue.DetachedProductsCount}, " +
+                        $"NestSheets: {oldValue.NestSheetsCount}, Hardware: {oldValue.HardwareCount}, " +
+                        $"Total items deleted: {totalDeletedItems}",
+                sessionId: null
+            );
+
+            _logger.LogInformation("Work order {WorkOrderId} ({WorkOrderName}) and all children deleted successfully. Total items deleted: {TotalDeleted}", 
+                workOrderId, workOrder.Name, totalDeletedItems + 1);
+
+            totalDeletedItems++; // Count the work order itself
+
+            return new DeletionResult 
+            { 
+                Success = true, 
+                Message = $"Work order '{workOrder.Name}' and all children deleted successfully. Total items deleted: {totalDeletedItems}",
+                ItemsDeleted = totalDeletedItems
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting work order {WorkOrderId}", workOrderId);
+            return new DeletionResult 
+            { 
+                Success = false, 
+                Message = "Error deleting work order: " + ex.Message 
+            };
+        }
+    }
 }
 
 /// <summary>

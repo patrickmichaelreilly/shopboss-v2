@@ -1,4 +1,6 @@
+using ShopBoss.Web.Data;
 using ShopBoss.Web.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace ShopBoss.Web.Services;
 
@@ -11,12 +13,21 @@ public class WorkOrderImportService
     private readonly ILogger<WorkOrderImportService> _logger;
     private readonly ColumnMappingService _columnMapping;
     private readonly PartFilteringService _partFilteringService;
+    private readonly LabelParserService _labelParser;
+    private readonly ShopBossDbContext _context;
 
-    public WorkOrderImportService(ILogger<WorkOrderImportService> logger, ColumnMappingService columnMapping, PartFilteringService partFilteringService)
+    public WorkOrderImportService(
+        ILogger<WorkOrderImportService> logger, 
+        ColumnMappingService columnMapping, 
+        PartFilteringService partFilteringService,
+        LabelParserService labelParser,
+        ShopBossDbContext context)
     {
         _logger = logger;
         _columnMapping = columnMapping;
         _partFilteringService = partFilteringService;
+        _labelParser = labelParser;
+        _context = context;
     }
 
     /// <summary>
@@ -690,5 +701,219 @@ public class WorkOrderImportService
             }
         }
         return null;
+    }
+
+    /// <summary>
+    /// Import part labels from Microvellum HTML label file using 3-tier assignment strategy
+    /// Called after work order is saved to database
+    /// </summary>
+    public async Task ImportLabelsAsync(string workOrderId, string workOrderName)
+    {
+        try
+        {
+            // Check for label file at standard location
+            var labelPath = $@"C:\Shopboss-Reports\ShopBoss Labels - {workOrderName}.html";
+            
+            if (!File.Exists(labelPath))
+            {
+                _logger.LogInformation("No label file found at {Path}. Labels are optional, continuing without them.", labelPath);
+                return;
+            }
+
+            _logger.LogInformation("Found label file at {Path}. Beginning import...", labelPath);
+
+            // Read and parse the HTML file
+            var html = await File.ReadAllTextAsync(labelPath);
+            var labels = _labelParser.ParseLabels(html);
+
+            if (labels.Count == 0)
+            {
+                _logger.LogWarning("No labels found in file {Path}", labelPath);
+                return;
+            }
+
+            _logger.LogInformation("Parsed {Count} labels from file. Using 3-tier assignment strategy...", labels.Count);
+
+            // Get the complete HTML for style extraction
+            var styleMatch = System.Text.RegularExpressions.Regex.Match(html, 
+                @"<style[^>]*>(.*?)</style>", 
+                System.Text.RegularExpressions.RegexOptions.Singleline | System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            var styles = styleMatch.Success ? styleMatch.Value : "";
+
+            // Get all parts for this work order ONCE to avoid O(n) database queries in the loop
+            // This avoids the EF translation error by doing the ExtractOriginalPartId filtering in memory
+            var productParts = await _context.Parts
+                .Include(p => p.Product)
+                .Where(p => p.Product != null && p.Product.WorkOrderId == workOrderId)
+                .ToListAsync();
+                
+            var detachedProductParts = await _context.Parts
+                .Include(p => p.Product) // Include for consistency even though it's null
+                .Where(p => p.ProductId != null && 
+                           _context.DetachedProducts.Any(dp => dp.Id == p.ProductId && dp.WorkOrderId == workOrderId))
+                .ToListAsync();
+            
+            var allWorkOrderParts = productParts.Concat(detachedProductParts).ToList();
+
+            // Track assigned parts to prevent duplicate assignments (pool consumption)
+            var assignedPartIds = new HashSet<string>();
+            var partLabels = new List<PartLabel>();
+            var matchedCount = 0;
+            var unmatchedBarcodes = new List<string>();
+
+            foreach (var kvp in labels)
+            {
+                var barcode = kvp.Key.Trim('*').Trim(); // Clean barcode
+                var labelHtml = kvp.Value;
+                
+                // Filter by barcode matching (exact or by extracting original) and availability
+                var matchingParts = allWorkOrderParts
+                    .Where(p => (p.Id == barcode || ExtractOriginalPartId(p.Id) == barcode) && 
+                               !assignedPartIds.Contains(p.Id))
+                    .ToList();
+
+                Part? selectedPart = null;
+
+                if (matchingParts.Count == 1)
+                {
+                    // Tier 1: Easy assignment
+                    selectedPart = matchingParts[0];
+                    _logger.LogDebug("Tier 1 match: Barcode {Barcode} → Part {PartId}", barcode, selectedPart.Id);
+                }
+                else if (matchingParts.Count > 1)
+                {
+                    // Tier 2: Try NestSheet disambiguation
+                    var nestSheetName = TryExtractNestSheetFromLabel(labelHtml);
+                    if (!string.IsNullOrEmpty(nestSheetName))
+                    {
+                        var nestSheetId = await GetNestSheetIdByNameAsync(nestSheetName, workOrderId);
+                        if (!string.IsNullOrEmpty(nestSheetId))
+                        {
+                            selectedPart = matchingParts.FirstOrDefault(p => p.NestSheetId == nestSheetId);
+                            if (selectedPart != null)
+                            {
+                                _logger.LogDebug("Tier 2 match: Barcode {Barcode} + NestSheet '{NestSheetName}' ({NestSheetId}) → Part {PartId}", 
+                                    barcode, nestSheetName, nestSheetId, selectedPart.Id);
+                            }
+                        }
+                    }
+
+                    // Tier 3: Pool consumption - take first available
+                    if (selectedPart == null)
+                    {
+                        selectedPart = matchingParts.FirstOrDefault();
+                        if (selectedPart != null)
+                        {
+                            _logger.LogDebug("Tier 3 match: Barcode {Barcode} → First available Part {PartId}", 
+                                barcode, selectedPart.Id);
+                        }
+                    }
+                }
+
+                if (selectedPart != null)
+                {
+                    // Wrap label with complete HTML structure for standalone display
+                    var wrappedHtml = _labelParser.WrapLabelForDisplay(labelHtml, styles);
+                    
+                    partLabels.Add(new PartLabel
+                    {
+                        PartId = selectedPart.Id,
+                        WorkOrderId = workOrderId,
+                        NestSheetId = selectedPart.NestSheetId,
+                        LabelHtml = wrappedHtml,
+                        ImportedDate = DateTime.Now
+                    });
+                    
+                    // Mark as assigned (consumed from pool)
+                    assignedPartIds.Add(selectedPart.Id);
+                    matchedCount++;
+                }
+                else
+                {
+                    unmatchedBarcodes.Add(barcode);
+                    _logger.LogWarning("No available part found for barcode {Barcode} (all matching parts already assigned)", barcode);
+                }
+            }
+
+            // Save to database
+            if (partLabels.Any())
+            {
+                await _context.PartLabels.AddRangeAsync(partLabels);
+                await _context.SaveChangesAsync();
+                
+                _logger.LogInformation("Successfully imported {MatchedCount} labels for work order {WorkOrderId} using 3-tier assignment", 
+                    matchedCount, workOrderId);
+            }
+
+            if (unmatchedBarcodes.Any())
+            {
+                _logger.LogWarning("Could not match {Count} labels to available parts. Unmatched barcodes: {Barcodes}", 
+                    unmatchedBarcodes.Count, string.Join(", ", unmatchedBarcodes.Take(10)));
+            }
+        }
+        catch (Exception ex)
+        {
+            // Log error but don't fail the import - labels are optional
+            _logger.LogError(ex, "Error importing labels for work order {WorkOrderId}. Import will continue without labels.", workOrderId);
+        }
+    }
+
+    /// <summary>
+    /// Try to extract nest sheet ID from label HTML for Tier 2 disambiguation
+    /// Extracts nest sheet name from div class="s97896f59" and looks up the NestSheetId
+    /// </summary>
+    private string? TryExtractNestSheetFromLabel(string labelHtml)
+    {
+        try
+        {
+            // Extract nest sheet name from div class="s97896f59" 
+            // Example: <div class="s97896f59" ...>Shopboss Test</div>
+            var match = System.Text.RegularExpressions.Regex.Match(labelHtml, 
+                @"class=""s97896f59""[^>]*>([^<]+)</div>", 
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            
+            if (match.Success)
+            {
+                var nestSheetName = match.Groups[1].Value.Trim();
+                if (!string.IsNullOrEmpty(nestSheetName))
+                {
+                    _logger.LogDebug("Extracted nest sheet name: {NestSheetName}", nestSheetName);
+                    return nestSheetName; // Return the name, we'll look up ID in the calling method
+                }
+            }
+            
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Error extracting nest sheet name from label HTML");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Look up nest sheet ID by name within the work order
+    /// </summary>
+    private async Task<string?> GetNestSheetIdByNameAsync(string nestSheetName, string workOrderId)
+    {
+        try
+        {
+            var nestSheet = await _context.NestSheets
+                .Where(ns => ns.Name == nestSheetName && ns.WorkOrderId == workOrderId)
+                .Select(ns => ns.Id)
+                .FirstOrDefaultAsync();
+                
+            if (!string.IsNullOrEmpty(nestSheet))
+            {
+                _logger.LogDebug("Found nest sheet ID {NestSheetId} for name {NestSheetName}", nestSheet, nestSheetName);
+            }
+            
+            return nestSheet;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Error looking up nest sheet ID for name {NestSheetName}", nestSheetName);
+            return null;
+        }
     }
 }

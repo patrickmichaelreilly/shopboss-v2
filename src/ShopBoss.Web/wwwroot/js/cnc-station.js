@@ -156,6 +156,7 @@ function viewNestSheetDetails(nestSheetId) {
                                     <th>Status</th>
                                     <th>Material</th>
                                     <th>Dimensions</th>
+                                    <th>Label</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -167,6 +168,7 @@ function viewNestSheetDetails(nestSheetId) {
                                         <td><span class="badge ${part.status === 'Cut' ? 'bg-success' : part.status === 'Pending' ? 'bg-secondary' : 'bg-primary'}">${part.status}</span></td>
                                         <td>${part.material || 'N/A'}</td>
                                         <td class="small">${[part.length && `L:${part.length}`, part.width && `W:${part.width}`, part.thickness && `T:${part.thickness}`].filter(Boolean).join('×') || 'N/A'}</td>
+                                        <td><button type="button" class="btn btn-outline-primary btn-sm" onclick="viewPartLabel('${part.id}')"><i class="fas fa-tag me-1"></i>View</button></td>
                                     </tr>
                                 `).join('')}
                             </tbody>
@@ -185,6 +187,40 @@ function viewNestSheetDetails(nestSheetId) {
             console.error('Error loading nest sheet details:', error);
             alert('An error occurred while loading nest sheet details.');
         });
+}
+
+// View part label in new window
+function viewPartLabel(partId) {
+    if (!partId) {
+        alert('Part ID is required');
+        return;
+    }
+
+    // Open the label endpoint in a new window
+    const labelUrl = `/Cnc/GetPartLabel?partId=${encodeURIComponent(partId)}`;
+    const labelWindow = window.open(labelUrl, 'partLabel', 'width=800,height=600,scrollbars=yes,resizable=yes');
+    
+    if (!labelWindow) {
+        alert('Pop-up blocked. Please allow pop-ups for this site to view part labels.');
+        return;
+    }
+
+    // Handle potential errors by checking if the window loaded successfully
+    labelWindow.onload = function() {
+        // Check if the window contains an error message
+        try {
+            const windowContent = labelWindow.document.body.innerText || labelWindow.document.body.textContent || '';
+            if (windowContent.includes('Part ID is required') || 
+                windowContent.includes('No label found') || 
+                windowContent.includes('No active work order')) {
+                alert('Label not available: ' + windowContent);
+                labelWindow.close();
+            }
+        } catch (e) {
+            // Cross-origin restrictions or other errors - assume success
+            console.log('Label window opened successfully');
+        }
+    };
 }
 
 // Load recent scans modal

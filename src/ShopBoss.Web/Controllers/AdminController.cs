@@ -20,6 +20,7 @@ public class AdminController : Controller
     private readonly IHubContext<StatusHub> _hubContext;
     private readonly BackupService _backupService;
     private readonly SystemHealthMonitor _healthMonitor;
+    private readonly WorkOrderDeletionService _workOrderDeletionService;
 
     public AdminController(
         ShopBossDbContext context, 
@@ -29,7 +30,8 @@ public class AdminController : Controller
         AuditTrailService auditTrailService,
         IHubContext<StatusHub> hubContext,
         BackupService backupService,
-        SystemHealthMonitor healthMonitor)
+        SystemHealthMonitor healthMonitor,
+        WorkOrderDeletionService workOrderDeletionService)
     {
         _context = context;
         _logger = logger;
@@ -39,6 +41,7 @@ public class AdminController : Controller
         _hubContext = hubContext;
         _backupService = backupService;
         _healthMonitor = healthMonitor;
+        _workOrderDeletionService = workOrderDeletionService;
     }
 
     public async Task<IActionResult> Index(string search = "", bool includeArchived = false)
@@ -73,22 +76,24 @@ public class AdminController : Controller
 
         try
         {
-            var workOrder = await _context.WorkOrders.FindAsync(id);
-            if (workOrder == null)
+            // Use comprehensive deletion service instead of direct EF removal
+            var result = await _workOrderDeletionService.DeleteWorkOrderAsync(id, "Admin");
+            
+            if (result.Success)
             {
-                return NotFound();
+                TempData["SuccessMessage"] = result.Message;
             }
-
-            _context.WorkOrders.Remove(workOrder);
-            await _context.SaveChangesAsync();
-
-            TempData["SuccessMessage"] = $"Work order '{workOrder.Name}' has been deleted successfully.";
+            else
+            {
+                TempData["ErrorMessage"] = result.Message;
+            }
+            
             return RedirectToAction(nameof(Index));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error deleting work order {WorkOrderId}", id);
-            TempData["ErrorMessage"] = "An error occurred while deleting the work order.";
+            TempData["ErrorMessage"] = "An unexpected error occurred while deleting the work order.";
             return RedirectToAction(nameof(Index));
         }
     }
@@ -271,8 +276,10 @@ public class AdminController : Controller
 
         try
         {
+            // Get work order names for success message
             var workOrders = await _context.WorkOrders
                 .Where(w => selectedIds.Contains(w.Id))
+                .Select(w => new { w.Id, w.Name })
                 .ToListAsync();
 
             if (workOrders.Count == 0)
@@ -288,16 +295,40 @@ public class AdminController : Controller
                 HttpContext.Session.Remove("ActiveWorkOrderId");
             }
 
-            _context.WorkOrders.RemoveRange(workOrders);
-            await _context.SaveChangesAsync();
+            // Use comprehensive deletion service for each work order
+            var successfulDeletions = 0;
+            var totalItemsDeleted = 0;
+            
+            foreach (var workOrder in workOrders)
+            {
+                var result = await _workOrderDeletionService.DeleteWorkOrderAsync(workOrder.Id, "Admin");
+                if (result.Success)
+                {
+                    successfulDeletions++;
+                    totalItemsDeleted += result.ItemsDeleted;
+                }
+                else
+                {
+                    _logger.LogError("Failed to delete work order {WorkOrderId} ({WorkOrderName}): {Error}", 
+                        workOrder.Id, workOrder.Name, result.Message);
+                }
+            }
 
-            TempData["SuccessMessage"] = $"Successfully deleted {workOrders.Count} work order(s).";
+            if (successfulDeletions == workOrders.Count)
+            {
+                TempData["SuccessMessage"] = $"Successfully deleted {successfulDeletions} work order(s) and {totalItemsDeleted} total items.";
+            }
+            else
+            {
+                TempData["ErrorMessage"] = $"Deleted {successfulDeletions} out of {workOrders.Count} work orders. Some deletions failed - check logs.";
+            }
+            
             return RedirectToAction(nameof(Index));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error performing bulk delete operation");
-            TempData["ErrorMessage"] = "An error occurred while deleting the selected work orders.";
+            TempData["ErrorMessage"] = "An unexpected error occurred while deleting the selected work orders.";
             return RedirectToAction(nameof(Index));
         }
     }

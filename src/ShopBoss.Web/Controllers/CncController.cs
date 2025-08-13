@@ -520,4 +520,44 @@ public class CncController : Controller
             return "Unknown";
         }
     }
+
+    /// <summary>
+    /// Get the label HTML for a specific part
+    /// </summary>
+    [HttpGet]
+    public async Task<IActionResult> GetPartLabel(string partId)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(partId))
+            {
+                return BadRequest("Part ID is required");
+            }
+
+            // Get the active work order from session
+            var activeWorkOrderId = HttpContext.Session.GetString("ActiveWorkOrderId");
+            if (string.IsNullOrEmpty(activeWorkOrderId))
+            {
+                return BadRequest("No active work order selected");
+            }
+
+            // Find the label for this part in this work order
+            var label = await _context.PartLabels
+                .FirstOrDefaultAsync(l => l.PartId == partId && l.WorkOrderId == activeWorkOrderId);
+
+            if (label == null)
+            {
+                _logger.LogInformation("No label found for part {PartId} in work order {WorkOrderId}", partId, activeWorkOrderId);
+                return NotFound($"No label found for part {partId}");
+            }
+
+            // Return the HTML content directly
+            return Content(label.LabelHtml, "text/html");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving label for part {PartId}", partId);
+            return StatusCode(500, "An error occurred while retrieving the part label");
+        }
+    }
 }

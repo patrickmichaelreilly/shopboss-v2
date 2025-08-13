@@ -958,6 +958,9 @@ public class ImportController : Controller
             _context.WorkOrders.Add(workOrder);
             await _context.SaveChangesAsync();
             
+            // Import labels after work order is saved (labels are optional)
+            await _workOrderImportService.ImportLabelsAsync(workOrder.Id, workOrderName);
+            
             // Commit transaction
             await transaction.CommitAsync();
 

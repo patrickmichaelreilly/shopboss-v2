@@ -30,6 +30,7 @@ public class ShopBossDbContext : DbContext
     public DbSet<PurchaseOrder> PurchaseOrders { get; set; }
     public DbSet<CustomWorkOrder> CustomWorkOrders { get; set; }
     public DbSet<ProjectEvent> ProjectEvents { get; set; }
+    public DbSet<PartLabel> PartLabels { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -405,6 +406,36 @@ public class ShopBossDbContext : DbContext
             entity.HasIndex(e => e.ProjectId);
             entity.HasIndex(e => e.EventDate);
             entity.HasIndex(e => e.EventType);
+        });
+
+        modelBuilder.Entity<PartLabel>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.PartId).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.WorkOrderId).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.NestSheetId).IsRequired(false).HasMaxLength(100);
+            entity.Property(e => e.LabelHtml).IsRequired();
+            entity.Property(e => e.ImportedDate).IsRequired();
+            
+            entity.HasOne(e => e.Part)
+                .WithMany()
+                .HasForeignKey(e => e.PartId)
+                .OnDelete(DeleteBehavior.Cascade);
+                
+            entity.HasOne(e => e.WorkOrder)
+                .WithMany()
+                .HasForeignKey(e => e.WorkOrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+                
+            entity.HasOne(e => e.NestSheet)
+                .WithMany()
+                .HasForeignKey(e => e.NestSheetId)
+                .OnDelete(DeleteBehavior.SetNull);
+                
+            entity.HasIndex(e => e.PartId);
+            entity.HasIndex(e => e.WorkOrderId);
+            entity.HasIndex(e => e.NestSheetId);
+            entity.HasIndex(e => new { e.WorkOrderId, e.PartId }).IsUnique();
         });
     }
 }
