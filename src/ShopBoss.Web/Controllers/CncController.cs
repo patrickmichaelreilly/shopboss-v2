@@ -551,8 +551,42 @@ public class CncController : Controller
                 return NotFound($"No label found for part {partId}");
             }
 
-            // Return the HTML content directly
-            return Content(label.LabelHtml, "text/html");
+            // Inject @font-face CSS to embed the barcode font
+            var fontFaceCss = @"
+<style>
+@font-face {
+    font-family: '3 of 9 Barcode';
+    src: url('/fonts/3OF9.TTF') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+}
+</style>
+";
+            
+            // Inject the font-face CSS right after the opening <head> tag
+            var modifiedHtml = label.LabelHtml;
+            var headIndex = modifiedHtml.IndexOf("<head>", StringComparison.OrdinalIgnoreCase);
+            if (headIndex >= 0)
+            {
+                var insertPosition = headIndex + 6; // Length of "<head>"
+                modifiedHtml = modifiedHtml.Insert(insertPosition, fontFaceCss);
+            }
+            else
+            {
+                // If no head tag found, try to insert after <html> tag
+                var htmlIndex = modifiedHtml.IndexOf("<html", StringComparison.OrdinalIgnoreCase);
+                if (htmlIndex >= 0)
+                {
+                    var endOfHtmlTag = modifiedHtml.IndexOf(">", htmlIndex);
+                    if (endOfHtmlTag >= 0)
+                    {
+                        modifiedHtml = modifiedHtml.Insert(endOfHtmlTag + 1, "<head>" + fontFaceCss + "</head>");
+                    }
+                }
+            }
+            
+            // Return the modified HTML content with embedded font
+            return Content(modifiedHtml, "text/html");
         }
         catch (Exception ex)
         {
