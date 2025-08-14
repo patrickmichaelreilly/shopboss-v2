@@ -168,7 +168,7 @@ function viewNestSheetDetails(nestSheetId) {
                                         <td><span class="badge ${part.status === 'Cut' ? 'bg-success' : part.status === 'Pending' ? 'bg-secondary' : 'bg-primary'}">${part.status}</span></td>
                                         <td>${part.material || 'N/A'}</td>
                                         <td class="small">${[part.length && `L:${part.length}`, part.width && `W:${part.width}`, part.thickness && `T:${part.thickness}`].filter(Boolean).join('×') || 'N/A'}</td>
-                                        <td><button type="button" class="btn btn-outline-primary btn-sm" onclick="viewPartLabel('${part.id}')"><i class="fas fa-tag me-1"></i>View</button></td>
+                                        <td><button type="button" class="btn btn-outline-primary btn-sm" onclick="viewPartLabel('${part.id}')"><i class="fas fa-print me-1"></i>Print</button></td>
                                     </tr>
                                 `).join('')}
                             </tbody>
@@ -177,6 +177,10 @@ function viewNestSheetDetails(nestSheetId) {
                 `;
                 
                 document.getElementById('nestSheetDetailsContent').innerHTML = content;
+                
+                // Update button text based on auto-print preference
+                updateModalButtonText();
+                
                 const modal = new bootstrap.Modal(document.getElementById('nestSheetDetailsModal'));
                 modal.show();
             } else {
@@ -189,14 +193,99 @@ function viewNestSheetDetails(nestSheetId) {
         });
 }
 
-// View part label in new window
+// Print part label using hidden iframe
 function viewPartLabel(partId) {
     if (!partId) {
         alert('Part ID is required');
         return;
     }
 
-    // Open the label endpoint in a new window
+    // Check if auto-print is enabled in preferences
+    const autoPrintEnabled = ShopBossPreferences.CNC.getAutoPrintLabels();
+    
+    if (!autoPrintEnabled) {
+        // Fall back to popup if auto-print is disabled
+        openLabelInPopup(partId);
+        return;
+    }
+
+    // Create hidden iframe for printing
+    const labelUrl = `/Cnc/GetPartLabel?partId=${encodeURIComponent(partId)}`;
+    const iframe = document.createElement('iframe');
+    
+    // Style the iframe to be hidden but still functional for printing
+    iframe.style.position = 'absolute';
+    iframe.style.left = '-9999px';
+    iframe.style.top = '-9999px';
+    iframe.style.width = '300px';
+    iframe.style.height = '100px';
+    iframe.style.border = 'none';
+    
+    // Set up iframe source
+    iframe.src = labelUrl;
+    
+    // Trigger print when iframe loads (we're already in auto-print mode)
+    iframe.onload = function() {
+        setTimeout(function() {
+            try {
+                iframe.contentWindow.print();
+                // Notify that printing is complete
+                setTimeout(function() {
+                    window.postMessage('printComplete', '*');
+                }, 1000);
+            } catch (e) {
+                console.warn('Print failed:', e);
+                window.postMessage('printComplete', '*');
+            }
+        }, 100); // Small delay for fonts to load
+    };
+    
+    // Set up cleanup and error handling
+    let cleanupTimer;
+    let isCleanedUp = false;
+    
+    const cleanup = () => {
+        if (isCleanedUp) return;
+        isCleanedUp = true;
+        
+        if (cleanupTimer) clearTimeout(cleanupTimer);
+        if (iframe && iframe.parentNode) {
+            iframe.parentNode.removeChild(iframe);
+        }
+    };
+    
+    // Listen for print completion messages from iframe
+    const messageHandler = (event) => {
+        if (event.data === 'printComplete') {
+            console.log('Label print completed');
+            setTimeout(cleanup, 1000); // Small delay before cleanup
+            window.removeEventListener('message', messageHandler);
+        }
+    };
+    
+    window.addEventListener('message', messageHandler);
+    
+    // Handle iframe load errors
+    iframe.onerror = function() {
+        console.error('Failed to load label for printing');
+        alert('Failed to load label for printing');
+        cleanup();
+        window.removeEventListener('message', messageHandler);
+    };
+    
+    // Fallback cleanup after 30 seconds
+    cleanupTimer = setTimeout(() => {
+        console.log('Print operation timed out, cleaning up');
+        cleanup();
+        window.removeEventListener('message', messageHandler);
+    }, 30000);
+    
+    // Add iframe to document
+    document.body.appendChild(iframe);
+}
+
+// Fallback function for popup mode when auto-print is disabled
+function openLabelInPopup(partId) {
     const labelUrl = `/Cnc/GetPartLabel?partId=${encodeURIComponent(partId)}`;
     const labelWindow = window.open(labelUrl, 'partLabel', 'width=800,height=600,scrollbars=yes,resizable=yes');
     
@@ -207,7 +296,6 @@ function viewPartLabel(partId) {
 
     // Handle potential errors by checking if the window loaded successfully
     labelWindow.onload = function() {
-        // Check if the window contains an error message
         try {
             const windowContent = labelWindow.document.body.innerText || labelWindow.document.body.textContent || '';
             if (windowContent.includes('Part ID is required') || 
@@ -217,10 +305,41 @@ function viewPartLabel(partId) {
                 labelWindow.close();
             }
         } catch (e) {
-            // Cross-origin restrictions or other errors - assume success
-            console.log('Label window opened successfully');
+            console.log('Label window loaded successfully');
         }
     };
+}
+
+// Toggle auto-print preference
+function toggleAutoPrint() {
+    const toggle = document.getElementById('autoPrintToggle');
+    const isEnabled = toggle.checked;
+    
+    // Save preference
+    ShopBossPreferences.CNC.setAutoPrintLabels(isEnabled);
+    
+    // Update any open modals to reflect the change
+    updateModalButtonText();
+    
+    console.log('Auto-print labels:', isEnabled ? 'enabled' : 'disabled');
+}
+
+// Update button text in nest sheet details modal based on auto-print preference
+function updateModalButtonText() {
+    const autoPrintEnabled = ShopBossPreferences.CNC.getAutoPrintLabels();
+    
+    // Find all label buttons in the modal and update their text/icon
+    const modal = document.getElementById('nestSheetDetailsModal');
+    if (modal) {
+        const labelButtons = modal.querySelectorAll('button[onclick*="viewPartLabel"]');
+        labelButtons.forEach(button => {
+            if (autoPrintEnabled) {
+                button.innerHTML = '<i class="fas fa-print me-1"></i>Print';
+            } else {
+                button.innerHTML = '<i class="fas fa-eye me-1"></i>View';
+            }
+        });
+    }
 }
 
 // Load recent scans modal

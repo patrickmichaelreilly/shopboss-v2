@@ -551,8 +551,8 @@ public class CncController : Controller
                 return NotFound($"No label found for part {partId}");
             }
 
-            // Inject @font-face CSS to embed the barcode font
-            var fontFaceCss = @"
+            // Inject @font-face CSS and auto-print JavaScript
+            var fontFaceAndPrintCss = @"
 <style>
 @font-face {
     font-family: '3 of 9 Barcode';
@@ -560,16 +560,32 @@ public class CncController : Controller
     font-weight: normal;
     font-style: normal;
 }
+@media print {
+    @page {
+        size: 4in 1.125in;  /* Label size with smaller margin buffer */
+        margin: 0;
+    }
+    body { 
+        margin: 0;
+        padding: 0.0625in 0;  /* Top/bottom padding 1/16 inch margins */
+    }
+    .StiPageContainer { 
+        width: 3.875in !important;  /* Account for smaller padding */
+        height: auto !important;
+        margin: 0 auto;
+        page-break-after: avoid;
+    }
+}
 </style>
 ";
             
-            // Inject the font-face CSS right after the opening <head> tag
+            // Inject the font-face CSS and print script right after the opening <head> tag
             var modifiedHtml = label.LabelHtml;
             var headIndex = modifiedHtml.IndexOf("<head>", StringComparison.OrdinalIgnoreCase);
             if (headIndex >= 0)
             {
                 var insertPosition = headIndex + 6; // Length of "<head>"
-                modifiedHtml = modifiedHtml.Insert(insertPosition, fontFaceCss);
+                modifiedHtml = modifiedHtml.Insert(insertPosition, fontFaceAndPrintCss);
             }
             else
             {
@@ -580,7 +596,7 @@ public class CncController : Controller
                     var endOfHtmlTag = modifiedHtml.IndexOf(">", htmlIndex);
                     if (endOfHtmlTag >= 0)
                     {
-                        modifiedHtml = modifiedHtml.Insert(endOfHtmlTag + 1, "<head>" + fontFaceCss + "</head>");
+                        modifiedHtml = modifiedHtml.Insert(endOfHtmlTag + 1, "<head>" + fontFaceAndPrintCss + "</head>");
                     }
                 }
             }

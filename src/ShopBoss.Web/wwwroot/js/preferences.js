@@ -7,6 +7,7 @@ const ShopBossPreferences = {
         SORTING_SELECTED_RACK: 'shopboss.sorting.selectedRackId',
         CNC_SHOW_PROCESSED: 'shopboss.cnc.showProcessed',
         CNC_GROUP_BY_MATERIAL: 'shopboss.cnc.groupByMaterial',
+        CNC_AUTO_PRINT_LABELS: 'shopboss.cnc.autoPrintLabels',
         ASSEMBLY_SHOW_BILLBOARD: 'shopboss.assembly.showBillboard',
         LAST_ACTIVE_WORK_ORDER: 'shopboss.global.lastActiveWorkOrder'
     },
@@ -90,6 +91,12 @@ const ShopBossPreferences = {
         },
         setGroupByMaterial: function(group) {
             return ShopBossPreferences.set(ShopBossPreferences.Keys.CNC_GROUP_BY_MATERIAL, group);
+        },
+        getAutoPrintLabels: function() {
+            return ShopBossPreferences.get(ShopBossPreferences.Keys.CNC_AUTO_PRINT_LABELS, true); // Default to true
+        },
+        setAutoPrintLabels: function(enabled) {
+            return ShopBossPreferences.set(ShopBossPreferences.Keys.CNC_AUTO_PRINT_LABELS, enabled);
         }
     },
     
