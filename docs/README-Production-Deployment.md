@@ -8,16 +8,16 @@ This guide provides instructions for deploying ShopBoss to a Windows production 
 
 1. **Download** the ShopBoss deployment package
 2. **Extract** to a temporary directory
-3. **Run PowerShell as Administrator**
+3. **Run Command Prompt as Administrator**
 4. **Execute** the installation script:
 
-```powershell
-.\scripts\install-shopboss.ps1
+```batch
+scripts\install-shopboss.bat
 ```
 
 The automated installer will:
 - Build and publish the application
-- Install as a Windows Service
+- Install as a Windows Service (default: "ShopBoss")
 - Configure Windows Firewall (port 5000)
 - Start the service automatically
 - Verify the installation
@@ -26,8 +26,10 @@ The automated installer will:
 
 For custom installation paths or ports:
 
-```powershell
-.\scripts\install-shopboss.ps1 -InstallPath "D:\ShopBoss" -Port 8080
+```batch
+scripts\install-shopboss.bat -InstallPath "D:\ShopBoss" -Port 8080
+scripts\install-shopboss.bat -ServiceName "MyShopBoss" -SkipFirewall
+scripts\install-shopboss.bat -Force
 ```
 
 ## Manual Installation
@@ -36,8 +38,23 @@ For custom installation paths or ports:
 
 - Windows Server 2019 or later (or Windows 10/11)
 - .NET 8.0 Runtime
-- PowerShell 5.1 or later
 - Administrator privileges
+
+### Important: Database Location for Service Installation
+
+**⚠️ CRITICAL**: When ShopBoss is installed as a Windows Service, the SQLite database file (`shopboss.db`) is created in the **System32** directory to resolve path issues when running as a service under the system account.
+
+**Production Database Location**: `C:\Windows\System32\shopboss.db`
+
+This location is used because:
+- Windows Services run with different working directory contexts
+- System32 provides reliable path resolution for service accounts
+- Avoids permission issues with application-specific directories
+
+**For Database Operations**:
+- Backup: Copy from `C:\Windows\System32\shopboss.db`
+- Migration: Apply changes to `C:\Windows\System32\shopboss.db`
+- Recovery: Replace file at `C:\Windows\System32\shopboss.db`
 
 ### Step 1: Build and Publish
 
