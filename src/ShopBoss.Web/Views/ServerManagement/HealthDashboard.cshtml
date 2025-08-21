@@ -1,0 +1,342 @@
+@model HealthDashboardViewModel
+
+@{
+    ViewData["Title"] = Model.PageTitle;
+    Layout = "_Layout";
+}
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">@Model.PageTitle</h1>
+                <div>
+                    <button id="refreshHealthBtn" class="btn btn-primary me-2">
+                        <i class="bi bi-arrow-clockwise"></i> Refresh Health Check
+                    </button>
+                    <a href="@Url.Action("Index", "ServerManagement")" class="btn btn-secondary">
+                        <i class="bi bi-arrow-left"></i> Back to Server Management
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Overall Health Status -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <h5 class="card-title">Overall System Health</h5>
+                            <div class="d-flex align-items-center">
+                                <div id="overallStatusIcon" class="me-2"></div>
+                                <span id="overallStatusText" class="fs-5 fw-bold"></span>
+                            </div>
+                            <small class="text-muted">Last checked: <span id="lastHealthCheck"></span></small>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <div class="row">
+                                <div class="col-6">
+                                    <div class="text-center">
+                                        <div class="fw-bold fs-4" id="activeWorkOrderCount">-</div>
+                                        <small class="text-muted">Active Work Orders</small>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="text-center">
+                                        <div class="fw-bold fs-4" id="totalPartsCount">-</div>
+                                        <small class="text-muted">Total Parts</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Component Health Status -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <div id="databaseStatusIcon" class="mb-2"></div>
+                    <h6 class="card-title">Database</h6>
+                    <p id="databaseStatusText" class="mb-1"></p>
+                    <small class="text-muted">
+                        <span id="databaseConnectionTime">-</span>ms
+                    </small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <div id="diskSpaceStatusIcon" class="mb-2"></div>
+                    <h6 class="card-title">Disk Space</h6>
+                    <p id="diskSpaceStatusText" class="mb-1"></p>
+                    <small class="text-muted">
+                        <span id="diskUsagePercentage">-</span>% used
+                    </small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <div id="memoryStatusIcon" class="mb-2"></div>
+                    <h6 class="card-title">Memory</h6>
+                    <p id="memoryStatusText" class="mb-1"></p>
+                    <small class="text-muted">
+                        <span id="memoryUsage">-</span>MB
+                    </small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <div id="responseTimeStatusIcon" class="mb-2"></div>
+                    <h6 class="card-title">Response Time</h6>
+                    <p id="responseTimeStatusText" class="mb-1"></p>
+                    <small class="text-muted">
+                        <span id="averageResponseTime">-</span>ms
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detailed Metrics -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">Disk Space Usage</h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Available Space</span>
+                        <span id="availableDiskSpace">-</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Total Space</span>
+                        <span id="totalDiskSpace">-</span>
+                    </div>
+                    <div class="progress" style="height: 20px;">
+                        <div id="diskUsageProgress" class="progress-bar" role="progressbar" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">Performance Metrics</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-2">
+                        <div class="col-8">Database Connection Time</div>
+                        <div class="col-4 text-end">
+                            <span id="detailedDatabaseTime">-</span>ms
+                        </div>
+                    </div>
+                    <div class="row mb-2">
+                        <div class="col-8">Application Response Time</div>
+                        <div class="col-4 text-end">
+                            <span id="detailedResponseTime">-</span>ms
+                        </div>
+                    </div>
+                    <div class="row mb-2">
+                        <div class="col-8">Memory Usage</div>
+                        <div class="col-4 text-end">
+                            <span id="detailedMemoryUsage">-</span>MB
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Note: Recent Health Events section removed as per user request - health monitoring provides real-time metrics only -->
+</div>
+
+@section Scripts {
+    <script>
+        // Health status connection
+        const healthConnection = new signalR.HubConnectionBuilder()
+            .withUrl("/hubs/status")
+            .build();
+
+        // Start SignalR connection
+        healthConnection.start().then(function () {
+            console.log("Health monitoring connected");
+            
+            // Join server monitoring group
+            healthConnection.invoke("JoinGroup", "server-monitoring");
+            
+            // Load initial health data
+            loadHealthData();
+        }).catch(function (err) {
+            console.error("Error connecting to health monitoring:", err);
+        });
+
+        // Listen for health updates
+        healthConnection.on("HealthUpdate", function (healthData) {
+            updateHealthDisplay(healthData);
+        });
+
+        // Load health data from server
+        function loadHealthData() {
+            fetch('@Url.Action("GetHealthMetrics", "ServerManagement")')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        console.error("Error loading health data:", data.error);
+                        return;
+                    }
+                    updateHealthDisplay(data);
+                })
+                .catch(error => {
+                    console.error("Error loading health data:", error);
+                });
+        }
+
+        // Update health display
+        function updateHealthDisplay(healthData) {
+            // Overall status
+            updateStatusDisplay('overall', healthData.overallStatus);
+            document.getElementById('lastHealthCheck').textContent = 
+                new Date(healthData.lastHealthCheck).toLocaleString();
+
+            // Component statuses
+            updateStatusDisplay('database', healthData.databaseStatus);
+            updateStatusDisplay('diskSpace', healthData.diskSpaceStatus);
+            updateStatusDisplay('memory', healthData.memoryStatus);
+            updateStatusDisplay('responseTime', healthData.responseTimeStatus);
+
+            // Metrics
+            document.getElementById('activeWorkOrderCount').textContent = healthData.activeWorkOrderCount || 0;
+            document.getElementById('totalPartsCount').textContent = healthData.totalPartsCount || 0;
+            document.getElementById('databaseConnectionTime').textContent = 
+                Math.round(healthData.databaseConnectionTimeMs || 0);
+            document.getElementById('diskUsagePercentage').textContent = 
+                Math.round(healthData.diskUsagePercentage || 0);
+            document.getElementById('memoryUsage').textContent = 
+                Math.round(healthData.memoryUsagePercentage || 0);
+            document.getElementById('averageResponseTime').textContent = 
+                Math.round(healthData.averageResponseTimeMs || 0);
+
+            // Detailed metrics
+            document.getElementById('availableDiskSpace').textContent = 
+                `${Math.round(healthData.availableDiskSpaceGB || 0)} GB`;
+            document.getElementById('totalDiskSpace').textContent = 
+                `${Math.round(healthData.totalDiskSpaceGB || 0)} GB`;
+            document.getElementById('detailedDatabaseTime').textContent = 
+                Math.round(healthData.databaseConnectionTimeMs || 0);
+            document.getElementById('detailedResponseTime').textContent = 
+                Math.round(healthData.averageResponseTimeMs || 0);
+            document.getElementById('detailedMemoryUsage').textContent = 
+                Math.round(healthData.memoryUsagePercentage || 0);
+
+            // Disk usage progress bar
+            const diskUsagePercent = Math.round(healthData.diskUsagePercentage || 0);
+            const progressBar = document.getElementById('diskUsageProgress');
+            progressBar.style.width = diskUsagePercent + '%';
+            progressBar.textContent = diskUsagePercent + '%';
+            
+            // Color code the progress bar
+            if (diskUsagePercent < 85) {
+                progressBar.className = 'progress-bar bg-success';
+            } else if (diskUsagePercent < 95) {
+                progressBar.className = 'progress-bar bg-warning';
+            } else {
+                progressBar.className = 'progress-bar bg-danger';
+            }
+        }
+
+        // Update status display with appropriate styling
+        function updateStatusDisplay(component, status) {
+            const iconElement = document.getElementById(component + 'StatusIcon');
+            const textElement = document.getElementById(component + 'StatusText');
+            
+            if (!iconElement || !textElement) return;
+
+            let icon, cssClass, text;
+            
+            switch (status) {
+                case 'Healthy':
+                    icon = '<i class="bi bi-check-circle-fill text-success fs-3"></i>';
+                    cssClass = 'text-success';
+                    text = 'Healthy';
+                    break;
+                case 'Warning':
+                    icon = '<i class="bi bi-exclamation-triangle-fill text-warning fs-3"></i>';
+                    cssClass = 'text-warning';
+                    text = 'Warning';
+                    break;
+                case 'Critical':
+                    icon = '<i class="bi bi-x-circle-fill text-danger fs-3"></i>';
+                    cssClass = 'text-danger';
+                    text = 'Critical';
+                    break;
+                case 'Error':
+                    icon = '<i class="bi bi-x-circle-fill text-danger fs-3"></i>';
+                    cssClass = 'text-danger';
+                    text = 'Error';
+                    break;
+                default:
+                    icon = '<i class="bi bi-question-circle-fill text-muted fs-3"></i>';
+                    cssClass = 'text-muted';
+                    text = 'Unknown';
+            }
+            
+            iconElement.innerHTML = icon;
+            textElement.textContent = text;
+            textElement.className = cssClass;
+        }
+
+        // Manual health check button
+        document.getElementById('refreshHealthBtn').addEventListener('click', function() {
+            const btn = this;
+            const originalText = btn.innerHTML;
+            
+            btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Checking...';
+            btn.disabled = true;
+            
+            fetch('@Url.Action("RunHealthCheck", "ServerManagement")', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Reload health data after successful check
+                    setTimeout(() => {
+                        loadHealthData();
+                    }, 1000);
+                } else {
+                    console.error('Health check failed:', data.message);
+                    alert('Health check failed: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error running health check:', error);
+                alert('Error running health check.');
+            })
+            .finally(() => {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            });
+        });
+
+        // Auto-refresh every 30 seconds
+        setInterval(loadHealthData, 30000);
+    </script>
+}

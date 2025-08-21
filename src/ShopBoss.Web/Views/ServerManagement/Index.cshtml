@@ -1,0 +1,325 @@
+@model ServerManagementDashboardViewModel
+@{
+    ViewData["Title"] = Model.PageTitle;
+}
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="h2 mb-4">@Model.PageTitle</h1>
+            
+            @if (TempData["SuccessMessage"] != null)
+            {
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    @TempData["SuccessMessage"]
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            }
+            
+            @if (TempData["ErrorMessage"] != null)
+            {
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    @TempData["ErrorMessage"]
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Quick Action Buttons -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="btn-group" role="group">
+                <a href="@Url.Action("HealthDashboard")" class="btn btn-outline-primary">
+                    <i class="fas fa-heartbeat"></i> Health Dashboard
+                </a>
+                <a href="@Url.Action("BackupManagement")" class="btn btn-outline-secondary">
+                    <i class="fas fa-database"></i> Backup Management
+                </a>
+                <button type="button" class="btn btn-outline-success" onclick="runHealthCheck()">
+                    <i class="fas fa-sync"></i> Run Health Check
+                </button>
+                <button type="button" class="btn btn-outline-warning" onclick="createManualBackup()">
+                    <i class="fas fa-download"></i> Create Backup
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Overview Cards -->
+    <div class="row mb-4">
+        <!-- System Health Card -->
+        <div class="col-md-6 col-lg-3 mb-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="card-title mb-0">System Health</h6>
+                        <i class="fas fa-heartbeat text-muted"></i>
+                    </div>
+                    @if (Model.CurrentMetrics != null)
+                    {
+                        <div class="d-flex align-items-center">
+                            <span class="badge bg-@GetHealthStatusColor(Model.CurrentMetrics.OverallStatus) me-2">
+                                @Model.CurrentMetrics.OverallStatus
+                            </span>
+                            <small class="text-muted">
+                                @Model.CurrentMetrics.LastHealthCheck.ToString("HH:mm")
+                            </small>
+                        </div>
+                        <div class="mt-2 small text-muted">
+                            DB: @Model.CurrentMetrics.DatabaseConnectionTimeMs ms<br>
+                            Disk: @Model.CurrentMetrics.AvailableDiskSpaceGB.ToString("F1") GB free
+                        </div>
+                    }
+                    else
+                    {
+                        <span class="badge bg-secondary">Unknown</span>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Backup Status Card -->
+        <div class="col-md-6 col-lg-3 mb-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="card-title mb-0">Last Backup</h6>
+                        <i class="fas fa-database text-muted"></i>
+                    </div>
+                    @if (Model.RecentBackups.Any())
+                    {
+                        var lastBackup = Model.RecentBackups.First();
+                        <div class="d-flex align-items-center">
+                            <span class="badge bg-@GetBackupStatusColor(lastBackup.IsSuccessful) me-2">
+                                @(lastBackup.IsSuccessful ? "Success" : "Failed")
+                            </span>
+                            <small class="text-muted">
+                                @lastBackup.CreatedDate.ToString("MM/dd HH:mm")
+                            </small>
+                        </div>
+                        <div class="mt-2 small text-muted">
+                            Type: @lastBackup.BackupType<br>
+                            Size: @(lastBackup.BackupSize / 1024 / 1024).ToString("F1") MB
+                        </div>
+                    }
+                    else
+                    {
+                        <span class="badge bg-secondary">No backups</span>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Active Work Orders Card -->
+        <div class="col-md-6 col-lg-3 mb-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="card-title mb-0">Work Orders</h6>
+                        <i class="fas fa-clipboard-list text-muted"></i>
+                    </div>
+                    @if (Model.CurrentMetrics != null)
+                    {
+                        <h4 class="text-primary mb-1">@Model.CurrentMetrics.ActiveWorkOrderCount</h4>
+                        <small class="text-muted">
+                            @Model.CurrentMetrics.TotalPartsCount total parts
+                        </small>
+                    }
+                    else
+                    {
+                        <h4 class="text-muted mb-1">-</h4>
+                        <small class="text-muted">Loading...</small>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Backup Configuration Card -->
+        <div class="col-md-6 col-lg-3 mb-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="card-title mb-0">Auto Backup</h6>
+                        <i class="fas fa-cog text-muted"></i>
+                    </div>
+                    @if (Model.BackupConfiguration != null)
+                    {
+                        <div class="d-flex align-items-center">
+                            <span class="badge bg-@(Model.BackupConfiguration.EnableAutomaticBackups ? "success" : "secondary") me-2">
+                                @(Model.BackupConfiguration.EnableAutomaticBackups ? "Enabled" : "Disabled")
+                            </span>
+                        </div>
+                        <div class="mt-2 small text-muted">
+                            Interval: @Model.BackupConfiguration.BackupIntervalMinutes min<br>
+                            Retention: @Model.BackupConfiguration.MaxBackupRetention backups
+                        </div>
+                    }
+                    else
+                    {
+                        <span class="badge bg-secondary">Not configured</span>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Activity and Recent Backups -->
+    <div class="row">
+        <!-- Recent Activity -->
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">Recent Activity</h6>
+                    <small class="text-muted">Last 10 events</small>
+                </div>
+                <div class="card-body p-0">
+                    @if (Model.RecentActivityLogs.Any())
+                    {
+                        <div class="list-group list-group-flush">
+                            @foreach (var log in Model.RecentActivityLogs)
+                            {
+                                <div class="list-group-item list-group-item-action">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h6 class="mb-1">@log.Action</h6>
+                                        <small class="text-muted">@log.Timestamp.ToString("HH:mm")</small>
+                                    </div>
+                                    <p class="mb-1 small">@log.Details</p>
+                                    <small class="text-muted">@log.Station</small>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="p-3 text-center text-muted">
+                            <i class="fas fa-inbox fa-2x mb-2"></i><br>
+                            No recent activity
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Backups -->
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">Recent Backups</h6>
+                    <a href="@Url.Action("BackupManagement")" class="btn btn-sm btn-outline-primary">View All</a>
+                </div>
+                <div class="card-body p-0">
+                    @if (Model.RecentBackups.Any())
+                    {
+                        <div class="list-group list-group-flush">
+                            @foreach (var backup in Model.RecentBackups)
+                            {
+                                <div class="list-group-item">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <div>
+                                            <span class="badge bg-@GetBackupStatusColor(backup.IsSuccessful) me-2">
+                                                @(backup.IsSuccessful ? "Success" : "Failed")
+                                            </span>
+                                            @backup.BackupType
+                                        </div>
+                                        <small class="text-muted">@backup.CreatedDate.ToString("MM/dd HH:mm")</small>
+                                    </div>
+                                    <small class="text-muted d-block mt-1">
+                                        Size: @(backup.BackupSize / 1024 / 1024).ToString("F1") MB
+                                        @if (!string.IsNullOrEmpty(backup.ErrorMessage))
+                                        {
+                                            <br><span class="text-danger">@backup.ErrorMessage</span>
+                                        }
+                                    </small>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="p-3 text-center text-muted">
+                            <i class="fas fa-database fa-2x mb-2"></i><br>
+                            No backups found
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@functions {
+    private string GetHealthStatusColor(HealthStatusLevel status)
+    {
+        return status switch
+        {
+            HealthStatusLevel.Healthy => "success",
+            HealthStatusLevel.Warning => "warning", 
+            HealthStatusLevel.Critical => "danger",
+            HealthStatusLevel.Error => "danger",
+            _ => "secondary"
+        };
+    }
+    
+    private string GetBackupStatusColor(bool isSuccessful)
+    {
+        return isSuccessful ? "success" : "danger";
+    }
+}
+
+<script>
+async function runHealthCheck() {
+    try {
+        const response = await fetch('@Url.Action("RunHealthCheck")', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
+            }
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showAlert('success', result.message);
+            // Refresh the page after a short delay to show updated metrics
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            showAlert('danger', result.message);
+        }
+    } catch (error) {
+        showAlert('danger', 'An error occurred while running the health check.');
+    }
+}
+
+async function createManualBackup() {
+    try {
+        const response = await fetch('@Url.Action("CreateManualBackup")', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
+            }
+        });
+        
+        if (response.ok) {
+            showAlert('success', 'Manual backup initiated. Refreshing page...');
+            setTimeout(() => location.reload(), 2000);
+        } else {
+            showAlert('danger', 'Failed to create manual backup.');
+        }
+    } catch (error) {
+        showAlert('danger', 'An error occurred while creating the backup.');
+    }
+}
+
+function showAlert(type, message) {
+    const alertHtml = `
+        <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    $('.container-fluid .row:first .col-12').after(`<div class="col-12">${alertHtml}</div>`);
+}
+</script>

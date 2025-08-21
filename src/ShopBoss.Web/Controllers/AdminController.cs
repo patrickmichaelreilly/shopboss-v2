@@ -18,8 +18,6 @@ public class AdminController : Controller
     private readonly WorkOrderService _workOrderService;
     private readonly AuditTrailService _auditTrailService;
     private readonly IHubContext<StatusHub> _hubContext;
-    private readonly BackupService _backupService;
-    private readonly SystemHealthMonitor _healthMonitor;
     private readonly WorkOrderDeletionService _workOrderDeletionService;
 
     public AdminController(
@@ -29,8 +27,6 @@ public class AdminController : Controller
         WorkOrderService workOrderService,
         AuditTrailService auditTrailService,
         IHubContext<StatusHub> hubContext,
-        BackupService backupService,
-        SystemHealthMonitor healthMonitor,
         WorkOrderDeletionService workOrderDeletionService)
     {
         _context = context;
@@ -39,8 +35,6 @@ public class AdminController : Controller
         _workOrderService = workOrderService;
         _auditTrailService = auditTrailService;
         _hubContext = hubContext;
-        _backupService = backupService;
-        _healthMonitor = healthMonitor;
         _workOrderDeletionService = workOrderDeletionService;
     }
 
@@ -1185,243 +1179,6 @@ public class AdminController : Controller
     }
 
 
-    // Backup Management Actions (Phase A2)
-    [HttpGet]
-    public async Task<IActionResult> BackupManagement()
-    {
-        try
-        {
-            var config = await _backupService.GetBackupConfigurationAsync();
-            var recentBackups = await _backupService.GetRecentBackupsAsync(20);
-            
-            var viewModel = new BackupManagementViewModel
-            {
-                Configuration = config,
-                RecentBackups = recentBackups
-            };
-            
-            return View(viewModel);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error loading backup management page");
-            TempData["ErrorMessage"] = "An error occurred while loading the backup management page.";
-            return RedirectToAction(nameof(Index));
-        }
-    }
-
-    [HttpPost]
-    public async Task<IActionResult> UpdateBackupConfiguration(BackupConfiguration configuration)
-    {
-        try
-        {
-            if (ModelState.IsValid)
-            {
-                var success = await _backupService.UpdateBackupConfigurationAsync(configuration);
-                if (success)
-                {
-                    TempData["SuccessMessage"] = "Backup configuration updated successfully.";
-                }
-                else
-                {
-                    TempData["ErrorMessage"] = "Failed to update backup configuration.";
-                }
-            }
-            else
-            {
-                TempData["ErrorMessage"] = "Invalid backup configuration settings.";
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error updating backup configuration");
-            TempData["ErrorMessage"] = "An error occurred while updating the backup configuration.";
-        }
-        
-        return RedirectToAction(nameof(BackupManagement));
-    }
-
-    [HttpPost]
-    public async Task<IActionResult> CreateManualBackup()
-    {
-        try
-        {
-            var backupResult = await _backupService.CreateBackupAsync(BackupType.Manual);
-            
-            if (backupResult.IsSuccessful)
-            {
-                TempData["SuccessMessage"] = $"Manual backup created successfully. File: {Path.GetFileName(backupResult.FilePath)}";
-            }
-            else
-            {
-                TempData["ErrorMessage"] = $"Backup failed: {backupResult.ErrorMessage}";
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error creating manual backup");
-            TempData["ErrorMessage"] = "An error occurred while creating the backup.";
-        }
-        
-        return RedirectToAction(nameof(BackupManagement));
-    }
-
-    [HttpPost]
-    public async Task<IActionResult> DeleteBackup(int id)
-    {
-        try
-        {
-            var success = await _backupService.DeleteBackupAsync(id);
-            
-            if (success)
-            {
-                TempData["SuccessMessage"] = "Backup deleted successfully.";
-            }
-            else
-            {
-                TempData["ErrorMessage"] = "Failed to delete backup.";
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error deleting backup {BackupId}", id);
-            TempData["ErrorMessage"] = "An error occurred while deleting the backup.";
-        }
-        
-        return RedirectToAction(nameof(BackupManagement));
-    }
-
-    [HttpPost]
-    public async Task<IActionResult> RestoreBackup(int id)
-    {
-        try
-        {
-            var success = await _backupService.RestoreBackupAsync(id);
-            
-            if (success)
-            {
-                TempData["SuccessMessage"] = "Database restored successfully. Please restart the application.";
-            }
-            else
-            {
-                TempData["ErrorMessage"] = "Failed to restore backup.";
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error restoring backup {BackupId}", id);
-            TempData["ErrorMessage"] = "An error occurred while restoring the backup.";
-        }
-        
-        return RedirectToAction(nameof(BackupManagement));
-    }
-
-
-    public async Task<IActionResult> HealthDashboard()
-    {
-        try
-        {
-            // Get current health status from database
-            var healthStatus = await _healthMonitor.GetOrCreateHealthStatusAsync();
-            
-            // Get recent health metrics
-            var currentMetrics = await _healthMonitor.CheckSystemHealthAsync();
-            
-            // Get recent audit logs for health-related activities
-            var recentHealthLogs = await _context.AuditLogs
-                .Where(log => log.EntityType == "SystemHealth" || log.EntityType == "System")
-                .OrderByDescending(log => log.Timestamp)
-                .Take(20)
-                .ToListAsync();
-
-            var viewModel = new HealthDashboardViewModel
-            {
-                CurrentHealthStatus = healthStatus,
-                CurrentMetrics = currentMetrics,
-                RecentHealthLogs = recentHealthLogs,
-                PageTitle = "System Health Dashboard"
-            };
-
-            return View(viewModel);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error loading health dashboard");
-            TempData["ErrorMessage"] = "An error occurred while loading the health dashboard.";
-            return RedirectToAction(nameof(Index));
-        }
-    }
-
-    [HttpPost]
-    public async Task<IActionResult> RunHealthCheck()
-    {
-        try
-        {
-            // Force an immediate health check
-            var metrics = await _healthMonitor.CheckSystemHealthAsync();
-            await _healthMonitor.UpdateHealthStatusAsync(metrics);
-            
-            await _auditTrailService.LogAsync(
-                "SystemHealth",
-                "ManualHealthCheck",
-                "System",
-                "1",
-                "Admin",
-                "Manual health check initiated from admin dashboard");
-
-            return Json(new { success = true, message = "Health check completed successfully." });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error running manual health check");
-            return Json(new { success = false, message = "An error occurred while running the health check." });
-        }
-    }
-
-    [HttpGet]
-    public async Task<IActionResult> GetHealthMetrics()
-    {
-        try
-        {
-            // Get fresh health metrics instead of relying solely on database
-            var healthMetrics = await _healthMonitor.CheckSystemHealthAsync();
-            
-            // Also try to get stored status for additional data
-            var healthStatus = await _healthMonitor.GetOrCreateHealthStatusAsync();
-            
-            var response = new
-            {
-                overallStatus = healthMetrics.OverallStatus.ToString(),
-                databaseStatus = healthMetrics.DatabaseStatus.ToString(),
-                diskSpaceStatus = healthMetrics.DiskSpaceStatus.ToString(),
-                memoryStatus = healthMetrics.MemoryStatus.ToString(),
-                responseTimeStatus = healthMetrics.ResponseTimeStatus.ToString(),
-                availableDiskSpaceGB = healthMetrics.AvailableDiskSpaceGB,
-                totalDiskSpaceGB = healthMetrics.TotalDiskSpaceGB,
-                diskUsagePercentage = healthMetrics.TotalDiskSpaceGB > 0 ? 
-                    ((healthMetrics.TotalDiskSpaceGB - healthMetrics.AvailableDiskSpaceGB) / healthMetrics.TotalDiskSpaceGB) * 100 : 0,
-                memoryUsagePercentage = healthMetrics.MemoryUsagePercentage,
-                averageResponseTimeMs = healthMetrics.AverageResponseTimeMs,
-                databaseConnectionTimeMs = healthMetrics.DatabaseConnectionTimeMs,
-                activeWorkOrderCount = healthMetrics.ActiveWorkOrderCount,
-                totalPartsCount = healthMetrics.TotalPartsCount,
-                lastHealthCheck = healthMetrics.LastHealthCheck,
-                errorMessage = healthMetrics.ErrorMessage
-            };
-
-            return Json(response);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving health metrics");
-            return Json(new { 
-                overallStatus = "Error",
-                error = "Failed to retrieve health metrics",
-                errorMessage = ex.Message,
-                lastHealthCheck = DateTime.Now
-            });
-        }
-    }
 
     [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
     public IActionResult Error()

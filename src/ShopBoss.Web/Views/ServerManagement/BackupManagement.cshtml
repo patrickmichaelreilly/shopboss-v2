@@ -1,0 +1,321 @@
+@model ShopBoss.Web.Models.BackupManagementViewModel
+
+@{
+    ViewData["Title"] = "Backup Management";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2>Backup Management</h2>
+        <small class="text-muted">Configure and manage database backups</small>
+    </div>
+    <div class="btn-group" role="group">
+        <a href="@Url.Action("Index", "ServerManagement")" class="btn btn-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back to Server Management
+        </a>
+        <button type="button" class="btn btn-primary" onclick="createManualBackup()">
+            <i class="fas fa-database me-2"></i>Create Manual Backup
+        </button>
+    </div>
+</div>
+
+<!-- Backup Configuration -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="card-title mb-0">
+            <i class="fas fa-cog me-2"></i>Backup Configuration
+        </h5>
+    </div>
+    <div class="card-body">
+        <form asp-action="UpdateBackupConfiguration" method="post">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label asp-for="Configuration.BackupIntervalMinutes" class="form-label">Backup Interval (minutes)</label>
+                        <input asp-for="Configuration.BackupIntervalMinutes" type="number" class="form-control" min="15" max="10080" />
+                        <div class="form-text">Minimum 15 minutes, maximum 1 week (10080 minutes)</div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label asp-for="Configuration.MaxBackupRetention" class="form-label">Maximum Backups to Keep</label>
+                        <input asp-for="Configuration.MaxBackupRetention" type="number" class="form-control" min="3" max="168" />
+                        <div class="form-text">Minimum 3 backups, maximum 168 (1 week of hourly backups)</div>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label asp-for="Configuration.BackupDirectoryPath" class="form-label">Backup Directory</label>
+                        <input asp-for="Configuration.BackupDirectoryPath" type="text" class="form-control" />
+                        <div class="form-text">Relative or absolute path for backup files</div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input asp-for="Configuration.EnableCompression" class="form-check-input" type="checkbox" />
+                            <label asp-for="Configuration.EnableCompression" class="form-check-label">
+                                Enable Compression
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input asp-for="Configuration.EnableAutomaticBackups" class="form-check-input" type="checkbox" />
+                            <label asp-for="Configuration.EnableAutomaticBackups" class="form-check-label">
+                                Enable Automatic Backups
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <input type="hidden" asp-for="Configuration.Id" />
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save me-2"></i>Update Configuration
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- Backup Status -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="card-title mb-0">
+            <i class="fas fa-info-circle me-2"></i>Backup Status
+        </h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-3">
+                <div class="bg-light p-3 rounded text-center">
+                    <div class="h5 mb-1">@Model.RecentBackups.Count</div>
+                    <div class="text-muted small">Total Backups</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="bg-light p-3 rounded text-center">
+                    <div class="h5 mb-1">@(Model.RecentBackups.Count(b => b.IsSuccessful))</div>
+                    <div class="text-muted small">Successful</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="bg-light p-3 rounded text-center">
+                    <div class="h5 mb-1">@(Model.RecentBackups.Count(b => !b.IsSuccessful))</div>
+                    <div class="text-muted small">Failed</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="bg-light p-3 rounded text-center">
+                    <div class="h5 mb-1">@(Model.RecentBackups.Where(b => b.IsSuccessful).Sum(b => b.BackupSize) / 1024 / 1024) MB</div>
+                    <div class="text-muted small">Total Size</div>
+                </div>
+            </div>
+        </div>
+        @if (Model.RecentBackups.Any(b => b.IsSuccessful))
+        {
+            var lastSuccessfulBackup = Model.RecentBackups.Where(b => b.IsSuccessful).OrderByDescending(b => b.CreatedDate).First();
+            <div class="mt-3">
+                <small class="text-muted">
+                    <i class="fas fa-clock me-1"></i>
+                    Last successful backup: @lastSuccessfulBackup.CreatedDate.ToString("yyyy-MM-dd HH:mm:ss UTC")
+                </small>
+            </div>
+        }
+    </div>
+</div>
+
+<!-- Recent Backups -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="card-title mb-0">
+            <i class="fas fa-history me-2"></i>Recent Backups
+        </h5>
+    </div>
+    <div class="card-body">
+        @if (Model.RecentBackups.Any())
+        {
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Created</th>
+                            <th>Type</th>
+                            <th>Status</th>
+                            <th>Size</th>
+                            <th>Duration</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var backup in Model.RecentBackups)
+                        {
+                            <tr class="@(backup.IsSuccessful ? "" : "table-danger")">
+                                <td>
+                                    <small>@backup.CreatedDate.ToString("yyyy-MM-dd HH:mm:ss")</small>
+                                </td>
+                                <td>
+                                    <span class="badge bg-@(backup.BackupType == ShopBoss.Web.Models.BackupType.Manual ? "primary" : "secondary")">
+                                        @backup.BackupType
+                                    </span>
+                                </td>
+                                <td>
+                                    @if (backup.IsSuccessful)
+                                    {
+                                        <span class="badge bg-success">
+                                            <i class="fas fa-check me-1"></i>Success
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-danger">
+                                            <i class="fas fa-times me-1"></i>Failed
+                                        </span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (backup.IsSuccessful)
+                                    {
+                                        <small>
+                                            @FormatFileSize(backup.BackupSize)
+                                            @if (backup.BackupSize < backup.OriginalSize)
+                                            {
+                                                <span class="text-success">
+                                                    (@(Math.Round((1 - (double)backup.BackupSize / backup.OriginalSize) * 100, 1))% compressed)
+                                                </span>
+                                            }
+                                        </small>
+                                    }
+                                    else
+                                    {
+                                        <small class="text-muted">-</small>
+                                    }
+                                </td>
+                                <td>
+                                    <small>@backup.Duration.ToString(@"mm\:ss")</small>
+                                </td>
+                                <td>
+                                    @if (backup.IsSuccessful)
+                                    {
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <button type="button" class="btn btn-outline-warning" onclick="restoreBackup(@backup.Id)" title="Restore">
+                                                <i class="fas fa-undo"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-outline-danger" onclick="deleteBackup(@backup.Id)" title="Delete">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <button type="button" class="btn btn-outline-danger btn-sm" onclick="deleteBackup(@backup.Id)" title="Delete">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    }
+                                </td>
+                            </tr>
+                            @if (!backup.IsSuccessful && !string.IsNullOrEmpty(backup.ErrorMessage))
+                            {
+                                <tr class="table-danger">
+                                    <td colspan="6">
+                                        <small class="text-danger">
+                                            <i class="fas fa-exclamation-triangle me-1"></i>
+                                            @backup.ErrorMessage
+                                        </small>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <div class="text-center py-4">
+                <i class="fas fa-database fa-3x text-muted mb-3"></i>
+                <h5>No backups found</h5>
+                <p class="text-muted">Create your first backup to get started</p>
+            </div>
+        }
+    </div>
+</div>
+
+<script>
+    function createManualBackup() {
+        if (confirm('Create a manual backup now?')) {
+            var form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '@Url.Action("CreateManualBackup")';
+            
+            var token = document.querySelector('input[name="__RequestVerificationToken"]');
+            if (token) {
+                form.appendChild(token.cloneNode());
+            }
+            
+            document.body.appendChild(form);
+            form.submit();
+        }
+    }
+
+    function deleteBackup(backupId) {
+        if (confirm('Are you sure you want to delete this backup? This action cannot be undone.')) {
+            var form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '@Url.Action("DeleteBackup")';
+            
+            var idInput = document.createElement('input');
+            idInput.type = 'hidden';
+            idInput.name = 'id';
+            idInput.value = backupId;
+            form.appendChild(idInput);
+            
+            var token = document.querySelector('input[name="__RequestVerificationToken"]');
+            if (token) {
+                form.appendChild(token.cloneNode());
+            }
+            
+            document.body.appendChild(form);
+            form.submit();
+        }
+    }
+
+    function restoreBackup(backupId) {
+        if (confirm('Are you sure you want to restore this backup? This will replace the current database and require an application restart.')) {
+            var form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '@Url.Action("RestoreBackup")';
+            
+            var idInput = document.createElement('input');
+            idInput.type = 'hidden';
+            idInput.name = 'id';
+            idInput.value = backupId;
+            form.appendChild(idInput);
+            
+            var token = document.querySelector('input[name="__RequestVerificationToken"]');
+            if (token) {
+                form.appendChild(token.cloneNode());
+            }
+            
+            document.body.appendChild(form);
+            form.submit();
+        }
+    }
+</script>
+
+@functions {
+    string FormatFileSize(long bytes)
+    {
+        const int scale = 1024;
+        string[] orders = { "GB", "MB", "KB", "Bytes" };
+        long max = (long)Math.Pow(scale, orders.Length - 1);
+
+        foreach (string order in orders)
+        {
+            if (bytes > max)
+                return $"{decimal.Divide(bytes, max):##.##} {order}";
+
+            max /= scale;
+        }
+        return "0 Bytes";
+    }
+}
