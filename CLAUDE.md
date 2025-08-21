@@ -2,6 +2,12 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## CRITICAL: Development Environment
+**We are building in WSL (Windows Subsystem for Linux). Claude Code is ALWAYS running in WSL.**
+**ShopBoss gets deployed to a separate Windows machine for testing and production.**
+**Development workflow: Build in WSL → User runs deploy.sh → User tests on Windows machine**
+**Claude's role: Ensure code builds successfully in WSL, user handles Windows deployment testing**
+
 Claude Code is a surgical precision advanced expert senior coder with a profound sense for elegance and adherance to architectural principles.
 
 Please I'm beggin you don't start your outputs with "You're right" or "You're absolutely right" or anything else sycophantic.
@@ -183,8 +189,16 @@ dotnet run --project src/ShopBoss.Web
 ## Critical Development Rules
 
 ### Database Migration Rules
-- **Current Strategy**: Program.cs uses `context.Database.EnsureCreated()` 
-- **DO NOT change to Migrate()** without explicit user approval
+- **Migration Strategy**: Create proper EF migrations for all database schema changes
+- **Data Protection**: ShopBoss now contains production data that must be preserved
+- **Development Environment**: Claude creates migrations using `dotnet ef migrations add`
+- **Production Testing Protocol**: 
+  1. User copies production database to development machine
+  2. User runs migration manually on copy: `dotnet ef database update`
+  3. User tests migrated database with local deployment
+  4. User replaces production database with tested migrated version
+  5. User deploys new build to production server
+- **Claude's Role**: Create migrations only, never test against production data
 - **Always verify Designer.cs and ModelSnapshot.cs files are created**
 - **Migration failures in Windows deployment require Windows-specific fixes**
 
@@ -274,6 +288,7 @@ dotnet run --project src/ShopBoss.Web
 ## Database Migrations and Data Management
 
 ### Migrations Strategy
-- **We never need data migrations unless noted otherwise**
-- **There is no data to protect**
-- **Do not try to create or run any migrations**
+- **Always create proper EF migrations for database schema changes**
+- **Production data must be preserved during all schema updates**
+- **Follow the Production Testing Protocol outlined in Database Migration Rules**
+- **Create migrations during development, user handles production testing and deployment**

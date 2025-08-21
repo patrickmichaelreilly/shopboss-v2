@@ -42,6 +42,9 @@
                 <button type="button" class="btn btn-outline-warning" onclick="createManualBackup()">
                     <i class="fas fa-download"></i> Create Backup
                 </button>
+                <button type="button" class="btn btn-outline-info" onclick="checkAllServices()">
+                    <i class="fas fa-sync"></i> Check All Services
+                </button>
             </div>
         </div>
     </div>
@@ -164,6 +167,128 @@
         </div>
     </div>
 
+    <!-- Monitored Services Status -->
+    @if (Model.MonitoredServices.Any())
+    {
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0"><i class="fas fa-server me-2"></i>Monitored Services</h6>
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="checkAllServices()">
+                            <i class="fas fa-sync"></i> Check All
+                        </button>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Service</th>
+                                        <th>Type</th>
+                                        <th>Status</th>
+                                        <th>Last Check</th>
+                                        <th>Response Time</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var service in Model.MonitoredServices)
+                                    {
+                                        var latestStatus = Model.LatestServiceStatuses.FirstOrDefault(s => s.ServiceId == service.Id);
+                                        <tr>
+                                            <td>
+                                                <div>
+                                                    <strong>@service.ServiceName</strong>
+                                                    @if (!string.IsNullOrEmpty(service.Description))
+                                                    {
+                                                        <br><small class="text-muted">@service.Description</small>
+                                                    }
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-secondary">@service.ServiceType</span>
+                                            </td>
+                                            <td>
+                                                @if (latestStatus != null)
+                                                {
+                                                    <span class="badge bg-@GetServiceStatusColor(latestStatus.Status)" id="status-@service.Id">
+                                                        @latestStatus.Status
+                                                    </span>
+                                                    @if (!latestStatus.IsReachable)
+                                                    {
+                                                        <br><small class="text-danger">Unreachable</small>
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-secondary" id="status-@service.Id">Unknown</span>
+                                                }
+                                            </td>
+                                            <td id="lastcheck-@service.Id">
+                                                @if (latestStatus != null)
+                                                {
+                                                    <small>@latestStatus.LastChecked.ToString("MM/dd HH:mm")</small>
+                                                }
+                                                else
+                                                {
+                                                    <small class="text-muted">Never</small>
+                                                }
+                                            </td>
+                                            <td id="responsetime-@service.Id">
+                                                @if (latestStatus?.ResponseTimeMs != null)
+                                                {
+                                                    <small>@latestStatus.ResponseTimeMs ms</small>
+                                                }
+                                                else
+                                                {
+                                                    <small class="text-muted">-</small>
+                                                }
+                                            </td>
+                                            <td>
+                                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="checkServiceHealth('@service.Id')" title="Check Health">
+                                                    <i class="fas fa-sync"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        @if (latestStatus != null && !string.IsNullOrEmpty(latestStatus.ErrorMessage))
+                                        {
+                                            <tr>
+                                                <td colspan="6" class="border-top-0 pt-0">
+                                                    <small class="text-danger">
+                                                        <i class="fas fa-exclamation-triangle me-1"></i>
+                                                        @latestStatus.ErrorMessage
+                                                    </small>
+                                                </td>
+                                            </tr>
+                                        }
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body text-center py-4">
+                        <i class="fas fa-server fa-3x text-muted mb-3"></i>
+                        <h5>No Services Monitored</h5>
+                        <p class="text-muted">Initialize default services to start monitoring</p>
+                        <button type="button" class="btn btn-primary" onclick="initializeDefaultServices()">
+                            <i class="fas fa-plus"></i> Initialize Default Services
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
     <!-- Recent Activity and Recent Backups -->
     <div class="row">
         <!-- Recent Activity -->
@@ -265,6 +390,19 @@
     {
         return isSuccessful ? "success" : "danger";
     }
+    
+    private string GetServiceStatusColor(ServiceHealthLevel status)
+    {
+        return status switch
+        {
+            ServiceHealthLevel.Healthy => "success",
+            ServiceHealthLevel.Warning => "warning",
+            ServiceHealthLevel.Critical => "danger",
+            ServiceHealthLevel.Offline => "danger",
+            ServiceHealthLevel.Unknown => "secondary",
+            _ => "secondary"
+        };
+    }
 }
 
 <script>
@@ -310,6 +448,111 @@ async function createManualBackup() {
         }
     } catch (error) {
         showAlert('danger', 'An error occurred while creating the backup.');
+    }
+}
+
+async function checkAllServices() {
+    try {
+        const response = await fetch('@Url.Action("CheckAllServicesHealth")', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
+            }
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showAlert('success', result.message);
+            // Refresh the page after a short delay to show updated status
+            setTimeout(() => location.reload(), 2000);
+        } else {
+            showAlert('danger', result.message);
+        }
+    } catch (error) {
+        showAlert('danger', 'An error occurred while checking services.');
+    }
+}
+
+async function checkServiceHealth(serviceId) {
+    try {
+        const response = await fetch('@Url.Action("CheckServiceHealth")', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
+            },
+            body: JSON.stringify({ serviceId: serviceId })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showAlert('success', 'Service health check completed.');
+            // Update the UI elements for this service
+            updateServiceStatusUI(serviceId, result.healthStatus);
+        } else {
+            showAlert('danger', result.message);
+        }
+    } catch (error) {
+        showAlert('danger', 'An error occurred while checking service health.');
+    }
+}
+
+async function initializeDefaultServices() {
+    try {
+        const response = await fetch('@Url.Action("InitializeDefaultServices")', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
+            }
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showAlert('success', result.message);
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            showAlert('danger', result.message);
+        }
+    } catch (error) {
+        showAlert('danger', 'An error occurred while initializing services.');
+    }
+}
+
+function updateServiceStatusUI(serviceId, healthStatus) {
+    // Update status badge
+    const statusElement = document.getElementById(`status-${serviceId}`);
+    if (statusElement) {
+        statusElement.textContent = healthStatus.status;
+        statusElement.className = `badge bg-${getServiceStatusColor(healthStatus.status)}`;
+    }
+    
+    // Update last check time
+    const lastCheckElement = document.getElementById(`lastcheck-${serviceId}`);
+    if (lastCheckElement) {
+        const lastCheck = new Date(healthStatus.lastChecked);
+        lastCheckElement.innerHTML = `<small>${lastCheck.toLocaleDateString()} ${lastCheck.toLocaleTimeString()}</small>`;
+    }
+    
+    // Update response time
+    const responseTimeElement = document.getElementById(`responsetime-${serviceId}`);
+    if (responseTimeElement && healthStatus.responseTimeMs) {
+        responseTimeElement.innerHTML = `<small>${healthStatus.responseTimeMs} ms</small>`;
+    }
+}
+
+function getServiceStatusColor(status) {
+    switch (status) {
+        case 'Healthy': return 'success';
+        case 'Warning': return 'warning';
+        case 'Critical': return 'danger';
+        case 'Offline': return 'danger';
+        case 'Unknown': return 'secondary';
+        default: return 'secondary';
     }
 }
 

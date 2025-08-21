@@ -16,6 +16,7 @@ public class ServerManagementController : Controller
     private readonly SystemHealthMonitor _healthMonitor;
     private readonly AuditTrailService _auditTrailService;
     private readonly IHubContext<StatusHub> _hubContext;
+    private readonly ServiceMonitoringService _serviceMonitoringService;
 
     public ServerManagementController(
         ShopBossDbContext context, 
@@ -23,7 +24,8 @@ public class ServerManagementController : Controller
         BackupService backupService,
         SystemHealthMonitor healthMonitor,
         AuditTrailService auditTrailService,
-        IHubContext<StatusHub> hubContext)
+        IHubContext<StatusHub> hubContext,
+        ServiceMonitoringService serviceMonitoringService)
     {
         _context = context;
         _logger = logger;
@@ -31,6 +33,7 @@ public class ServerManagementController : Controller
         _healthMonitor = healthMonitor;
         _auditTrailService = auditTrailService;
         _hubContext = hubContext;
+        _serviceMonitoringService = serviceMonitoringService;
     }
 
     // Main Dashboard - consolidates health and backup overview
@@ -46,6 +49,10 @@ public class ServerManagementController : Controller
             var backupConfig = await _backupService.GetBackupConfigurationAsync();
             var recentBackups = await _backupService.GetRecentBackupsAsync(5); // Just top 5 for dashboard
             
+            // Get service monitoring data
+            var monitoredServices = await _serviceMonitoringService.GetAllMonitoredServicesAsync();
+            var latestServiceStatuses = await _serviceMonitoringService.GetLatestHealthStatusesAsync();
+            
             // Get recent health-related audit logs
             var recentHealthLogs = await _context.AuditLogs
                 .Where(log => log.EntityType == "SystemHealth" || log.EntityType == "System" || log.EntityType == "BackupConfiguration")
@@ -60,6 +67,8 @@ public class ServerManagementController : Controller
                 BackupConfiguration = backupConfig,
                 RecentBackups = recentBackups,
                 RecentActivityLogs = recentHealthLogs,
+                MonitoredServices = monitoredServices,
+                LatestServiceStatuses = latestServiceStatuses,
                 PageTitle = "Server Management Dashboard"
             };
 
@@ -337,5 +346,89 @@ public class ServerManagementController : Controller
         }
         
         return RedirectToAction(nameof(BackupManagement));
+    }
+
+    // Service Monitoring Actions
+    [HttpPost]
+    public async Task<IActionResult> CheckServiceHealth(string serviceId)
+    {
+        try
+        {
+            var healthStatus = await _serviceMonitoringService.CheckServiceHealthAsync(serviceId);
+            
+            // Notify via SignalR
+            await _hubContext.Clients.Group("server-monitoring")
+                .SendAsync("ServiceHealthUpdated", new
+                {
+                    ServiceId = serviceId,
+                    Status = healthStatus.Status.ToString(),
+                    LastChecked = healthStatus.LastChecked,
+                    ResponseTime = healthStatus.ResponseTimeMs,
+                    IsReachable = healthStatus.IsReachable,
+                    ErrorMessage = healthStatus.ErrorMessage
+                });
+
+            return Json(new { success = true, healthStatus });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error checking service health for service {ServiceId}", serviceId);
+            return Json(new { success = false, message = ex.Message });
+        }
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> CheckAllServicesHealth()
+    {
+        try
+        {
+            var healthStatuses = await _serviceMonitoringService.CheckAllServicesHealthAsync();
+            
+            // Notify via SignalR
+            await _hubContext.Clients.Group("server-monitoring")
+                .SendAsync("AllServicesHealthUpdated", new
+                {
+                    Timestamp = DateTime.Now,
+                    ServiceCount = healthStatuses.Count,
+                    HealthyCount = healthStatuses.Count(h => h.Status == ServiceHealthLevel.Healthy)
+                });
+
+            return Json(new { success = true, message = $"Checked {healthStatuses.Count} services" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error checking all services health");
+            return Json(new { success = false, message = ex.Message });
+        }
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> GetServiceHealthData(string serviceId)
+    {
+        try
+        {
+            var healthHistory = await _serviceMonitoringService.GetServiceHealthHistoryAsync(serviceId, 10);
+            return Json(new { success = true, healthHistory });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting service health data for {ServiceId}", serviceId);
+            return Json(new { success = false, message = ex.Message });
+        }
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> InitializeDefaultServices()
+    {
+        try
+        {
+            await _serviceMonitoringService.InitializeDefaultServicesAsync();
+            return Json(new { success = true, message = "Default services initialized" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error initializing default services");
+            return Json(new { success = false, message = ex.Message });
+        }
     }
 }
