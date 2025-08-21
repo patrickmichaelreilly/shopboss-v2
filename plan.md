@@ -1,132 +1,189 @@
-# ShopBoss Part Labels - Fixes and Enhancements
+# ShopBoss Server Management Module Implementation Plan
 
-## Issues Identified
+## Overview
+Implementation plan for the Server Management Module that monitors supporting infrastructure services and manages shop data backups. This will be a new module within ShopBoss that consolidates and expands existing backup and health monitoring functionality.
 
-### 1. Work Order Deletion Not Using Proper Cascading
-- `AdminController.DeleteWorkOrder()` only deletes WorkOrder entity directly
-- Does NOT use existing `WorkOrderDeletionService` that properly cascades to all children
-- Results in orphaned Parts, PartLabels, and other child entities
+## Architecture Restructuring
+**Phase 0: Extract existing functionality from AdminController**
+- Move backup management from AdminController to new ServerManagementController
+- Move health monitoring from AdminController to new ServerManagementController  
+- Clean up AdminController to focus on core admin functions
+- Maintain existing functionality during transition
 
-### 2. Part Label Matching Fails Due to ID Suffixing  
-- Labels stored with original barcode: `PartId = "PART123"`
-- Parts created with suffixed IDs: `Id = "PART123_1"` (for quantity expansion)
-- `GetPartLabel()` searches for exact match: `l.PartId == partId` 
-- No match found → "Label not available" errors
+## Phase 1: Foundation & SQL Monitoring - 2-3 days
+**Objective:** Create basic server management infrastructure with SQL Server monitoring
 
-### 3. Label Absolute Positioning Issue (FIXED but not yet tested by User)
-- ✅ Labels displayed with excessive whitespace from original composite sheet positioning
-- ✅ Fixed by normalizing absolute positioning in `LabelParserService.WrapLabelForDisplay()`
+**Target Files:**
+- Backend: Controllers/ServerManagementController.cs, Services/ServiceMonitoringService.cs
+- Frontend: Views/ServerManagement/Index.cshtml, Views/ServerManagement/Dashboard.cshtml
+- Database: Models/MonitoredService.cs, Models/ServiceHealthStatus.cs
+- Config: Program.cs service registration
 
-## Implementation Plan
+**Tasks:**
+1. Create ServerManagementController with Index action and basic dashboard
+2. Move BackupService integration from AdminController to ServerManagementController
+3. Move SystemHealthMonitor integration from AdminController to ServerManagementController
+4. Create ServiceMonitoringService for centralized health checking
+5. Create MonitoredService and ServiceHealthStatus models
+6. Add models to ShopBossDbContext
+7. Create database migration for new models
+8. Implement SQL Server connectivity monitoring (alive/dead status)
+9. Create unified dashboard view combining health and backup status
+10. Add Guest/Admin role distinction in views (hide config buttons for guests)
+11. Integrate SignalR using existing StatusHub for real-time updates
+12. Add navigation link to Server Management from main admin menu
+13. Update AdminController to remove moved functionality
+14. Update Admin views to remove backup and health dashboard links
 
-### Phase 1: Fix Work Order Deletion
-**Modify AdminController to use WorkOrderDeletionService:**
-1. Add `WorkOrderDeletionService` to AdminController constructor
-2. Replace direct EF deletion with comprehensive service-based deletion
-3. Handle both individual and bulk delete operations
-4. Ensure all child entities (Parts, PartLabels, Products, etc.) are properly removed
+**Validation:**
+- [ ] Build succeeds without errors
+- [ ] Existing backup functionality works in new location
+- [ ] Existing health monitoring works in new location
+- [ ] SQL Server status displays correctly
+- [ ] Real-time updates work via SignalR
+- [ ] Guest users cannot see configuration options
+- [ ] Admin functionality preserved
 
-### Phase 2: Implement Elegant 3-Tier Label Assignment During Import
-**Use pool consumption pattern (mirrors existing nest sheet assignment logic):**
+**Dependencies:** None - refactoring existing code
 
-**Key Insights:**
-- Microvellum already generates individual labels for each part instance (natural 1:1 correspondence)
-- Edge case: Multiple quantity product with same parts on same nest sheet
-- Need pool consumption to prevent duplicate assignments
+## Phase 2: Windows Service Management - 2-3 days
+**Objective:** Add Windows service monitoring and management capabilities
 
-**3-Tier Assignment Strategy:**
-1. **Easy Match**: Single part for barcode → Direct assignment
-2. **NestSheet Disambiguation**: Multiple parts but NestSheetId narrows to 1 → Direct assignment  
-3. **Pool Consumption**: Multiple parts with same barcode AND NestSheetId → Take first available, remove from pool
+**Target Files:**
+- Backend: Services/WindowsServiceManager.cs, Models/WindowsServiceConfig.cs
+- Frontend: Views/ServerManagement/Services.cshtml
+- Database: Migration for WindowsServiceConfig model
 
-### Phase 3: Simplify Label Lookup (After Import Fix)
-**Since each part gets its own PartLabel during import:**
-1. Simple exact matching: `l.PartId == partId` (no more complex logic needed)
-2. Optional NestSheetId validation for additional context
+**Tasks:**
+1. Create WindowsServiceManager service for service operations
+2. Implement Windows service status checking (running/stopped/disabled)
+3. Add service start/stop/restart functionality with elevated permissions handling
+4. Create WindowsServiceConfig model for service configuration
+5. Add default monitored services: SQL Server, ShopBoss, SpeedDial, Time & Attendance, Polling Service
+6. Create service configuration interface for adding/removing services
+7. Add service uptime tracking and last-checked timestamps
+8. Integrate service monitoring into main dashboard
+9. Add service management section to navigation
+10. Implement error handling for permission-related failures
 
-## Solution Code Snippets
+**Validation:**
+- [ ] Can view status of all configured Windows services
+- [ ] Can start/stop services (with appropriate permissions)
+- [ ] Service status updates in real-time on dashboard
+- [ ] Can add/remove services from monitoring list
+- [ ] Graceful handling of permission errors
 
-### 3-Tier Label Assignment During Import (Pool Consumption Pattern)
-```csharp
-// In WorkOrderImportService.ImportLabelsAsync()
-var assignedPartIds = new HashSet<string>(); // Track consumed parts
+**Dependencies:** Phase 1 completed
 
-foreach (var label in parsedLabels)
-{
-    var barcode = label.Key.Trim('*'); // Clean barcode
-    var labelHtml = label.Value;
-    
-    // Tier 1: Easy match - single part for barcode
-    var matchingParts = await _context.Parts
-        .Where(p => (p.Id == barcode || ExtractOriginalPartId(p.Id) == barcode) && 
-                   p.WorkOrderId == workOrderId &&
-                   !assignedPartIds.Contains(p.Id))
-        .ToListAsync();
-    
-    if (matchingParts.Count == 1)
-    {
-        CreatePartLabel(matchingParts[0], labelHtml, workOrderId);
-        assignedPartIds.Add(matchingParts[0].Id);
-        continue;
-    }
-    
-    // Tier 2: NestSheet disambiguation (if we can extract nest sheet context from label)
-    if (TryExtractNestSheetFromLabel(labelHtml, out var nestSheetId))
-    {
-        var nestSheetMatch = matchingParts.FirstOrDefault(p => p.NestSheetId == nestSheetId);
-        if (nestSheetMatch != null)
-        {
-            CreatePartLabel(nestSheetMatch, labelHtml, workOrderId);
-            assignedPartIds.Add(nestSheetMatch.Id);
-            continue;
-        }
-    }
-    
-    // Tier 3: Pool consumption - take first available
-    var firstAvailable = matchingParts.FirstOrDefault();
-    if (firstAvailable != null)
-    {
-        CreatePartLabel(firstAvailable, labelHtml, workOrderId);
-        assignedPartIds.Add(firstAvailable.Id);
-    }
-}
+## Phase 3: Enhanced Backup System - 3-4 days
+**Objective:** Extend backup system for SQL Server databases and offsite storage
+
+**Target Files:**
+- Backend: Services/SqlServerBackupService.cs, Services/OffsiteStorageService.cs
+- Backend: Models/BackupTarget.cs, Models/BackupSchedule.cs
+- Frontend: Views/ServerManagement/Backups.cshtml
+- Database: Migration for new backup models
+
+**Tasks:**
+1. Create SqlServerBackupService for SQL Server differential backups
+2. Add backup targets for Microvellum and Production Coach databases
+3. Create OffsiteStorageService for Egnyte/Carbonite integration
+4. Implement BackupTarget and BackupSchedule models
+5. Create configurable retention policies interface
+6. Add backup scheduling with BackupScheduleService
+7. Implement backup size tracking and history
+8. Create backup management interface
+9. Add manual backup trigger functionality
+10. Integrate backup status into main dashboard
+11. Add backup configuration to navigation
+
+**Validation:**
+- [ ] Can backup Microvellum and Production Coach databases
+- [ ] Backups upload to offsite storage successfully
+- [ ] Can configure backup schedules and retention
+- [ ] Manual backups work on demand
+- [ ] Backup history tracks all operations
+- [ ] Backup status visible on main dashboard
+
+**Dependencies:** Phase 2 completed
+
+## Phase 4: Recovery Tools & System Monitoring - 2-3 days
+**Objective:** Implement restore capabilities and comprehensive system monitoring
+
+**Target Files:**
+- Backend: Services/DatabaseRestoreService.cs, Services/SystemResourceMonitor.cs
+- Frontend: Views/ServerManagement/Restore.cshtml, Views/ServerManagement/SystemResources.cshtml
+- Database: Models/RestoreOperation.cs
+
+**Tasks:**
+1. Create DatabaseRestoreService for point-in-time restore operations
+2. Implement pre-restore safety snapshot functionality
+3. Create restore interface with database and time selection
+4. Add SystemResourceMonitor for CPU/memory/disk monitoring
+5. Implement log file viewer for monitored services
+6. Create system resources monitoring dashboard
+7. Add export functionality for monitoring data
+8. Implement restore operation tracking and audit
+9. Add restore section to navigation
+10. Create comprehensive unified dashboard with all metrics
+
+**Validation:**
+- [ ] Can restore databases to specific points in time
+- [ ] Pre-restore snapshots created automatically
+- [ ] System resource monitoring displays current status
+- [ ] Can view logs from monitored services
+- [ ] Can export monitoring data
+- [ ] All operations properly audited
+
+**Dependencies:** Phase 3 completed
+
+## Technical Architecture
+
+### Database Schema
+```sql
+-- Service monitoring
+MonitoredService: Id, ServiceName, ServiceType, ConnectionString, CheckInterval, IsEnabled, CreatedDate
+ServiceHealthStatus: Id, ServiceId, Status, LastChecked, ResponseTime, ErrorMessage
+
+-- Windows services
+WindowsServiceConfig: Id, ServiceName, DisplayName, IsMonitored, CanManage, CreatedDate
+
+-- Enhanced backup system
+BackupTarget: Id, DatabaseName, ConnectionString, BackupType, IsEnabled
+BackupSchedule: Id, TargetId, Schedule, RetentionDays, OffsiteEnabled
+RestoreOperation: Id, DatabaseName, RestorePoint, Status, CreatedDate, CompletedDate
 ```
 
-### Simplified Label Lookup (After Import Fix)
-```csharp
-// In CncController.GetPartLabel() - Simple exact match since import creates 1:1
-var label = await _context.PartLabels
-    .FirstOrDefaultAsync(l => l.PartId == partId && l.WorkOrderId == activeWorkOrderId);
-```
+### Service Architecture
+- **ServiceMonitoringService**: Centralized health checking coordinator
+- **WindowsServiceManager**: Windows service operations
+- **SqlServerBackupService**: SQL Server backup operations  
+- **OffsiteStorageService**: Remote storage integration
+- **DatabaseRestoreService**: Database restore operations
+- **SystemResourceMonitor**: System performance monitoring
 
-### Work Order Deletion Fix
-```csharp
-// Replace AdminController.DeleteWorkOrder() method
-private readonly WorkOrderDeletionService _workOrderDeletionService;
+### SignalR Integration
+- Use existing StatusHub with new group: `server-monitoring`
+- Real-time updates for service status, backup progress, restore operations
+- Client-side JavaScript for dashboard updates
 
-public async Task<IActionResult> DeleteWorkOrder(string id)
-{
-    // Use comprehensive deletion service instead of direct EF removal
-    var result = await _workOrderDeletionService.DeleteWorkOrderAsync(id);
-    
-    if (result.Success)
-        TempData["SuccessMessage"] = result.Message;
-    else
-        TempData["ErrorMessage"] = result.Message;
-        
-    return RedirectToAction(nameof(Index));
-}
-```
+### UI Structure
+- `/ServerManagement/Index` - Main unified dashboard
+- `/ServerManagement/Services` - Service configuration and management
+- `/ServerManagement/Backups` - Backup configuration and history
+- `/ServerManagement/Restore` - Database restore interface
+- `/ServerManagement/SystemResources` - System performance monitoring
 
-## Files to Modify
-1. `Controllers/AdminController.cs` - Use WorkOrderDeletionService for proper cascading
-2. `Services/WorkOrderDeletionService.cs` - Add comprehensive work order deletion method
-3. `Services/WorkOrderImportService.cs` - Implement 3-tier label assignment with pool consumption
-4. `Models/PartLabel.cs` - Add optional NestSheetId foreign key for context
-5. `Data/ShopBossDbContext.cs` - Add NestSheetId relationship configuration
+### Role-Based Access
+- **Guest**: View-only access to dashboards and status
+- **Admin**: Full access to configuration, management, and restore operations
+- Implementation: Hide navigation buttons and action buttons for Guest users
 
-## Expected Results
-- ✅ Work orders fully delete all child entities when deleted
-- ✅ Part labels display correctly for both original and suffixed part IDs  
-- ✅ Reimporting work orders works cleanly without orphaned data
-- ✅ Label buttons work for quantity-expanded parts
+## Success Criteria
+- All shop-critical services monitored from single interface
+- Existing backup and health functionality preserved and enhanced
+- Complete SQL database backup and restore workflow
+- Real-time monitoring with SignalR updates
+- Clean separation from AdminController
+- Zero additional deployment complexity
+- Maintains existing ShopBoss architectural patterns
