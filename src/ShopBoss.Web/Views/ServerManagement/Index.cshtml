@@ -4,6 +4,12 @@
 }
 
 <div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="h2 mb-4"><i class="fas fa-server me-2"></i>@Model.PageTitle</h1>
+        </div>
+    </div>
+
     @if (TempData["SuccessMessage"] != null)
     {
         <div class="alert alert-success alert-dismissible fade show mb-3" role="alert">
@@ -51,9 +57,6 @@
         <div class="row mb-4">
             <div class="col-12">
                 <div class="card">
-                    <div class="card-header">
-                        <h6 class="mb-0"><i class="fas fa-server me-2"></i>System Monitoring</h6>
-                    </div>
                     <div class="card-body p-0">
                         <div class="table-responsive">
                             <table class="table table-hover mb-0">
@@ -185,19 +188,178 @@
         
         <!-- Backup Management Tab -->
         <div class="tab-pane fade" id="backup" role="tabpanel" aria-labelledby="backup-tab">
-            <div class="d-flex justify-content-end mb-3">
-                <button type="button" class="btn btn-primary" onclick="createManualBackup()">
-                    <i class="fas fa-database me-2"></i>Create Manual Backup
-                </button>
-            </div>
             
-            <!-- Backup content will be loaded here -->
-            <div id="backup-content">
-                <div class="text-center py-4">
-                    <div class="spinner-border" role="status">
-                        <span class="visually-hidden">Loading...</span>
-                    </div>
-                    <p class="mt-2 text-muted">Loading backup management data...</p>
+            <!-- Backup Configuration -->
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0"><i class="fas fa-cog me-2"></i>Backup Configuration</h6>
+                    <button type="button" class="btn btn-sm btn-primary" onclick="createManualBackup()">
+                        <i class="fas fa-database me-2"></i>Create Manual Backup
+                    </button>
+                </div>
+                <div class="card-body">
+                    @if (Model.BackupConfiguration != null)
+                    {
+                        <form asp-action="UpdateBackupConfiguration" method="post">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label asp-for="BackupConfiguration.BackupIntervalMinutes" class="form-label small">Backup Interval (minutes)</label>
+                                        <input asp-for="BackupConfiguration.BackupIntervalMinutes" type="number" class="form-control form-control-sm" min="15" max="10080" />
+                                        <div class="form-text small">Minimum 15 minutes, maximum 1 week</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label asp-for="BackupConfiguration.MaxBackupRetention" class="form-label small">Maximum Backups to Keep</label>
+                                        <input asp-for="BackupConfiguration.MaxBackupRetention" type="number" class="form-control form-control-sm" min="3" max="168" />
+                                        <div class="form-text small">Minimum 3 backups, maximum 168</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label asp-for="BackupConfiguration.BackupDirectoryPath" class="form-label small">Backup Directory</label>
+                                        <input asp-for="BackupConfiguration.BackupDirectoryPath" type="text" class="form-control form-control-sm" />
+                                        <div class="form-text small">Relative or absolute path for backup files</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <div class="form-check">
+                                            <input asp-for="BackupConfiguration.EnableCompression" class="form-check-input" type="checkbox" />
+                                            <label asp-for="BackupConfiguration.EnableCompression" class="form-check-label small">
+                                                Enable Compression
+                                            </label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input asp-for="BackupConfiguration.EnableAutomaticBackups" class="form-check-input" type="checkbox" />
+                                            <label asp-for="BackupConfiguration.EnableAutomaticBackups" class="form-check-label small">
+                                                Enable Automatic Backups
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <input type="hidden" asp-for="BackupConfiguration.Id" />
+                            <button type="submit" class="btn btn-sm btn-primary">
+                                <i class="fas fa-save me-2"></i>Update Configuration
+                            </button>
+                        </form>
+                    }
+                    else
+                    {
+                        <div class="text-center py-3">
+                            <small class="text-muted">Backup configuration not found</small>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Recent Backups -->
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-history me-2"></i>Recent Backups</h6>
+                </div>
+                <div class="card-body p-0">
+                    @if (Model.RecentBackups.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Created</th>
+                                        <th>Type</th>
+                                        <th>Status</th>
+                                        <th>Size</th>
+                                        <th>Duration</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var backup in Model.RecentBackups)
+                                    {
+                                        <tr class="@(backup.IsSuccessful ? "" : "table-danger")">
+                                            <td>
+                                                <small>@backup.CreatedDate.ToString("MM/dd HH:mm")</small>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-@(backup.BackupType == ShopBoss.Web.Models.BackupType.Manual ? "primary" : "secondary")">
+                                                    @backup.BackupType
+                                                </span>
+                                            </td>
+                                            <td>
+                                                @if (backup.IsSuccessful)
+                                                {
+                                                    <span class="badge bg-success">
+                                                        <i class="fas fa-check me-1"></i>Success
+                                                    </span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-danger">
+                                                        <i class="fas fa-times me-1"></i>Failed
+                                                    </span>
+                                                }
+                                            </td>
+                                            <td>
+                                                @if (backup.IsSuccessful)
+                                                {
+                                                    <small>@((backup.BackupSize / 1024.0 / 1024.0).ToString("F1")) MB</small>
+                                                }
+                                                else
+                                                {
+                                                    <small class="text-muted">-</small>
+                                                }
+                                            </td>
+                                            <td>
+                                                <small>@backup.Duration.ToString(@"mm\:ss")</small>
+                                            </td>
+                                            <td>
+                                                @if (backup.IsSuccessful)
+                                                {
+                                                    <div class="btn-group btn-group-sm" role="group">
+                                                        <button type="button" class="btn btn-outline-warning btn-sm" onclick="restoreBackup('@backup.Id')" title="Restore">
+                                                            <i class="fas fa-undo"></i>
+                                                        </button>
+                                                        <button type="button" class="btn btn-outline-danger btn-sm" onclick="deleteBackup('@backup.Id')" title="Delete">
+                                                            <i class="fas fa-trash"></i>
+                                                        </button>
+                                                    </div>
+                                                }
+                                                else
+                                                {
+                                                    <button type="button" class="btn btn-outline-danger btn-sm" onclick="deleteBackup('@backup.Id')" title="Delete">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                }
+                                            </td>
+                                        </tr>
+                                        @if (!backup.IsSuccessful && !string.IsNullOrEmpty(backup.ErrorMessage))
+                                        {
+                                            <tr class="table-danger">
+                                                <td colspan="6" class="border-top-0 pt-0">
+                                                    <small class="text-danger">
+                                                        <i class="fas fa-exclamation-triangle me-1"></i>
+                                                        @backup.ErrorMessage
+                                                    </small>
+                                                </td>
+                                            </tr>
+                                        }
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="card-body text-center py-4">
+                            <i class="fas fa-database fa-3x text-muted mb-3"></i>
+                            <h5>No backups found</h5>
+                            <small class="text-muted">Create your first backup to get started</small>
+                        </div>
+                    }
                 </div>
             </div>
         </div>
@@ -233,11 +395,6 @@ function switchToBackupTab() {
     // Activate backup tab
     backupTab.classList.add('active');
     backupTabContent.classList.add('active', 'show');
-    
-    // Load backup content if not already loaded
-    if (!document.getElementById('backup-content').hasAttribute('data-loaded')) {
-        loadBackupContent();
-    }
 }
 
 async function createManualBackup() {
@@ -273,56 +430,47 @@ function showAlert(type, message) {
     $('.container-fluid .row:first .col-12').after(`<div class="col-12">${alertHtml}</div>`);
 }
 
-// Tab management
-document.addEventListener('DOMContentLoaded', function() {
-    const tabTriggerList = [].slice.call(document.querySelectorAll('#serverManagementTabs button[data-bs-toggle="tab"]'));
-    
-    tabTriggerList.forEach(function (tabTrigger) {
-        tabTrigger.addEventListener('shown.bs.tab', function (event) {
-            const targetTab = event.target.getAttribute('data-bs-target');
-            
-            // Load content for backup tab on demand
-            if (targetTab === '#backup' && !document.getElementById('backup-content').hasAttribute('data-loaded')) {
-                loadBackupContent();
-            }
-        });
-    });
-});
-
-async function loadBackupContent() {
-    const backupContent = document.getElementById('backup-content');
-    
-    try {
-        const response = await fetch('@Url.Action("BackupManagement")', {
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest'
-            }
-        });
+function deleteBackup(backupId) {
+    if (confirm('Are you sure you want to delete this backup? This action cannot be undone.')) {
+        var form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '@Url.Action("DeleteBackup")';
         
-        if (response.ok) {
-            const html = await response.text();
-            // Extract just the content we need (remove layout wrapper)
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(html, 'text/html');
-            
-            // Get everything except the header
-            const headerDiv = doc.querySelector('.d-flex.justify-content-between');
-            if (headerDiv) headerDiv.remove();
-            
-            // Get the remaining content
-            const cards = doc.querySelectorAll('.card');
-            let contentHTML = '';
-            cards.forEach(card => {
-                contentHTML += card.outerHTML;
-            });
-            
-            backupContent.innerHTML = contentHTML;
-            backupContent.setAttribute('data-loaded', 'true');
-        } else {
-            backupContent.innerHTML = '<div class="alert alert-danger">Failed to load backup management data.</div>';
+        var idInput = document.createElement('input');
+        idInput.type = 'hidden';
+        idInput.name = 'id';
+        idInput.value = backupId;
+        form.appendChild(idInput);
+        
+        var token = document.querySelector('input[name="__RequestVerificationToken"]');
+        if (token) {
+            form.appendChild(token.cloneNode());
         }
-    } catch (error) {
-        backupContent.innerHTML = '<div class="alert alert-danger">Error loading backup management data.</div>';
+        
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+
+function restoreBackup(backupId) {
+    if (confirm('Are you sure you want to restore this backup? This will replace the current database and require an application restart.')) {
+        var form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '@Url.Action("RestoreBackup")';
+        
+        var idInput = document.createElement('input');
+        idInput.type = 'hidden';
+        idInput.name = 'id';
+        idInput.value = backupId;
+        form.appendChild(idInput);
+        
+        var token = document.querySelector('input[name="__RequestVerificationToken"]');
+        if (token) {
+            form.appendChild(token.cloneNode());
+        }
+        
+        document.body.appendChild(form);
+        form.submit();
     }
 }
 </script>
