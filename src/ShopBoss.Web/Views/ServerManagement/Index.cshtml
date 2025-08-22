@@ -4,27 +4,21 @@
 }
 
 <div class="container-fluid">
-    <div class="row">
-        <div class="col-12">
-            <h1 class="h2 mb-4">@Model.PageTitle</h1>
-            
-            @if (TempData["SuccessMessage"] != null)
-            {
-                <div class="alert alert-success alert-dismissible fade show" role="alert">
-                    @TempData["SuccessMessage"]
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                </div>
-            }
-            
-            @if (TempData["ErrorMessage"] != null)
-            {
-                <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                    @TempData["ErrorMessage"]
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                </div>
-            }
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show mb-3" role="alert">
+            @TempData["SuccessMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
-    </div>
+    }
+    
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
+            @TempData["ErrorMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
 
     <!-- Tab Navigation -->
     <div class="row mb-4">
@@ -32,17 +26,12 @@
             <ul class="nav nav-tabs" id="serverManagementTabs" role="tablist">
                 <li class="nav-item" role="presentation">
                     <button class="nav-link active" id="dashboard-tab" data-bs-toggle="tab" data-bs-target="#dashboard" type="button" role="tab">
-                        <i class="fas fa-tachometer-alt me-2"></i>Dashboard
+                        <i class="fas fa-server me-2"></i>System Status
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" id="backup-tab" data-bs-toggle="tab" data-bs-target="#backup" type="button" role="tab">
-                        <i class="fas fa-database me-2"></i>Backup Management
-                    </button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="services-tab" data-bs-toggle="tab" data-bs-target="#services" type="button" role="tab">
-                        <i class="fas fa-server me-2"></i>Services Config
+                        <i class="fas fa-database me-2"></i>Backups
                     </button>
                 </li>
             </ul>
@@ -73,7 +62,6 @@
                                         <th>Component</th>
                                         <th>Status</th>
                                         <th>Details</th>
-                                        <th>Last Check</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -116,21 +104,11 @@
                                                     <small class="text-muted">-</small>
                                                 }
                                             </td>
-                                            <td id="lastcheck-@service.Id">
-                                                @if (latestStatus != null)
-                                                {
-                                                    <small>@latestStatus.LastChecked.ToString("MM/dd HH:mm")</small>
-                                                }
-                                                else
-                                                {
-                                                    <small class="text-muted">Never</small>
-                                                }
-                                            </td>
                                         </tr>
                                         @if (latestStatus != null && !string.IsNullOrEmpty(latestStatus.ErrorMessage))
                                         {
                                             <tr>
-                                                <td colspan="4" class="border-top-0 pt-0">
+                                                <td colspan="3" class="border-top-0 pt-0">
                                                     <small class="text-danger">
                                                         <i class="fas fa-exclamation-triangle me-1"></i>
                                                         @latestStatus.ErrorMessage
@@ -178,17 +156,6 @@
                                                 <small class="text-muted">-</small>
                                             }
                                         </td>
-                                        <td>
-                                            @if (Model.RecentBackups.Any())
-                                            {
-                                                var lastBackup = Model.RecentBackups.First();
-                                                <small>@lastBackup.CreatedDate.ToString("MM/dd HH:mm")</small>
-                                            }
-                                            else
-                                            {
-                                                <small class="text-muted">Never</small>
-                                            }
-                                        </td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -232,65 +199,6 @@
                     </div>
                     <p class="mt-2 text-muted">Loading backup management data...</p>
                 </div>
-            </div>
-        </div>
-        
-        <!-- Services Configuration Tab -->
-        <div class="tab-pane fade" id="services" role="tabpanel" aria-labelledby="services-tab">
-            
-            <!-- Services content -->
-            <div id="services-content">
-                @if (Model.MonitoredServices.Any())
-                {
-                    <div class="card">
-                        <div class="card-header">
-                            <h5 class="mb-0"><i class="fas fa-server me-2"></i>Service Configuration</h5>
-                        </div>
-                        <div class="card-body">
-                            <p class="text-muted">Service configuration interface coming in Phase 2...</p>
-                            <div class="table-responsive">
-                                <table class="table">
-                                    <thead>
-                                        <tr>
-                                            <th>Service Name</th>
-                                            <th>Check Interval</th>
-                                            <th>Status</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @foreach (var service in Model.MonitoredServices)
-                                        {
-                                            <tr>
-                                                <td>@service.ServiceName</td>
-                                                <td>@service.CheckIntervalMinutes min</td>
-                                                <td>
-                                                    @if (service.IsEnabled)
-                                                    {
-                                                        <span class="badge bg-success">Enabled</span>
-                                                    }
-                                                    else
-                                                    {
-                                                        <span class="badge bg-secondary">Disabled</span>
-                                                    }
-                                                </td>
-                                            </tr>
-                                        }
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                }
-                else
-                {
-                    <div class="card">
-                        <div class="card-body text-center py-4">
-                            <i class="fas fa-server fa-3x text-muted mb-3"></i>
-                            <h5>No Services Configured</h5>
-                            <p class="text-muted">Services will be automatically initialized on first load</p>
-                        </div>
-                    </div>
-                }
             </div>
         </div>
         

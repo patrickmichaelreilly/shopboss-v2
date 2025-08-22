@@ -43,53 +43,6 @@ public class SystemMonitoringService
             .FirstOrDefaultAsync(s => s.Id == serviceId);
     }
 
-    /// <summary>
-    /// Create or update a monitored service
-    /// </summary>
-    public async Task<MonitoredService> CreateOrUpdateServiceAsync(MonitoredService service)
-    {
-        var existingService = await _context.MonitoredServices.FindAsync(service.Id);
-        
-        if (existingService == null)
-        {
-            service.CreatedDate = DateTime.Now;
-            service.LastModifiedDate = DateTime.Now;
-            _context.MonitoredServices.Add(service);
-            _logger.LogInformation("Created new monitored service: {ServiceName}", service.ServiceName);
-        }
-        else
-        {
-            existingService.ServiceName = service.ServiceName;
-            existingService.ServiceType = service.ServiceType;
-            existingService.ConnectionString = service.ConnectionString;
-            existingService.CheckIntervalMinutes = service.CheckIntervalMinutes;
-            existingService.IsEnabled = service.IsEnabled;
-            existingService.Description = service.Description;
-            existingService.LastModifiedDate = DateTime.Now;
-            _logger.LogInformation("Updated monitored service: {ServiceName}", service.ServiceName);
-        }
-
-        await _context.SaveChangesAsync();
-        return existingService ?? service;
-    }
-
-    /// <summary>
-    /// Delete a monitored service and its health history
-    /// </summary>
-    public async Task<bool> DeleteServiceAsync(string serviceId)
-    {
-        var service = await _context.MonitoredServices.FindAsync(serviceId);
-        if (service == null)
-        {
-            return false;
-        }
-
-        _context.MonitoredServices.Remove(service);
-        await _context.SaveChangesAsync();
-        
-        _logger.LogInformation("Deleted monitored service: {ServiceName}", service.ServiceName);
-        return true;
-    }
 
     /// <summary>
     /// Check health of a specific service
@@ -252,10 +205,15 @@ public class SystemMonitoringService
             ConnectionString = _configuration.GetConnectionString("DefaultConnection"),
             CheckIntervalMinutes = 5,
             IsEnabled = true,
-            Description = "Main ShopBoss SQLite database connectivity"
+            Description = "Main ShopBoss SQLite database connectivity",
+            CreatedDate = DateTime.Now,
+            LastModifiedDate = DateTime.Now
         };
 
-        await CreateOrUpdateServiceAsync(sqlServerService);
+        _context.MonitoredServices.Add(sqlServerService);
+        await _context.SaveChangesAsync();
+        
+        _logger.LogInformation("Created default monitored service: {ServiceName}", sqlServerService.ServiceName);
         
         _logger.LogInformation("Default monitored services initialized");
     }
