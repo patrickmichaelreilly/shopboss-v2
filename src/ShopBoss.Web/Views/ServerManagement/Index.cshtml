@@ -59,9 +59,10 @@
                 <div class="card">
                     <div class="card-body p-0">
                         <div class="table-responsive">
-                            <table class="table table-hover mb-0">
+                            <table class="table table-hover mb-0" id="services-table">
                                 <thead class="table-light">
                                     <tr>
+                                        <th width="50"></th>
                                         <th>Component</th>
                                         <th>Status</th>
                                         <th>Details</th>
@@ -70,24 +71,32 @@
                                 <tbody>
                                     @foreach (var service in Model.MonitoredServices)
                                     {
-                                        var latestStatus = Model.LatestServiceStatuses.FirstOrDefault(s => s.ServiceId == service.Id);
-                                        <tr>
+                                        var rowClass = !service.IsEnabled ? "table-secondary" : "";
+                                        <tr class="@rowClass">
+                                            <td class="text-center">
+                                                <i class="fas fa-chevron-right expand-icon" id="expand-icon-@service.Id" 
+                                                   onclick="toggleService('@service.Id')" style="cursor: pointer;"></i>
+                                            </td>
                                             <td>
                                                 <div>
-                                                    <strong>@service.ServiceName</strong>
+                                                    <strong>@service.Name</strong>
                                                     @if (!string.IsNullOrEmpty(service.Description))
                                                     {
                                                         <br><small class="text-muted">@service.Description</small>
                                                     }
+                                                    @if (!service.IsEnabled)
+                                                    {
+                                                        <br><span class="badge bg-secondary">Disabled</span>
+                                                    }
                                                 </div>
                                             </td>
                                             <td>
-                                                @if (latestStatus != null)
+                                                @if (service.CurrentStatus != null)
                                                 {
-                                                    <span class="badge bg-@GetServiceStatusColor(latestStatus.Status)" id="status-@service.Id">
-                                                        @latestStatus.Status
+                                                    <span class="badge bg-@GetServiceStatusColor(service.CurrentStatus.Value)" id="status-@service.Id">
+                                                        @service.CurrentStatus
                                                     </span>
-                                                    @if (!latestStatus.IsReachable)
+                                                    @if (!service.IsReachable)
                                                     {
                                                         <br><small class="text-danger">Unreachable</small>
                                                     }
@@ -98,9 +107,9 @@
                                                 }
                                             </td>
                                             <td>
-                                                @if (latestStatus?.ResponseTimeMs != null)
+                                                @if (service.ResponseTimeMs != null)
                                                 {
-                                                    <small class="text-muted">@latestStatus.ResponseTimeMs ms</small>
+                                                    <small class="text-muted">@service.ResponseTimeMs ms</small>
                                                 }
                                                 else
                                                 {
@@ -108,21 +117,72 @@
                                                 }
                                             </td>
                                         </tr>
-                                        @if (latestStatus != null && !string.IsNullOrEmpty(latestStatus.ErrorMessage))
-                                        {
-                                            <tr>
-                                                <td colspan="3" class="border-top-0 pt-0">
-                                                    <small class="text-danger">
-                                                        <i class="fas fa-exclamation-triangle me-1"></i>
-                                                        @latestStatus.ErrorMessage
-                                                    </small>
-                                                </td>
-                                            </tr>
-                                        }
+
+                                        <!-- Expanded Service Details -->
+                                        <tr class="d-none no-hover" id="details-@service.Id">
+                                            <td class="no-hover"></td>
+                                            <td class="no-hover"></td>
+                                            <td colspan="3" class="p-0 no-hover">
+                                                <div class="bg-light border-start border-end border-bottom p-3">
+                                                    <div class="card mb-0">
+                                                        <div class="card-body p-2">
+                                                            <table class="table table-sm table-borderless mb-0">
+                                                                <tbody>
+                                                                    <tr>
+                                                                        <td width="120" class="text-muted">Service Type:</td>
+                                                                        <td><span class="badge bg-info">@service.ServiceType</span></td>
+                                                                        <td width="120" class="text-muted">Status:</td>
+                                                                        <td>@(service.IsEnabled ? "Enabled" : "Disabled")</td>
+                                                                    </tr>
+                                                                    <tr>
+                                                                        <td class="text-muted">Connection:</td>
+                                                                        <td colspan="3">
+                                                                            <code class="small">@(service.ServiceType == "Database" && service.ConnectionString?.Contains("Data Source") == true ? service.ConnectionString : service.ConnectionString?.Length > 80 ? service.ConnectionString.Substring(0, 80) + "..." : service.ConnectionString)</code>
+                                                                        </td>
+                                                                    </tr>
+                                                                    @if (service.LastChecked != null)
+                                                                    {
+                                                                        <tr>
+                                                                            <td class="text-muted">Last Check:</td>
+                                                                            <td>@service.LastChecked.Value.ToString("MM/dd/yy hh:mm tt")</td>
+                                                                            <td class="text-muted">Response Time:</td>
+                                                                            <td>@(service.ResponseTimeMs?.ToString() ?? "-") ms</td>
+                                                                        </tr>
+                                                                        @if (!string.IsNullOrEmpty(service.StatusDetails))
+                                                                        {
+                                                                            <tr>
+                                                                                <td class="text-muted align-top">Details:</td>
+                                                                                <td colspan="3">@service.StatusDetails</td>
+                                                                            </tr>
+                                                                        }
+                                                                        @if (!string.IsNullOrEmpty(service.ErrorMessage))
+                                                                        {
+                                                                            <tr>
+                                                                                <td class="text-muted align-top">Error:</td>
+                                                                                <td colspan="3" class="text-danger">@service.ErrorMessage</td>
+                                                                            </tr>
+                                                                        }
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        <tr>
+                                                                            <td class="text-muted" colspan="4">No health check performed yet</td>
+                                                                        </tr>
+                                                                    }
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
                                     }
                                     
                                     <!-- Auto Backup Row -->
                                     <tr style="cursor: pointer;" onclick="switchToBackupTab()">
+                                        <td class="text-center">
+                                            <i class="fas fa-external-link-alt text-muted"></i>
+                                        </td>
                                         <td>
                                             <div>
                                                 <strong>Auto Backup</strong>
@@ -383,6 +443,33 @@
 }
 
 <script>
+// Toggle service expansion
+function toggleService(serviceId) {
+    const details = document.getElementById(`details-${serviceId}`);
+    const icon = document.getElementById(`expand-icon-${serviceId}`);
+    const table = document.getElementById('services-table');
+    
+    if (details.classList.contains('d-none')) {
+        details.classList.remove('d-none');
+        icon.classList.remove('fa-chevron-right');
+        icon.classList.add('fa-chevron-down');
+        
+        // Remove hover effect from table when any service is expanded
+        table.classList.remove('table-hover');
+    } else {
+        details.classList.add('d-none');
+        icon.classList.remove('fa-chevron-down');
+        icon.classList.add('fa-chevron-right');
+        
+        // Check if any other services are still expanded
+        const anyExpanded = document.querySelector('tr[id^="details-"]:not(.d-none)');
+        if (!anyExpanded) {
+            // Re-add hover effect if no services are expanded
+            table.classList.add('table-hover');
+        }
+    }
+}
+
 function switchToBackupTab() {
     // Switch to the Backup Management tab
     const backupTab = document.getElementById('backup-tab');

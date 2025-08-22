@@ -1,120 +1,104 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Data.Sqlite;
-using ShopBoss.Web.Data;
+using Microsoft.Data.SqlClient;
 using ShopBoss.Web.Models;
+using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.ServiceProcess;
 
 namespace ShopBoss.Web.Services;
 
 public class SystemMonitoringService
 {
-    private readonly ShopBossDbContext _context;
     private readonly ILogger<SystemMonitoringService> _logger;
     private readonly IConfiguration _configuration;
+    
+    // In-memory storage for current health status
+    private readonly ConcurrentDictionary<string, MonitoredService> _services;
 
     public SystemMonitoringService(
-        ShopBossDbContext context,
         ILogger<SystemMonitoringService> logger,
         IConfiguration configuration)
     {
-        _context = context;
         _logger = logger;
         _configuration = configuration;
+        _services = new ConcurrentDictionary<string, MonitoredService>();
+        
+        InitializeMonitoredServices();
     }
 
     /// <summary>
-    /// Get all monitored services
+    /// Get all monitored services with their current status
     /// </summary>
-    public async Task<List<MonitoredService>> GetAllMonitoredServicesAsync()
+    public List<MonitoredService> GetAllServices()
     {
-        return await _context.MonitoredServices
-            .Include(s => s.HealthStatuses.OrderByDescending(h => h.LastChecked).Take(1))
-            .OrderBy(s => s.ServiceName)
-            .ToListAsync();
+        return _services.Values.OrderBy(s => s.Name).ToList();
     }
 
     /// <summary>
-    /// Get a specific monitored service by ID
+    /// Get a specific service by ID
     /// </summary>
-    public async Task<MonitoredService?> GetMonitoredServiceAsync(string serviceId)
+    public MonitoredService? GetService(string serviceId)
     {
-        return await _context.MonitoredServices
-            .Include(s => s.HealthStatuses.OrderByDescending(h => h.LastChecked))
-            .FirstOrDefaultAsync(s => s.Id == serviceId);
+        _services.TryGetValue(serviceId, out var service);
+        return service;
     }
-
 
     /// <summary>
     /// Check health of a specific service
     /// </summary>
-    public async Task<ServiceHealthStatus> CheckServiceHealthAsync(string serviceId)
+    public async Task<MonitoredService> CheckServiceHealthAsync(string serviceId)
     {
-        var service = await _context.MonitoredServices.FindAsync(serviceId);
-        if (service == null)
+        if (!_services.TryGetValue(serviceId, out var service))
         {
             throw new ArgumentException($"Service with ID {serviceId} not found");
         }
-
-        var healthStatus = new ServiceHealthStatus
-        {
-            ServiceId = serviceId,
-            LastChecked = DateTime.Now
-        };
 
         try
         {
             switch (service.ServiceType)
             {
-                case ServiceType.SqlServer:
-                    await CheckSqlServerHealthAsync(service, healthStatus);
+                case "Database":
+                    await CheckDatabaseHealthAsync(service);
                     break;
                     
-                case ServiceType.HttpEndpoint:
-                    await CheckHttpEndpointHealthAsync(service, healthStatus);
+                case "HttpApi":
+                    await CheckHttpApiHealthAsync(service);
                     break;
                     
-                case ServiceType.WindowsService:
-                    await CheckWindowsServiceHealthAsync(service, healthStatus);
-                    break;
-                    
-                case ServiceType.CustomCheck:
-                    await CheckCustomServiceHealthAsync(service, healthStatus);
+                case "WindowsService":
+                    await CheckWindowsServiceHealthAsync(service);
                     break;
                     
                 default:
-                    healthStatus.Status = ServiceHealthLevel.Unknown;
-                    healthStatus.ErrorMessage = $"Unknown service type: {service.ServiceType}";
-                    healthStatus.IsReachable = false;
+                    service.CurrentStatus = ServiceHealthLevel.Unknown;
+                    service.ErrorMessage = $"Unknown service type: {service.ServiceType}";
+                    service.IsReachable = false;
                     break;
             }
+            
+            service.LastChecked = DateTime.Now;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error checking health for service {ServiceName}", service.ServiceName);
-            healthStatus.Status = ServiceHealthLevel.Critical;
-            healthStatus.ErrorMessage = ex.Message;
-            healthStatus.IsReachable = false;
+            _logger.LogError(ex, "Error checking health for service {ServiceName}", service.Name);
+            service.CurrentStatus = ServiceHealthLevel.Critical;
+            service.ErrorMessage = ex.Message;
+            service.IsReachable = false;
+            service.LastChecked = DateTime.Now;
         }
 
-        // Save health status to database
-        _context.ServiceHealthStatuses.Add(healthStatus);
-        await _context.SaveChangesAsync();
-
-        return healthStatus;
+        return service;
     }
 
     /// <summary>
     /// Check health of all enabled services
     /// </summary>
-    public async Task<List<ServiceHealthStatus>> CheckAllServicesHealthAsync()
+    public async Task<List<MonitoredService>> CheckAllServicesHealthAsync()
     {
-        var services = await _context.MonitoredServices
-            .Where(s => s.IsEnabled)
-            .ToListAsync();
+        var enabledServices = _services.Values.Where(s => s.IsEnabled).ToList();
+        var healthResults = new List<MonitoredService>();
 
-        var healthResults = new List<ServiceHealthStatus>();
-
-        foreach (var service in services)
+        foreach (var service in enabledServices)
         {
             try
             {
@@ -123,110 +107,100 @@ public class SystemMonitoringService
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to check health for service {ServiceName}", service.ServiceName);
+                _logger.LogError(ex, "Failed to check health for service {ServiceName}", service.Name);
                 
-                // Create a failed health status
-                var failedHealth = new ServiceHealthStatus
-                {
-                    ServiceId = service.Id,
-                    Status = ServiceHealthLevel.Critical,
-                    LastChecked = DateTime.Now,
-                    ErrorMessage = ex.Message,
-                    IsReachable = false
-                };
+                service.CurrentStatus = ServiceHealthLevel.Critical;
+                service.ErrorMessage = ex.Message;
+                service.IsReachable = false;
+                service.LastChecked = DateTime.Now;
                 
-                _context.ServiceHealthStatuses.Add(failedHealth);
-                healthResults.Add(failedHealth);
+                healthResults.Add(service);
             }
         }
 
-        await _context.SaveChangesAsync();
         return healthResults;
     }
 
     /// <summary>
-    /// Get recent health history for a service
+    /// Initialize the monitored services
     /// </summary>
-    public async Task<List<ServiceHealthStatus>> GetServiceHealthHistoryAsync(string serviceId, int count = 20)
+    private void InitializeMonitoredServices()
     {
-        return await _context.ServiceHealthStatuses
-            .Where(h => h.ServiceId == serviceId)
-            .OrderByDescending(h => h.LastChecked)
-            .Take(count)
-            .ToListAsync();
-    }
-
-    /// <summary>
-    /// Get latest health status for all services
-    /// </summary>
-    public async Task<List<ServiceHealthStatus>> GetLatestHealthStatusesAsync()
-    {
-        var services = await _context.MonitoredServices
-            .Where(s => s.IsEnabled)
-            .ToListAsync();
-
-        var latestStatuses = new List<ServiceHealthStatus>();
+        var services = new List<MonitoredService>
+        {
+            // ShopBoss Application (SQLite database monitoring)
+            new MonitoredService
+            {
+                Id = "shopboss-app",
+                Name = "ShopBoss Application",
+                ServiceType = "Database",
+                ConnectionString = _configuration.GetConnectionString("DefaultConnection") ?? "",
+                IsEnabled = true,
+                Description = "ShopBoss application and SQLite database connectivity"
+            },
+            
+            // External SQL Server (Microvellum data sources)
+            new MonitoredService
+            {
+                Id = "microvellum-sql",
+                Name = "Microvellum SQL Server",
+                ServiceType = "Database",
+                ConnectionString = "Server=YOUR_SQL_SERVER;Database=MicrovellumData;Trusted_Connection=true;TrustServerCertificate=true;",
+                IsEnabled = false, // Disabled until configured
+                Description = "External SQL Server for Microvellum data import"
+            },
+            
+            // SpeedDial Service
+            new MonitoredService
+            {
+                Id = "speeddial-api",
+                Name = "SpeedDial Service",
+                ServiceType = "HttpApi",
+                ConnectionString = "http://localhost:8080/api/health",
+                IsEnabled = false, // Disabled until configured
+                Description = "SpeedDial web service API endpoint"
+            },
+            
+            // Time & Attendance Service
+            new MonitoredService
+            {
+                Id = "timeattendance-api",
+                Name = "Time & Attendance Service",
+                ServiceType = "HttpApi",
+                ConnectionString = "http://localhost:8081/api/status",
+                IsEnabled = false, // Disabled until configured
+                Description = "Time & Attendance web service API endpoint"
+            },
+            
+            // Polling Service
+            new MonitoredService
+            {
+                Id = "polling-service",
+                Name = "Polling Service",
+                ServiceType = "WindowsService",
+                ConnectionString = "PollingService", // Windows service name
+                IsEnabled = false, // Disabled until configured
+                Description = "Windows service for data polling operations"
+            }
+        };
 
         foreach (var service in services)
         {
-            var latestStatus = await _context.ServiceHealthStatuses
-                .Where(h => h.ServiceId == service.Id)
-                .OrderByDescending(h => h.LastChecked)
-                .FirstOrDefaultAsync();
-
-            if (latestStatus != null)
-            {
-                latestStatuses.Add(latestStatus);
-            }
+            _services.TryAdd(service.Id, service);
         }
-
-        return latestStatuses;
-    }
-
-    /// <summary>
-    /// Initialize default monitored services
-    /// </summary>
-    public async Task InitializeDefaultServicesAsync()
-    {
-        // Check if we already have services configured
-        var existingServices = await _context.MonitoredServices.CountAsync();
-        if (existingServices > 0)
-        {
-            return; // Already initialized
-        }
-
-        _logger.LogInformation("Initializing default monitored services");
-
-        // Add SQL Server monitoring (using the main database connection)
-        var sqlServerService = new MonitoredService
-        {
-            ServiceName = "SQL Server Database",
-            ServiceType = ServiceType.SqlServer,
-            ConnectionString = _configuration.GetConnectionString("DefaultConnection"),
-            CheckIntervalMinutes = 5,
-            IsEnabled = true,
-            Description = "Main ShopBoss SQLite database connectivity",
-            CreatedDate = DateTime.Now,
-            LastModifiedDate = DateTime.Now
-        };
-
-        _context.MonitoredServices.Add(sqlServerService);
-        await _context.SaveChangesAsync();
         
-        _logger.LogInformation("Created default monitored service: {ServiceName}", sqlServerService.ServiceName);
-        
-        _logger.LogInformation("Default monitored services initialized");
+        _logger.LogInformation("Initialized {Count} monitored services", services.Count);
     }
 
     #region Private Health Check Methods
 
-    private async Task CheckSqlServerHealthAsync(MonitoredService service, ServiceHealthStatus healthStatus)
+    private async Task CheckDatabaseHealthAsync(MonitoredService service)
     {
         if (string.IsNullOrEmpty(service.ConnectionString))
         {
-            healthStatus.Status = ServiceHealthLevel.Critical;
-            healthStatus.ErrorMessage = "No connection string configured";
-            healthStatus.IsReachable = false;
+            service.CurrentStatus = ServiceHealthLevel.Critical;
+            service.ErrorMessage = "No connection string configured";
+            service.IsReachable = false;
             return;
         }
 
@@ -234,93 +208,200 @@ public class SystemMonitoringService
         
         try
         {
-            using var connection = new SqliteConnection(service.ConnectionString);
-            await connection.OpenAsync();
+            // Determine if this is SQLite or SQL Server based on connection string
+            bool isSqlite = service.ConnectionString.Contains("Data Source") || 
+                           service.Id == "shopboss-app";
             
-            // Simple connectivity test
-            using var command = connection.CreateCommand();
-            command.CommandText = "SELECT 1";
-            await command.ExecuteScalarAsync();
-            
-            dbStopwatch.Stop();
+            if (isSqlite)
+            {
+                // SQLite connection for ShopBoss Application monitoring
+                using var connection = new SqliteConnection(service.ConnectionString);
+                await connection.OpenAsync();
+                
+                using var command = connection.CreateCommand();
+                command.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type='table'";
+                var tableCount = await command.ExecuteScalarAsync();
+                
+                dbStopwatch.Stop();
 
-            healthStatus.Status = ServiceHealthLevel.Healthy;
-            healthStatus.IsReachable = true;
-            healthStatus.Details = "Database connection successful";
-            healthStatus.ResponseTimeMs = dbStopwatch.ElapsedMilliseconds;
+                service.CurrentStatus = ServiceHealthLevel.Healthy;
+                service.IsReachable = true;
+                service.StatusDetails = $"SQLite database connection successful ({tableCount} tables)";
+                service.ResponseTimeMs = dbStopwatch.ElapsedMilliseconds;
+                service.ErrorMessage = null;
+            }
+            else
+            {
+                // External SQL Server connection
+                using var connection = new SqlConnection(service.ConnectionString);
+                await connection.OpenAsync();
+                
+                using var command = connection.CreateCommand();
+                command.CommandText = "SELECT @@VERSION";
+                var version = await command.ExecuteScalarAsync();
+                
+                dbStopwatch.Stop();
+
+                service.CurrentStatus = ServiceHealthLevel.Healthy;
+                service.IsReachable = true;
+                service.StatusDetails = "SQL Server connection successful";
+                service.ResponseTimeMs = dbStopwatch.ElapsedMilliseconds;
+                service.ErrorMessage = null;
+            }
         }
         catch (Exception ex)
         {
             dbStopwatch.Stop();
-            healthStatus.Status = ServiceHealthLevel.Critical;
-            healthStatus.ErrorMessage = ex.Message;
-            healthStatus.IsReachable = false;
-            healthStatus.ResponseTimeMs = dbStopwatch.ElapsedMilliseconds;
+            service.CurrentStatus = ServiceHealthLevel.Critical;
+            service.ErrorMessage = ex.Message;
+            service.IsReachable = false;
+            service.ResponseTimeMs = dbStopwatch.ElapsedMilliseconds;
+            service.StatusDetails = null;
         }
     }
 
-    private async Task CheckHttpEndpointHealthAsync(MonitoredService service, ServiceHealthStatus healthStatus)
+    private async Task CheckHttpApiHealthAsync(MonitoredService service)
     {
         if (string.IsNullOrEmpty(service.ConnectionString))
         {
-            healthStatus.Status = ServiceHealthLevel.Critical;
-            healthStatus.ErrorMessage = "No URL configured";
-            healthStatus.IsReachable = false;
+            service.CurrentStatus = ServiceHealthLevel.Critical;
+            service.ErrorMessage = "No URL configured";
+            service.IsReachable = false;
             return;
         }
 
+        var stopwatch = Stopwatch.StartNew();
+        
         try
         {
             using var httpClient = new HttpClient();
             httpClient.Timeout = TimeSpan.FromSeconds(30);
             
             var response = await httpClient.GetAsync(service.ConnectionString);
+            stopwatch.Stop();
             
             if (response.IsSuccessStatusCode)
             {
-                healthStatus.Status = ServiceHealthLevel.Healthy;
-                healthStatus.IsReachable = true;
-                healthStatus.Details = $"HTTP {(int)response.StatusCode} {response.StatusCode}";
+                service.CurrentStatus = ServiceHealthLevel.Healthy;
+                service.IsReachable = true;
+                service.StatusDetails = $"HTTP {(int)response.StatusCode} {response.StatusCode}";
+                service.ErrorMessage = null;
             }
             else
             {
-                healthStatus.Status = ServiceHealthLevel.Warning;
-                healthStatus.IsReachable = true;
-                healthStatus.ErrorMessage = $"HTTP {(int)response.StatusCode} {response.StatusCode}";
+                service.CurrentStatus = ServiceHealthLevel.Warning;
+                service.IsReachable = true;
+                service.ErrorMessage = $"HTTP {(int)response.StatusCode} {response.StatusCode}";
+                service.StatusDetails = null;
             }
+            
+            service.ResponseTimeMs = stopwatch.ElapsedMilliseconds;
         }
         catch (HttpRequestException ex)
         {
-            healthStatus.Status = ServiceHealthLevel.Critical;
-            healthStatus.ErrorMessage = ex.Message;
-            healthStatus.IsReachable = false;
+            stopwatch.Stop();
+            service.CurrentStatus = ServiceHealthLevel.Critical;
+            service.ErrorMessage = ex.Message;
+            service.IsReachable = false;
+            service.ResponseTimeMs = stopwatch.ElapsedMilliseconds;
+            service.StatusDetails = null;
         }
         catch (TaskCanceledException)
         {
-            healthStatus.Status = ServiceHealthLevel.Critical;
-            healthStatus.ErrorMessage = "Request timeout";
-            healthStatus.IsReachable = false;
+            stopwatch.Stop();
+            service.CurrentStatus = ServiceHealthLevel.Critical;
+            service.ErrorMessage = "Request timeout";
+            service.IsReachable = false;
+            service.ResponseTimeMs = stopwatch.ElapsedMilliseconds;
+            service.StatusDetails = null;
         }
     }
 
-    private async Task CheckWindowsServiceHealthAsync(MonitoredService service, ServiceHealthStatus healthStatus)
+    private async Task CheckWindowsServiceHealthAsync(MonitoredService service)
     {
-        // This will be implemented in Phase 2 when we add Windows service monitoring
-        await Task.CompletedTask;
+        await Task.CompletedTask; // Make method async compliant
         
-        healthStatus.Status = ServiceHealthLevel.Unknown;
-        healthStatus.ErrorMessage = "Windows service monitoring not yet implemented";
-        healthStatus.IsReachable = false;
-    }
+        if (string.IsNullOrEmpty(service.ConnectionString))
+        {
+            service.CurrentStatus = ServiceHealthLevel.Critical;
+            service.ErrorMessage = "No service name configured";
+            service.IsReachable = false;
+            return;
+        }
 
-    private async Task CheckCustomServiceHealthAsync(MonitoredService service, ServiceHealthStatus healthStatus)
-    {
-        // This will be implemented later for custom health checks
-        await Task.CompletedTask;
+        var stopwatch = Stopwatch.StartNew();
         
-        healthStatus.Status = ServiceHealthLevel.Unknown;
-        healthStatus.ErrorMessage = "Custom health checks not yet implemented";
-        healthStatus.IsReachable = false;
+        try
+        {
+            // Check if running on Windows (this check will only work in Windows deployment)
+            if (!OperatingSystem.IsWindows())
+            {
+                service.CurrentStatus = ServiceHealthLevel.Warning;
+                service.ErrorMessage = "Windows service checks only available on Windows";
+                service.IsReachable = false;
+                service.StatusDetails = "Development environment - Windows service monitoring unavailable";
+                return;
+            }
+
+            using var serviceController = new ServiceController(service.ConnectionString);
+            
+            // This will throw if service doesn't exist
+            var status = serviceController.Status;
+            var displayName = serviceController.DisplayName;
+            
+            stopwatch.Stop();
+
+            switch (status)
+            {
+                case ServiceControllerStatus.Running:
+                    service.CurrentStatus = ServiceHealthLevel.Healthy;
+                    service.IsReachable = true;
+                    service.StatusDetails = $"Service '{displayName}' is running";
+                    service.ErrorMessage = null;
+                    break;
+                    
+                case ServiceControllerStatus.Stopped:
+                    service.CurrentStatus = ServiceHealthLevel.Critical;
+                    service.ErrorMessage = $"Service '{displayName}' is stopped";
+                    service.IsReachable = false;
+                    service.StatusDetails = null;
+                    break;
+                    
+                case ServiceControllerStatus.Paused:
+                    service.CurrentStatus = ServiceHealthLevel.Warning;
+                    service.ErrorMessage = $"Service '{displayName}' is paused";
+                    service.IsReachable = false;
+                    service.StatusDetails = null;
+                    break;
+                    
+                default:
+                    service.CurrentStatus = ServiceHealthLevel.Warning;
+                    service.ErrorMessage = $"Service '{displayName}' status: {status}";
+                    service.IsReachable = false;
+                    service.StatusDetails = null;
+                    break;
+            }
+            
+            service.ResponseTimeMs = stopwatch.ElapsedMilliseconds;
+        }
+        catch (InvalidOperationException ex)
+        {
+            stopwatch.Stop();
+            service.CurrentStatus = ServiceHealthLevel.Critical;
+            service.ErrorMessage = $"Service '{service.ConnectionString}' not found: {ex.Message}";
+            service.IsReachable = false;
+            service.ResponseTimeMs = stopwatch.ElapsedMilliseconds;
+            service.StatusDetails = null;
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+            service.CurrentStatus = ServiceHealthLevel.Critical;
+            service.ErrorMessage = ex.Message;
+            service.IsReachable = false;
+            service.ResponseTimeMs = stopwatch.ElapsedMilliseconds;
+            service.StatusDetails = null;
+        }
     }
 
     #endregion

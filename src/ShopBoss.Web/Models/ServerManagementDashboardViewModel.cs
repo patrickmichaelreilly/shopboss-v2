@@ -9,5 +9,4 @@ public class ServerManagementDashboardViewModel
     public List<BackupStatus> RecentBackups { get; set; } = new();
     public List<AuditLog> RecentActivityLogs { get; set; } = new();
     public List<MonitoredService> MonitoredServices { get; set; } = new();
-    public List<ServiceHealthStatus> LatestServiceStatuses { get; set; } = new();
 }

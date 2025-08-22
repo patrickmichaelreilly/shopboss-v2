@@ -42,15 +42,11 @@ public class ServerManagementController : Controller
             var backupConfig = await _backupService.GetBackupConfigurationAsync();
             var recentBackups = await _backupService.GetRecentBackupsAsync(5); // Just top 5 for dashboard
             
-            // Auto-initialize services if none exist
-            await _systemMonitoringService.InitializeDefaultServicesAsync();
-            
-            // Run health checks for all services on page load
+            // Run health checks for all enabled services on page load
             await _systemMonitoringService.CheckAllServicesHealthAsync();
             
-            // Get service monitoring data
-            var monitoredServices = await _systemMonitoringService.GetAllMonitoredServicesAsync();
-            var latestServiceStatuses = await _systemMonitoringService.GetLatestHealthStatusesAsync();
+            // Get monitored services with current status
+            var monitoredServices = _systemMonitoringService.GetAllServices();
             
             // Get recent health-related audit logs
             var recentHealthLogs = await _context.AuditLogs
@@ -65,7 +61,6 @@ public class ServerManagementController : Controller
                 RecentBackups = recentBackups,
                 RecentActivityLogs = recentHealthLogs,
                 MonitoredServices = monitoredServices,
-                LatestServiceStatuses = latestServiceStatuses,
                 PageTitle = "Server Management Dashboard"
             };
 
@@ -238,41 +233,25 @@ public class ServerManagementController : Controller
     {
         try
         {
-            var healthStatus = await _systemMonitoringService.CheckServiceHealthAsync(serviceId);
+            var service = await _systemMonitoringService.CheckServiceHealthAsync(serviceId);
             
             // Notify via SignalR
             await _hubContext.Clients.Group("server-monitoring")
                 .SendAsync("ServiceHealthUpdated", new
                 {
                     ServiceId = serviceId,
-                    Status = healthStatus.Status.ToString(),
-                    LastChecked = healthStatus.LastChecked,
-                    ResponseTime = healthStatus.ResponseTimeMs,
-                    IsReachable = healthStatus.IsReachable,
-                    ErrorMessage = healthStatus.ErrorMessage
+                    Status = service.CurrentStatus?.ToString(),
+                    LastChecked = service.LastChecked,
+                    ResponseTime = service.ResponseTimeMs,
+                    IsReachable = service.IsReachable,
+                    ErrorMessage = service.ErrorMessage
                 });
 
-            return Json(new { success = true, healthStatus });
+            return Json(new { success = true, service });
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error checking service health for service {ServiceId}", serviceId);
-            return Json(new { success = false, message = ex.Message });
-        }
-    }
-
-
-    [HttpGet]
-    public async Task<IActionResult> GetServiceHealthData(string serviceId)
-    {
-        try
-        {
-            var healthHistory = await _systemMonitoringService.GetServiceHealthHistoryAsync(serviceId, 10);
-            return Json(new { success = true, healthHistory });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting service health data for {ServiceId}", serviceId);
             return Json(new { success = false, message = ex.Message });
         }
     }

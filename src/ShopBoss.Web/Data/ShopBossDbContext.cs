@@ -31,8 +31,6 @@ public class ShopBossDbContext : DbContext
     public DbSet<CustomWorkOrder> CustomWorkOrders { get; set; }
     public DbSet<ProjectEvent> ProjectEvents { get; set; }
     public DbSet<PartLabel> PartLabels { get; set; }
-    public DbSet<MonitoredService> MonitoredServices { get; set; }
-    public DbSet<ServiceHealthStatus> ServiceHealthStatuses { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -440,37 +438,5 @@ public class ShopBossDbContext : DbContext
             entity.HasIndex(e => new { e.WorkOrderId, e.PartId }).IsUnique();
         });
 
-        modelBuilder.Entity<MonitoredService>(entity =>
-        {
-            entity.HasKey(e => e.Id);
-            entity.Property(e => e.ServiceName).IsRequired().HasMaxLength(100);
-            entity.Property(e => e.ServiceType).IsRequired();
-            entity.Property(e => e.CheckIntervalMinutes).IsRequired();
-            entity.Property(e => e.IsEnabled).IsRequired();
-            entity.Property(e => e.CreatedDate).IsRequired();
-            entity.Property(e => e.LastModifiedDate).IsRequired();
-            
-            entity.HasIndex(e => e.ServiceName);
-            entity.HasIndex(e => e.ServiceType);
-            entity.HasIndex(e => e.IsEnabled);
-        });
-
-        modelBuilder.Entity<ServiceHealthStatus>(entity =>
-        {
-            entity.HasKey(e => e.Id);
-            entity.Property(e => e.ServiceId).IsRequired();
-            entity.Property(e => e.Status).IsRequired();
-            entity.Property(e => e.LastChecked).IsRequired();
-            entity.Property(e => e.IsReachable).IsRequired();
-            
-            entity.HasOne(e => e.Service)
-                .WithMany(s => s.HealthStatuses)
-                .HasForeignKey(e => e.ServiceId)
-                .OnDelete(DeleteBehavior.Cascade);
-                
-            entity.HasIndex(e => e.ServiceId);
-            entity.HasIndex(e => e.LastChecked);
-            entity.HasIndex(e => e.Status);
-        });
     }
 }
