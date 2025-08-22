@@ -26,146 +26,35 @@
         </div>
     </div>
 
-    <!-- Quick Action Buttons -->
+    <!-- Tab Navigation -->
     <div class="row mb-4">
         <div class="col-12">
-            <div class="btn-group" role="group">
-                <a href="@Url.Action("HealthDashboard")" class="btn btn-outline-primary">
-                    <i class="fas fa-heartbeat"></i> Health Dashboard
-                </a>
-                <a href="@Url.Action("BackupManagement")" class="btn btn-outline-secondary">
-                    <i class="fas fa-database"></i> Backup Management
-                </a>
-                <button type="button" class="btn btn-outline-success" onclick="runHealthCheck()">
-                    <i class="fas fa-sync"></i> Run Health Check
-                </button>
-                <button type="button" class="btn btn-outline-warning" onclick="createManualBackup()">
-                    <i class="fas fa-download"></i> Create Backup
-                </button>
-                <button type="button" class="btn btn-outline-info" onclick="checkAllServices()">
-                    <i class="fas fa-sync"></i> Check All Services
-                </button>
-            </div>
+            <ul class="nav nav-tabs" id="serverManagementTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="dashboard-tab" data-bs-toggle="tab" data-bs-target="#dashboard" type="button" role="tab">
+                        <i class="fas fa-tachometer-alt me-2"></i>Dashboard
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="backup-tab" data-bs-toggle="tab" data-bs-target="#backup" type="button" role="tab">
+                        <i class="fas fa-database me-2"></i>Backup Management
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="services-tab" data-bs-toggle="tab" data-bs-target="#services" type="button" role="tab">
+                        <i class="fas fa-server me-2"></i>Services Config
+                    </button>
+                </li>
+            </ul>
         </div>
     </div>
 
-    <!-- Overview Cards -->
-    <div class="row mb-4">
-        <!-- System Health Card -->
-        <div class="col-md-6 col-lg-3 mb-3">
-            <div class="card h-100">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <h6 class="card-title mb-0">System Health</h6>
-                        <i class="fas fa-heartbeat text-muted"></i>
-                    </div>
-                    @if (Model.CurrentMetrics != null)
-                    {
-                        <div class="d-flex align-items-center">
-                            <span class="badge bg-@GetHealthStatusColor(Model.CurrentMetrics.OverallStatus) me-2">
-                                @Model.CurrentMetrics.OverallStatus
-                            </span>
-                            <small class="text-muted">
-                                @Model.CurrentMetrics.LastHealthCheck.ToString("HH:mm")
-                            </small>
-                        </div>
-                        <div class="mt-2 small text-muted">
-                            DB: @Model.CurrentMetrics.DatabaseConnectionTimeMs ms<br>
-                            Disk: @Model.CurrentMetrics.AvailableDiskSpaceGB.ToString("F1") GB free
-                        </div>
-                    }
-                    else
-                    {
-                        <span class="badge bg-secondary">Unknown</span>
-                    }
-                </div>
-            </div>
-        </div>
-
-        <!-- Backup Status Card -->
-        <div class="col-md-6 col-lg-3 mb-3">
-            <div class="card h-100">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <h6 class="card-title mb-0">Last Backup</h6>
-                        <i class="fas fa-database text-muted"></i>
-                    </div>
-                    @if (Model.RecentBackups.Any())
-                    {
-                        var lastBackup = Model.RecentBackups.First();
-                        <div class="d-flex align-items-center">
-                            <span class="badge bg-@GetBackupStatusColor(lastBackup.IsSuccessful) me-2">
-                                @(lastBackup.IsSuccessful ? "Success" : "Failed")
-                            </span>
-                            <small class="text-muted">
-                                @lastBackup.CreatedDate.ToString("MM/dd HH:mm")
-                            </small>
-                        </div>
-                        <div class="mt-2 small text-muted">
-                            Type: @lastBackup.BackupType<br>
-                            Size: @(lastBackup.BackupSize / 1024 / 1024).ToString("F1") MB
-                        </div>
-                    }
-                    else
-                    {
-                        <span class="badge bg-secondary">No backups</span>
-                    }
-                </div>
-            </div>
-        </div>
-
-        <!-- Active Work Orders Card -->
-        <div class="col-md-6 col-lg-3 mb-3">
-            <div class="card h-100">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <h6 class="card-title mb-0">Work Orders</h6>
-                        <i class="fas fa-clipboard-list text-muted"></i>
-                    </div>
-                    @if (Model.CurrentMetrics != null)
-                    {
-                        <h4 class="text-primary mb-1">@Model.CurrentMetrics.ActiveWorkOrderCount</h4>
-                        <small class="text-muted">
-                            @Model.CurrentMetrics.TotalPartsCount total parts
-                        </small>
-                    }
-                    else
-                    {
-                        <h4 class="text-muted mb-1">-</h4>
-                        <small class="text-muted">Loading...</small>
-                    }
-                </div>
-            </div>
-        </div>
-
-        <!-- Backup Configuration Card -->
-        <div class="col-md-6 col-lg-3 mb-3">
-            <div class="card h-100">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <h6 class="card-title mb-0">Auto Backup</h6>
-                        <i class="fas fa-cog text-muted"></i>
-                    </div>
-                    @if (Model.BackupConfiguration != null)
-                    {
-                        <div class="d-flex align-items-center">
-                            <span class="badge bg-@(Model.BackupConfiguration.EnableAutomaticBackups ? "success" : "secondary") me-2">
-                                @(Model.BackupConfiguration.EnableAutomaticBackups ? "Enabled" : "Disabled")
-                            </span>
-                        </div>
-                        <div class="mt-2 small text-muted">
-                            Interval: @Model.BackupConfiguration.BackupIntervalMinutes min<br>
-                            Retention: @Model.BackupConfiguration.MaxBackupRetention backups
-                        </div>
-                    }
-                    else
-                    {
-                        <span class="badge bg-secondary">Not configured</span>
-                    }
-                </div>
-            </div>
-        </div>
-    </div>
+    <!-- Tab Content -->
+    <div class="tab-content" id="serverManagementTabContent">
+        
+        <!-- Dashboard Tab -->
+        <div class="tab-pane fade show active" id="dashboard" role="tabpanel" aria-labelledby="dashboard-tab">
+            
 
     <!-- Monitored Services Status -->
     @if (Model.MonitoredServices.Any())
@@ -173,23 +62,18 @@
         <div class="row mb-4">
             <div class="col-12">
                 <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h6 class="mb-0"><i class="fas fa-server me-2"></i>Monitored Services</h6>
-                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="checkAllServices()">
-                            <i class="fas fa-sync"></i> Check All
-                        </button>
+                    <div class="card-header">
+                        <h6 class="mb-0"><i class="fas fa-server me-2"></i>System Monitoring</h6>
                     </div>
                     <div class="card-body p-0">
                         <div class="table-responsive">
                             <table class="table table-hover mb-0">
                                 <thead class="table-light">
                                     <tr>
-                                        <th>Service</th>
-                                        <th>Type</th>
+                                        <th>Component</th>
                                         <th>Status</th>
+                                        <th>Details</th>
                                         <th>Last Check</th>
-                                        <th>Response Time</th>
-                                        <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -207,9 +91,6 @@
                                                 </div>
                                             </td>
                                             <td>
-                                                <span class="badge bg-secondary">@service.ServiceType</span>
-                                            </td>
-                                            <td>
                                                 @if (latestStatus != null)
                                                 {
                                                     <span class="badge bg-@GetServiceStatusColor(latestStatus.Status)" id="status-@service.Id">
@@ -225,6 +106,16 @@
                                                     <span class="badge bg-secondary" id="status-@service.Id">Unknown</span>
                                                 }
                                             </td>
+                                            <td>
+                                                @if (latestStatus?.ResponseTimeMs != null)
+                                                {
+                                                    <small class="text-muted">@latestStatus.ResponseTimeMs ms</small>
+                                                }
+                                                else
+                                                {
+                                                    <small class="text-muted">-</small>
+                                                }
+                                            </td>
                                             <td id="lastcheck-@service.Id">
                                                 @if (latestStatus != null)
                                                 {
@@ -235,26 +126,11 @@
                                                     <small class="text-muted">Never</small>
                                                 }
                                             </td>
-                                            <td id="responsetime-@service.Id">
-                                                @if (latestStatus?.ResponseTimeMs != null)
-                                                {
-                                                    <small>@latestStatus.ResponseTimeMs ms</small>
-                                                }
-                                                else
-                                                {
-                                                    <small class="text-muted">-</small>
-                                                }
-                                            </td>
-                                            <td>
-                                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="checkServiceHealth('@service.Id')" title="Check Health">
-                                                    <i class="fas fa-sync"></i>
-                                                </button>
-                                            </td>
                                         </tr>
                                         @if (latestStatus != null && !string.IsNullOrEmpty(latestStatus.ErrorMessage))
                                         {
                                             <tr>
-                                                <td colspan="6" class="border-top-0 pt-0">
+                                                <td colspan="4" class="border-top-0 pt-0">
                                                     <small class="text-danger">
                                                         <i class="fas fa-exclamation-triangle me-1"></i>
                                                         @latestStatus.ErrorMessage
@@ -263,6 +139,57 @@
                                             </tr>
                                         }
                                     }
+                                    
+                                    <!-- Auto Backup Row -->
+                                    <tr style="cursor: pointer;" onclick="switchToBackupTab()">
+                                        <td>
+                                            <div>
+                                                <strong>Auto Backup</strong>
+                                                <br><small class="text-muted">Automated database backup system</small>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            @if (Model.BackupConfiguration != null)
+                                            {
+                                                <span class="badge bg-@(Model.BackupConfiguration.EnableAutomaticBackups ? "success" : "secondary")">
+                                                    @(Model.BackupConfiguration.EnableAutomaticBackups ? "Enabled" : "Disabled")
+                                                </span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-secondary">Not configured</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (Model.BackupConfiguration != null)
+                                            {
+                                                <div class="small text-muted">
+                                                    Interval: @Model.BackupConfiguration.BackupIntervalMinutes min<br>
+                                                    Retention: @Model.BackupConfiguration.MaxBackupRetention backups
+                                                    @if (Model.RecentBackups.Any())
+                                                    {
+                                                        var lastBackup = Model.RecentBackups.First();
+                                                        @:<br>Last: @(lastBackup.IsSuccessful ? "Success" : "Failed") (@((lastBackup.BackupSize / 1024.0 / 1024.0).ToString("F1")) MB)
+                                                    }
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <small class="text-muted">-</small>
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (Model.RecentBackups.Any())
+                                            {
+                                                var lastBackup = Model.RecentBackups.First();
+                                                <small>@lastBackup.CreatedDate.ToString("MM/dd HH:mm")</small>
+                                            }
+                                            else
+                                            {
+                                                <small class="text-muted">Never</small>
+                                            }
+                                        </td>
+                                    </tr>
                                 </tbody>
                             </table>
                         </div>
@@ -278,119 +205,99 @@
                 <div class="card">
                     <div class="card-body text-center py-4">
                         <i class="fas fa-server fa-3x text-muted mb-3"></i>
-                        <h5>No Services Monitored</h5>
-                        <p class="text-muted">Initialize default services to start monitoring</p>
-                        <button type="button" class="btn btn-primary" onclick="initializeDefaultServices()">
-                            <i class="fas fa-plus"></i> Initialize Default Services
-                        </button>
+                        <h5>Initializing Services</h5>
+                        <p class="text-muted">Services are being initialized automatically...</p>
                     </div>
                 </div>
             </div>
         </div>
     }
 
-    <!-- Recent Activity and Recent Backups -->
-    <div class="row">
-        <!-- Recent Activity -->
-        <div class="col-md-6 mb-4">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h6 class="mb-0">Recent Activity</h6>
-                    <small class="text-muted">Last 10 events</small>
-                </div>
-                <div class="card-body p-0">
-                    @if (Model.RecentActivityLogs.Any())
-                    {
-                        <div class="list-group list-group-flush">
-                            @foreach (var log in Model.RecentActivityLogs)
-                            {
-                                <div class="list-group-item list-group-item-action">
-                                    <div class="d-flex w-100 justify-content-between">
-                                        <h6 class="mb-1">@log.Action</h6>
-                                        <small class="text-muted">@log.Timestamp.ToString("HH:mm")</small>
-                                    </div>
-                                    <p class="mb-1 small">@log.Details</p>
-                                    <small class="text-muted">@log.Station</small>
-                                </div>
-                            }
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="p-3 text-center text-muted">
-                            <i class="fas fa-inbox fa-2x mb-2"></i><br>
-                            No recent activity
-                        </div>
-                    }
+        
+        </div> <!-- End Dashboard Tab -->
+        
+        <!-- Backup Management Tab -->
+        <div class="tab-pane fade" id="backup" role="tabpanel" aria-labelledby="backup-tab">
+            <div class="d-flex justify-content-end mb-3">
+                <button type="button" class="btn btn-primary" onclick="createManualBackup()">
+                    <i class="fas fa-database me-2"></i>Create Manual Backup
+                </button>
+            </div>
+            
+            <!-- Backup content will be loaded here -->
+            <div id="backup-content">
+                <div class="text-center py-4">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2 text-muted">Loading backup management data...</p>
                 </div>
             </div>
         </div>
-
-        <!-- Recent Backups -->
-        <div class="col-md-6 mb-4">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h6 class="mb-0">Recent Backups</h6>
-                    <a href="@Url.Action("BackupManagement")" class="btn btn-sm btn-outline-primary">View All</a>
-                </div>
-                <div class="card-body p-0">
-                    @if (Model.RecentBackups.Any())
-                    {
-                        <div class="list-group list-group-flush">
-                            @foreach (var backup in Model.RecentBackups)
-                            {
-                                <div class="list-group-item">
-                                    <div class="d-flex w-100 justify-content-between">
-                                        <div>
-                                            <span class="badge bg-@GetBackupStatusColor(backup.IsSuccessful) me-2">
-                                                @(backup.IsSuccessful ? "Success" : "Failed")
-                                            </span>
-                                            @backup.BackupType
-                                        </div>
-                                        <small class="text-muted">@backup.CreatedDate.ToString("MM/dd HH:mm")</small>
-                                    </div>
-                                    <small class="text-muted d-block mt-1">
-                                        Size: @(backup.BackupSize / 1024 / 1024).ToString("F1") MB
-                                        @if (!string.IsNullOrEmpty(backup.ErrorMessage))
+        
+        <!-- Services Configuration Tab -->
+        <div class="tab-pane fade" id="services" role="tabpanel" aria-labelledby="services-tab">
+            
+            <!-- Services content -->
+            <div id="services-content">
+                @if (Model.MonitoredServices.Any())
+                {
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="fas fa-server me-2"></i>Service Configuration</h5>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted">Service configuration interface coming in Phase 2...</p>
+                            <div class="table-responsive">
+                                <table class="table">
+                                    <thead>
+                                        <tr>
+                                            <th>Service Name</th>
+                                            <th>Check Interval</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var service in Model.MonitoredServices)
                                         {
-                                            <br><span class="text-danger">@backup.ErrorMessage</span>
+                                            <tr>
+                                                <td>@service.ServiceName</td>
+                                                <td>@service.CheckIntervalMinutes min</td>
+                                                <td>
+                                                    @if (service.IsEnabled)
+                                                    {
+                                                        <span class="badge bg-success">Enabled</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="badge bg-secondary">Disabled</span>
+                                                    }
+                                                </td>
+                                            </tr>
                                         }
-                                    </small>
-                                </div>
-                            }
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
-                    }
-                    else
-                    {
-                        <div class="p-3 text-center text-muted">
-                            <i class="fas fa-database fa-2x mb-2"></i><br>
-                            No backups found
+                    </div>
+                }
+                else
+                {
+                    <div class="card">
+                        <div class="card-body text-center py-4">
+                            <i class="fas fa-server fa-3x text-muted mb-3"></i>
+                            <h5>No Services Configured</h5>
+                            <p class="text-muted">Services will be automatically initialized on first load</p>
                         </div>
-                    }
-                </div>
+                    </div>
+                }
             </div>
         </div>
-    </div>
+        
+    </div> <!-- End Tab Content -->
 </div>
 
 @functions {
-    private string GetHealthStatusColor(HealthStatusLevel status)
-    {
-        return status switch
-        {
-            HealthStatusLevel.Healthy => "success",
-            HealthStatusLevel.Warning => "warning", 
-            HealthStatusLevel.Critical => "danger",
-            HealthStatusLevel.Error => "danger",
-            _ => "secondary"
-        };
-    }
-    
-    private string GetBackupStatusColor(bool isSuccessful)
-    {
-        return isSuccessful ? "success" : "danger";
-    }
-    
     private string GetServiceStatusColor(ServiceHealthLevel status)
     {
         return status switch
@@ -406,27 +313,22 @@
 }
 
 <script>
-async function runHealthCheck() {
-    try {
-        const response = await fetch('@Url.Action("RunHealthCheck")', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
-            }
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            showAlert('success', result.message);
-            // Refresh the page after a short delay to show updated metrics
-            setTimeout(() => location.reload(), 1000);
-        } else {
-            showAlert('danger', result.message);
-        }
-    } catch (error) {
-        showAlert('danger', 'An error occurred while running the health check.');
+function switchToBackupTab() {
+    // Switch to the Backup Management tab
+    const backupTab = document.getElementById('backup-tab');
+    const backupTabContent = document.getElementById('backup');
+    
+    // Remove active class from current tab
+    document.querySelector('#serverManagementTabs .nav-link.active').classList.remove('active');
+    document.querySelector('.tab-pane.active').classList.remove('active', 'show');
+    
+    // Activate backup tab
+    backupTab.classList.add('active');
+    backupTabContent.classList.add('active', 'show');
+    
+    // Load backup content if not already loaded
+    if (!document.getElementById('backup-content').hasAttribute('data-loaded')) {
+        loadBackupContent();
     }
 }
 
@@ -451,110 +353,7 @@ async function createManualBackup() {
     }
 }
 
-async function checkAllServices() {
-    try {
-        const response = await fetch('@Url.Action("CheckAllServicesHealth")', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
-            }
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            showAlert('success', result.message);
-            // Refresh the page after a short delay to show updated status
-            setTimeout(() => location.reload(), 2000);
-        } else {
-            showAlert('danger', result.message);
-        }
-    } catch (error) {
-        showAlert('danger', 'An error occurred while checking services.');
-    }
-}
 
-async function checkServiceHealth(serviceId) {
-    try {
-        const response = await fetch('@Url.Action("CheckServiceHealth")', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
-            },
-            body: JSON.stringify({ serviceId: serviceId })
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            showAlert('success', 'Service health check completed.');
-            // Update the UI elements for this service
-            updateServiceStatusUI(serviceId, result.healthStatus);
-        } else {
-            showAlert('danger', result.message);
-        }
-    } catch (error) {
-        showAlert('danger', 'An error occurred while checking service health.');
-    }
-}
-
-async function initializeDefaultServices() {
-    try {
-        const response = await fetch('@Url.Action("InitializeDefaultServices")', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
-            }
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            showAlert('success', result.message);
-            setTimeout(() => location.reload(), 1000);
-        } else {
-            showAlert('danger', result.message);
-        }
-    } catch (error) {
-        showAlert('danger', 'An error occurred while initializing services.');
-    }
-}
-
-function updateServiceStatusUI(serviceId, healthStatus) {
-    // Update status badge
-    const statusElement = document.getElementById(`status-${serviceId}`);
-    if (statusElement) {
-        statusElement.textContent = healthStatus.status;
-        statusElement.className = `badge bg-${getServiceStatusColor(healthStatus.status)}`;
-    }
-    
-    // Update last check time
-    const lastCheckElement = document.getElementById(`lastcheck-${serviceId}`);
-    if (lastCheckElement) {
-        const lastCheck = new Date(healthStatus.lastChecked);
-        lastCheckElement.innerHTML = `<small>${lastCheck.toLocaleDateString()} ${lastCheck.toLocaleTimeString()}</small>`;
-    }
-    
-    // Update response time
-    const responseTimeElement = document.getElementById(`responsetime-${serviceId}`);
-    if (responseTimeElement && healthStatus.responseTimeMs) {
-        responseTimeElement.innerHTML = `<small>${healthStatus.responseTimeMs} ms</small>`;
-    }
-}
-
-function getServiceStatusColor(status) {
-    switch (status) {
-        case 'Healthy': return 'success';
-        case 'Warning': return 'warning';
-        case 'Critical': return 'danger';
-        case 'Offline': return 'danger';
-        case 'Unknown': return 'secondary';
-        default: return 'secondary';
-    }
-}
 
 function showAlert(type, message) {
     const alertHtml = `
@@ -564,5 +363,58 @@ function showAlert(type, message) {
         </div>
     `;
     $('.container-fluid .row:first .col-12').after(`<div class="col-12">${alertHtml}</div>`);
+}
+
+// Tab management
+document.addEventListener('DOMContentLoaded', function() {
+    const tabTriggerList = [].slice.call(document.querySelectorAll('#serverManagementTabs button[data-bs-toggle="tab"]'));
+    
+    tabTriggerList.forEach(function (tabTrigger) {
+        tabTrigger.addEventListener('shown.bs.tab', function (event) {
+            const targetTab = event.target.getAttribute('data-bs-target');
+            
+            // Load content for backup tab on demand
+            if (targetTab === '#backup' && !document.getElementById('backup-content').hasAttribute('data-loaded')) {
+                loadBackupContent();
+            }
+        });
+    });
+});
+
+async function loadBackupContent() {
+    const backupContent = document.getElementById('backup-content');
+    
+    try {
+        const response = await fetch('@Url.Action("BackupManagement")', {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+        
+        if (response.ok) {
+            const html = await response.text();
+            // Extract just the content we need (remove layout wrapper)
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            
+            // Get everything except the header
+            const headerDiv = doc.querySelector('.d-flex.justify-content-between');
+            if (headerDiv) headerDiv.remove();
+            
+            // Get the remaining content
+            const cards = doc.querySelectorAll('.card');
+            let contentHTML = '';
+            cards.forEach(card => {
+                contentHTML += card.outerHTML;
+            });
+            
+            backupContent.innerHTML = contentHTML;
+            backupContent.setAttribute('data-loaded', 'true');
+        } else {
+            backupContent.innerHTML = '<div class="alert alert-danger">Failed to load backup management data.</div>';
+        }
+    } catch (error) {
+        backupContent.innerHTML = '<div class="alert alert-danger">Error loading backup management data.</div>';
+    }
 }
 </script>

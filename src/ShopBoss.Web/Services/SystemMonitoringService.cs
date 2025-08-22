@@ -6,15 +6,15 @@ using System.Diagnostics;
 
 namespace ShopBoss.Web.Services;
 
-public class ServiceMonitoringService
+public class SystemMonitoringService
 {
     private readonly ShopBossDbContext _context;
-    private readonly ILogger<ServiceMonitoringService> _logger;
+    private readonly ILogger<SystemMonitoringService> _logger;
     private readonly IConfiguration _configuration;
 
-    public ServiceMonitoringService(
+    public SystemMonitoringService(
         ShopBossDbContext context,
-        ILogger<ServiceMonitoringService> logger,
+        ILogger<SystemMonitoringService> logger,
         IConfiguration configuration)
     {
         _context = context;
@@ -108,8 +108,6 @@ public class ServiceMonitoringService
             LastChecked = DateTime.Now
         };
 
-        var stopwatch = Stopwatch.StartNew();
-
         try
         {
             switch (service.ServiceType)
@@ -143,11 +141,6 @@ public class ServiceMonitoringService
             healthStatus.Status = ServiceHealthLevel.Critical;
             healthStatus.ErrorMessage = ex.Message;
             healthStatus.IsReachable = false;
-        }
-        finally
-        {
-            stopwatch.Stop();
-            healthStatus.ResponseTimeMs = stopwatch.ElapsedMilliseconds;
         }
 
         // Save health status to database
@@ -279,6 +272,8 @@ public class ServiceMonitoringService
             return;
         }
 
+        var dbStopwatch = Stopwatch.StartNew();
+        
         try
         {
             using var connection = new SqliteConnection(service.ConnectionString);
@@ -288,16 +283,21 @@ public class ServiceMonitoringService
             using var command = connection.CreateCommand();
             command.CommandText = "SELECT 1";
             await command.ExecuteScalarAsync();
+            
+            dbStopwatch.Stop();
 
             healthStatus.Status = ServiceHealthLevel.Healthy;
             healthStatus.IsReachable = true;
             healthStatus.Details = "Database connection successful";
+            healthStatus.ResponseTimeMs = dbStopwatch.ElapsedMilliseconds;
         }
         catch (Exception ex)
         {
+            dbStopwatch.Stop();
             healthStatus.Status = ServiceHealthLevel.Critical;
             healthStatus.ErrorMessage = ex.Message;
             healthStatus.IsReachable = false;
+            healthStatus.ResponseTimeMs = dbStopwatch.ElapsedMilliseconds;
         }
     }
 

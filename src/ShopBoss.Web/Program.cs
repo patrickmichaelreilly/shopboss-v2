@@ -78,7 +78,6 @@ builder.Services.AddScoped<ShippingService>();
 builder.Services.AddScoped<HardwareGroupingService>();
 builder.Services.AddScoped<WorkOrderService>();
 builder.Services.AddScoped<BackupService>();
-builder.Services.AddScoped<SystemHealthMonitor>();
 builder.Services.AddScoped<WorkOrderImportService>();
 builder.Services.AddScoped<WorkOrderDeletionService>();
 builder.Services.AddScoped<ProjectService>();
@@ -87,7 +86,7 @@ builder.Services.AddScoped<PurchaseOrderService>();
 builder.Services.AddScoped<CustomWorkOrderService>();
 builder.Services.AddScoped<SmartSheetImportService>();
 builder.Services.AddScoped<LabelParserService>();
-builder.Services.AddScoped<ServiceMonitoringService>();
+builder.Services.AddScoped<SystemMonitoringService>();
 
 // Add background services
 builder.Services.AddHostedService<BackupBackgroundService>();
