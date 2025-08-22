@@ -3,7 +3,6 @@ using Microsoft.Data.SqlClient;
 using ShopBoss.Web.Models;
 using System.Collections.Concurrent;
 using System.Diagnostics;
-using System.ServiceProcess;
 
 namespace ShopBoss.Web.Services;
 
@@ -65,8 +64,8 @@ public class SystemMonitoringService
                     await CheckHttpApiHealthAsync(service);
                     break;
                     
-                case "WindowsService":
-                    await CheckWindowsServiceHealthAsync(service);
+                case "Process":
+                    await CheckProcessHealthAsync(service);
                     break;
                     
                 default:
@@ -128,7 +127,7 @@ public class SystemMonitoringService
     {
         var services = new List<MonitoredService>
         {
-            // ShopBoss Application (SQLite database monitoring)
+            // ShopBoss Application (SQLite database monitoring) - First in list
             new MonitoredService
             {
                 Id = "shopboss-app",
@@ -145,8 +144,8 @@ public class SystemMonitoringService
                 Id = "microvellum-sql",
                 Name = "Microvellum SQL Server",
                 ServiceType = "Database",
-                ConnectionString = "Server=YOUR_SQL_SERVER;Database=MicrovellumData;Trusted_Connection=true;TrustServerCertificate=true;",
-                IsEnabled = false, // Disabled until configured
+                ConnectionString = "Server=192.168.0.24\\EUROTEXSQLSERVER;Database=MV_Database;User Id=sa;Password=PC12345!;TrustServerCertificate=true;",
+                IsEnabled = true, // Now enabled with real connection
                 Description = "External SQL Server for Microvellum data import"
             },
             
@@ -156,31 +155,31 @@ public class SystemMonitoringService
                 Id = "speeddial-api",
                 Name = "SpeedDial Service",
                 ServiceType = "HttpApi",
-                ConnectionString = "http://localhost:8080/api/health",
-                IsEnabled = false, // Disabled until configured
-                Description = "SpeedDial web service API endpoint"
+                ConnectionString = "http://192.168.0.24:5555/",
+                IsEnabled = true, // Now enabled with real endpoint
+                Description = "SpeedDial Windows service web interface"
             },
             
-            // Time & Attendance Service
+            // Time & Attendance Process
             new MonitoredService
             {
-                Id = "timeattendance-api",
-                Name = "Time & Attendance Service",
-                ServiceType = "HttpApi",
-                ConnectionString = "http://localhost:8081/api/status",
-                IsEnabled = false, // Disabled until configured
-                Description = "Time & Attendance web service API endpoint"
+                Id = "timeattendance-process",
+                Name = "Time & Attendance (PROXTIMEHW)",
+                ServiceType = "Process",
+                ConnectionString = "proxtimehw.exe",
+                IsEnabled = true, // Now enabled for process monitoring
+                Description = "PROXTIMEHW background process for time tracking"
             },
             
-            // Polling Service
+            // Polling Process
             new MonitoredService
             {
-                Id = "polling-service",
-                Name = "Polling Service",
-                ServiceType = "WindowsService",
-                ConnectionString = "PollingService", // Windows service name
-                IsEnabled = false, // Disabled until configured
-                Description = "Windows service for data polling operations"
+                Id = "polling-process",
+                Name = "Polling Service (ALTOAUTO)",
+                ServiceType = "Process",
+                ConnectionString = "altoauto.exe",
+                IsEnabled = true, // Now enabled for process monitoring
+                Description = "ALTOAUTO background process for data polling"
             }
         };
 
@@ -317,14 +316,14 @@ public class SystemMonitoringService
         }
     }
 
-    private async Task CheckWindowsServiceHealthAsync(MonitoredService service)
+    private async Task CheckProcessHealthAsync(MonitoredService service)
     {
         await Task.CompletedTask; // Make method async compliant
         
         if (string.IsNullOrEmpty(service.ConnectionString))
         {
             service.CurrentStatus = ServiceHealthLevel.Critical;
-            service.ErrorMessage = "No service name configured";
+            service.ErrorMessage = "No process name configured";
             service.IsReachable = false;
             return;
         }
@@ -333,65 +332,45 @@ public class SystemMonitoringService
         
         try
         {
-            // Check if running on Windows (this check will only work in Windows deployment)
+            // Check if running on Windows (process monitoring only works on Windows)
             if (!OperatingSystem.IsWindows())
             {
                 service.CurrentStatus = ServiceHealthLevel.Warning;
-                service.ErrorMessage = "Windows service checks only available on Windows";
+                service.ErrorMessage = "Process monitoring only available on Windows";
                 service.IsReachable = false;
-                service.StatusDetails = "Development environment - Windows service monitoring unavailable";
+                service.StatusDetails = "Development environment - process monitoring unavailable";
                 return;
             }
 
-            using var serviceController = new ServiceController(service.ConnectionString);
-            
-            // This will throw if service doesn't exist
-            var status = serviceController.Status;
-            var displayName = serviceController.DisplayName;
+            // Use WMI to check if process is running
+            var processName = service.ConnectionString.Replace(".exe", ""); // Remove .exe if present
+            var processes = System.Diagnostics.Process.GetProcessesByName(processName);
             
             stopwatch.Stop();
 
-            switch (status)
+            if (processes.Length > 0)
             {
-                case ServiceControllerStatus.Running:
-                    service.CurrentStatus = ServiceHealthLevel.Healthy;
-                    service.IsReachable = true;
-                    service.StatusDetails = $"Service '{displayName}' is running";
-                    service.ErrorMessage = null;
-                    break;
-                    
-                case ServiceControllerStatus.Stopped:
-                    service.CurrentStatus = ServiceHealthLevel.Critical;
-                    service.ErrorMessage = $"Service '{displayName}' is stopped";
-                    service.IsReachable = false;
-                    service.StatusDetails = null;
-                    break;
-                    
-                case ServiceControllerStatus.Paused:
-                    service.CurrentStatus = ServiceHealthLevel.Warning;
-                    service.ErrorMessage = $"Service '{displayName}' is paused";
-                    service.IsReachable = false;
-                    service.StatusDetails = null;
-                    break;
-                    
-                default:
-                    service.CurrentStatus = ServiceHealthLevel.Warning;
-                    service.ErrorMessage = $"Service '{displayName}' status: {status}";
-                    service.IsReachable = false;
-                    service.StatusDetails = null;
-                    break;
+                var process = processes[0];
+                service.CurrentStatus = ServiceHealthLevel.Healthy;
+                service.IsReachable = true;
+                service.StatusDetails = $"Process '{processName}' is running (PID: {process.Id})";
+                service.ErrorMessage = null;
+                
+                // Dispose processes to avoid memory leaks
+                foreach (var p in processes)
+                {
+                    p.Dispose();
+                }
+            }
+            else
+            {
+                service.CurrentStatus = ServiceHealthLevel.Critical;
+                service.ErrorMessage = $"Process '{processName}' is not running";
+                service.IsReachable = false;
+                service.StatusDetails = null;
             }
             
             service.ResponseTimeMs = stopwatch.ElapsedMilliseconds;
-        }
-        catch (InvalidOperationException ex)
-        {
-            stopwatch.Stop();
-            service.CurrentStatus = ServiceHealthLevel.Critical;
-            service.ErrorMessage = $"Service '{service.ConnectionString}' not found: {ex.Message}";
-            service.IsReachable = false;
-            service.ResponseTimeMs = stopwatch.ElapsedMilliseconds;
-            service.StatusDetails = null;
         }
         catch (Exception ex)
         {

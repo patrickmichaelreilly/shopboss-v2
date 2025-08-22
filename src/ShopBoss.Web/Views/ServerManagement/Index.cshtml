@@ -69,7 +69,22 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @foreach (var service in Model.MonitoredServices)
+                                    @{
+                                        // Custom ordering: Specific priority order
+                                        var serviceOrder = new Dictionary<string, int>
+                                        {
+                                            {"shopboss-app", 1},
+                                            // ShopBoss Data Backup is inserted after shopboss-app (position 2)
+                                            {"microvellum-sql", 3},
+                                            {"speeddial-api", 4},
+                                            {"polling-process", 5},
+                                            {"timeattendance-process", 6}
+                                        };
+                                        
+                                        var orderedServices = Model.MonitoredServices
+                                            .OrderBy(s => serviceOrder.ContainsKey(s.Id) ? serviceOrder[s.Id] : 999);
+                                    }
+                                    @foreach (var service in orderedServices)
                                     {
                                         var rowClass = !service.IsEnabled ? "table-secondary" : "";
                                         <tr class="@rowClass">
@@ -176,50 +191,50 @@
                                                 </div>
                                             </td>
                                         </tr>
+                                        
+                                        @* Insert ShopBoss Data Backup right after ShopBoss Application *@
+                                        @if (service.Id == "shopboss-app")
+                                        {
+                                            <!-- ShopBoss Data Backup Row -->
+                                            <tr style="cursor: pointer;" onclick="switchToBackupTab()">
+                                                <td class="text-center">
+                                                    <i class="fas fa-external-link-alt text-muted"></i>
+                                                </td>
+                                                <td>
+                                                    <div>
+                                                        <strong>ShopBoss Data Backup</strong>
+                                                        <br><small class="text-muted">Automated database backup system</small>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    @if (Model.BackupConfiguration != null)
+                                                    {
+                                                        <span class="badge bg-@(Model.BackupConfiguration.EnableAutomaticBackups ? "success" : "secondary")">
+                                                            @(Model.BackupConfiguration.EnableAutomaticBackups ? "Enabled" : "Disabled")
+                                                        </span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="badge bg-secondary">Not configured</span>
+                                                    }
+                                                </td>
+                                                <td>
+                                                    @if (Model.BackupConfiguration != null)
+                                                    {
+                                                        <div class="small text-muted">
+                                                            Interval: @Model.BackupConfiguration.BackupIntervalMinutes min<br>
+                                                            Retention: @Model.BackupConfiguration.MaxBackupRetention backups
+                                                        </div>
+                                                    }
+                                                    else
+                                                    {
+                                                        <small class="text-muted">Not configured</small>
+                                                    }
+                                                </td>
+                                            </tr>
+                                        }
                                     }
                                     
-                                    <!-- Auto Backup Row -->
-                                    <tr style="cursor: pointer;" onclick="switchToBackupTab()">
-                                        <td class="text-center">
-                                            <i class="fas fa-external-link-alt text-muted"></i>
-                                        </td>
-                                        <td>
-                                            <div>
-                                                <strong>Auto Backup</strong>
-                                                <br><small class="text-muted">Automated database backup system</small>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            @if (Model.BackupConfiguration != null)
-                                            {
-                                                <span class="badge bg-@(Model.BackupConfiguration.EnableAutomaticBackups ? "success" : "secondary")">
-                                                    @(Model.BackupConfiguration.EnableAutomaticBackups ? "Enabled" : "Disabled")
-                                                </span>
-                                            }
-                                            else
-                                            {
-                                                <span class="badge bg-secondary">Not configured</span>
-                                            }
-                                        </td>
-                                        <td>
-                                            @if (Model.BackupConfiguration != null)
-                                            {
-                                                <div class="small text-muted">
-                                                    Interval: @Model.BackupConfiguration.BackupIntervalMinutes min<br>
-                                                    Retention: @Model.BackupConfiguration.MaxBackupRetention backups
-                                                    @if (Model.RecentBackups.Any())
-                                                    {
-                                                        var lastBackup = Model.RecentBackups.First();
-                                                        @:<br>Last: @(lastBackup.IsSuccessful ? "Success" : "Failed") (@((lastBackup.BackupSize / 1024.0 / 1024.0).ToString("F1")) MB)
-                                                    }
-                                                </div>
-                                            }
-                                            else
-                                            {
-                                                <small class="text-muted">-</small>
-                                            }
-                                        </td>
-                                    </tr>
                                 </tbody>
                             </table>
                         </div>
