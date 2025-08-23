@@ -1,185 +1,186 @@
-# ShopBoss Server Management Module Implementation Plan
+# SmartSheet Embedded Integration - Vision & Implementation Plan
 
-## Overview
-Implementation plan for the Server Management Module that provides **monitoring-only** visibility into supporting infrastructure services and manages shop data backups. This module consolidates existing backup and health monitoring functionality into a clean, simplified interface focused on status visibility rather than configuration complexity.
+## VISION: ShopBoss as Unified Shop Operating System
 
-## Core Philosophy
-**Simplicity over configurability** - Services are hardcoded and auto-initialized. The interface focuses purely on monitoring status with minimal user interaction. We reduce complexity at every step and avoid feature bloat.
+Transform ShopBoss from a tracking system into a comprehensive shop operating hub by embedding SmartSheet project management directly into the application, eliminating context switching while maintaining familiar workflows.
 
-## Monitoring-Only Design Principles
-- **No service management capabilities** - status visibility only, no start/stop/restart
-- **No user configuration** - services are hardcoded in code, no configuration UI
-- **No real-time updates** - data loads on page visit only, no SignalR complexity
-- **No manual refresh buttons** - auto-load on page visit, no user interaction needed
-- **Expandable details only** - technical information hidden until specifically requested
-- **Read-only interface** - focus on information display, not control or modification
+## Product Requirements Document (PRD)
 
-## ✅ Phase 0: COMPLETE - Architecture Restructuring 
-**Objective:** Extract existing functionality from AdminController
-- ✅ Moved backup management from AdminController to ServerManagementController
-- ✅ Moved health monitoring from AdminController to ServerManagementController  
-- ✅ Cleaned up AdminController to focus on core admin functions
-- ✅ Maintained existing functionality during transition
+### Core Objectives
+1. **Embed SmartSheet grids** directly into project detail cards
+2. **Enable bi-directional sync** between ShopBoss projects and SmartSheet workspace
+3. **Maintain existing SmartSheet workflows** while adding ShopBoss value
+4. **Parse SmartSheet data** for enhanced visibility and reporting
 
-## ✅ Phase 1: COMPLETE - Foundation & ShopBoss Application Monitoring
-**Objective:** Create basic server management infrastructure with ShopBoss internal monitoring
+### Key Features
 
-**✅ Actual Implementation:**
-- **Backend:** ServerManagementController.cs, SystemMonitoringService.cs (renamed)
-- **Frontend:** Views/ServerManagement/Index.cshtml (unified tabbed interface)
-- **Database:** MonitoredService.cs, ServiceHealthStatus.cs models with EF migrations
-- **Architecture:** Eliminated SystemHealthMonitor, consolidated into SystemMonitoringService
+#### 1. Embedded SmartSheet Grid View
+- Display actual SmartSheet grid within expanded project details
+- Full interactivity: edit cells, add rows, update formulas
+- Real-time sync with SmartSheet servers
+- Preserve all SmartSheet functionality (formulas, conditionals, etc.)
 
-**✅ Completed Tasks:**
-1. ✅ Created ServerManagementController with unified tabbed dashboard
-2. ✅ Moved BackupService integration from AdminController
-3. ✅ **Eliminated** SystemHealthMonitor entirely (redundant)
-4. ✅ Created SystemMonitoringService for centralized health checking
-5. ✅ Created MonitoredService and ServiceHealthStatus models
-6. ✅ Added models to ShopBossDbContext with proper migrations
-7. ✅ Implemented **ShopBoss SQLite database** connectivity monitoring with response time
-8. ✅ Created unified System Status + Backups tabbed interface
-9. ✅ **Simplified approach** - removed manual buttons, auto-refresh, configuration UI
-10. ✅ Auto-initialization of services on page load
-11. ✅ Clean, dense UI with tabs acting as section headers
-12. ✅ Added to admin navigation menu
+#### 2. Project-Sheet Linking
+- Auto-link projects to corresponding SmartSheet using Job Number
+- Create new SmartSheets from templates when creating projects
+- Sync high-level project info between Master List and ShopBoss
 
-**✅ Key Departures from Original Plan:**
-- **No user configuration** - services are hardcoded and auto-managed
-- **No real-time updates** - data loads on page visit only
-- **No SignalR complexity** - simplified to page load updates
-- **Two tabs only** - System Status and Backups (removed Services Config)
-- **Monitoring-only philosophy** - no service management capabilities
+#### 3. Enhanced Data Extraction
+- Continue parsing attachments/comments into custom UI
+- Extract key dates and milestones for timeline view
+- Monitor approval processes and quality reviews
+- Aggregate data across projects for reporting
 
-**Dependencies:** None - refactoring existing code
+#### 4. Workspace Management
+- Display active project workspace structure
+- Navigate between Master List and individual project sheets
+- Create new projects from SmartSheet templates
 
-## Phase 2: Service Monitoring Expansion - 1-2 days
-**Objective:** Add monitoring for critical shop services with expandable detail views
+### Technical Requirements
+- SmartSheet API for data operations
+- SmartSheet Embed SDK for grid display
+- WebSocket/SignalR for real-time updates
+- Caching layer for performance
+- Error handling for API limits
 
-**Target Files:**
-- Backend: SystemMonitoringService.cs (enhance existing)
-- Frontend: Views/ServerManagement/Index.cshtml (enhance System Status table)
-- Database: Update InitializeDefaultServicesAsync with additional services
+## PHASED IMPLEMENTATION PLAN
 
-**Target Services to Add:**
-- ShopBoss Application (✅ already implemented as SQLite monitoring - needs enhancement)
-- **External SQL Servers** (Microvellum data sources)
-- SpeedDial Service
-- Time & Attendance Service  
-- Polling Service
+### Phase 0: Research & Documentation Foundation (1-2 days)
+**Objective:** Collect and curate documentation to guide implementation
 
 **Tasks:**
-1. **Rename existing SQLite monitoring** from "SQL Server Database" to "ShopBoss Application" 
-2. **Enhance ShopBoss Application monitoring** with app-specific metrics (version, uptime, database stats)
-3. **Add external SQL Server monitoring** for Microvellum data sources using Microsoft.Data.SqlClient
-4. **Add HTTP endpoint monitoring** for SpeedDial and Time & Attendance services
-5. **Add Polling Service monitoring** (Windows service or HTTP endpoint)
-6. **Implement expandable row pattern** in System Status table (following Project view pattern)
-7. **Add service-specific detail views**:
-   - Connection strings/endpoints  
-   - Response times and error details
-   - Service configuration paths
-   - Technical specifications and troubleshooting info
-8. **Add chevron expand/collapse** functionality with JavaScript
-9. **Style expandable content** to match Project view density
-10. **Test monitoring** for all services with build validation
+1. Research SmartSheet Embed SDK (different from current API SDK)
+2. Document authentication flows for embedded sheets vs API access
+3. Research and document webhook capabilities and setup
+4. Document workspace operations and template management
+5. Research caching strategies and performance considerations
+6. Document integration architecture patterns
+7. Create decision records for key technical choices
+8. Research rate limiting and error handling best practices
 
-**Monitoring-Only Approach:**
-- **No service management** (start/stop/restart functionality)
-- **No user configuration** - services are hardcoded in code
-- **Status visibility only** - green/red health indicators
-- **Expandable details** - technical info hidden until expanded
+**Deliverables:**
+- `docs/SmartSheet-Embed-SDK-Guide.md`
+- `docs/SmartSheet-Authentication-Flows.md` 
+- `docs/SmartSheet-Webhook-Setup.md`
+- `docs/SmartSheet-Architecture-Decisions.md`
+- Updated `docs/SmartSheet-API-Cheatsheet.md` with embed patterns
 
 **Validation:**
-- [ ] ShopBoss Application monitoring enhanced with app-specific details
-- [ ] External SQL Servers added with proper Microsoft.Data.SqlClient connectivity 
-- [ ] HTTP services (SpeedDial, Time & Attendance) monitored with endpoint checks
-- [ ] Polling Service monitored (service type to be determined)
-- [ ] All 5 services appear in System Status table
-- [ ] Each row can expand to show technical details
-- [ ] Health checks work for all service types
-- [ ] Build succeeds without errors
-- [ ] UI matches Project view expandable pattern
+- All key integration patterns documented
+- Future agents can reference curated docs
+- Technical decisions captured with rationale
 
-**Dependencies:** Phase 1 completed ✅
-
-## Phase 3: Backup System Refinement - 1 day
-**Objective:** Simple reliability improvements to existing backup functionality
-
-**Target Files:**
-- Backend: BackupService.cs (minor enhancements only)
-
-**Monitoring-Only Focus:**
-- **No configuration UI changes** - existing Backups tab is sufficient
-- **Reliability improvements only** - error handling and validation
-- **No feature additions** - maintain simplicity
+### Phase 1: SmartSheet Sheet Linking & Basic Display (3-4 days)
+**Objective:** Link projects to SmartSheets and display basic sheet info
 
 **Tasks:**
-1. Add backup validation checks (file integrity verification)
-2. Improve error reporting in backup operations
-3. Add backup retention enforcement (automatic cleanup)
-4. Optimize backup scheduling reliability
+1. Add SmartSheetId field to Project model
+2. Create SmartSheetService for sheet operations
+3. Implement sheet search/linking by Job Number
+4. Display sheet metadata in project details
+5. Add manual link/unlink functionality
 
 **Validation:**
-- [ ] Backup operations are more reliable
-- [ ] Error messages are clearer and actionable
-- [ ] Retention policies work automatically
-- [ ] Build succeeds without errors
+- Projects can be linked to SmartSheets
+- Sheet info displays in project cards
+- Manual linking workflow functions
 
-**Dependencies:** Phase 2 completed
+### Phase 2: Embedded Grid Implementation (4-5 days)
+**Objective:** Embed interactive SmartSheet grid in project details
 
-## Phase 4: Future Expansion (Deferred)
-**Objective:** Reserved for future system monitoring enhancements
+**Tasks:**
+1. Integrate SmartSheet Embed SDK
+2. Create embedded grid component
+3. Implement authentication flow
+4. Add grid to expanded project details
+5. Handle resize and responsive behavior
 
-**Notes:**
-- System resource monitoring deferred to maintain simplicity
-- Focus remains on service connectivity monitoring only
-- Additional metrics can be added later if specifically requested
+**Validation:**
+- SmartSheet grid loads in project cards
+- Users can interact with grid directly
+- Authentication persists across sessions
 
-## Technical Architecture
+### Phase 3: Bi-directional Sync Foundation (3-4 days)
+**Objective:** Sync core data between ShopBoss and SmartSheet
 
-### Database Schema (Current Implementation)
-```sql
--- Service monitoring (✅ implemented)
-MonitoredService: Id, ServiceName, ServiceType, ConnectionString, CheckInterval, IsEnabled, CreatedDate, LastModifiedDate, Description
-ServiceHealthStatus: Id, ServiceId, Status, LastChecked, ResponseTimeMs, ErrorMessage, Details, IsReachable
+**Tasks:**
+1. Create sync mapping configuration
+2. Implement push updates to SmartSheet
+3. Set up webhook receivers for SmartSheet changes
+4. Handle conflict resolution
+5. Add sync status indicators
 
--- Existing backup system (✅ using existing models)
-BackupConfiguration: Id, BackupIntervalMinutes, MaxBackupRetention, BackupDirectoryPath, EnableCompression, EnableAutomaticBackups
-BackupStatus: Id, CreatedDate, BackupType, IsSuccessful, BackupSize, OriginalSize, Duration, ErrorMessage
-```
+**Validation:**
+- Changes in ShopBoss reflect in SmartSheet
+- SmartSheet updates appear in ShopBoss
+- Sync conflicts handled gracefully
 
-### Service Architecture (Current Implementation)
-- **SystemMonitoringService**: Centralized health checking and service management
-- **BackupService**: Database backup operations (existing, enhanced)
-- **Future additions**: Service-specific health checkers as methods within SystemMonitoringService
+### Phase 4: Template & Project Creation (3-4 days)
+**Objective:** Create new SmartSheets from templates via ShopBoss
 
-### UI Architecture (Current Implementation) 
-- **Single page with tabs**: `/ServerManagement/Index`
-  - **System Status tab**: Unified monitoring table with expandable rows
-  - **Backups tab**: Configuration form + Recent backups table
-- **No separate views** - everything consolidated into tabbed interface
-- **No SignalR complexity** - page load updates only
-- **Monitoring-only interface** - no service management controls
+**Tasks:**
+1. List available workspace templates
+2. Create project creation workflow
+3. Deploy template with project data
+4. Link new sheet to project
+5. Update Master List automatically
 
-### Expandable Row Pattern (Phase 2 Implementation)
-Following Project view pattern for System Status table expansion:
-- **Chevron Toggle**: First column contains expand/collapse chevron icon
-- **Expandable Content**: Technical details hidden until row is expanded
-- **Service-Specific Details**: Connection strings, configuration paths, status details
-- **Consistent Styling**: Match Project view density and visual patterns
-- **No Configuration**: Details are read-only technical information only
+**Validation:**
+- New projects create SmartSheets
+- Templates deploy with correct data
+- Master List stays synchronized
 
-### Role-Based Access
-- **Guest**: View-only access to dashboards and status
-- **Admin**: Full access to configuration, management, and restore operations
-- Implementation: Hide navigation buttons and action buttons for Guest users
+### Phase 5: Enhanced Data Extraction (3-4 days)
+**Objective:** Extract and display rich project data
 
-## Success Criteria
-- All shop-critical services monitored from single interface
-- Existing backup functionality preserved in simplified interface
-- SQL database backup and restore workflow through Backups tab
-- Monitoring-only approach with status visibility focused design
-- Clean separation from AdminController architecture
-- Zero additional deployment complexity
-- Maintains existing ShopBoss architectural patterns and simplicity philosophy
+**Tasks:**
+1. Parse sheet data for milestones
+2. Extract approval process status
+3. Identify deliverable dates
+4. Create aggregated reports view
+5. Add notification system for changes
+
+**Validation:**
+- Timeline shows SmartSheet milestones
+- Reports aggregate across projects
+- Users receive relevant notifications
+
+### Phase 6: Performance & Polish (2-3 days)
+**Objective:** Optimize performance and user experience
+
+**Tasks:**
+1. Implement caching strategy
+2. Add loading states and skeletons
+3. Handle offline scenarios
+4. Optimize API calls
+5. Add user preferences
+
+**Validation:**
+- Sheets load quickly
+- Smooth user experience
+- Graceful degradation
+
+## Success Metrics
+- Users spend 80% less time switching between systems
+- Project data accuracy increases by 95%
+- Report generation time reduced by 75%
+- User adoption rate exceeds 90%
+
+## Risk Mitigation
+- **API Limits:** Implement caching and request batching
+- **Authentication:** Store tokens securely, handle refresh
+- **Performance:** Progressive loading, virtualization
+- **User Adoption:** Maintain familiar SmartSheet interface
+
+## Current Implementation Status
+
+### Existing Foundation
+-  Project model with basic fields
+-  SmartSheet SDK integrated
+-  SmartSheet import service for Master List
+-  Expandable project detail cards
+-  File attachment system
+-  Project timeline/events
+
+### Phase 0 Ready to Begin
+Next step: Research SmartSheet Embed SDK and document integration patterns to ensure subsequent agents have curated guidance.
