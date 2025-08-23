@@ -109,6 +109,7 @@ else
                     <th width="120">Install Date</th>
                     <th width="80">WO</th>
                     <th width="80">Files</th>
+                    <th width="80">SmartSheet</th>
                     <th width="150">Actions</th>
                 </tr>
             </thead>
@@ -147,6 +148,16 @@ else
                         <td>
                             <span class="badge bg-success">@project.Attachments.Count</span>
                         </td>
+                        <td class="text-center">
+                            @if (project.SmartSheetId.HasValue)
+                            {
+                                <i class="fas fa-table text-success" title="Linked to SmartSheet ID: @project.SmartSheetId"></i>
+                            }
+                            else
+                            {
+                                <i class="fas fa-table text-muted" title="Not linked to SmartSheet"></i>
+                            }
+                        </td>
                         <td>
                             <div class="btn-group" role="group">
                                 @if (project.IsArchived)
@@ -173,7 +184,7 @@ else
                     <tr class="d-none no-hover" id="details-@project.Id">
                         <td class="no-hover"></td>
                         <td class="no-hover"></td>
-                        <td colspan="5" class="p-0 no-hover">
+                        <td colspan="6" class="p-0 no-hover">
                             <div class="bg-light border-start border-end border-bottom p-3">
                     
                                 <!-- Project Details Section -->

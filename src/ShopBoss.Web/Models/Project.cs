@@ -39,6 +39,11 @@ public class Project
     
     public DateTime? ArchivedDate { get; set; }
     
+    // SmartSheet integration fields
+    public long? SmartSheetId { get; set; }
+    
+    public DateTime? SmartSheetLastSync { get; set; }
+    
     // Navigation properties
     public List<WorkOrder> WorkOrders { get; set; } = new();
     

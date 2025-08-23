@@ -1,5 +1,60 @@
 @model ShopBoss.Web.Models.Project
 
+<!-- SmartSheet Section -->
+<div class="card mb-3">
+    <div class="card-body p-2">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-table me-2 text-muted"></i>
+                <small class="fw-bold">SmartSheet</small>
+                @if (Model.SmartSheetId.HasValue)
+                {
+                    <span class="badge bg-success ms-2" style="font-size: 0.7em;">Linked</span>
+                }
+                else
+                {
+                    <span class="badge bg-secondary ms-2" style="font-size: 0.7em;">Not Linked</span>
+                }
+            </div>
+            <div class="d-flex">
+                <div id="smartsheet-session-status-@Model.Id" class="me-2" style="font-size: 0.8em;">
+                    <!-- Session status will be loaded here -->
+                </div>
+                @if (!Model.SmartSheetId.HasValue)
+                {
+                    <button type="button" class="btn btn-sm btn-outline-primary me-1" onclick="showSmartSheetLinking('@Model.Id')">
+                        <i class="fas fa-link me-1"></i>Link
+                    </button>
+                }
+                else
+                {
+                    <button type="button" class="btn btn-sm btn-outline-danger me-1" onclick="unlinkSmartSheet('@Model.Id')">
+                        <i class="fas fa-unlink me-1"></i>Unlink
+                    </button>
+                }
+            </div>
+        </div>
+        
+        <div id="smartsheet-content-@Model.Id" data-smartsheet-id="@(Model.SmartSheetId ?? 0)">
+            @if (Model.SmartSheetId.HasValue)
+            {
+                <div id="smartsheet-info-@Model.Id" class="py-2">
+                    <!-- SmartSheet information will be loaded here -->
+                    <div class="text-center text-muted">
+                        <small><i class="fas fa-spinner fa-spin me-1"></i>Loading SmartSheet information...</small>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="text-center text-muted py-3">
+                    <small><i class="fas fa-info-circle me-1"></i>Project not linked to SmartSheet</small>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
 <!-- Files Section -->
 <div class="card mb-3">
     <div class="card-body p-2">

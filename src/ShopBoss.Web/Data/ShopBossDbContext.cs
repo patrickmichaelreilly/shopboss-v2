@@ -315,6 +315,7 @@ public class ShopBossDbContext : DbContext
             entity.HasIndex(e => e.ProjectCategory);
             entity.HasIndex(e => e.IsArchived);
             entity.HasIndex(e => e.CreatedDate);
+            entity.HasIndex(e => e.SmartSheetId);
         });
 
         modelBuilder.Entity<ProjectAttachment>(entity =>

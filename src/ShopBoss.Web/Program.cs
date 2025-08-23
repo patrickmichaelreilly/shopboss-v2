@@ -30,6 +30,9 @@ builder.WebHost.ConfigureKestrel(serverOptions =>
 // Add HTTP context accessor for services that need access to the current HTTP context
 builder.Services.AddHttpContextAccessor();
 
+// Add HttpClient for OAuth operations
+builder.Services.AddHttpClient();
+
 // Configure Data Protection for Windows Service compatibility
 var dataProtection = builder.Services.AddDataProtection()
     .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(builder.Environment.ContentRootPath, "keys")))
@@ -85,6 +88,7 @@ builder.Services.AddScoped<ProjectAttachmentService>();
 builder.Services.AddScoped<PurchaseOrderService>();
 builder.Services.AddScoped<CustomWorkOrderService>();
 builder.Services.AddScoped<SmartSheetImportService>();
+builder.Services.AddScoped<SmartSheetService>();
 builder.Services.AddScoped<LabelParserService>();
 builder.Services.AddScoped<SystemMonitoringService>();
 

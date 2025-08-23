@@ -12,6 +12,7 @@ public class ProjectController : Controller
     private readonly PurchaseOrderService _purchaseOrderService;
     private readonly CustomWorkOrderService _customWorkOrderService;
     private readonly SmartSheetImportService _smartSheetImportService;
+    private readonly SmartSheetService _smartSheetService;
     private readonly ILogger<ProjectController> _logger;
 
     public ProjectController(
@@ -20,6 +21,7 @@ public class ProjectController : Controller
         PurchaseOrderService purchaseOrderService,
         CustomWorkOrderService customWorkOrderService,
         SmartSheetImportService smartSheetImportService,
+        SmartSheetService smartSheetService,
         ILogger<ProjectController> logger)
     {
         _projectService = projectService;
@@ -27,6 +29,7 @@ public class ProjectController : Controller
         _purchaseOrderService = purchaseOrderService;
         _customWorkOrderService = customWorkOrderService;
         _smartSheetImportService = smartSheetImportService;
+        _smartSheetService = smartSheetService;
         _logger = logger;
     }
 
@@ -495,6 +498,119 @@ public class ProjectController : Controller
         }
     }
 
+    // SmartSheet Integration Actions
+
+    [HttpGet]
+    public IActionResult GetSmartSheetSessionStatus()
+    {
+        try
+        {
+            var hasSession = _smartSheetService.HasSmartSheetSession();
+            var userEmail = _smartSheetService.GetCurrentUserEmail();
+            
+            return Json(new { 
+                success = true, 
+                hasSession = hasSession, 
+                userEmail = userEmail 
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting SmartSheet session status");
+            return Json(new { success = false, message = "Error checking SmartSheet connection" });
+        }
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> GetSmartSheetInfo(long sheetId)
+    {
+        try
+        {
+            var sheetInfo = await _smartSheetService.GetSheetInfoAsync(sheetId);
+            if (sheetInfo != null)
+            {
+                return Json(new { success = true, sheet = sheetInfo });
+            }
+            
+            return Json(new { success = false, message = "SmartSheet not found or not accessible" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting SmartSheet info for sheet {SheetId}", sheetId);
+            return Json(new { success = false, message = "Error loading SmartSheet information" });
+        }
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> SearchSmartSheets(string searchTerm)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(searchTerm))
+            {
+                return Json(new { success = true, sheets = new List<object>() });
+            }
+
+            var sheets = await _smartSheetService.SearchSheetsAsync(searchTerm);
+            return Json(new { success = true, sheets = sheets });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error searching SmartSheets with term '{SearchTerm}'", searchTerm);
+            return Json(new { success = false, message = "Error searching SmartSheets" });
+        }
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> LinkProjectToSmartSheet([FromBody] LinkProjectToSmartSheetRequest request)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(request.ProjectId) || request.SheetId <= 0)
+            {
+                return Json(new { success = false, message = "Invalid project or sheet ID" });
+            }
+
+            var success = await _smartSheetService.LinkProjectToSheetAsync(request.ProjectId, request.SheetId);
+            if (success)
+            {
+                return Json(new { success = true, message = "Project successfully linked to SmartSheet" });
+            }
+            
+            return Json(new { success = false, message = "Failed to link project to SmartSheet" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error linking project {ProjectId} to SmartSheet {SheetId}", request.ProjectId, request.SheetId);
+            return Json(new { success = false, message = "Error linking to SmartSheet" });
+        }
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> UnlinkProjectFromSmartSheet([FromBody] UnlinkProjectFromSmartSheetRequest request)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(request.ProjectId))
+            {
+                return Json(new { success = false, message = "Invalid project ID" });
+            }
+
+            var success = await _smartSheetService.UnlinkProjectFromSheetAsync(request.ProjectId);
+            if (success)
+            {
+                return Json(new { success = true, message = "Project successfully unlinked from SmartSheet" });
+            }
+            
+            return Json(new { success = false, message = "Failed to unlink project from SmartSheet" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error unlinking project {ProjectId} from SmartSheet", request.ProjectId);
+            return Json(new { success = false, message = "Error unlinking from SmartSheet" });
+        }
+    }
+
 
     public class AttachWorkOrdersRequest
     {
@@ -506,6 +622,17 @@ public class ProjectController : Controller
     {
         public string Id { get; set; } = string.Empty;
         public string Category { get; set; } = string.Empty;
+    }
+
+    public class LinkProjectToSmartSheetRequest
+    {
+        public string ProjectId { get; set; } = string.Empty;
+        public long SheetId { get; set; }
+    }
+
+    public class UnlinkProjectFromSmartSheetRequest
+    {
+        public string ProjectId { get; set; } = string.Empty;
     }
 
 }
