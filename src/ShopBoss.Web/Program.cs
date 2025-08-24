@@ -89,6 +89,7 @@ builder.Services.AddScoped<PurchaseOrderService>();
 builder.Services.AddScoped<CustomWorkOrderService>();
 builder.Services.AddScoped<SmartSheetImportService>();
 builder.Services.AddScoped<SmartSheetService>();
+builder.Services.AddScoped<SmartSheetCacheService>();
 builder.Services.AddScoped<LabelParserService>();
 builder.Services.AddScoped<SystemMonitoringService>();
 

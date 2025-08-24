@@ -1,3 +1,6 @@
+# SmartSheet cache data (development only)
+data/
+
 # User-specific files
 *.rsuser
 *.suo

@@ -226,6 +226,204 @@ public class SmartSheetService
             .OrderBy(p => p.ProjectName)
             .ToListAsync();
     }
+
+    /// <summary>
+    /// Get accessible workspaces with their sheets
+    /// </summary>
+    public async Task<List<object>> GetAccessibleWorkspacesAsync()
+    {
+        try
+        {
+            var smartsheet = GetSmartSheetClient();
+            if (smartsheet == null) return new List<object>();
+
+            var workspaces = new List<object>();
+
+            // Get all workspaces
+            var workspaceList = await Task.Run(() => smartsheet.WorkspaceResources.ListWorkspaces());
+            
+            foreach (var workspace in workspaceList.Data ?? new List<Smartsheet.Api.Models.Workspace>())
+            {
+                // Get workspace details to include sheets
+                var workspaceDetails = await Task.Run(() => 
+                    smartsheet.WorkspaceResources.GetWorkspace(workspace.Id ?? 0, null));
+
+                workspaces.Add(new
+                {
+                    id = workspace.Id ?? 0,
+                    name = workspace.Name ?? "",
+                    sheetCount = workspaceDetails.Sheets?.Count ?? 0,
+                    sheets = workspaceDetails.Sheets?.Select(s => new
+                    {
+                        id = s.Id ?? 0,
+                        name = s.Name ?? "",
+                        modifiedAt = s.ModifiedAt,
+                        permalink = s.Permalink
+                    }).Cast<object>().ToList() ?? new List<object>()
+                });
+            }
+
+            return workspaces;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting accessible workspaces");
+            return new List<object>();
+        }
+    }
+
+    /// <summary>
+    /// Get specific workspace by ID
+    /// </summary>
+    public async Task<object?> GetWorkspaceByIdAsync(long workspaceId)
+    {
+        try
+        {
+            var smartsheet = GetSmartSheetClient();
+            if (smartsheet == null) return null;
+
+            // Get workspace details with sheets
+            var workspaceDetails = await Task.Run(() => 
+                smartsheet.WorkspaceResources.GetWorkspace(workspaceId, null));
+
+            if (workspaceDetails == null) return null;
+
+            return new
+            {
+                id = workspaceDetails.Id ?? 0,
+                name = workspaceDetails.Name ?? "",
+                sheetCount = workspaceDetails.Sheets?.Count ?? 0,
+                sheets = workspaceDetails.Sheets?.Select(s => new
+                {
+                    id = s.Id ?? 0,
+                    name = s.Name ?? "",
+                    modifiedAt = s.ModifiedAt,
+                    permalink = s.Permalink
+                }).Cast<object>().ToList() ?? new List<object>()
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting workspace {WorkspaceId}", workspaceId);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Get specific workspace by name
+    /// </summary>
+    public async Task<object?> GetWorkspaceByNameAsync(string workspaceName)
+    {
+        try
+        {
+            var smartsheet = GetSmartSheetClient();
+            if (smartsheet == null) return null;
+
+            // Get all workspaces to find the one with matching name
+            var workspaceList = await Task.Run(() => smartsheet.WorkspaceResources.ListWorkspaces());
+            
+            var matchingWorkspace = workspaceList.Data?.FirstOrDefault(w => 
+                string.Equals(w.Name, workspaceName, StringComparison.OrdinalIgnoreCase));
+
+            if (matchingWorkspace == null) return null;
+
+            return await GetWorkspaceByIdAsync(matchingWorkspace.Id ?? 0);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting workspace by name '{WorkspaceName}'", workspaceName);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Get detailed sheet data including columns and rows
+    /// </summary>
+    public async Task<object?> GetSheetDataAsync(long sheetId)
+    {
+        try
+        {
+            var smartsheet = GetSmartSheetClient();
+            if (smartsheet == null) return null;
+
+            // Get sheet with all data
+            var sheet = await Task.Run(() => 
+                smartsheet.SheetResources.GetSheet(sheetId, null, null, null, null, null, null, null));
+
+            if (sheet == null) return null;
+
+            return new
+            {
+                id = sheet.Id ?? 0,
+                name = sheet.Name ?? "",
+                totalRowCount = sheet.TotalRowCount ?? 0,
+                columns = sheet.Columns?.Select(c => new
+                {
+                    id = c.Id ?? 0,
+                    title = c.Title ?? "",
+                    type = c.Type?.ToString() ?? "",
+                    index = c.Index ?? 0,
+                    primary = c.Primary == true,
+                    options = c.Options?.ToList()
+                }).Cast<object>().ToList() ?? new List<object>(),
+                rows = sheet.Rows?.Select(r => new
+                {
+                    id = r.Id ?? 0,
+                    rowNumber = r.RowNumber ?? 0,
+                    cells = r.Cells?.ToDictionary(
+                        c => c.ColumnId ?? 0,
+                        c => c.Value ?? (object)"") ?? new Dictionary<long, object>(),
+                    createdAt = r.CreatedAt,
+                    modifiedAt = r.ModifiedAt,
+                    createdBy = r.CreatedBy?.Email,
+                    modifiedBy = r.ModifiedBy?.Email
+                }).Cast<object>().ToList() ?? new List<object>(),
+                createdAt = sheet.CreatedAt,
+                modifiedAt = sheet.ModifiedAt,
+                permalink = sheet.Permalink
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting sheet data for sheet {SheetId}", sheetId);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Get basic sheet summary information
+    /// </summary>
+    public async Task<object?> GetSheetSummaryAsync(long sheetId)
+    {
+        try
+        {
+            var smartsheet = GetSmartSheetClient();
+            if (smartsheet == null) return null;
+
+            // Get sheet summary (without full rows/columns)
+            var sheet = await Task.Run(() => 
+                smartsheet.SheetResources.GetSheet(sheetId, null, null, null, null, null, null, null));
+
+            if (sheet == null) return null;
+
+            return new
+            {
+                id = sheet.Id ?? 0,
+                name = sheet.Name ?? "",
+                totalRowCount = sheet.TotalRowCount ?? 0,
+                columnCount = sheet.Columns?.Count ?? 0,
+                createdAt = sheet.CreatedAt,
+                modifiedAt = sheet.ModifiedAt,
+                permalink = sheet.Permalink,
+                columnNames = sheet.Columns?.Select(c => c.Title ?? "").ToList() ?? new List<string>()
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting sheet summary for sheet {SheetId}", sheetId);
+            return null;
+        }
+    }
 }
 
 /// <summary>
