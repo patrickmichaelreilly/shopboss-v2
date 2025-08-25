@@ -1,52 +1,56 @@
 # SmartSheet Integration - Implementation Decisions
 
-**Date:** August 23, 2025  
-**Status:** Finalized  
-**Context:** Temporary bridge solution for transition period
+**Date:** August 25, 2025 (Updated)  
+**Status:** Revised - Timeline-Centric Approach  
+**Context:** Process composition platform foundation
 
 ## Project Context
 
-This SmartSheet integration is a **temporary bridge solution** to ease the transition while an in-house SmartSheet clone is being developed. Key constraints:
+This SmartSheet integration has evolved into a **process composition platform foundation** where SmartSheet provides the communication layer while ShopBoss orchestrates workflow and business entity management.
 
-- **Temporary solution** - will be deprecated when in-house clone is ready
-- **4 users only** - minimal concurrency concerns
-- **Simplicity over robustness** - avoid over-engineering
-- **Quick delivery** - focus on core functionality
+## MAJOR PIVOT: Timeline-Centric Approach
 
-## Core Implementation Approach
+**Key Discovery:** SmartSheet grid templates are inconsistent - the chronological timeline of comments/attachments tells the real project story and represents activities within process chunks.
 
-### Architecture: Session-Based Hybrid Integration
-1. **Session-based OAuth** for user attribution (no user storage in ShopBoss)
-2. **iframe embedding** with published SmartSheets
-3. **Basic synchronization** with simple field mapping
-4. **Memory-only caching** (no Redis complexity)
-5. **Single template approach** with template ID: **8130468873457540**
+### Current Architecture: API-Based Timeline Processing
+1. **Session-based OAuth** for user attribution ✅ IMPLEMENTED
+2. **Timeline import and processing** - chronological comments/attachments ✅ IMPLEMENTED  
+3. **SmartSheet cache service** for analysis and data extraction ✅ IMPLEMENTED
+4. **TaskChunk entity system** for process composition (Phase 2)
+5. **Memory-only caching** with SmartSheet API integration ✅ IMPLEMENTED
 
-### What We're Building
+### What We've Built (Completed)
 
-**Phase 1: Session-Based OAuth & Basic Linking (2-3 days)**
-- Add `SmartSheetId` field to Project model
-- Session-only OAuth flow (no user storage)
-- "Link SmartSheet" functionality
-- Display basic sheet metadata in project cards
+**Phase 1: OAuth & Project Linking ✅ COMPLETE**
+- SmartSheetId field in Project model
+- Session-based OAuth flow (no user storage)
+- Project-SmartSheet linking functionality
+- SmartSheet metadata display in project cards
+- User attribution preserved in session
 
-**Phase 2: iframe Embedding (1-2 days)**
-- Embed published SmartSheet URLs in project details
-- Basic loading states and error handling
-- iframe communication setup
+**Phase 2: Timeline Import & Processing ✅ COMPLETE**
+- SmartSheetCacheService for data extraction and analysis
+- Chronological import of comments and attachments
+- ProjectEvent model with comprehensive fields
+- SmartSheet analysis tools for research and debugging
 
-**Phase 3: Minimal Sync (2-3 days)**
-- Simple webhook receiver endpoint
-- Basic field mapping with clear ownership rules
-- Memory cache for performance
-- Simple timestamp-based conflict resolution
+### What We're Building Next
 
-**Phase 4: Template Creation (1-2 days)**
-- "Create SmartSheet" from single template
-- Auto-link new sheets to projects
-- Update master project list
+**Phase 3: TaskChunk Entity System (Current Focus)**
+- TaskChunk as separate entity (not special ProjectEvents)  
+- FK relationship: TaskChunk -> ProjectEvents
+- Manual timeline organization UI for chunk discovery
+- Server-side persistence of chunk relationships
+- Foundation for process template system
 
-### What We're NOT Building
+**Phase 4: Process Composition (Future)**
+- Convert discovered chunks into reusable templates
+- Visual workflow composition interface
+- Business entity flow between chunks
+- Bi-directional sync with SmartSheet via OAuth
+
+### What We're NOT Building (Avoiding Over-Engineering)
+❌ iframe embedding (abandoned - no added value)
 ❌ Complex conflict resolution algorithms  
 ❌ Redis/distributed caching infrastructure  
 ❌ Sophisticated error recovery patterns  
@@ -54,6 +58,7 @@ This SmartSheet integration is a **temporary bridge solution** to ease the trans
 ❌ Multiple template management system  
 ❌ Extensive fallback mechanisms  
 ❌ Advanced monitoring and alerting  
+❌ Groups implemented as special ProjectEvents (architectural mistake)  
 
 ## Key Technical Decisions
 
@@ -306,6 +311,32 @@ When the in-house SmartSheet clone is ready:
 4. Remove SmartSheet integration code
 5. Clean up session data (no permanent storage to remove)
 
+## Current Implementation Status (August 25, 2025)
+
+### ✅ Completed Foundation
+- **SmartSheet OAuth Integration**: Session-based authentication working
+- **Project-Sheet Linking**: Manual ID entry with metadata display  
+- **Timeline Import**: Chronological comments/attachments from SmartSheet
+- **Cache Service**: SmartSheetCacheService for data analysis and extraction
+- **Analysis Tools**: Research and debugging tools for SmartSheet data
+
+### 🎯 Next Phase: TaskChunk Architecture
+**Objective:** Enable manual organization of timeline events into reusable TaskChunk entities
+
+**Critical Architecture Decision:** TaskChunk as separate entity with FK relationship to ProjectEvents (not special ProjectEvents)
+
+**Implementation Approach:**
+1. Create TaskChunk entity with proper relationships
+2. Add drag-and-drop UI for event selection and chunk creation  
+3. Server-side persistence of chunk organization
+4. Foundation for future template system and process composition
+
+### 📚 Key Lessons Learned
+- **Timeline over Grid**: SmartSheet timelines more valuable than grid data
+- **Entity Separation**: Proper entities beat clever workarounds
+- **Process Discovery**: Manual organization reveals natural workflow patterns
+- **API over iframe**: Direct API integration more flexible than embedding
+
 ---
 
-**Key Principle: Maximum simplicity for a temporary solution - don't over-engineer!**
+**Evolution:** From temporary bridge solution to process composition platform foundation**

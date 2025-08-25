@@ -1,8 +1,14 @@
 # SmartSheet Integration - Vision & Implementation Plan (UPDATED)
 
-## VISION: ShopBoss as Process-Aware Shop Operating System
+## VISION: ShopBoss as Visual Process Composition Platform
 
-Transform ShopBoss from a tracking system into a comprehensive shop operating hub that uses SmartSheet as a flexible backend while providing a shop-process-focused frontend that adapts to job-shop realities.
+Transform ShopBoss from a tracking system into a **visual workflow composition platform** where:
+- **Task Chunks** capture reusable process patterns with inputs/outputs
+- **Business entities** (POs, Approvals, Drawings) flow between chunks and systems  
+- **SmartSheet** provides communication and coordination layer
+- **ShopBoss** orchestrates the overall workflow and business entity management
+
+**Core Innovation:** Instead of rigid templates, enable **modular process composition** where workflows are built from reusable, interconnected Task Chunks that reflect real shop operations.
 
 ## Product Requirements Document (PRD) - REVISED
 
@@ -14,12 +20,11 @@ Transform ShopBoss from a tracking system into a comprehensive shop operating hu
 
 ### Key Features (Revised)
 
-#### 1. Shop-Process-Aware Dashboard (Already Built)
-- Display project data in context of actual shop workflows
-- Timeline view with critical milestones
-- Approval workflow status cards
-- Recent activity feed and contextual file attachments
-- **Status:** ✅ Foundation complete via existing project detail cards
+#### 1. Timeline-Centric Project Dashboard (Evolution in Progress)
+- **Core Discovery:** Chronological comment/attachment timeline tells the real project story
+- SmartSheet grid templates are inconsistent - timeline is the source of truth
+- Answers key questions: current status, waiting states, next actions, recent activity
+- **Status:** ✅ Foundation (SmartSheet Migration import) built, enhancing with intelligence
 
 #### 2. Project-Sheet Linking (Completed)
 - Link projects to corresponding SmartSheet using manual ID entry
@@ -70,42 +75,54 @@ Transform ShopBoss from a tracking system into a comprehensive shop operating hu
 
 **Key Achievement:** Foundation established for all future SmartSheet operations
 
-### Phase 2: OAuth-Powered Dashboard (CURRENT - REVISED APPROACH)
-**Objective:** Skip iframe embedding, focus on OAuth-powered custom interface
+### Phase 2: Task Chunk Discovery & Manual Organization (CURRENT)
+**Objective:** Enable manual organization of timeline events into **Task Chunks** - reusable process building blocks that will become the foundation for workflow composition
 
-**Why the Pivot:**
-- iframe embedding provides no value over existing SmartSheet interface
-- Shop-focused UI already built and superior to generic grid view
-- OAuth enables bi-directional authoring with user attribution
-- Real value is in process-aware interface, not replicating SmartSheet
+**Key Insight:** The groups users create aren't just organization tools - they're **process templates** that capture reusable patterns of work with inputs and outputs that connect to business entities.
 
-**Tasks:**
-1. **Test OAuth write operations** - Verify we can modify SmartSheet via OAuth
-2. **Convert existing dashboard** - Migrate from API token to OAuth session tokens  
-3. **Add basic write capabilities** - Status updates, task creation from ShopBoss
-4. **Add "View in SmartSheet" links** - Direct access to grid when needed
-5. **Foundation for modular processes** - Prepare data structure for Phase 3
+**Task Chunk Concept:** Process modules with inputs/outputs containing SmartSheet activities (comments/attachments) that produce business entities (POs, Approvals, Drawings) flowing to other systems.
+
+**Implementation Tasks:**
+1. **Restructure Project Cards** - Consolidate SmartSheet status, eliminate Files card, streamline Purchase Orders
+2. **Add Manual Grouping UI** - Create Task Chunks by organizing timeline events with grouping
+3. **Simple Visual Hierarchy** - Groups show as process headers with bounding boxes around constituent events
+4. **No Validation** - Complete flexibility for users to discover natural process patterns
+
+**Technical Foundation - CRITICAL ARCHITECTURE INSIGHT:**
+- **TaskChunk as Separate Entity**: TaskChunk must be its own entity, NOT special ProjectEvents
+- **Entity Relationship**: TaskChunk -> ProjectEvents via FK (TaskChunkId field on ProjectEvent)
+- **Proper Data Model**: 
+  ```
+  TaskChunk {
+    Id, ProjectId, Name, Description, DisplayOrder, IsTemplate
+    Events: List<ProjectEvent> (navigation property)
+  }
+  
+  ProjectEvent {
+    // existing fields...
+    TaskChunkId: string? (FK to TaskChunk)
+    ChunkDisplayOrder: int (order within chunk)
+  }
+  ```
+- Simple UI for drag-and-drop selection, chunk creation, reordering
+- Build on existing SmartSheet Migration functionality (chronological import already works)
+- Foundation for business entity connections and template system (future)
+
+**Learning Phase Goal:**
+- Users manually organize existing project data into logical Task Chunks
+- Discover patterns of work that naturally emerge from real projects
+- Build library of common chunks through hands-on organization
 
 **Validation:**
-- OAuth write operations confirmed working
-- Dashboard uses session-based authentication
-- Users can modify SmartSheet data from ShopBoss interface
-- Seamless transition between ShopBoss dashboard and SmartSheet grid
+- Users can organize timeline events in any hierarchy they want
+- Groups are collapsible and clearly show relationships through indentation
+- All organization persists correctly and displays consistently
+- No restrictions on what can be grouped together
 
-### Phase 3: Modular Process Composition (FUTURE - COLLABORATIVE DESIGN)
-**Objective:** Enable bespoke workflow creation via composable process modules
+### Phase 3: Task Chunk Composition & Deployment (FUTURE)
+**Objective:** Deploy discovered Task Chunks as reusable process templates for new project creation
 
-**Approach:**
-- Collaborative design sessions between Claude and user (Patrick)
-- Leverage Patrick's entrenched shop process knowledge
-- Build library of reusable process chunks
-- Enable per-project workflow composition
-
-**Concept:**
-Instead of rigid templates, compose workflows like:
-- "CNC Cutting Process" + "Custom Finishing Module" + "Client Approval Workflow"
-- Add/remove process steps based on actual job requirements
-- Write composed workflows as SmartSheet rows via OAuth
+**Approach:** Convert discovered chunks into templates → Visual workflow composition → Business entity flow between chunks and systems → Bi-directional SmartSheet sync
 
 ### Phase 4: Advanced Bi-directional Sync (FUTURE)
 **Objective:** Full synchronization between ShopBoss and SmartSheet
@@ -116,59 +133,22 @@ Instead of rigid templates, compose workflows like:
 - Comprehensive data mapping
 - Performance optimization
 
-## Success Metrics
-- Users spend 80% less time switching between systems
-- Project data accuracy increases by 95%
-- Report generation time reduced by 75%
-- User adoption rate exceeds 90%
+## Foundation Complete ✅
+**OAuth, project linking, timeline import, SmartSheet analysis tools** - Ready for TaskChunk implementation
 
-## Risk Mitigation
-- **API Limits:** Implement caching and request batching
-- **Authentication:** Store tokens securely, handle refresh
-- **Performance:** Progressive loading, virtualization
-- **User Adoption:** Maintain familiar SmartSheet interface
+**Key Insight:** Timeline > Grid - SmartSheet timelines tell the real project story, process-aware UI beats generic grid interface.
 
-## Current Implementation Status
+## Ready for Phase 2: Task Chunk Discovery
+**Current Objective:** Enable manual organization of timeline events into Task Chunks - the building blocks for future process composition
 
-### Existing Foundation
--  Project model with basic fields
--  SmartSheet SDK integrated
--  SmartSheet import service for Master List
--  Expandable project detail cards
--  File attachment system
--  Project timeline/events
+**Key Insight:** Timeline events from SmartSheet (comments/attachments) represent the **activities within process chunks**. By letting users manually group these activities, we discover natural process patterns that become reusable templates.
 
-## Key Pivot Rationale
+**Implementation Steps (Corrected Architecture):**
+1. **Create TaskChunk Entity** - Separate model with proper relationships
+2. **Add TaskChunk DbSet** - Configure in DbContext with navigation properties  
+3. **Create Migration** - Add TaskChunks table with FK relationships
+4. **Update Timeline Rendering** - Display TaskChunks with their contained events
+5. **Add Chunk Management UI** - Multi-select events, create chunks, drag-and-drop
+6. **Server-Side Persistence** - Controller endpoints for chunk CRUD operations
 
-### Why We Abandoned iframe Embedding
-1. **No Added Value:** iframe just replicates existing SmartSheet interface
-2. **Technical Limitations:** Published sheets lose authentication context
-3. **User Experience:** Generic grid doesn't reflect shop processes
-4. **Real Opportunity:** Process-aware interface provides actual improvement
-
-### Why This Approach Works Better
-1. **Shop-Focused:** UI designed around actual manufacturing workflows
-2. **Flexible Backend:** SmartSheet provides reliable data storage and sync
-3. **Best of Both Worlds:** Custom interface + familiar grid access when needed
-4. **Job-Shop Reality:** Modular processes reflect actual project variability
-5. **Bi-directional:** Users can work in either interface seamlessly
-
-## Current Implementation Status ✅
-
-### Foundation Complete
-- ✅ **OAuth Authentication:** Session-based with user attribution
-- ✅ **Project Linking:** Manual SmartSheet ID linking operational  
-- ✅ **Metadata Display:** Sheet info shown in project cards
-- ✅ **Shop-Focused UI:** Process-aware dashboard already built
-- ✅ **Documentation:** All architectural decisions and patterns documented
-
-## Success Metrics (Updated)
-- Users compose custom workflows 50% faster than rigid templates
-- Time spent switching between systems reduced by 80%
-- Project data accuracy maintained while adding flexibility  
-- Process modules reused across projects, reducing setup time
-- User adoption driven by improved workflow flexibility
-
-## Ready for Phase 2
-**Current Objective:** Test OAuth write operations and add bi-directional capabilities
-**Next Steps:** Collaborative design of modular process system with Patrick's shop expertise
+**Key Lesson Learned:** Avoid implementing groups as special ProjectEvents - use proper entity separation for future extensibility and template support.
