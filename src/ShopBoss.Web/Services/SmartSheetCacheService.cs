@@ -124,10 +124,10 @@ public class SmartSheetCacheService
                     VALUES (@sheetId, @workspaceId, @name, @columnCount, @rowCount, @lastModified, @lastSynced)
                 ";
                 
-                insertSheetCommand.Parameters.AddWithValue("@sheetId", (long)sheetData.id);
+                insertSheetCommand.Parameters.AddWithValue("@sheetId", sheetData?.id != null ? (long)sheetData.id : 0L);
                 insertSheetCommand.Parameters.AddWithValue("@workspaceId", DBNull.Value); // We'll update this when caching workspace
-                insertSheetCommand.Parameters.AddWithValue("@name", (string)sheetData.name);
-                insertSheetCommand.Parameters.AddWithValue("@columnCount", ((IEnumerable<dynamic>)sheetData.columns).Count());
+                insertSheetCommand.Parameters.AddWithValue("@name", (string?)sheetData?.name ?? "Unknown Sheet");
+                insertSheetCommand.Parameters.AddWithValue("@columnCount", ((IEnumerable<dynamic>?)sheetData?.columns ?? new object[0]).Count());
                 insertSheetCommand.Parameters.AddWithValue("@rowCount", (int)sheetData.totalRowCount);
                 insertSheetCommand.Parameters.AddWithValue("@lastModified", DateTime.Parse((string)sheetData.modifiedAt));
                 insertSheetCommand.Parameters.AddWithValue("@lastSynced", DateTime.UtcNow);
@@ -199,7 +199,7 @@ public class SmartSheetCacheService
                 
                 return true;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 transaction.Rollback();
                 throw;
@@ -229,12 +229,12 @@ public class SmartSheetCacheService
             }
 
             var workspaceData = JsonConvert.DeserializeObject<dynamic>(JsonConvert.SerializeObject(workspace));
-            var sheets = workspaceData.sheets;
+            var sheets = workspaceData?.sheets ?? new object[0];
 
             var result = new CacheWorkspaceResult
             {
                 Success = true,
-                WorkspaceName = workspaceData.name,
+                WorkspaceName = workspaceData?.name ?? "Unknown Workspace",
                 TotalSheets = ((IEnumerable<dynamic>)sheets).Count(),
                 CachedSheets = new List<string>(),
                 FailedSheets = new List<string>()
@@ -250,7 +250,7 @@ public class SmartSheetCacheService
                     VALUES (@workspaceId, @name, @lastSynced)
                 ";
                 insertWorkspaceCommand.Parameters.AddWithValue("@workspaceId", workspaceId);
-                insertWorkspaceCommand.Parameters.AddWithValue("@name", (string)workspaceData.name);
+                insertWorkspaceCommand.Parameters.AddWithValue("@name", (string?)workspaceData?.name ?? "Unknown Workspace");
                 insertWorkspaceCommand.Parameters.AddWithValue("@lastSynced", DateTime.UtcNow);
                 insertWorkspaceCommand.ExecuteNonQuery();
             }
@@ -322,7 +322,7 @@ public class SmartSheetCacheService
                 {
                     var fieldName = reader.GetName(i);
                     var value = reader.IsDBNull(i) ? null : reader.GetValue(i);
-                    row[fieldName] = value;
+                    row[fieldName] = value ?? DBNull.Value;
                 }
                 results.Add(row);
             }

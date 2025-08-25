@@ -26,6 +26,11 @@ public class ProjectEvent
     // Optional row number for events imported from SmartSheet
     public int? RowNumber { get; set; }
     
-    // Navigation property
+    // TaskBlock relationship (optional - events can exist without being in a block)
+    public string? TaskBlockId { get; set; }
+    public int? BlockDisplayOrder { get; set; }
+    
+    // Navigation properties
     public Project Project { get; set; } = null!;
+    public TaskBlock? TaskBlock { get; set; }
 }

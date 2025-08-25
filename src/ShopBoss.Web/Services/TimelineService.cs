@@ -1,0 +1,269 @@
+using Microsoft.EntityFrameworkCore;
+using ShopBoss.Web.Data;
+using ShopBoss.Web.Models;
+
+namespace ShopBoss.Web.Services;
+
+public class TimelineService
+{
+    private readonly ShopBossDbContext _context;
+    private readonly ILogger<TimelineService> _logger;
+
+    public TimelineService(ShopBossDbContext context, ILogger<TimelineService> logger)
+    {
+        _context = context;
+        _logger = logger;
+    }
+
+    // Timeline data retrieval
+    public async Task<TimelineData> GetTimelineDataAsync(string projectId)
+    {
+        try
+        {
+            var project = await _context.Projects
+                .Include(p => p.Events)
+                .FirstOrDefaultAsync(p => p.Id == projectId);
+
+            if (project == null)
+                throw new ArgumentException($"Project not found: {projectId}", nameof(projectId));
+
+            // Get all blocks for this project ordered by DisplayOrder
+            var blocks = await _context.TaskBlocks
+                .Where(tb => tb.ProjectId == projectId)
+                .Include(tb => tb.Events)
+                .OrderBy(tb => tb.DisplayOrder)
+                .ToListAsync();
+
+            // Get all events for this project, ordered chronologically
+            var allEvents = await _context.ProjectEvents
+                .Where(pe => pe.ProjectId == projectId)
+                .OrderBy(pe => pe.EventDate)
+                .ToListAsync();
+
+            // Separate events into blocked and unblocked
+            var blockedEventIds = blocks.SelectMany(tb => tb.Events.Select(e => e.Id)).ToHashSet();
+            var unblockedEvents = allEvents.Where(e => !blockedEventIds.Contains(e.Id)).ToList();
+
+            return new TimelineData
+            {
+                Project = project,
+                TaskBlocks = blocks,
+                UnblockedEvents = unblockedEvents
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving timeline data for project: {ProjectId}", projectId);
+            throw;
+        }
+    }
+
+    // TaskBlock CRUD operations
+    public async Task<TaskBlock> CreateTaskBlockAsync(string projectId, string name, string? description = null)
+    {
+        try
+        {
+            // Get the next display order
+            var maxOrder = await _context.TaskBlocks
+                .Where(tb => tb.ProjectId == projectId)
+                .MaxAsync(tb => (int?)tb.DisplayOrder) ?? 0;
+
+            var block = new TaskBlock
+            {
+                Id = Guid.NewGuid().ToString(),
+                ProjectId = projectId,
+                Name = name,
+                Description = description,
+                DisplayOrder = maxOrder + 1,
+                IsTemplate = false
+            };
+
+            _context.TaskBlocks.Add(block);
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Created TaskBlock: {BlockName} for project: {ProjectId}", name, projectId);
+            return block;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating TaskBlock: {BlockName} for project: {ProjectId}", name, projectId);
+            throw;
+        }
+    }
+
+    public async Task<TaskBlock?> UpdateTaskBlockAsync(string blockId, string name, string? description = null)
+    {
+        try
+        {
+            var block = await _context.TaskBlocks.FindAsync(blockId);
+            if (block == null) return null;
+
+            block.Name = name;
+            block.Description = description;
+
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Updated TaskBlock: {BlockId} - {BlockName}", blockId, name);
+            return block;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating TaskBlock: {BlockId}", blockId);
+            throw;
+        }
+    }
+
+    public async Task<bool> DeleteTaskBlockAsync(string blockId)
+    {
+        try
+        {
+            var block = await _context.TaskBlocks
+                .Include(tb => tb.Events)
+                .FirstOrDefaultAsync(tb => tb.Id == blockId);
+
+            if (block == null) return false;
+
+            // Unassign all events from this block (don't delete the events)
+            foreach (var evt in block.Events)
+            {
+                evt.TaskBlockId = null;
+                evt.BlockDisplayOrder = null;
+            }
+
+            _context.TaskBlocks.Remove(block);
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Deleted TaskBlock: {BlockId}", blockId);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting TaskBlock: {BlockId}", blockId);
+            throw;
+        }
+    }
+
+    public async Task<bool> ReorderTaskBlocksAsync(string projectId, List<string> blockIdsInOrder)
+    {
+        try
+        {
+            var blocks = await _context.TaskBlocks
+                .Where(tb => tb.ProjectId == projectId && blockIdsInOrder.Contains(tb.Id))
+                .ToListAsync();
+
+            for (int i = 0; i < blockIdsInOrder.Count; i++)
+            {
+                var block = blocks.FirstOrDefault(tb => tb.Id == blockIdsInOrder[i]);
+                if (block != null)
+                {
+                    block.DisplayOrder = i + 1;
+                }
+            }
+
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Reordered {Count} TaskBlocks for project: {ProjectId}", blocks.Count, projectId);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error reordering TaskBlocks for project: {ProjectId}", projectId);
+            throw;
+        }
+    }
+
+    // Event assignment operations
+    public async Task<bool> AssignEventsToBlockAsync(string blockId, List<string> eventIds)
+    {
+        try
+        {
+            var events = await _context.ProjectEvents
+                .Where(pe => eventIds.Contains(pe.Id))
+                .ToListAsync();
+
+            // Get the next block display order for each event
+            var maxOrder = await _context.ProjectEvents
+                .Where(pe => pe.TaskBlockId == blockId)
+                .MaxAsync(pe => (int?)pe.BlockDisplayOrder) ?? 0;
+
+            for (int i = 0; i < events.Count; i++)
+            {
+                events[i].TaskBlockId = blockId;
+                events[i].BlockDisplayOrder = maxOrder + i + 1;
+            }
+
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Assigned {Count} events to TaskBlock: {BlockId}", events.Count, blockId);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error assigning events to TaskBlock: {BlockId}", blockId);
+            throw;
+        }
+    }
+
+    public async Task<bool> UnassignEventsFromBlockAsync(List<string> eventIds)
+    {
+        try
+        {
+            var events = await _context.ProjectEvents
+                .Where(pe => eventIds.Contains(pe.Id))
+                .ToListAsync();
+
+            foreach (var evt in events)
+            {
+                evt.TaskBlockId = null;
+                evt.BlockDisplayOrder = null;
+            }
+
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Unassigned {Count} events from their blocks", events.Count);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error unassigning events from blocks");
+            throw;
+        }
+    }
+
+    public async Task<bool> ReorderEventsInBlockAsync(string blockId, List<string> eventIdsInOrder)
+    {
+        try
+        {
+            var events = await _context.ProjectEvents
+                .Where(pe => pe.TaskBlockId == blockId && eventIdsInOrder.Contains(pe.Id))
+                .ToListAsync();
+
+            for (int i = 0; i < eventIdsInOrder.Count; i++)
+            {
+                var evt = events.FirstOrDefault(pe => pe.Id == eventIdsInOrder[i]);
+                if (evt != null)
+                {
+                    evt.BlockDisplayOrder = i + 1;
+                }
+            }
+
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Reordered {Count} events in TaskBlock: {BlockId}", events.Count, blockId);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error reordering events in TaskBlock: {BlockId}", blockId);
+            throw;
+        }
+    }
+}
+
+// View model for timeline data
+public class TimelineData
+{
+    public Project Project { get; set; } = null!;
+    public List<TaskBlock> TaskBlocks { get; set; } = new();
+    public List<ProjectEvent> UnblockedEvents { get; set; } = new();
+}

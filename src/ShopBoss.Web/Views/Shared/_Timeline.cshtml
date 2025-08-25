@@ -1,0 +1,197 @@
+@model ShopBoss.Web.Services.TimelineData
+
+@{
+    var projectId = Model.Project.Id;
+    var timelineId = ViewData["TimelineId"]?.ToString() ?? $"timeline-{projectId}";
+}
+
+<div id="@timelineId" class="timeline-container border rounded p-3">
+    @if (Model.TaskBlocks.Any() || Model.UnblockedEvents.Any())
+    {
+        <!-- TaskBlocks with their events -->
+        @foreach (var block in Model.TaskBlocks.OrderBy(tb => tb.DisplayOrder))
+        {
+            <div class="task-block mb-2" data-block-id="@block.Id">
+                <div class="task-block-header d-flex justify-content-between align-items-center p-2 bg-light border rounded">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-folder me-2 text-primary"></i>
+                        <h6 class="mb-0 fw-bold">@block.Name</h6>
+                        @if (!string.IsNullOrEmpty(block.Description))
+                        {
+                            <small class="text-muted ms-2">• @block.Description</small>
+                        }
+                        <span class="badge bg-info ms-2">@block.Events.Count events</span>
+                    </div>
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" 
+                                onclick="editTaskChunk('@block.Id', '@block.Name', '@(block.Description ?? "")')" 
+                                title="Edit block">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button type="button" class="btn btn-outline-danger btn-sm" 
+                                onclick="deleteTaskChunk('@block.Id')" 
+                                title="Delete block">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Events within this block -->
+                <div class="task-block-events ms-3 mt-1">
+                    @foreach (var evt in block.Events.OrderBy(e => e.BlockDisplayOrder ?? 0).ThenBy(e => e.EventDate))
+                    {
+                        <div class="timeline-event blocked-event" data-event-id="@evt.Id">
+                            <div class="event-content">
+                                <div class="event-header d-flex justify-content-between align-items-center mb-1">
+                                    <div class="event-metadata">
+                                        <span class="badge bg-@(evt.EventType == "comment" ? "info" : "secondary") me-1">@evt.EventType</span>
+                                        @if (evt.RowNumber.HasValue)
+                                        {
+                                            <span class="badge bg-primary me-1">Row @evt.RowNumber</span>
+                                        }
+                                        <small class="text-muted me-1">@evt.EventDate.ToString("yyyy-MM-dd HH:mm")</small>
+                                        <small class="text-muted">by @(evt.CreatedBy ?? "Unknown")</small>
+                                    </div>
+                                    <button type="button" class="btn btn-outline-warning btn-sm" 
+                                            onclick="unassignEventFromChunk('@evt.Id')" 
+                                            title="Remove from block">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                                <div class="event-description mb-1">@evt.Description</div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        <!-- Unblocked Events -->
+        @if (Model.UnblockedEvents.Any())
+        {
+            <div class="unblocked-events">
+                <div class="section-header d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="mb-0 text-muted">
+                        <i class="fas fa-clock me-1"></i>Unblocked Events (@Model.UnblockedEvents.Count)
+                    </h6>
+                    <button type="button" class="btn btn-outline-primary btn-sm" 
+                            onclick="showCreateTaskChunk('@projectId')" 
+                            title="Create new block">
+                        <i class="fas fa-plus me-1"></i>New Chunk
+                    </button>
+                </div>
+                
+                @foreach (var evt in Model.UnblockedEvents.OrderBy(e => e.EventDate))
+                {
+                    <div class="timeline-event unblocked-event" data-event-id="@evt.Id">
+                        <div class="event-content">
+                            <div class="event-header d-flex align-items-center mb-1">
+                                <input type="checkbox" class="form-check-input me-2 event-selector" 
+                                       value="@evt.Id" title="Select for blocking">
+                                <div class="event-metadata flex-grow-1">
+                                    <span class="badge bg-@(evt.EventType == "comment" ? "info" : "secondary") me-1">@evt.EventType</span>
+                                    @if (evt.RowNumber.HasValue)
+                                    {
+                                        <span class="badge bg-primary me-1">Row @evt.RowNumber</span>
+                                    }
+                                    <small class="text-muted me-1">@evt.EventDate.ToString("yyyy-MM-dd HH:mm")</small>
+                                    <small class="text-muted">by @(evt.CreatedBy ?? "Unknown")</small>
+                                </div>
+                            </div>
+                            <div class="event-description mb-1">@evt.Description</div>
+                        </div>
+                    </div>
+                }
+                
+                <!-- Bulk Actions for Unblocked Events -->
+                <div class="bulk-actions mt-3 d-none" id="bulk-actions-@projectId">
+                    <div class="d-flex gap-2 align-items-center p-2 bg-light rounded">
+                        <small class="text-muted">Selected: <span id="selected-count-@projectId">0</span></small>
+                        <button type="button" class="btn btn-sm btn-primary" 
+                                onclick="assignSelectedToNewBlock('@projectId')">
+                            <i class="fas fa-plus me-1"></i>Create Block
+                        </button>
+                        <button type="button" class="btn btn-sm btn-secondary" 
+                                onclick="showAssignToExistingBlock('@projectId')">
+                            <i class="fas fa-folder-plus me-1"></i>Add to Existing
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" 
+                                onclick="clearSelection('@projectId')">
+                            Clear
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+    else
+    {
+        <div class="text-center text-muted py-4">
+            <i class="fas fa-history fa-2x mb-2"></i>
+            <p>No timeline events found</p>
+            <small>Events will appear here after SmartSheet data is imported</small>
+        </div>
+    }
+</div>
+
+<style>
+    .timeline-event {
+        margin-bottom: 4px;
+        padding: 2px 0;
+    }
+    
+    .timeline-event .event-content {
+        /* No padding needed since we removed the marker */
+    }
+    
+    .timeline-event .event-header {
+        margin-bottom: 2px;
+    }
+    
+    .timeline-event .event-metadata {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 2px;
+    }
+    
+    .timeline-event .event-description {
+        margin-bottom: 1px;
+        line-height: 1.2;
+    }
+    
+    .timeline-event .badge {
+        font-size: 0.7em;
+    }
+    
+    .task-block {
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        background-color: #f8f9fa;
+    }
+    
+    .task-block-header {
+        border-bottom: 1px solid #dee2e6;
+    }
+    
+    .task-block-events {
+        background-color: white;
+        padding: 8px;
+        border-radius: 0 0 6px 6px;
+    }
+    
+    .event-selector {
+        cursor: pointer;
+    }
+    
+    .bulk-actions {
+        border-top: 1px solid #dee2e6;
+        margin-top: 8px;
+        padding-top: 5px;
+    }
+    
+    .section-header {
+        border-bottom: 1px solid #e9ecef;
+        padding-bottom: 4px;
+    }
+</style>

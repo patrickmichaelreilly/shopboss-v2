@@ -797,7 +797,7 @@ public class ProjectController : Controller
                 }
                 var workspaceData = Newtonsoft.Json.JsonConvert.DeserializeObject<dynamic>(
                     Newtonsoft.Json.JsonConvert.SerializeObject(workspace));
-                actualWorkspaceId = (long)workspaceData.id;
+                actualWorkspaceId = workspaceData?.id != null ? (long)workspaceData.id : 0;
             }
             else
             {

@@ -30,6 +30,7 @@ public class ShopBossDbContext : DbContext
     public DbSet<PurchaseOrder> PurchaseOrders { get; set; }
     public DbSet<CustomWorkOrder> CustomWorkOrders { get; set; }
     public DbSet<ProjectEvent> ProjectEvents { get; set; }
+    public DbSet<TaskBlock> TaskBlocks { get; set; }
     public DbSet<PartLabel> PartLabels { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -404,9 +405,34 @@ public class ShopBossDbContext : DbContext
                 .HasForeignKey(e => e.ProjectId)
                 .OnDelete(DeleteBehavior.Cascade);
                 
+            entity.HasOne(e => e.TaskBlock)
+                .WithMany(tc => tc.Events)
+                .HasForeignKey(e => e.TaskBlockId)
+                .OnDelete(DeleteBehavior.SetNull);
+                
             entity.HasIndex(e => e.ProjectId);
             entity.HasIndex(e => e.EventDate);
             entity.HasIndex(e => e.EventType);
+            entity.HasIndex(e => e.TaskBlockId);
+        });
+
+        modelBuilder.Entity<TaskBlock>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.ProjectId).IsRequired();
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(200);
+            entity.Property(e => e.Description).HasMaxLength(1000);
+            entity.Property(e => e.DisplayOrder).IsRequired();
+            entity.Property(e => e.IsTemplate).IsRequired();
+            
+            entity.HasOne(e => e.Project)
+                .WithMany()
+                .HasForeignKey(e => e.ProjectId)
+                .OnDelete(DeleteBehavior.Cascade);
+                
+            entity.HasIndex(e => e.ProjectId);
+            entity.HasIndex(e => e.DisplayOrder);
+            entity.HasIndex(e => new { e.ProjectId, e.DisplayOrder });
         });
 
         modelBuilder.Entity<PartLabel>(entity =>

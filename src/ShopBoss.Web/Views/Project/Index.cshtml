@@ -187,79 +187,7 @@ else
                         <td colspan="6" class="p-0 no-hover">
                             <div class="bg-light border-start border-end border-bottom p-3">
                     
-                                <!-- Project Details Section -->
-                                <div class="card mb-3">
-                                    <div class="card-body p-2 position-relative">
-                                        <!-- Display Mode Buttons -->
-                                        <div id="display-buttons-@project.Id" class="position-absolute" style="top: 8px; right: 8px;">
-                                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="editProject('@project.Id')">
-                                                <i class="fas fa-edit me-1"></i>Edit
-                                            </button>
-                                        </div>
-                                        <!-- Edit Mode Buttons -->
-                                        <div id="edit-buttons-@project.Id" class="position-absolute d-none" style="top: 8px; right: 8px;">
-                                            <button type="button" class="btn btn-sm btn-success me-1" onclick="saveProjectEdit('@project.Id')">
-                                                <i class="fas fa-save me-1"></i>Save
-                                            </button>
-                                            <button type="button" class="btn btn-sm btn-secondary" onclick="cancelProjectEdit('@project.Id')">
-                                                <i class="fas fa-times me-1"></i>Cancel
-                                            </button>
-                                        </div>
-                                        
-                                        <!-- Display Mode -->
-                                        <div id="project-display-@project.Id">
-                                            <table class="table table-sm table-borderless mb-0">
-                                                <tbody>
-                                                    <!-- Left: Customer Info, Right: Internal Info -->
-                                                    <tr>
-                                                        <td width="120" class="text-muted ps-3">Address:</td>
-                                                        <td>@(project.ProjectAddress ?? "-")</td>
-                                                        <td width="120" class="text-muted">Bid Date:</td>
-                                                        <td>@(project.BidRequestDate?.ToString("MM/dd/yy") ?? "-")</td>
-                                                    </tr>
-                                                    <tr>
-                                                        <td class="text-muted ps-3">Contractor:</td>
-                                                        <td>@(project.GeneralContractor ?? "-")</td>
-                                                        <td class="text-muted">PM:</td>
-                                                        <td>@(project.ProjectManager ?? "-")</td>
-                                                    </tr>
-                                                    <tr>
-                                                        <td class="text-muted ps-3">Contact:</td>
-                                                        <td>@(project.ProjectContact ?? "-")</td>
-                                                        <td class="text-muted">Installer:</td>
-                                                        <td>@(project.Installer ?? "-")</td>
-                                                    </tr>
-                                                    <tr>
-                                                        <td class="text-muted ps-3">Email:</td>
-                                                        <td>@(project.ProjectContactEmail ?? "-")</td>
-                                                        <td class="text-muted">Category:</td>
-                                                        <td><span class="badge bg-secondary">@project.ProjectCategory</span></td>
-                                                    </tr>
-                                                    <tr>
-                                                        <td class="text-muted ps-3">Phone:</td>
-                                                        <td>@(project.ProjectContactPhone ?? "-")</td>
-                                                        <td></td>
-                                                        <td></td>
-                                                    </tr>
-                                                    
-                                                    @if (!string.IsNullOrEmpty(project.Notes))
-                                                    {
-                                                        <tr><td colspan="4" class="py-2"></td></tr>
-                                                        <tr>
-                                                            <td class="text-muted align-top ps-3">Notes:</td>
-                                                            <td colspan="3">@project.Notes</td>
-                                                        </tr>
-                                                    }
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                        
-                                        <!-- Edit Mode -->
-                                        <div id="project-edit-@project.Id" class="d-none">
-                                            @await Html.PartialAsync("_ProjectForm", project)
-                                        </div>
-                                    </div>
-                                </div>
+                                <!-- Project info section removed - now in _ProjectDetails partial -->
 
                                 <!-- Project Details Content -->
                                 @await Html.PartialAsync("_ProjectDetails", project)
@@ -407,6 +335,8 @@ else
 
 @section Scripts {
     <script src="~/js/project-management.js" asp-append-version="true"></script>
+    <script src="~/js/smartsheet.js" asp-append-version="true"></script>
+    <script src="~/js/timeline.js" asp-append-version="true"></script>
 }
 
 <style>

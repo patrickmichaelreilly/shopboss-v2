@@ -1,59 +1,97 @@
 @model ShopBoss.Web.Models.Project
 
-<!-- SmartSheet Section -->
+<!-- Project Information Section -->
 <div class="card mb-3">
     <div class="card-body p-2">
         <div class="d-flex justify-content-between align-items-center mb-2">
             <div class="d-flex align-items-center">
-                <i class="fas fa-table me-2 text-muted"></i>
-                <small class="fw-bold">SmartSheet</small>
-                @if (Model.SmartSheetId.HasValue)
-                {
-                    <span class="badge bg-success ms-2" style="font-size: 0.7em;">Linked</span>
-                }
-                else
-                {
-                    <span class="badge bg-secondary ms-2" style="font-size: 0.7em;">Not Linked</span>
-                }
+                <i class="fas fa-info-circle me-2 text-muted"></i>
+                <small class="fw-bold">Project Information</small>
             </div>
-            <div class="d-flex">
-                <div id="smartsheet-session-status-@Model.Id" class="me-2" style="font-size: 0.8em;">
-                    <!-- Session status will be loaded here -->
-                </div>
-                @if (!Model.SmartSheetId.HasValue)
-                {
-                    <button type="button" class="btn btn-sm btn-outline-primary me-1" onclick="showSmartSheetLinking('@Model.Id')">
-                        <i class="fas fa-link me-1"></i>Link
-                    </button>
-                }
-                else
-                {
-                    <button type="button" class="btn btn-sm btn-outline-danger me-1" onclick="unlinkSmartSheet('@Model.Id')">
-                        <i class="fas fa-unlink me-1"></i>Unlink
-                    </button>
-                }
+            <div id="edit-buttons-@Model.Id" class="d-none">
+                <button type="button" class="btn btn-sm btn-success me-1" onclick="saveProjectEdit('@Model.Id')">
+                    <i class="fas fa-save me-1"></i>Save
+                </button>
+                <button type="button" class="btn btn-sm btn-secondary" onclick="cancelProjectEdit('@Model.Id')">
+                    <i class="fas fa-times me-1"></i>Cancel
+                </button>
             </div>
         </div>
         
-        <div id="smartsheet-content-@Model.Id" data-smartsheet-id="@(Model.SmartSheetId ?? 0)">
-            @if (Model.SmartSheetId.HasValue)
-            {
-                <div id="smartsheet-info-@Model.Id" class="py-2">
-                    <!-- SmartSheet information will be loaded here -->
-                    <div class="text-center text-muted">
-                        <small><i class="fas fa-spinner fa-spin me-1"></i>Loading SmartSheet information...</small>
-                    </div>
-                </div>
-            }
-            else
-            {
-                <div class="text-center text-muted py-3">
-                    <small><i class="fas fa-info-circle me-1"></i>Project not linked to SmartSheet</small>
-                </div>
-            }
+        <!-- Display Mode -->
+        <div id="project-display-@Model.Id">
+            <table class="table table-sm table-borderless mb-0">
+                <tbody>
+                    <!-- Left: Customer Info, Right: Internal Info -->
+                    <tr>
+                        <td width="120" class="text-muted ps-3">Address:</td>
+                        <td>@(Model.ProjectAddress ?? "-")</td>
+                        <td width="120" class="text-muted">Bid Date:</td>
+                        <td>@(Model.BidRequestDate?.ToString("MM/dd/yy") ?? "-")</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted ps-3">Contractor:</td>
+                        <td>@(Model.GeneralContractor ?? "-")</td>
+                        <td class="text-muted">PM:</td>
+                        <td>@(Model.ProjectManager ?? "-")</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted ps-3">Contact:</td>
+                        <td>@(Model.ProjectContact ?? "-")</td>
+                        <td class="text-muted">Installer:</td>
+                        <td>@(Model.Installer ?? "-")</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted ps-3">Email:</td>
+                        <td>@(Model.ProjectContactEmail ?? "-")</td>
+                        <td class="text-muted">Category:</td>
+                        <td><span class="badge bg-secondary">@Model.ProjectCategory</span></td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted ps-3">Phone:</td>
+                        <td>@(Model.ProjectContactPhone ?? "-")</td>
+                        <td class="text-muted">SmartSheet:</td>
+                        <td>
+                            @if (Model.SmartSheetId.HasValue)
+                            {
+                                <div class="d-flex align-items-center">
+                                    <span class="badge bg-success me-2" style="font-size: 0.7em;">Linked</span>
+                                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="unlinkSmartSheet('@Model.Id')">
+                                        <i class="fas fa-unlink me-1"></i>Unlink
+                                    </button>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="d-flex align-items-center">
+                                    <span class="badge bg-secondary me-2" style="font-size: 0.7em;">Not Linked</span>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="showSmartSheetLinking('@Model.Id')">
+                                        <i class="fas fa-link me-1"></i>Link
+                                    </button>
+                                </div>
+                            }
+                        </td>
+                    </tr>
+                    
+                    @if (!string.IsNullOrEmpty(Model.Notes))
+                    {
+                        <tr><td colspan="4" class="py-2"></td></tr>
+                        <tr>
+                            <td class="text-muted align-top ps-3">Notes:</td>
+                            <td colspan="3">@Model.Notes</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Edit Mode -->
+        <div id="project-edit-@Model.Id" class="d-none">
+            @await Html.PartialAsync("_ProjectForm", Model)
         </div>
     </div>
 </div>
+
 
 <!-- Files Section -->
 <div class="card mb-3">
@@ -175,11 +213,15 @@
             </div>
         </div>
         
-        @{
-            ViewData["TimelineId"] = $"timeline-{Model.Id}";
-            ViewData["ProjectId"] = Model.Id;
-        }
-        @await Html.PartialAsync("_ProjectTimeline", Model.Events)
+        <div id="timeline-container-@Model.Id">
+            @{
+                ViewData["TimelineId"] = $"timeline-{Model.Id}";
+            }
+            <!-- Timeline will be loaded via AJAX -->
+            <div class="text-center text-muted py-3">
+                <i class="fas fa-spinner fa-spin me-1"></i>Loading timeline...
+            </div>
+        </div>
     </div>
 </div>
 
