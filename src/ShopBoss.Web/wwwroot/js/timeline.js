@@ -367,6 +367,9 @@ function initializeTimelineDragDrop(projectId) {
     
     // Initialize event reordering within blocks
     initializeEventReordering(projectId);
+    
+    // Initialize unblocked events drag-drop
+    initializeUnblockedEventsDragDrop(projectId);
 }
 
 // Initialize TaskBlock drag-drop reordering
@@ -452,6 +455,42 @@ function initializeEventReordering(projectId) {
     });
 }
 
+// Initialize drag-drop for unblocked events
+function initializeUnblockedEventsDragDrop(projectId) {
+    const unblockedEventsContainer = document.querySelector(`#timeline-container-${projectId} .unblocked-events`);
+    if (!unblockedEventsContainer) return;
+    
+    new Sortable(unblockedEventsContainer, {
+        draggable: '.unblocked-event',
+        handle: '.event-drag-handle',
+        ghostClass: 'sortable-ghost',
+        chosenClass: 'sortable-chosen',
+        dragClass: 'sortable-drag',
+        animation: 150,
+        group: `events-${projectId}`, // Same group as blocked events to allow cross-container dragging
+        onEnd: function(evt) {
+            // Check if event was dropped into a TaskBlock
+            const targetBlock = evt.to.closest('[data-block-id]');
+            if (targetBlock) {
+                const targetBlockId = targetBlock.dataset.blockId;
+                const movedEventId = evt.item.dataset.eventId;
+                
+                // Assign the event to the target block
+                assignEventsToBlock(targetBlockId, [movedEventId])
+                    .then(() => {
+                        showNotification('Event assigned to block successfully', 'success');
+                        loadTimelineForProject(projectId);
+                    })
+                    .catch(error => {
+                        console.error('Error assigning event to block:', error);
+                        showNotification('Error assigning event to block', 'error');
+                        loadTimelineForProject(projectId);
+                    });
+            }
+        }
+    });
+}
+
 // API call to reorder TaskBlocks
 function reorderTaskBlocks(projectId, blockIds) {
     const requestData = {
@@ -508,6 +547,117 @@ function reorderEventsInBlock(blockId, eventIds) {
     })
     .catch(error => {
         console.error('Error reordering events:', error);
+        showNotification('Network error occurred', 'error');
+    });
+}
+
+// Comment functionality
+function showAddComment(projectId) {
+    const modal = new bootstrap.Modal(document.getElementById(`addCommentModal-${projectId}`));
+    modal.show();
+}
+
+function saveComment(projectId) {
+    const commentText = document.getElementById(`commentText-${projectId}`).value.trim();
+    const commentDate = document.getElementById(`commentDate-${projectId}`).value;
+    const commentAuthor = document.getElementById(`commentAuthor-${projectId}`).value.trim();
+    
+    if (!commentText) {
+        showNotification('Comment text is required', 'error');
+        return;
+    }
+    
+    if (!commentDate) {
+        showNotification('Date is required', 'error');
+        return;
+    }
+    
+    const modal = bootstrap.Modal.getInstance(document.getElementById(`addCommentModal-${projectId}`));
+    
+    fetch(`/Project/CreateComment`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({
+            projectId: projectId,
+            description: commentText,
+            eventDate: commentDate,
+            createdBy: commentAuthor || null
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            modal.hide();
+            // Clear form
+            document.getElementById(`commentText-${projectId}`).value = '';
+            document.getElementById(`commentDate-${projectId}`).value = new Date().toISOString().slice(0, 16);
+            document.getElementById(`commentAuthor-${projectId}`).value = '';
+            
+            showNotification('Comment added successfully', 'success');
+            loadTimelineForProject(projectId);
+        } else {
+            showNotification(data.message || 'Error adding comment', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error saving comment:', error);
+        showNotification('Network error occurred', 'error');
+    });
+}
+
+// Attachment comment editing functionality
+var currentEditingEventId = null;
+
+function editAttachmentComment(eventId, currentDescription, projectId) {
+    currentEditingEventId = eventId;
+    
+    // Set the current description in the textarea
+    document.getElementById(`editAttachmentCommentText-${projectId}`).value = currentDescription || '';
+    
+    // Show the modal
+    const modal = new bootstrap.Modal(document.getElementById(`editAttachmentCommentModal-${projectId}`));
+    modal.show();
+}
+
+function saveAttachmentComment(projectId) {
+    if (!currentEditingEventId) {
+        showNotification('No event selected for editing', 'error');
+        return;
+    }
+    
+    const description = document.getElementById(`editAttachmentCommentText-${projectId}`).value.trim();
+    const modal = bootstrap.Modal.getInstance(document.getElementById(`editAttachmentCommentModal-${projectId}`));
+    
+    fetch(`/Project/UpdateEventDescription`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({
+            eventId: currentEditingEventId,
+            description: description
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            modal.hide();
+            // Clear form and reset state
+            document.getElementById(`editAttachmentCommentText-${projectId}`).value = '';
+            currentEditingEventId = null;
+            
+            showNotification('Comment updated successfully', 'success');
+            loadTimelineForProject(projectId);
+        } else {
+            showNotification(data.message || 'Error updating comment', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error updating attachment comment:', error);
         showNotification('Network error occurred', 'error');
     });
 }

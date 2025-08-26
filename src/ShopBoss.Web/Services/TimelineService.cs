@@ -31,12 +31,14 @@ public class TimelineService
             var blocks = await _context.TaskBlocks
                 .Where(tb => tb.ProjectId == projectId)
                 .Include(tb => tb.Events)
+                    .ThenInclude(e => e.Attachment)
                 .OrderBy(tb => tb.DisplayOrder)
                 .ToListAsync();
 
             // Get all events for this project, ordered chronologically
             var allEvents = await _context.ProjectEvents
                 .Where(pe => pe.ProjectId == projectId)
+                .Include(pe => pe.Attachment)
                 .OrderBy(pe => pe.EventDate)
                 .ToListAsync();
 

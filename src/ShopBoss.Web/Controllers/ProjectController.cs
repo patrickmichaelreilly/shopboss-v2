@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using ShopBoss.Web.Services;
 using ShopBoss.Web.Models;
+using ShopBoss.Web.Data;
 using System.Text.Json;
 
 namespace ShopBoss.Web.Controllers;
@@ -14,6 +15,7 @@ public class ProjectController : Controller
     private readonly SmartSheetImportService _smartSheetImportService;
     private readonly SmartSheetService _smartSheetService;
     private readonly SmartSheetCacheService _smartSheetCacheService;
+    private readonly ShopBossDbContext _context;
     private readonly ILogger<ProjectController> _logger;
 
     public ProjectController(
@@ -24,6 +26,7 @@ public class ProjectController : Controller
         SmartSheetImportService smartSheetImportService,
         SmartSheetService smartSheetService,
         SmartSheetCacheService smartSheetCacheService,
+        ShopBossDbContext context,
         ILogger<ProjectController> logger)
     {
         _projectService = projectService;
@@ -33,6 +36,7 @@ public class ProjectController : Controller
         _smartSheetImportService = smartSheetImportService;
         _smartSheetService = smartSheetService;
         _smartSheetCacheService = smartSheetCacheService;
+        _context = context;
         _logger = logger;
     }
 
@@ -232,7 +236,7 @@ public class ProjectController : Controller
     }
 
     [HttpPost]
-    public async Task<IActionResult> UploadFile(string projectId, string category, IFormFile file)
+    public async Task<IActionResult> UploadFile(string projectId, string category, IFormFile file, string? comment = null)
     {
         try
         {
@@ -241,7 +245,7 @@ public class ProjectController : Controller
                 return Json(new { success = false, message = "No file selected" });
             }
 
-            var attachment = await _attachmentService.UploadAttachmentAsync(projectId, file, category);
+            var attachment = await _attachmentService.UploadAttachmentAsync(projectId, file, category, comment: comment);
             return Json(new { success = true, attachment = attachment });
         }
         catch (Exception ex)
@@ -897,6 +901,76 @@ public class ProjectController : Controller
         }
     }
 
+    [HttpPost]
+    public async Task<IActionResult> CreateComment([FromBody] CreateCommentRequest request)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(request.ProjectId))
+            {
+                return Json(new { success = false, message = "Project ID is required" });
+            }
+
+            if (string.IsNullOrWhiteSpace(request.Description))
+            {
+                return Json(new { success = false, message = "Comment description is required" });
+            }
+
+            // Create new ProjectEvent for the comment
+            var projectEvent = new ProjectEvent
+            {
+                ProjectId = request.ProjectId,
+                EventDate = request.EventDate,
+                EventType = "comment",
+                Description = request.Description,
+                CreatedBy = request.CreatedBy
+            };
+
+            var success = await _projectService.AddProjectEventAsync(projectEvent);
+            
+            if (success)
+            {
+                return Json(new { success = true, message = "Comment added successfully" });
+            }
+            else
+            {
+                return Json(new { success = false, message = "Failed to add comment" });
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating comment for project {ProjectId}", request.ProjectId);
+            return Json(new { success = false, message = "An error occurred while adding the comment" });
+        }
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> UpdateEventDescription([FromBody] UpdateEventDescriptionRequest request)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(request.EventId))
+            {
+                return Json(new { success = false, message = "Event ID is required" });
+            }
+
+            var projectEvent = await _context.ProjectEvents.FindAsync(request.EventId);
+            if (projectEvent == null)
+            {
+                return Json(new { success = false, message = "Event not found" });
+            }
+
+            projectEvent.Description = request.Description ?? "";
+            await _context.SaveChangesAsync();
+
+            return Json(new { success = true, message = "Comment updated successfully" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating event description for event {EventId}", request.EventId);
+            return Json(new { success = false, message = "An error occurred while updating the comment" });
+        }
+    }
 
     public class AttachWorkOrdersRequest
     {
@@ -924,6 +998,20 @@ public class ProjectController : Controller
     public class QueryCacheRequest
     {
         public string Sql { get; set; } = string.Empty;
+    }
+
+    public class CreateCommentRequest
+    {
+        public string ProjectId { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public DateTime EventDate { get; set; }
+        public string? CreatedBy { get; set; }
+    }
+
+    public class UpdateEventDescriptionRequest
+    {
+        public string EventId { get; set; } = string.Empty;
+        public string? Description { get; set; }
     }
 
 }

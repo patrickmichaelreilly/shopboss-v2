@@ -104,7 +104,7 @@
                 <small class="fw-bold">Project Timeline (@Model.Events.Count)</small>
             </div>
             <div class="btn-group" role="group">
-                <button type="button" class="btn btn-sm btn-outline-primary" onclick="document.getElementById('fileInputHidden-@Model.Id').click();">
+                <button type="button" class="btn btn-sm btn-outline-primary" onclick="showUploadFileModal('@Model.Id')">
                     <i class="fas fa-upload me-1"></i>Upload File
                 </button>
                 <button type="button" class="btn btn-sm btn-outline-success" onclick="showCreatePurchaseOrder('@Model.Id')">
@@ -115,6 +115,9 @@
                 </button>
                 <button type="button" class="btn btn-sm btn-outline-info" onclick="showCreateCustomWorkOrder('@Model.Id')" title="Add Custom Work Order">
                     <i class="fas fa-plus me-1"></i>Custom
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="showAddComment('@Model.Id')" title="Add Comment">
+                    <i class="fas fa-comment me-1"></i>Comment
                 </button>
             </div>
             <input type="file" id="fileInputHidden-@Model.Id" class="d-none" multiple 
@@ -128,6 +131,112 @@
             <!-- Timeline will be loaded via AJAX -->
             <div class="text-center text-muted py-3">
                 <i class="fas fa-spinner fa-spin me-1"></i>Loading timeline...
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Comment Modal -->
+<div class="modal fade" id="addCommentModal-@Model.Id" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Comment</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addCommentForm-@Model.Id">
+                    <div class="mb-3">
+                        <label for="commentText-@Model.Id" class="form-label">Comment</label>
+                        <textarea class="form-control" id="commentText-@Model.Id" rows="4" required 
+                                  placeholder="Enter your comment..."></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="commentDate-@Model.Id" class="form-label">Date</label>
+                        <input type="datetime-local" class="form-control" id="commentDate-@Model.Id" 
+                               value="@DateTime.Now.ToString("yyyy-MM-ddTHH:mm")" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="commentAuthor-@Model.Id" class="form-label">Author</label>
+                        <input type="text" class="form-control" id="commentAuthor-@Model.Id" 
+                               placeholder="Your name (optional)">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveComment('@Model.Id')">
+                    <i class="fas fa-comment me-1"></i>Add Comment
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Upload File Modal -->
+<div class="modal fade" id="uploadFileModal-@Model.Id" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Upload Files</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="uploadFileForm-@Model.Id" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="fileInput-@Model.Id" class="form-label">Select Files</label>
+                        <input type="file" class="form-control" id="fileInput-@Model.Id" multiple required>
+                        <div class="form-text">You can select multiple files to upload.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="fileCategory-@Model.Id" class="form-label">Category</label>
+                        <select class="form-select" id="fileCategory-@Model.Id">
+                            <option value="Schematic">Schematic</option>
+                            <option value="Correspondence">Correspondence</option>
+                            <option value="Invoice">Invoice</option>
+                            <option value="Proof">Proof</option>
+                            <option value="Other" selected>Other</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="fileComment-@Model.Id" class="form-label">Comment (Optional)</label>
+                        <textarea class="form-control" id="fileComment-@Model.Id" rows="2" 
+                                  placeholder="Add a comment about these files..."></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="uploadFilesWithComment('@Model.Id')">
+                    <i class="fas fa-upload me-1"></i>Upload Files
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Attachment Comment Modal -->
+<div class="modal fade" id="editAttachmentCommentModal-@Model.Id" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Attachment Comment</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editAttachmentCommentForm-@Model.Id">
+                    <div class="mb-3">
+                        <label for="editAttachmentCommentText-@Model.Id" class="form-label">Comment</label>
+                        <textarea class="form-control" id="editAttachmentCommentText-@Model.Id" rows="4" 
+                                  placeholder="Enter your comment about this attachment..."></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveAttachmentComment('@Model.Id')">
+                    <i class="fas fa-save me-1"></i>Save Comment
+                </button>
             </div>
         </div>
     </div>

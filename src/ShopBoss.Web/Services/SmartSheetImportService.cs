@@ -11,15 +11,18 @@ public class SmartSheetImportService
     private readonly ShopBossDbContext _context;
     private readonly ILogger<SmartSheetImportService> _logger;
     private readonly IConfiguration _configuration;
+    private readonly ProjectAttachmentService _attachmentService;
 
     public SmartSheetImportService(
         ShopBossDbContext context,
         ILogger<SmartSheetImportService> logger,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        ProjectAttachmentService attachmentService)
     {
         _context = context;
         _logger = logger;
         _configuration = configuration;
+        _attachmentService = attachmentService;
     }
 
     public async Task<SmartSheetImportResult> ImportProjectsFromMasterListAsync()
@@ -669,10 +672,6 @@ public class SmartSheetImportService
                 .Build();
 
             var attachments = smartsheet.SheetResources.AttachmentResources.ListAttachments(sheetId, new PaginationParameters(true, null, null));
-            
-            // Create directory for project attachments
-            var uploadPath = Path.Combine("wwwroot", "uploads", "projects", projectId);
-            Directory.CreateDirectory(uploadPath);
 
             foreach (var attachment in attachments.Data)
             {
@@ -685,41 +684,22 @@ public class SmartSheetImportService
                         using var httpClient = new HttpClient();
                         var fileBytes = await httpClient.GetByteArrayAsync(attachmentDetails.Url);
                         
-                        var fileName = Path.GetFileName(attachment.Name ?? "unknown_file");
-                        var filePath = Path.Combine(uploadPath, fileName);
+                        var originalFileName = attachment.Name ?? "unknown_file";
+                        var uploadedBy = attachment.CreatedBy?.Email ?? "SmartSheet Migration";
+                        var uploadDate = attachment.CreatedAt ?? DateTime.UtcNow;
+
+                        // Use shared attachment service for consistent file storage
+                        await _attachmentService.SaveAttachmentAsync(
+                            projectId,
+                            originalFileName,
+                            fileBytes,
+                            "application/octet-stream", // SmartSheet doesn't provide detailed MIME types
+                            "SmartSheet", // Category to identify SmartSheet imports
+                            uploadedBy,
+                            uploadDate);
                         
-                        await File.WriteAllBytesAsync(filePath, fileBytes);
-                        
-                        // Create ProjectAttachment record
-                        var projectAttachment = new ProjectAttachment
-                        {
-                            ProjectId = projectId,
-                            FileName = fileName,
-                            OriginalFileName = attachment.Name ?? "",
-                            FileSize = fileBytes.Length,
-                            UploadedDate = DateTime.UtcNow,
-                            UploadedBy = "SmartSheet Migration",
-                            ContentType = "application/octet-stream",
-                            Category = "Other"
-                        };
-                        
-                        _context.ProjectAttachments.Add(projectAttachment);
-                        
-                        // Create timeline event if requested (more efficient than looking up later)
-                        if (createTimelineEvents)
-                        {
-                            var attachmentEvent = new ProjectEvent
-                            {
-                                ProjectId = projectId,
-                                EventDate = attachment.CreatedAt ?? DateTime.UtcNow,
-                                EventType = "attachment",
-                                Description = $"File uploaded: {attachment.Name} ({(attachment.SizeInKb ?? 0) / 1024.0:F1} MB)",
-                                CreatedBy = attachment.CreatedBy?.Email ?? "SmartSheet Migration",
-                                AttachmentId = projectAttachment.Id,
-                                RowNumber = null // Row number mapping would require additional API calls
-                            };
-                            _context.ProjectEvents.Add(attachmentEvent);
-                        }
+                        _logger.LogInformation("Downloaded and saved SmartSheet attachment: {FileName} for project {ProjectId}", 
+                            originalFileName, projectId);
                     }
                 }
                 catch (Exception ex)

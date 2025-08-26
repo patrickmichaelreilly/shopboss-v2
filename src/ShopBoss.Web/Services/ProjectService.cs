@@ -281,4 +281,19 @@ public class ProjectService
             throw;
         }
     }
+
+    public async Task<bool> AddProjectEventAsync(ProjectEvent projectEvent)
+    {
+        try
+        {
+            _context.ProjectEvents.Add(projectEvent);
+            await _context.SaveChangesAsync();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error adding project event for project {ProjectId}", projectEvent.ProjectId);
+            return false;
+        }
+    }
 }

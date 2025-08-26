@@ -61,32 +61,30 @@
                                     </button>
                                 </div>
                                 <div class="event-description mb-1">
-                                    @if (evt.EventType == "attachment" && !string.IsNullOrEmpty(evt.AttachmentId))
+                                    @if (evt.EventType == "attachment" && !string.IsNullOrEmpty(evt.AttachmentId) && evt.Attachment != null)
                                     {
-                                        @* Render attachment event as downloadable link *@
-                                        <div class="d-flex align-items-center">
-                                            <i class="fas fa-file text-muted me-2" style="font-size: 0.9em;"></i>
-                                            <a href="@Url.Action("DownloadFile", "Project", new { id = evt.AttachmentId })" 
-                                               class="text-decoration-none me-2" style="font-size: 0.9em;">
-                                                @{
-                                                    var fileName = evt.Description.Replace("File uploaded: ", "").Replace("File deleted: ", "");
-                                                    if (fileName.Contains(" ("))
-                                                    {
-                                                        fileName = fileName.Substring(0, fileName.IndexOf(" ("));
-                                                    }
-                                                }
-                                                @fileName
-                                            </a>
-                                            @if (evt.Description.Contains("deleted"))
-                                            {
-                                                <span class="badge bg-danger" style="font-size: 0.7em;">Deleted</span>
-                                            }
-                                            else
-                                            {
-                                                <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-2" 
+                                        @* Render attachment event with file info from Attachment object *@
+                                        <div class="attachment-event">
+                                            <div class="d-flex align-items-center">
+                                                <i class="fas fa-file text-muted me-2" style="font-size: 0.9em;"></i>
+                                                <a href="@Url.Action("DownloadFile", "Project", new { id = evt.AttachmentId })" 
+                                                   class="text-decoration-none me-2" style="font-size: 0.9em;">
+                                                    @evt.Attachment.OriginalFileName
+                                                </a>
+                                                <small class="text-muted me-2">(@((evt.Attachment.FileSize / 1024.0).ToString("F1")) KB)</small>
+                                                <button type="button" class="btn btn-sm btn-link text-danger p-0 me-2" 
                                                         onclick="deleteFile('@evt.AttachmentId', '@Model.Project.Id')" title="Delete">
                                                     <i class="fas fa-times"></i>
                                                 </button>
+                                                <button type="button" class="btn btn-sm btn-link text-primary p-0" onclick="editAttachmentComment('@evt.Id', '@(evt.Description?.Replace("'", "\\'").Replace("\"", "\\\"") ?? "")', '@Model.Project.Id')" title="Edit Comment">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                            </div>
+                                            @if (!string.IsNullOrEmpty(evt.Description))
+                                            {
+                                                <div class="attachment-comment mt-1 ms-4">
+                                                    <small class="text-muted"><i class="fas fa-comment me-1"></i>@evt.Description</small>
+                                                </div>
                                             }
                                         </div>
                                     }
@@ -101,7 +99,7 @@
                                                 <div class="flex-grow-1" style="font-size: 0.9em;">
                                                     @{
                                                         // Extract PO details from description
-                                                        var poDetails = evt.Description;
+                                                        var poDetails = evt.Description ?? "";
                                                         if (poDetails.Contains(":"))
                                                         {
                                                             poDetails = poDetails.Substring(poDetails.IndexOf(":") + 1).Trim();
@@ -112,7 +110,7 @@
                                                     {
                                                         <small class="text-muted ms-2">• @poDetails.Split(" - ")[1]</small>
                                                     }
-                                                    @if (evt.Description.Contains("status changed") && evt.Description.Contains("→"))
+                                                    @if (!string.IsNullOrEmpty(evt.Description) && evt.Description.Contains("status changed") && evt.Description.Contains("→"))
                                                     {
                                                         var statusPart = evt.Description.Substring(evt.Description.IndexOf("→") + 1).Trim();
                                                         var statusBadgeClass = statusPart switch
@@ -237,6 +235,7 @@
                     <div class="timeline-event unblocked-event" data-event-id="@evt.Id">
                         <div class="event-content">
                             <div class="event-header d-flex align-items-center mb-1">
+                                <i class="fas fa-grip-vertical event-drag-handle me-2 text-muted" style="cursor: grab; font-size: 0.8em;" title="Drag to assign to block"></i>
                                 <input type="checkbox" class="form-check-input me-2 event-selector" 
                                        value="@evt.Id" title="Select for blocking">
                                 <div class="event-metadata flex-grow-1">
@@ -250,32 +249,30 @@
                                 </div>
                             </div>
                             <div class="event-description mb-1">
-                                @if (evt.EventType == "attachment" && !string.IsNullOrEmpty(evt.AttachmentId))
+                                @if (evt.EventType == "attachment" && !string.IsNullOrEmpty(evt.AttachmentId) && evt.Attachment != null)
                                 {
-                                    @* Render attachment event as downloadable link *@
-                                    <div class="d-flex align-items-center">
-                                        <i class="fas fa-file text-muted me-2" style="font-size: 0.9em;"></i>
-                                        <a href="@Url.Action("DownloadFile", "Project", new { id = evt.AttachmentId })" 
-                                           class="text-decoration-none me-2" style="font-size: 0.9em;">
-                                            @{
-                                                var fileName = evt.Description.Replace("File uploaded: ", "").Replace("File deleted: ", "");
-                                                if (fileName.Contains(" ("))
-                                                {
-                                                    fileName = fileName.Substring(0, fileName.IndexOf(" ("));
-                                                }
-                                            }
-                                            @fileName
-                                        </a>
-                                        @if (evt.Description.Contains("deleted"))
-                                        {
-                                            <span class="badge bg-danger" style="font-size: 0.7em;">Deleted</span>
-                                        }
-                                        else
-                                        {
-                                            <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-2" 
+                                    @* Render attachment event with file info from Attachment object *@
+                                    <div class="attachment-event">
+                                        <div class="d-flex align-items-center">
+                                            <i class="fas fa-file text-muted me-2" style="font-size: 0.9em;"></i>
+                                            <a href="@Url.Action("DownloadFile", "Project", new { id = evt.AttachmentId })" 
+                                               class="text-decoration-none me-2" style="font-size: 0.9em;">
+                                                @evt.Attachment.OriginalFileName
+                                            </a>
+                                            <small class="text-muted me-2">(@((evt.Attachment.FileSize / 1024.0).ToString("F1")) KB)</small>
+                                            <button type="button" class="btn btn-sm btn-link text-danger p-0 me-2" 
                                                     onclick="deleteFile('@evt.AttachmentId', '@Model.Project.Id')" title="Delete">
                                                 <i class="fas fa-times"></i>
                                             </button>
+                                            <button type="button" class="btn btn-sm btn-link text-primary p-0" onclick="editAttachmentComment('@evt.Id', '@(evt.Description?.Replace("'", "\\'").Replace("\"", "\\\"") ?? "")', '@Model.Project.Id')" title="Edit Comment">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                        </div>
+                                        @if (!string.IsNullOrEmpty(evt.Description))
+                                        {
+                                            <div class="attachment-comment mt-1 ms-4">
+                                                <small class="text-muted"><i class="fas fa-comment me-1"></i>@evt.Description</small>
+                                            </div>
                                         }
                                     </div>
                                 }
@@ -290,7 +287,7 @@
                                             <div class="flex-grow-1" style="font-size: 0.9em;">
                                                 @{
                                                     // Extract PO details from description
-                                                    var poDetails = evt.Description;
+                                                    var poDetails = evt.Description ?? "";
                                                     if (poDetails.Contains(":"))
                                                     {
                                                         poDetails = poDetails.Substring(poDetails.IndexOf(":") + 1).Trim();
@@ -301,7 +298,7 @@
                                                 {
                                                     <small class="text-muted ms-2">• @poDetails.Split(" - ")[1]</small>
                                                 }
-                                                @if (evt.Description.Contains("status changed") && evt.Description.Contains("→"))
+                                                @if (!string.IsNullOrEmpty(evt.Description) && evt.Description.Contains("status changed") && evt.Description.Contains("→"))
                                                 {
                                                     var statusPart = evt.Description.Substring(evt.Description.IndexOf("→") + 1).Trim();
                                                     var statusBadgeClass = statusPart switch

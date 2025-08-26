@@ -128,8 +128,8 @@ public class SmartSheetCacheService
                 insertSheetCommand.Parameters.AddWithValue("@workspaceId", DBNull.Value); // We'll update this when caching workspace
                 insertSheetCommand.Parameters.AddWithValue("@name", (string?)sheetData?.name ?? "Unknown Sheet");
                 insertSheetCommand.Parameters.AddWithValue("@columnCount", ((IEnumerable<dynamic>?)sheetData?.columns ?? new object[0]).Count());
-                insertSheetCommand.Parameters.AddWithValue("@rowCount", (int)sheetData.totalRowCount);
-                insertSheetCommand.Parameters.AddWithValue("@lastModified", DateTime.Parse((string)sheetData.modifiedAt));
+                insertSheetCommand.Parameters.AddWithValue("@rowCount", (int)(sheetData?.totalRowCount ?? 0));
+                insertSheetCommand.Parameters.AddWithValue("@lastModified", DateTime.Parse((string?)sheetData?.modifiedAt ?? DateTime.UtcNow.ToString()));
                 insertSheetCommand.Parameters.AddWithValue("@lastSynced", DateTime.UtcNow);
                 
                 insertSheetCommand.ExecuteNonQuery();
@@ -153,7 +153,7 @@ public class SmartSheetCacheService
                     VALUES (@sheetId, @columnId, @title, @columnType, @columnIndex, @options)
                 ";
 
-                foreach (var column in sheetData.columns)
+                foreach (var column in sheetData?.columns ?? new object[0])
                 {
                     insertColumnCommand.Parameters.Clear();
                     insertColumnCommand.Parameters.AddWithValue("@sheetId", sheetId);
@@ -175,7 +175,7 @@ public class SmartSheetCacheService
                     VALUES (@sheetId, @rowId, @rowNumber, @cellData, @createdAt, @modifiedAt)
                 ";
 
-                foreach (var row in sheetData.rows)
+                foreach (var row in sheetData?.rows ?? new object[0])
                 {
                     insertRowCommand.Parameters.Clear();
                     insertRowCommand.Parameters.AddWithValue("@sheetId", sheetId);
@@ -192,8 +192,8 @@ public class SmartSheetCacheService
 
                 transaction.Commit();
                 
-                var sheetName = (string)sheetData.name;
-                var rowCount = ((IEnumerable<dynamic>)sheetData.rows).Count();
+                var sheetName = (string?)sheetData?.name ?? "Unknown Sheet";
+                var rowCount = ((IEnumerable<dynamic>?)sheetData?.rows ?? new object[0]).Count();
                 _logger.LogInformation("Successfully cached sheet {SheetId} ({SheetName}) with {RowCount} rows", 
                     sheetId, sheetName, rowCount);
                 

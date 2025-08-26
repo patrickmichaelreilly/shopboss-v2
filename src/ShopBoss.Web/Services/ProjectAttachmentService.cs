@@ -20,48 +20,55 @@ public class ProjectAttachmentService
         Directory.CreateDirectory(_fileStorageRoot);
     }
 
-    public async Task<ProjectAttachment> UploadAttachmentAsync(string projectId, IFormFile file, string category, string? uploadedBy = null)
+    // Shared method for saving attachments from any source
+    public async Task<ProjectAttachment> SaveAttachmentAsync(
+        string projectId,
+        string originalFileName,
+        byte[] fileContent,
+        string contentType,
+        string category,
+        string? uploadedBy = null,
+        DateTime? uploadDate = null,
+        string? comment = null)
     {
         try
         {
-            // Create project directory structure
-            var projectDir = Path.Combine(_fileStorageRoot, projectId, category);
+            // Get human-readable folder name using ProjectId and ProjectName
+            var projectFolderName = await GetProjectFolderNameAsync(projectId);
+            var projectDir = Path.Combine(_fileStorageRoot, projectFolderName);
             Directory.CreateDirectory(projectDir);
 
-            // Generate unique filename while preserving original
-            var fileExtension = Path.GetExtension(file.FileName);
-            var uniqueFileName = $"{Guid.NewGuid()}{fileExtension}";
-            var filePath = Path.Combine(projectDir, uniqueFileName);
+            // Handle duplicate filenames by appending counter if needed
+            var fileName = GetUniqueFileName(projectDir, originalFileName);
+            var filePath = Path.Combine(projectDir, fileName);
 
             // Save file to disk
-            using (var stream = new FileStream(filePath, FileMode.Create))
-            {
-                await file.CopyToAsync(stream);
-            }
+            await File.WriteAllBytesAsync(filePath, fileContent);
 
             // Create database record
             var attachment = new ProjectAttachment
             {
                 Id = Guid.NewGuid().ToString(),
                 ProjectId = projectId,
-                FileName = uniqueFileName,
-                OriginalFileName = file.FileName,
-                FileSize = file.Length,
-                ContentType = file.ContentType,
+                FileName = fileName, // Store the final filename (may have counter appended)
+                OriginalFileName = originalFileName, // Store the original filename
+                FileSize = fileContent.Length,
+                ContentType = contentType,
                 Category = category,
-                UploadedDate = DateTime.UtcNow,
+                UploadedDate = uploadDate ?? DateTime.UtcNow,
                 UploadedBy = uploadedBy
             };
 
             _context.ProjectAttachments.Add(attachment);
             
             // Create timeline event for file upload
+            // Store only the user comment in Description; file info comes from Attachment object
             var projectEvent = new ProjectEvent
             {
                 ProjectId = projectId,
-                EventDate = DateTime.UtcNow,
+                EventDate = uploadDate ?? DateTime.UtcNow,
                 EventType = "attachment",
-                Description = $"File uploaded: {file.FileName} ({file.Length / 1024:F1} KB)",
+                Description = comment ?? "",  // Only the user's comment
                 CreatedBy = uploadedBy,
                 AttachmentId = attachment.Id
             };
@@ -69,8 +76,51 @@ public class ProjectAttachmentService
             
             await _context.SaveChangesAsync();
 
-            _logger.LogInformation("Uploaded file {FileName} for project {ProjectId}", file.FileName, projectId);
+            _logger.LogInformation("Saved attachment {FileName} for project {ProjectId}", fileName, projectId);
             return attachment;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error saving attachment {FileName} for project {ProjectId}", originalFileName, projectId);
+            throw;
+        }
+    }
+
+    // Helper method to handle duplicate filenames
+    private string GetUniqueFileName(string directory, string originalFileName)
+    {
+        var fileName = originalFileName;
+        var counter = 1;
+        
+        while (File.Exists(Path.Combine(directory, fileName)))
+        {
+            var nameWithoutExt = Path.GetFileNameWithoutExtension(originalFileName);
+            var extension = Path.GetExtension(originalFileName);
+            fileName = $"{nameWithoutExt}({counter}){extension}";
+            counter++;
+        }
+        
+        return fileName;
+    }
+
+    public async Task<ProjectAttachment> UploadAttachmentAsync(string projectId, IFormFile file, string category, string? uploadedBy = null, string? comment = null)
+    {
+        try
+        {
+            // Convert IFormFile to byte array
+            using var memoryStream = new MemoryStream();
+            await file.CopyToAsync(memoryStream);
+            var fileContent = memoryStream.ToArray();
+
+            // Use shared save method
+            return await SaveAttachmentAsync(
+                projectId,
+                file.FileName,
+                fileContent,
+                file.ContentType,
+                category,
+                uploadedBy,
+                comment: comment);
         }
         catch (Exception ex)
         {
@@ -108,7 +158,9 @@ public class ProjectAttachmentService
                 return (null, null, null);
             }
 
-            var filePath = Path.Combine(_fileStorageRoot, attachment.ProjectId, attachment.Category, attachment.FileName);
+            // Use human-readable folder name: ProjectFiles/{ProjectId ProjectName}/{fileName}
+            var projectFolderName = await GetProjectFolderNameAsync(attachment.ProjectId);
+            var filePath = Path.Combine(_fileStorageRoot, projectFolderName, attachment.FileName);
             
             if (!File.Exists(filePath))
             {
@@ -133,8 +185,9 @@ public class ProjectAttachmentService
             var attachment = await _context.ProjectAttachments.FindAsync(attachmentId);
             if (attachment == null) return false;
 
-            // Delete file from disk
-            var filePath = Path.Combine(_fileStorageRoot, attachment.ProjectId, attachment.Category, attachment.FileName);
+            // Delete file from disk using human-readable folder structure
+            var projectFolderName = await GetProjectFolderNameAsync(attachment.ProjectId);
+            var filePath = Path.Combine(_fileStorageRoot, projectFolderName, attachment.FileName);
             if (File.Exists(filePath))
             {
                 File.Delete(filePath);
@@ -172,20 +225,9 @@ public class ProjectAttachmentService
             var attachment = await _context.ProjectAttachments.FindAsync(attachmentId);
             if (attachment == null) return false;
 
-            // Move file to new category directory if category changed
+            // Only update database category (no file moving needed with simplified structure)
             if (attachment.Category != newCategory)
             {
-                var oldPath = Path.Combine(_fileStorageRoot, attachment.ProjectId, attachment.Category, attachment.FileName);
-                var newCategoryDir = Path.Combine(_fileStorageRoot, attachment.ProjectId, newCategory);
-                Directory.CreateDirectory(newCategoryDir);
-                var newPath = Path.Combine(newCategoryDir, attachment.FileName);
-
-                if (File.Exists(oldPath))
-                {
-                    File.Move(oldPath, newPath);
-                }
-
-                // Update database record
                 attachment.Category = newCategory;
                 await _context.SaveChangesAsync();
 
@@ -201,17 +243,17 @@ public class ProjectAttachmentService
         }
     }
 
-    public Task CleanupProjectFilesAsync(string projectId)
+    public async Task CleanupProjectFilesAsync(string projectId)
     {
         try
         {
-            var projectDir = Path.Combine(_fileStorageRoot, projectId);
+            var projectFolderName = await GetProjectFolderNameAsync(projectId);
+            var projectDir = Path.Combine(_fileStorageRoot, projectFolderName);
             if (Directory.Exists(projectDir))
             {
                 Directory.Delete(projectDir, true);
                 _logger.LogInformation("Cleaned up files for project {ProjectId}", projectId);
             }
-            return Task.CompletedTask;
         }
         catch (Exception ex)
         {
@@ -220,8 +262,54 @@ public class ProjectAttachmentService
         }
     }
 
-    public string GetProjectFileDirectory(string projectId)
+    public async Task<string> GetProjectFileDirectoryAsync(string projectId)
     {
-        return Path.Combine(_fileStorageRoot, projectId);
+        var projectFolderName = await GetProjectFolderNameAsync(projectId);
+        return Path.Combine(_fileStorageRoot, projectFolderName);
+    }
+
+    private async Task<string> GetProjectFolderNameAsync(string projectId)
+    {
+        var project = await _context.Projects
+            .FirstOrDefaultAsync(p => p.Id == projectId);
+        
+        if (project == null)
+        {
+            _logger.LogWarning("Project not found with ID {ProjectId}, using fallback folder name", projectId);
+            return SanitizeFolderName($"Unknown {projectId}");
+        }
+
+        var folderName = $"{project.ProjectId} {project.ProjectName}";
+        return SanitizeFolderName(folderName);
+    }
+
+    private static string SanitizeFolderName(string folderName)
+    {
+        // Remove or replace invalid characters for file system paths
+        var invalidChars = Path.GetInvalidFileNameChars();
+        var sanitized = folderName;
+        
+        foreach (var invalidChar in invalidChars)
+        {
+            sanitized = sanitized.Replace(invalidChar, '_');
+        }
+
+        // Also replace other problematic characters
+        sanitized = sanitized.Replace('<', '_')
+                            .Replace('>', '_')
+                            .Replace(':', '_')
+                            .Replace('"', '_')
+                            .Replace('|', '_')
+                            .Replace('?', '_')
+                            .Replace('*', '_');
+
+        // Trim whitespace and limit length to avoid path issues
+        sanitized = sanitized.Trim();
+        if (sanitized.Length > 200)
+        {
+            sanitized = sanitized.Substring(0, 200).Trim();
+        }
+
+        return sanitized;
     }
 }
