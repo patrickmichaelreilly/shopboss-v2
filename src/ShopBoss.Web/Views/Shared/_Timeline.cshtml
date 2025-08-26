@@ -14,6 +14,7 @@
             <div class="task-block mb-2" data-block-id="@block.Id">
                 <div class="task-block-header d-flex justify-content-between align-items-center p-2 bg-light border rounded">
                     <div class="d-flex align-items-center">
+                        <i class="fas fa-grip-vertical block-drag-handle me-2 text-muted" style="cursor: grab;" title="Drag to reorder blocks"></i>
                         <i class="fas fa-folder me-2 text-primary"></i>
                         <h6 class="mb-0 fw-bold">@block.Name</h6>
                         @if (!string.IsNullOrEmpty(block.Description))
@@ -44,6 +45,7 @@
                             <div class="event-content">
                                 <div class="event-header d-flex justify-content-between align-items-center mb-1">
                                     <div class="event-metadata">
+                                        <i class="fas fa-grip-vertical event-drag-handle me-2 text-muted" style="cursor: grab; font-size: 0.8em;" title="Drag to reorder events"></i>
                                         <span class="badge bg-@(evt.EventType == "comment" ? "info" : "secondary") me-1">@evt.EventType</span>
                                         @if (evt.RowNumber.HasValue)
                                         {

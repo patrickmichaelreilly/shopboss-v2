@@ -48,6 +48,9 @@ function initializeTimelineInteractions(projectId) {
     
     // Initial update of bulk actions visibility
     updateBulkActionsVisibility(projectId);
+    
+    // Initialize drag-drop functionality
+    initializeTimelineDragDrop(projectId);
 }
 
 // Handler function for event selection changes
@@ -346,552 +349,165 @@ function getSelectedEventIds(projectId) {
     return Array.from(selectedCheckboxes).map(cb => cb.value);
 }
 
-// File management functions (moved from project-management.js)
+// File management functions have been moved to timeline-files.js
 
-// Direct file upload without filename preview
-function uploadFilesDirectly(projectId, fileInput) {
-    if (fileInput.files.length === 0) {
-        return;
-    }
+// Purchase Order management functions have been moved to timeline-purchases.js
 
-    const formData = new FormData();
-    formData.append('projectId', projectId);
-    formData.append('category', 'Other'); // Auto-assign to 'Other' category
+// Work Order management functions have been moved to timeline-workorders.js
+
+// ==================== DRAG-DROP FUNCTIONALITY ====================
+
+// Initialize drag-drop functionality for timeline reordering
+function initializeTimelineDragDrop(projectId) {
+    const timelineContainer = document.getElementById(`timeline-container-${projectId}`);
+    if (!timelineContainer) return;
     
-    for (let i = 0; i < fileInput.files.length; i++) {
-        formData.append('file', fileInput.files[i]);
-    }
+    // Initialize TaskBlock reordering
+    initializeTaskBlockReordering(projectId);
+    
+    // Initialize event reordering within blocks
+    initializeEventReordering(projectId);
+}
 
-    fetch('/Project/UploadFile', {
+// Initialize TaskBlock drag-drop reordering
+function initializeTaskBlockReordering(projectId) {
+    // Find the inner timeline container where TaskBlocks actually live
+    const innerTimeline = document.getElementById(`timeline-${projectId}`);
+    if (!innerTimeline) return;
+    
+    new Sortable(innerTimeline, {
+        draggable: '.task-block', // Only TaskBlocks are draggable
+        handle: '.block-drag-handle',
+        ghostClass: 'sortable-ghost',
+        chosenClass: 'sortable-chosen',
+        dragClass: 'sortable-drag',
+        animation: 150,
+        onEnd: function(evt) {
+            // Get all TaskBlock IDs in new order
+            const blockElements = innerTimeline.querySelectorAll('.task-block[data-block-id]');
+            const blockIds = Array.from(blockElements).map(el => el.dataset.blockId);
+            
+            // Call API to persist the new order
+            reorderTaskBlocks(projectId, blockIds);
+        }
+    });
+}
+
+// Initialize event drag-drop reordering within TaskBlocks
+function initializeEventReordering(projectId) {
+    // Find the inner timeline container where TaskBlocks actually live
+    const innerTimeline = document.getElementById(`timeline-${projectId}`);
+    if (!innerTimeline) return;
+    
+    // Initialize sortable for each TaskBlock's events container
+    const taskBlocks = innerTimeline.querySelectorAll('.task-block[data-block-id]');
+    taskBlocks.forEach(taskBlock => {
+        const blockId = taskBlock.dataset.blockId;
+        const eventsContainer = taskBlock.querySelector('.task-block-events');
+        if (!eventsContainer) return;
+        
+        new Sortable(eventsContainer, {
+            handle: '.event-drag-handle',
+            ghostClass: 'sortable-ghost',
+            chosenClass: 'sortable-chosen', 
+            dragClass: 'sortable-drag',
+            animation: 150,
+            group: `events-${projectId}`, // Allow drag between blocks
+            onEnd: function(evt) {
+                // Get all event IDs in new order for this block
+                const eventElements = eventsContainer.querySelectorAll('[data-event-id]');
+                const eventIds = Array.from(eventElements).map(el => el.dataset.eventId);
+                
+                // If events were moved between blocks, handle assignment
+                if (evt.from !== evt.to) {
+                    const targetBlock = evt.to.closest('[data-block-id]');
+                    const targetBlockId = targetBlock?.dataset.blockId;
+                    
+                    if (targetBlockId) {
+                        // Move event to different block
+                        const movedEventId = evt.item.dataset.eventId;
+                        assignEventsToBlock(targetBlockId, [movedEventId])
+                            .then(() => {
+                                // After assignment, reorder events in the target block
+                                const targetEventElements = evt.to.querySelectorAll('[data-event-id]');
+                                const targetEventIds = Array.from(targetEventElements).map(el => el.dataset.eventId);
+                                return reorderEventsInBlock(targetBlockId, targetEventIds);
+                            })
+                            .then(() => {
+                                showNotification('Event moved and reordered successfully', 'success');
+                            })
+                            .catch(error => {
+                                console.error('Error moving event between blocks:', error);
+                                showNotification('Error moving event between blocks', 'error');
+                                // Reload timeline to reset state
+                                loadTimelineForProject(projectId);
+                            });
+                    }
+                } else {
+                    // Same block reordering
+                    reorderEventsInBlock(blockId, eventIds);
+                }
+            }
+        });
+    });
+}
+
+// API call to reorder TaskBlocks
+function reorderTaskBlocks(projectId, blockIds) {
+    const requestData = {
+        ProjectId: projectId,
+        BlockIds: blockIds
+    };
+    
+    fetch('/Timeline/ReorderBlocks', {
         method: 'POST',
-        body: formData
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestData)
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            showNotification('File uploaded successfully', 'success');
-            fileInput.value = ''; // Clear the file input
-            
-            // Refresh timeline to show the new attachment event
+            showNotification('Task blocks reordered successfully', 'success');
+        } else {
+            showNotification(data.message || 'Error reordering task blocks', 'error');
+            // Reload timeline to reset state
             loadTimelineForProject(projectId);
-        } else {
-            showNotification(data.message || 'Error uploading files', 'error');
         }
     })
     .catch(error => {
-        console.error('Error:', error);
+        console.error('Error reordering task blocks:', error);
         showNotification('Network error occurred', 'error');
+        // Reload timeline to reset state  
+        loadTimelineForProject(projectId);
     });
 }
 
-// Update file category
-function updateFileCategory(fileId, category) {
-    fetch('/Project/UpdateFileCategory', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ id: fileId, category: category })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showNotification('Category updated', 'success');
-        } else {
-            showNotification(data.message || 'Error updating category', 'error');
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        showNotification('Network error occurred', 'error');
-    });
-}
-
-// Delete file
-function deleteFile(fileId, projectId) {
-    fetch('/Project/DeleteFile', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: `id=${fileId}`
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showNotification('File deleted successfully', 'success');
-            
-            // Refresh timeline to show the file deletion event
-            loadTimelineForProject(projectId);
-        } else {
-            showNotification(data.message || 'Error deleting file', 'error');
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        showNotification('Network error occurred', 'error');
-    });
-}
-
-// Purchase Order management functions (moved from project-management.js)
-
-let currentPurchaseOrderId = null;
-
-function showCreatePurchaseOrder(projectId) {
-    currentProjectId = projectId;
-    
-    // Clear the form
-    const form = document.getElementById('purchaseOrderForm');
-    if (form) {
-        form.reset();
-        form.querySelector('input[name="ProjectId"]').value = projectId;
-        form.querySelector('input[name="Id"]').value = '';
-        form.querySelector('input[name="OrderDate"]').value = new Date().toISOString().split('T')[0];
-    }
-    
-    const modal = new bootstrap.Modal(document.getElementById('createPurchaseOrderModal'));
-    modal.show();
-}
-
-function editPurchaseOrder(purchaseOrderId, projectId) {
-    currentPurchaseOrderId = purchaseOrderId;
-    currentProjectId = projectId;
-    
-    // Load purchase order data
-    fetch(`/Project/GetPurchaseOrder?id=${purchaseOrderId}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.success && data.purchaseOrder) {
-                const po = data.purchaseOrder;
-                const form = document.getElementById('editPurchaseOrderModal').querySelector('#purchaseOrderForm');
-                
-                // Populate form fields
-                form.querySelector('input[name="Id"]').value = po.id;
-                form.querySelector('input[name="ProjectId"]').value = po.projectId;
-                form.querySelector('input[name="PurchaseOrderNumber"]').value = po.purchaseOrderNumber || '';
-                form.querySelector('input[name="VendorName"]').value = po.vendorName || '';
-                form.querySelector('input[name="VendorContact"]').value = po.vendorContact || '';
-                form.querySelector('input[name="VendorPhone"]').value = po.vendorPhone || '';
-                form.querySelector('input[name="VendorEmail"]').value = po.vendorEmail || '';
-                form.querySelector('textarea[name="Description"]').value = po.description || '';
-                form.querySelector('input[name="OrderDate"]').value = po.orderDate ? po.orderDate.split('T')[0] : '';
-                form.querySelector('input[name="ExpectedDeliveryDate"]').value = po.expectedDeliveryDate ? po.expectedDeliveryDate.split('T')[0] : '';
-                form.querySelector('input[name="ActualDeliveryDate"]').value = po.actualDeliveryDate ? po.actualDeliveryDate.split('T')[0] : '';
-                form.querySelector('input[name="TotalAmount"]').value = po.totalAmount || '';
-                form.querySelector('select[name="Status"]').value = po.status || 0;
-                form.querySelector('textarea[name="Notes"]').value = po.notes || '';
-                
-                const modal = new bootstrap.Modal(document.getElementById('editPurchaseOrderModal'));
-                modal.show();
-            } else {
-                showNotification('Error loading purchase order data', 'error');
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            showNotification('Network error occurred', 'error');
-        });
-}
-
-function savePurchaseOrder() {
-    const form = document.getElementById('purchaseOrderForm');
-    const formData = new FormData(form);
-    
-    const purchaseOrder = {
-        Id: formData.get('Id') || '',
-        ProjectId: formData.get('ProjectId'),
-        PurchaseOrderNumber: formData.get('PurchaseOrderNumber'),
-        VendorName: formData.get('VendorName'),
-        VendorContact: formData.get('VendorContact') || null,
-        VendorPhone: formData.get('VendorPhone') || null,
-        VendorEmail: formData.get('VendorEmail') || null,
-        Description: formData.get('Description'),
-        OrderDate: formData.get('OrderDate'),
-        ExpectedDeliveryDate: formData.get('ExpectedDeliveryDate') || null,
-        ActualDeliveryDate: formData.get('ActualDeliveryDate') || null,
-        TotalAmount: formData.get('TotalAmount') ? parseFloat(formData.get('TotalAmount')) : null,
-        Status: parseInt(formData.get('Status')) || 0,
-        Notes: formData.get('Notes') || null
+// API call to reorder events within a TaskBlock
+function reorderEventsInBlock(blockId, eventIds) {
+    const requestData = {
+        BlockId: blockId,
+        EventIds: eventIds
     };
-
-    fetch('/Project/CreatePurchaseOrder', {
+    
+    fetch('/Timeline/ReorderEventsInBlock', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify(purchaseOrder)
+        body: JSON.stringify(requestData)
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            showNotification('Purchase order created successfully', 'success');
-            bootstrap.Modal.getInstance(document.getElementById('createPurchaseOrderModal')).hide();
-            
-            // Refresh timeline to show the new purchase order event
-            loadTimelineForProject(currentProjectId);
+            showNotification('Events reordered successfully', 'success');
         } else {
-            showNotification(data.message || 'Error creating purchase order', 'error');
+            showNotification(data.message || 'Error reordering events', 'error');
         }
     })
     .catch(error => {
-        console.error('Error:', error);
+        console.error('Error reordering events:', error);
         showNotification('Network error occurred', 'error');
     });
-}
-
-function savePurchaseOrderEdit() {
-    const form = document.getElementById('editPurchaseOrderModal').querySelector('#purchaseOrderForm');
-    const formData = new FormData(form);
-    
-    const purchaseOrder = {
-        Id: currentPurchaseOrderId,
-        ProjectId: currentProjectId,
-        PurchaseOrderNumber: formData.get('PurchaseOrderNumber'),
-        VendorName: formData.get('VendorName'),
-        VendorContact: formData.get('VendorContact') || null,
-        VendorPhone: formData.get('VendorPhone') || null,
-        VendorEmail: formData.get('VendorEmail') || null,
-        Description: formData.get('Description'),
-        OrderDate: formData.get('OrderDate'),
-        ExpectedDeliveryDate: formData.get('ExpectedDeliveryDate') || null,
-        ActualDeliveryDate: formData.get('ActualDeliveryDate') || null,
-        TotalAmount: formData.get('TotalAmount') ? parseFloat(formData.get('TotalAmount')) : null,
-        Status: parseInt(formData.get('Status')) || 0,
-        Notes: formData.get('Notes') || null
-    };
-
-    fetch('/Project/UpdatePurchaseOrder', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(purchaseOrder)
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showNotification('Purchase order updated successfully', 'success');
-            bootstrap.Modal.getInstance(document.getElementById('editPurchaseOrderModal')).hide();
-            
-            // Refresh timeline to show the updated purchase order event
-            loadTimelineForProject(currentProjectId);
-        } else {
-            showNotification(data.message || 'Error updating purchase order', 'error');
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        showNotification('Network error occurred', 'error');
-    });
-}
-
-function deletePurchaseOrder(purchaseOrderId, projectId) {
-    if (confirm('Are you sure you want to delete this purchase order?')) {
-        fetch('/Project/DeletePurchaseOrder', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: `id=${purchaseOrderId}`
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showNotification('Purchase order deleted successfully', 'success');
-                
-                // Refresh timeline to show the purchase order deletion event
-                loadTimelineForProject(projectId);
-            } else {
-                showNotification(data.message || 'Error deleting purchase order', 'error');
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            showNotification('Network error occurred', 'error');
-        });
-    }
-}
-
-// ==================== WORK ORDER FUNCTIONS ====================
-
-function showAssociateWorkOrders(projectId) {
-    currentProjectId = projectId;
-    
-    // Fetch fresh unassigned work orders
-    fetch('/Project/GetUnassignedWorkOrders')
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            const unassignedList = document.getElementById('unassignedWorkOrdersList');
-            
-            // Clear existing content
-            unassignedList.innerHTML = '';
-            
-            if (data.workOrders && data.workOrders.length > 0) {
-                // Populate with fresh work orders
-                data.workOrders.forEach(workOrder => {
-                    const workOrderDiv = document.createElement('div');
-                    workOrderDiv.className = 'form-check';
-                    workOrderDiv.innerHTML = `
-                        <input class="form-check-input" type="checkbox" value="${workOrder.id}" id="wo-${workOrder.id}">
-                        <label class="form-check-label" for="wo-${workOrder.id}">
-                            <strong>${workOrder.name}</strong>
-                            <br><small class="text-muted">Imported: ${new Date(workOrder.importedDate).toLocaleDateString('en-US', {month: '2-digit', day: '2-digit', year: '2-digit'})}</small>
-                        </label>
-                    `;
-                    unassignedList.appendChild(workOrderDiv);
-                });
-            } else {
-                // No unassigned work orders
-                unassignedList.innerHTML = '<p class="text-muted">No unassigned work orders available</p>';
-            }
-            
-            // Show the modal
-            const modal = new bootstrap.Modal(document.getElementById('associateWorkOrdersModal'));
-            modal.show();
-        } else {
-            showNotification(data.message || 'Error loading unassigned work orders', 'error');
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        showNotification('Network error occurred', 'error');
-    });
-}
-
-function associateSelectedWorkOrders() {
-    const checkboxes = document.querySelectorAll('#unassignedWorkOrdersList input[type="checkbox"]:checked');
-    const workOrderIds = Array.from(checkboxes).map(cb => cb.value);
-    
-    if (workOrderIds.length === 0) {
-        showNotification('Please select at least one work order', 'error');
-        return;
-    }
-
-    const request = {
-        ProjectId: currentProjectId,
-        WorkOrderIds: workOrderIds
-    };
-
-    fetch('/Project/AttachWorkOrders', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(request)
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            bootstrap.Modal.getInstance(document.getElementById('associateWorkOrdersModal')).hide();
-            showNotification('Work orders associated successfully', 'success');
-            
-            // Refresh timeline to show new work order events
-            loadTimelineForProject(currentProjectId);
-            
-            // Clear selections
-            checkboxes.forEach(cb => cb.checked = false);
-        } else {
-            showNotification(data.message || 'Error associating work orders', 'error');
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        showNotification('Network error occurred', 'error');
-    });
-}
-
-function detachWorkOrder(workOrderId, projectId) {
-    if (confirm('Are you sure you want to detach this work order from the project?')) {
-        fetch('/Project/DetachWorkOrder', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: `workOrderId=${workOrderId}`
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showNotification('Work order detached successfully', 'success');
-                
-                // Refresh timeline to remove the work order event
-                loadTimelineForProject(projectId);
-            } else {
-                showNotification(data.message || 'Error detaching work order', 'error');
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            showNotification('Network error occurred', 'error');
-        });
-    }
-}
-
-function showCreateCustomWorkOrder(projectId) {
-    currentProjectId = projectId;
-    
-    // Clear the form
-    const form = document.getElementById('customWorkOrderForm');
-    if (form) {
-        form.reset();
-        form.querySelector('input[name="ProjectId"]').value = projectId;
-        form.querySelector('input[name="Id"]').value = '';
-    }
-    
-    const modal = new bootstrap.Modal(document.getElementById('createCustomWorkOrderModal'));
-    modal.show();
-}
-
-function editCustomWorkOrder(customWorkOrderId, projectId) {
-    currentCustomWorkOrderId = customWorkOrderId;
-    currentProjectId = projectId;
-    
-    // Load custom work order data
-    fetch(`/Project/GetCustomWorkOrder?id=${customWorkOrderId}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.success && data.customWorkOrder) {
-                const cwo = data.customWorkOrder;
-                const form = document.getElementById('editCustomWorkOrderModal').querySelector('#customWorkOrderForm');
-                
-                // Populate form fields
-                form.querySelector('input[name="Id"]').value = cwo.id;
-                form.querySelector('input[name="ProjectId"]').value = cwo.projectId;
-                form.querySelector('input[name="Name"]').value = cwo.name || '';
-                form.querySelector('select[name="WorkOrderType"]').value = cwo.workOrderType || 0;
-                form.querySelector('textarea[name="Description"]').value = cwo.description || '';
-                form.querySelector('input[name="AssignedTo"]').value = cwo.assignedTo || '';
-                form.querySelector('input[name="EstimatedHours"]').value = cwo.estimatedHours || '';
-                form.querySelector('input[name="ActualHours"]').value = cwo.actualHours || '';
-                form.querySelector('select[name="Status"]').value = cwo.status || 0;
-                form.querySelector('input[name="StartDate"]').value = cwo.startDate ? cwo.startDate.split('T')[0] : '';
-                form.querySelector('input[name="CompletedDate"]').value = cwo.completedDate ? cwo.completedDate.split('T')[0] : '';
-                form.querySelector('textarea[name="Notes"]').value = cwo.notes || '';
-                
-                const modal = new bootstrap.Modal(document.getElementById('editCustomWorkOrderModal'));
-                modal.show();
-            } else {
-                showNotification('Error loading custom work order data', 'error');
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            showNotification('Network error occurred', 'error');
-        });
-}
-
-function saveCustomWorkOrder() {
-    const form = document.getElementById('customWorkOrderForm');
-    const formData = new FormData(form);
-    
-    const customWorkOrder = {
-        Id: formData.get('Id') || '',
-        ProjectId: formData.get('ProjectId'),
-        Name: formData.get('Name'),
-        WorkOrderType: parseInt(formData.get('WorkOrderType')) || 0,
-        Description: formData.get('Description'),
-        AssignedTo: formData.get('AssignedTo') || null,
-        EstimatedHours: formData.get('EstimatedHours') ? parseFloat(formData.get('EstimatedHours')) : null,
-        ActualHours: formData.get('ActualHours') ? parseFloat(formData.get('ActualHours')) : null,
-        Status: parseInt(formData.get('Status')) || 0,
-        StartDate: formData.get('StartDate') || null,
-        CompletedDate: formData.get('CompletedDate') || null,
-        Notes: formData.get('Notes') || null
-    };
-
-    fetch('/Project/CreateCustomWorkOrder', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(customWorkOrder)
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showNotification('Custom work order created successfully', 'success');
-            bootstrap.Modal.getInstance(document.getElementById('createCustomWorkOrderModal')).hide();
-            
-            // Refresh timeline to show new custom work order event
-            loadTimelineForProject(currentProjectId);
-        } else {
-            showNotification(data.message || 'Error creating custom work order', 'error');
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        showNotification('Network error occurred', 'error');
-    });
-}
-
-function saveCustomWorkOrderEdit() {
-    const form = document.getElementById('editCustomWorkOrderModal').querySelector('#customWorkOrderForm');
-    const formData = new FormData(form);
-    
-    const customWorkOrder = {
-        Id: currentCustomWorkOrderId,
-        ProjectId: currentProjectId,
-        Name: formData.get('Name'),
-        WorkOrderType: parseInt(formData.get('WorkOrderType')) || 0,
-        Description: formData.get('Description'),
-        AssignedTo: formData.get('AssignedTo') || null,
-        EstimatedHours: formData.get('EstimatedHours') ? parseFloat(formData.get('EstimatedHours')) : null,
-        ActualHours: formData.get('ActualHours') ? parseFloat(formData.get('ActualHours')) : null,
-        Status: parseInt(formData.get('Status')) || 0,
-        StartDate: formData.get('StartDate') || null,
-        CompletedDate: formData.get('CompletedDate') || null,
-        Notes: formData.get('Notes') || null
-    };
-
-    fetch('/Project/UpdateCustomWorkOrder', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(customWorkOrder)
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showNotification('Custom work order updated successfully', 'success');
-            bootstrap.Modal.getInstance(document.getElementById('editCustomWorkOrderModal')).hide();
-            
-            // Refresh timeline to show updated custom work order event
-            loadTimelineForProject(currentProjectId);
-        } else {
-            showNotification(data.message || 'Error updating custom work order', 'error');
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        showNotification('Network error occurred', 'error');
-    });
-}
-
-function deleteCustomWorkOrder(customWorkOrderId, projectId) {
-    if (confirm('Are you sure you want to delete this custom work order?')) {
-        fetch('/Project/DeleteCustomWorkOrder', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: `id=${customWorkOrderId}`
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showNotification('Custom work order deleted successfully', 'success');
-                
-                // Refresh timeline to remove the custom work order event
-                loadTimelineForProject(projectId);
-            } else {
-                showNotification(data.message || 'Error deleting custom work order', 'error');
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            showNotification('Network error occurred', 'error');
-        });
-    }
 }

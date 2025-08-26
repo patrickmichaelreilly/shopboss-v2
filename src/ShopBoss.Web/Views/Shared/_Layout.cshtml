@@ -114,8 +114,16 @@
     <script src="~/js/session-manager.js" asp-append-version="true"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
     
+    <!-- Timeline modules - load after core scripts -->
+    <script src="~/js/timeline-files.js" asp-append-version="true"></script>
+    <script src="~/js/timeline-purchases.js" asp-append-version="true"></script>
+    <script src="~/js/timeline-workorders.js" asp-append-version="true"></script>
+    
     <!-- SignalR -->
     <script src="~/lib/signalr/dist/browser/signalr.js"></script>
+    
+    <!-- Sortable.js for drag-and-drop functionality -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     
     <script>
         // Global Active Work Order functionality

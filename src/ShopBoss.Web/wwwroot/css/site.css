@@ -239,3 +239,57 @@ body {
 .navbar-nav .dropdown-menu .dropdown-item:focus {
   color: #000000 !important;
 }
+
+/* Drag-Drop Timeline Styles */
+.sortable-ghost {
+  opacity: 0.4;
+  background-color: rgba(0, 79, 0, 0.1) !important;
+  border: 2px dashed #004F00;
+  border-radius: 0.375rem;
+}
+
+.sortable-chosen {
+  box-shadow: 0 0.5rem 1rem rgba(0, 79, 0, 0.3);
+  transform: rotate(2deg);
+  z-index: 1000;
+  background-color: #fff;
+  border: 2px solid #004F00;
+}
+
+.sortable-drag {
+  opacity: 0.8;
+  cursor: grabbing !important;
+}
+
+.block-drag-handle {
+  cursor: grab;
+  transition: color 0.2s ease;
+}
+
+.block-drag-handle:hover {
+  color: #004F00 !important;
+}
+
+.event-drag-handle {
+  cursor: grab;
+  transition: color 0.2s ease;
+}
+
+.event-drag-handle:hover {
+  color: #004F00 !important;
+}
+
+.task-block {
+  transition: all 0.2s ease;
+}
+
+.timeline-event {
+  transition: all 0.2s ease;
+}
+
+/* Drag handle active states */
+.block-drag-handle:active,
+.event-drag-handle:active {
+  cursor: grabbing;
+  color: #003D00 !important;
+}
