@@ -625,20 +625,8 @@ public class SmartSheetImportService
                     _context.ProjectEvents.Add(evt);
                 }
 
-                // Add events from attachments
-                foreach (var attachment in sheetDetails.Attachments ?? new List<AttachmentInfo>())
-                {
-                    var evt = new ProjectEvent
-                    {
-                        ProjectId = project.Id,
-                        EventDate = attachment.CreatedAt ?? DateTime.UtcNow,
-                        EventType = "attachment",
-                        Description = $"File uploaded: {attachment.Name} ({attachment.SizeInKb:F1} MB)",
-                        CreatedBy = attachment.AttachedBy,
-                        RowNumber = attachment.RowNumber
-                    };
-                    _context.ProjectEvents.Add(evt);
-                }
+                // Note: Attachment events will be created during the download phase
+                // to ensure proper linking with ProjectAttachment records
             }
 
             // Download attachments if requested
@@ -646,7 +634,7 @@ public class SmartSheetImportService
             {
                 try
                 {
-                    await DownloadAttachmentsForProject(request.SheetId, project.Id);
+                    await DownloadAttachmentsForProject(request.SheetId, project.Id, request.CreateTimeline);
                 }
                 catch (Exception ex)
                 {
@@ -671,7 +659,7 @@ public class SmartSheetImportService
         return result;
     }
 
-    private async Task DownloadAttachmentsForProject(long sheetId, string projectId)
+    private async Task DownloadAttachmentsForProject(long sheetId, string projectId, bool createTimelineEvents = true)
     {
         try
         {
@@ -716,6 +704,22 @@ public class SmartSheetImportService
                         };
                         
                         _context.ProjectAttachments.Add(projectAttachment);
+                        
+                        // Create timeline event if requested (more efficient than looking up later)
+                        if (createTimelineEvents)
+                        {
+                            var attachmentEvent = new ProjectEvent
+                            {
+                                ProjectId = projectId,
+                                EventDate = attachment.CreatedAt ?? DateTime.UtcNow,
+                                EventType = "attachment",
+                                Description = $"File uploaded: {attachment.Name} ({(attachment.SizeInKb ?? 0) / 1024.0:F1} MB)",
+                                CreatedBy = attachment.CreatedBy?.Email ?? "SmartSheet Migration",
+                                AttachmentId = projectAttachment.Id,
+                                RowNumber = null // Row number mapping would require additional API calls
+                            };
+                            _context.ProjectEvents.Add(attachmentEvent);
+                        }
                     }
                 }
                 catch (Exception ex)

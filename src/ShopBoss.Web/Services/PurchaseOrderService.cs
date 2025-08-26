@@ -53,6 +53,19 @@ public class PurchaseOrderService
             purchaseOrder.CreatedDate = DateTime.UtcNow;
 
             _context.PurchaseOrders.Add(purchaseOrder);
+            
+            // Create timeline event for purchase order creation
+            var createEvent = new ProjectEvent
+            {
+                ProjectId = purchaseOrder.ProjectId,
+                EventDate = DateTime.UtcNow,
+                EventType = "purchase_order",
+                Description = $"Purchase Order created: {purchaseOrder.PurchaseOrderNumber} - {purchaseOrder.VendorName}",
+                CreatedBy = null, // Could be passed as parameter if needed
+                PurchaseOrderId = purchaseOrder.Id
+            };
+            _context.ProjectEvents.Add(createEvent);
+            
             await _context.SaveChangesAsync();
 
             _logger.LogInformation("Created purchase order {PurchaseOrderId} for project {ProjectId}", 
@@ -80,6 +93,10 @@ public class PurchaseOrderService
                 return null;
             }
 
+            // Check if status is changing to create specific event
+            bool statusChanged = existingPurchaseOrder.Status != purchaseOrder.Status;
+            var oldStatus = existingPurchaseOrder.Status;
+            
             // Update properties
             existingPurchaseOrder.PurchaseOrderNumber = purchaseOrder.PurchaseOrderNumber;
             existingPurchaseOrder.VendorName = purchaseOrder.VendorName;
@@ -93,6 +110,34 @@ public class PurchaseOrderService
             existingPurchaseOrder.TotalAmount = purchaseOrder.TotalAmount;
             existingPurchaseOrder.Status = purchaseOrder.Status;
             existingPurchaseOrder.Notes = purchaseOrder.Notes;
+
+            // Create timeline event
+            ProjectEvent timelineEvent;
+            if (statusChanged)
+            {
+                timelineEvent = new ProjectEvent
+                {
+                    ProjectId = existingPurchaseOrder.ProjectId,
+                    EventDate = DateTime.UtcNow,
+                    EventType = "purchase_order",
+                    Description = $"Purchase Order status changed: {purchaseOrder.PurchaseOrderNumber} - {oldStatus} → {purchaseOrder.Status}",
+                    CreatedBy = null,
+                    PurchaseOrderId = purchaseOrder.Id
+                };
+            }
+            else
+            {
+                timelineEvent = new ProjectEvent
+                {
+                    ProjectId = existingPurchaseOrder.ProjectId,
+                    EventDate = DateTime.UtcNow,
+                    EventType = "purchase_order",
+                    Description = $"Purchase Order updated: {purchaseOrder.PurchaseOrderNumber} - {purchaseOrder.VendorName}",
+                    CreatedBy = null,
+                    PurchaseOrderId = purchaseOrder.Id
+                };
+            }
+            _context.ProjectEvents.Add(timelineEvent);
 
             await _context.SaveChangesAsync();
 
@@ -120,6 +165,18 @@ public class PurchaseOrderService
                 return false;
             }
 
+            // Create timeline event for purchase order deletion
+            var deleteEvent = new ProjectEvent
+            {
+                ProjectId = purchaseOrder.ProjectId,
+                EventDate = DateTime.UtcNow,
+                EventType = "purchase_order",
+                Description = $"Purchase Order deleted: {purchaseOrder.PurchaseOrderNumber} - {purchaseOrder.VendorName}",
+                CreatedBy = null
+                // Note: Don't set PurchaseOrderId since the PO will be deleted
+            };
+            _context.ProjectEvents.Add(deleteEvent);
+            
             _context.PurchaseOrders.Remove(purchaseOrder);
             await _context.SaveChangesAsync();
 

@@ -207,6 +207,18 @@ public class ProjectService
             foreach (var workOrder in workOrders)
             {
                 workOrder.ProjectId = projectId;
+                
+                // Create timeline event for work order association
+                var workOrderEvent = new ProjectEvent
+                {
+                    ProjectId = projectId,
+                    EventDate = workOrder.ImportedDate, // Use ImportedDate as per entity display pattern
+                    EventType = "work_order",
+                    Description = workOrder.Name,
+                    CreatedBy = null, // Could be passed as parameter if needed
+                    WorkOrderId = workOrder.Id
+                };
+                _context.ProjectEvents.Add(workOrderEvent);
             }
 
             await _context.SaveChangesAsync();
@@ -228,7 +240,20 @@ public class ProjectService
             var workOrder = await _context.WorkOrders.FindAsync(workOrderId);
             if (workOrder == null) return false;
 
+            var projectId = workOrder.ProjectId; // Store before nulling
             workOrder.ProjectId = null;
+            
+            // Remove the associated timeline event (entity display pattern)
+            if (projectId != null)
+            {
+                var timelineEvent = await _context.ProjectEvents
+                    .FirstOrDefaultAsync(pe => pe.WorkOrderId == workOrderId && pe.ProjectId == projectId);
+                if (timelineEvent != null)
+                {
+                    _context.ProjectEvents.Remove(timelineEvent);
+                }
+            }
+            
             await _context.SaveChangesAsync();
 
             _logger.LogInformation("Detached work order {WorkOrderId} from project", workOrderId);

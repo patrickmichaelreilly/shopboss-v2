@@ -53,6 +53,19 @@ public class CustomWorkOrderService
             customWorkOrder.CreatedDate = DateTime.UtcNow;
 
             _context.CustomWorkOrders.Add(customWorkOrder);
+            
+            // Create timeline event for custom work order creation
+            var customWorkOrderEvent = new ProjectEvent
+            {
+                ProjectId = customWorkOrder.ProjectId,
+                EventDate = customWorkOrder.CreatedDate,
+                EventType = "custom_work_order",
+                Description = customWorkOrder.Name,
+                CreatedBy = null, // Could be passed as parameter if needed
+                CustomWorkOrderId = customWorkOrder.Id
+            };
+            _context.ProjectEvents.Add(customWorkOrderEvent);
+            
             await _context.SaveChangesAsync();
 
             _logger.LogInformation("Created custom work order {CustomWorkOrderId} for project {ProjectId}", 
@@ -92,6 +105,14 @@ public class CustomWorkOrderService
             existingCustomWorkOrder.CompletedDate = customWorkOrder.CompletedDate;
             existingCustomWorkOrder.Notes = customWorkOrder.Notes;
 
+            // Update the associated timeline event to reflect the current name
+            var timelineEvent = await _context.ProjectEvents
+                .FirstOrDefaultAsync(pe => pe.CustomWorkOrderId == customWorkOrder.Id);
+            if (timelineEvent != null)
+            {
+                timelineEvent.Description = customWorkOrder.Name;
+            }
+
             await _context.SaveChangesAsync();
 
             _logger.LogInformation("Updated custom work order {CustomWorkOrderId}", customWorkOrder.Id);
@@ -118,6 +139,14 @@ public class CustomWorkOrderService
                 return false;
             }
 
+            // Remove the associated timeline event (entity display pattern)
+            var timelineEvent = await _context.ProjectEvents
+                .FirstOrDefaultAsync(pe => pe.CustomWorkOrderId == id);
+            if (timelineEvent != null)
+            {
+                _context.ProjectEvents.Remove(timelineEvent);
+            }
+            
             _context.CustomWorkOrders.Remove(customWorkOrder);
             await _context.SaveChangesAsync();
 

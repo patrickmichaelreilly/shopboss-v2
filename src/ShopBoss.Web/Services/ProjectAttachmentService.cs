@@ -54,6 +54,19 @@ public class ProjectAttachmentService
             };
 
             _context.ProjectAttachments.Add(attachment);
+            
+            // Create timeline event for file upload
+            var projectEvent = new ProjectEvent
+            {
+                ProjectId = projectId,
+                EventDate = DateTime.UtcNow,
+                EventType = "attachment",
+                Description = $"File uploaded: {file.FileName} ({file.Length / 1024:F1} KB)",
+                CreatedBy = uploadedBy,
+                AttachmentId = attachment.Id
+            };
+            _context.ProjectEvents.Add(projectEvent);
+            
             await _context.SaveChangesAsync();
 
             _logger.LogInformation("Uploaded file {FileName} for project {ProjectId}", file.FileName, projectId);
@@ -126,6 +139,17 @@ public class ProjectAttachmentService
             {
                 File.Delete(filePath);
             }
+
+            // Create timeline event for file deletion
+            var projectEvent = new ProjectEvent
+            {
+                ProjectId = attachment.ProjectId,
+                EventDate = DateTime.UtcNow,
+                EventType = "attachment",
+                Description = $"File deleted: {attachment.OriginalFileName}",
+                CreatedBy = null // Could be passed as parameter if needed
+            };
+            _context.ProjectEvents.Add(projectEvent);
 
             // Remove from database
             _context.ProjectAttachments.Remove(attachment);

@@ -24,12 +24,12 @@
                     </div>
                     <div class="btn-group btn-group-sm" role="group">
                         <button type="button" class="btn btn-outline-secondary btn-sm" 
-                                onclick="editTaskChunk('@block.Id', '@block.Name', '@(block.Description ?? "")')" 
+                                onclick="editTaskBlock('@block.Id', '@block.Name', '@(block.Description ?? "")')" 
                                 title="Edit block">
                             <i class="fas fa-edit"></i>
                         </button>
                         <button type="button" class="btn btn-outline-danger btn-sm" 
-                                onclick="deleteTaskChunk('@block.Id')" 
+                                onclick="deleteTaskBlock('@block.Id')" 
                                 title="Delete block">
                             <i class="fas fa-trash"></i>
                         </button>
@@ -53,12 +53,161 @@
                                         <small class="text-muted">by @(evt.CreatedBy ?? "Unknown")</small>
                                     </div>
                                     <button type="button" class="btn btn-outline-warning btn-sm" 
-                                            onclick="unassignEventFromChunk('@evt.Id')" 
+                                            onclick="unassignEventFromBlock('@evt.Id')" 
                                             title="Remove from block">
                                         <i class="fas fa-times"></i>
                                     </button>
                                 </div>
-                                <div class="event-description mb-1">@evt.Description</div>
+                                <div class="event-description mb-1">
+                                    @if (evt.EventType == "attachment" && !string.IsNullOrEmpty(evt.AttachmentId))
+                                    {
+                                        @* Render attachment event as downloadable link *@
+                                        <div class="d-flex align-items-center">
+                                            <i class="fas fa-file text-muted me-2" style="font-size: 0.9em;"></i>
+                                            <a href="@Url.Action("DownloadFile", "Project", new { id = evt.AttachmentId })" 
+                                               class="text-decoration-none me-2" style="font-size: 0.9em;">
+                                                @{
+                                                    var fileName = evt.Description.Replace("File uploaded: ", "").Replace("File deleted: ", "");
+                                                    if (fileName.Contains(" ("))
+                                                    {
+                                                        fileName = fileName.Substring(0, fileName.IndexOf(" ("));
+                                                    }
+                                                }
+                                                @fileName
+                                            </a>
+                                            @if (evt.Description.Contains("deleted"))
+                                            {
+                                                <span class="badge bg-danger" style="font-size: 0.7em;">Deleted</span>
+                                            }
+                                            else
+                                            {
+                                                <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-2" 
+                                                        onclick="deleteFile('@evt.AttachmentId', '@Model.Project.Id')" title="Delete">
+                                                    <i class="fas fa-times"></i>
+                                                </button>
+                                            }
+                                        </div>
+                                    }
+                                    else if (evt.EventType == "purchase_order")
+                                    {
+                                        @* Render purchase order event with inline details *@
+                                        <div class="d-flex align-items-center">
+                                            <i class="fas fa-file-invoice text-muted me-2" style="font-size: 0.9em;"></i>
+                                            @if (!string.IsNullOrEmpty(evt.PurchaseOrderId))
+                                            {
+                                                @* Active purchase order with edit/delete buttons *@
+                                                <div class="flex-grow-1" style="font-size: 0.9em;">
+                                                    @{
+                                                        // Extract PO details from description
+                                                        var poDetails = evt.Description;
+                                                        if (poDetails.Contains(":"))
+                                                        {
+                                                            poDetails = poDetails.Substring(poDetails.IndexOf(":") + 1).Trim();
+                                                        }
+                                                    }
+                                                    <strong>@poDetails.Split(" - ")[0]</strong>
+                                                    @if (poDetails.Contains(" - ") && poDetails.Split(" - ").Length > 1)
+                                                    {
+                                                        <small class="text-muted ms-2">• @poDetails.Split(" - ")[1]</small>
+                                                    }
+                                                    @if (evt.Description.Contains("status changed") && evt.Description.Contains("→"))
+                                                    {
+                                                        var statusPart = evt.Description.Substring(evt.Description.IndexOf("→") + 1).Trim();
+                                                        var statusBadgeClass = statusPart switch
+                                                        {
+                                                            "Pending" => "bg-warning",
+                                                            "Ordered" => "bg-primary",
+                                                            "Received" => "bg-success",
+                                                            "Cancelled" => "bg-danger",
+                                                            _ => "bg-secondary"
+                                                        };
+                                                        <small class="text-muted ms-2">• <span class="badge @statusBadgeClass" style="font-size: 0.7em;">@statusPart</span></small>
+                                                    }
+                                                </div>
+                                                <div class="d-flex">
+                                                    <button type="button" class="btn btn-sm btn-link text-primary p-0 me-2" 
+                                                            onclick="editPurchaseOrder('@evt.PurchaseOrderId', '@Model.Project.Id')" title="Edit">
+                                                        <i class="fas fa-edit"></i>
+                                                    </button>
+                                                    <button type="button" class="btn btn-sm btn-link text-danger p-0" 
+                                                            onclick="deletePurchaseOrder('@evt.PurchaseOrderId', '@Model.Project.Id')" title="Delete">
+                                                        <i class="fas fa-times"></i>
+                                                    </button>
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                @* Deleted purchase order - just show description *@
+                                                <span class="text-muted" style="font-size: 0.9em;">@evt.Description</span>
+                                            }
+                                        </div>
+                                    }
+                                    else if (evt.EventType == "work_order")
+                                    {
+                                        @* Render work order event *@
+                                        <div class="d-flex align-items-center">
+                                            <i class="fas fa-cog text-primary me-2" style="font-size: 0.9em;" title="Manufacturing Work Order"></i>
+                                            <div class="flex-grow-1" style="font-size: 0.9em;">
+                                                <strong>@evt.Description</strong>
+                                                @if (evt.WorkOrder != null)
+                                                {
+                                                    <small class="text-muted ms-2">• Imported: @evt.WorkOrder.ImportedDate.ToString("MM/dd/yy")</small>
+                                                }
+                                            </div>
+                                            @if (!string.IsNullOrEmpty(evt.WorkOrderId))
+                                            {
+                                                <button type="button" class="btn btn-sm btn-link text-danger p-0" 
+                                                        onclick="detachWorkOrder('@evt.WorkOrderId', '@Model.Project.Id')" title="Remove">
+                                                    <i class="fas fa-times"></i>
+                                                </button>
+                                            }
+                                        </div>
+                                    }
+                                    else if (evt.EventType == "custom_work_order")
+                                    {
+                                        @* Render custom work order event *@
+                                        <div class="d-flex align-items-center">
+                                            <i class="fas fa-wrench text-info me-2" style="font-size: 0.9em;" title="Custom Work Order"></i>
+                                            <div class="flex-grow-1" style="font-size: 0.9em;">
+                                                <strong>@evt.Description</strong>
+                                                @if (evt.CustomWorkOrder != null)
+                                                {
+                                                    <small class="text-muted ms-2">
+                                                        • @evt.CustomWorkOrder.WorkOrderType.ToString()
+                                                        @{
+                                                            var statusBadgeClass = evt.CustomWorkOrder.Status switch
+                                                            {
+                                                                CustomWorkOrderStatus.Pending => "bg-warning",
+                                                                CustomWorkOrderStatus.InProgress => "bg-primary",
+                                                                CustomWorkOrderStatus.Completed => "bg-success",
+                                                                CustomWorkOrderStatus.Cancelled => "bg-danger",
+                                                                _ => "bg-secondary"
+                                                            };
+                                                        }
+                                                        • <span class="badge @statusBadgeClass" style="font-size: 0.7em;">@evt.CustomWorkOrder.Status</span>
+                                                    </small>
+                                                }
+                                            </div>
+                                            @if (!string.IsNullOrEmpty(evt.CustomWorkOrderId))
+                                            {
+                                                <div class="d-flex">
+                                                    <button type="button" class="btn btn-sm btn-link text-primary p-0 me-2" 
+                                                            onclick="editCustomWorkOrder('@evt.CustomWorkOrderId', '@Model.Project.Id')" title="Edit">
+                                                        <i class="fas fa-edit"></i>
+                                                    </button>
+                                                    <button type="button" class="btn btn-sm btn-link text-danger p-0" 
+                                                            onclick="deleteCustomWorkOrder('@evt.CustomWorkOrderId', '@Model.Project.Id')" title="Delete">
+                                                        <i class="fas fa-times"></i>
+                                                    </button>
+                                                </div>
+                                            }
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        @evt.Description
+                                    }
+                                </div>
                             </div>
                         </div>
                     }
@@ -75,9 +224,9 @@
                         <i class="fas fa-clock me-1"></i>Unblocked Events (@Model.UnblockedEvents.Count)
                     </h6>
                     <button type="button" class="btn btn-outline-primary btn-sm" 
-                            onclick="showCreateTaskChunk('@projectId')" 
+                            onclick="showCreateTaskBlock('@projectId')" 
                             title="Create new block">
-                        <i class="fas fa-plus me-1"></i>New Chunk
+                        <i class="fas fa-plus me-1"></i>New Block
                     </button>
                 </div>
                 
@@ -98,7 +247,156 @@
                                     <small class="text-muted">by @(evt.CreatedBy ?? "Unknown")</small>
                                 </div>
                             </div>
-                            <div class="event-description mb-1">@evt.Description</div>
+                            <div class="event-description mb-1">
+                                @if (evt.EventType == "attachment" && !string.IsNullOrEmpty(evt.AttachmentId))
+                                {
+                                    @* Render attachment event as downloadable link *@
+                                    <div class="d-flex align-items-center">
+                                        <i class="fas fa-file text-muted me-2" style="font-size: 0.9em;"></i>
+                                        <a href="@Url.Action("DownloadFile", "Project", new { id = evt.AttachmentId })" 
+                                           class="text-decoration-none me-2" style="font-size: 0.9em;">
+                                            @{
+                                                var fileName = evt.Description.Replace("File uploaded: ", "").Replace("File deleted: ", "");
+                                                if (fileName.Contains(" ("))
+                                                {
+                                                    fileName = fileName.Substring(0, fileName.IndexOf(" ("));
+                                                }
+                                            }
+                                            @fileName
+                                        </a>
+                                        @if (evt.Description.Contains("deleted"))
+                                        {
+                                            <span class="badge bg-danger" style="font-size: 0.7em;">Deleted</span>
+                                        }
+                                        else
+                                        {
+                                            <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-2" 
+                                                    onclick="deleteFile('@evt.AttachmentId', '@Model.Project.Id')" title="Delete">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        }
+                                    </div>
+                                }
+                                else if (evt.EventType == "purchase_order")
+                                {
+                                    @* Render purchase order event with inline details *@
+                                    <div class="d-flex align-items-center">
+                                        <i class="fas fa-file-invoice text-muted me-2" style="font-size: 0.9em;"></i>
+                                        @if (!string.IsNullOrEmpty(evt.PurchaseOrderId))
+                                        {
+                                            @* Active purchase order with edit/delete buttons *@
+                                            <div class="flex-grow-1" style="font-size: 0.9em;">
+                                                @{
+                                                    // Extract PO details from description
+                                                    var poDetails = evt.Description;
+                                                    if (poDetails.Contains(":"))
+                                                    {
+                                                        poDetails = poDetails.Substring(poDetails.IndexOf(":") + 1).Trim();
+                                                    }
+                                                }
+                                                <strong>@poDetails.Split(" - ")[0]</strong>
+                                                @if (poDetails.Contains(" - ") && poDetails.Split(" - ").Length > 1)
+                                                {
+                                                    <small class="text-muted ms-2">• @poDetails.Split(" - ")[1]</small>
+                                                }
+                                                @if (evt.Description.Contains("status changed") && evt.Description.Contains("→"))
+                                                {
+                                                    var statusPart = evt.Description.Substring(evt.Description.IndexOf("→") + 1).Trim();
+                                                    var statusBadgeClass = statusPart switch
+                                                    {
+                                                        "Pending" => "bg-warning",
+                                                        "Ordered" => "bg-primary",
+                                                        "Received" => "bg-success",
+                                                        "Cancelled" => "bg-danger",
+                                                        _ => "bg-secondary"
+                                                    };
+                                                    <small class="text-muted ms-2">• <span class="badge @statusBadgeClass" style="font-size: 0.7em;">@statusPart</span></small>
+                                                }
+                                            </div>
+                                            <div class="d-flex">
+                                                <button type="button" class="btn btn-sm btn-link text-primary p-0 me-2" 
+                                                        onclick="editPurchaseOrder('@evt.PurchaseOrderId', '@Model.Project.Id')" title="Edit">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                <button type="button" class="btn btn-sm btn-link text-danger p-0" 
+                                                        onclick="deletePurchaseOrder('@evt.PurchaseOrderId', '@Model.Project.Id')" title="Delete">
+                                                    <i class="fas fa-times"></i>
+                                                </button>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            @* Deleted purchase order - just show description *@
+                                            <span class="text-muted" style="font-size: 0.9em;">@evt.Description</span>
+                                        }
+                                    </div>
+                                }
+                                else if (evt.EventType == "work_order")
+                                {
+                                    @* Render work order event *@
+                                    <div class="d-flex align-items-center">
+                                        <i class="fas fa-cog text-primary me-2" style="font-size: 0.9em;" title="Manufacturing Work Order"></i>
+                                        <div class="flex-grow-1" style="font-size: 0.9em;">
+                                            <strong>@evt.Description</strong>
+                                            @if (evt.WorkOrder != null)
+                                            {
+                                                <small class="text-muted ms-2">• Imported: @evt.WorkOrder.ImportedDate.ToString("MM/dd/yy")</small>
+                                            }
+                                        </div>
+                                        @if (!string.IsNullOrEmpty(evt.WorkOrderId))
+                                        {
+                                            <button type="button" class="btn btn-sm btn-link text-danger p-0" 
+                                                    onclick="detachWorkOrder('@evt.WorkOrderId', '@Model.Project.Id')" title="Remove">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        }
+                                    </div>
+                                }
+                                else if (evt.EventType == "custom_work_order")
+                                {
+                                    @* Render custom work order event *@
+                                    <div class="d-flex align-items-center">
+                                        <i class="fas fa-wrench text-info me-2" style="font-size: 0.9em;" title="Custom Work Order"></i>
+                                        <div class="flex-grow-1" style="font-size: 0.9em;">
+                                            <strong>@evt.Description</strong>
+                                            @if (evt.CustomWorkOrder != null)
+                                            {
+                                                <small class="text-muted ms-2">
+                                                    • @evt.CustomWorkOrder.WorkOrderType.ToString()
+                                                    @{
+                                                        var statusBadgeClass = evt.CustomWorkOrder.Status switch
+                                                        {
+                                                            CustomWorkOrderStatus.Pending => "bg-warning",
+                                                            CustomWorkOrderStatus.InProgress => "bg-primary",
+                                                            CustomWorkOrderStatus.Completed => "bg-success",
+                                                            CustomWorkOrderStatus.Cancelled => "bg-danger",
+                                                            _ => "bg-secondary"
+                                                        };
+                                                    }
+                                                    • <span class="badge @statusBadgeClass" style="font-size: 0.7em;">@evt.CustomWorkOrder.Status</span>
+                                                </small>
+                                            }
+                                        </div>
+                                        @if (!string.IsNullOrEmpty(evt.CustomWorkOrderId))
+                                        {
+                                            <div class="d-flex">
+                                                <button type="button" class="btn btn-sm btn-link text-primary p-0 me-2" 
+                                                        onclick="editCustomWorkOrder('@evt.CustomWorkOrderId', '@Model.Project.Id')" title="Edit">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                <button type="button" class="btn btn-sm btn-link text-danger p-0" 
+                                                        onclick="deleteCustomWorkOrder('@evt.CustomWorkOrderId', '@Model.Project.Id')" title="Delete">
+                                                    <i class="fas fa-times"></i>
+                                                </button>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                                else
+                                {
+                                    @evt.Description
+                                }
+                            </div>
                         </div>
                     </div>
                 }
