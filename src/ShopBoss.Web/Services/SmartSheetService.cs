@@ -557,11 +557,12 @@ public class SmartSheetService
                 throw new InvalidOperationException("No SmartSheet session. Please authenticate first.");
             }
 
-            // Get sheet with all data including discussions/comments
+            // Get sheet with all data including discussions/comments and summary
             var includes = new List<SheetLevelInclusion> 
             { 
                 SheetLevelInclusion.ATTACHMENTS,
-                SheetLevelInclusion.DISCUSSIONS 
+                SheetLevelInclusion.DISCUSSIONS,
+                SheetLevelInclusion.SUMMARY
             };
             var sheet = await Task.Run(() => smartsheet.SheetResources.GetSheet(sheetId, includes, null, null, null, null, null, null));
             
@@ -582,52 +583,21 @@ public class SmartSheetService
                 }
             }
 
-            // Extract sheet summary (key-value pairs from first few rows)
-            if (sheet.Rows != null && sheet.Columns != null)
+            // Extract SmartSheet Summary fields (the official Summary feature)
+            if (sheet.Summary != null && sheet.Summary.Fields != null && sheet.Summary.Fields.Any())
             {
-                var columns = sheet.Columns.ToList();
-                
-                // Look for rows that appear to contain summary data (typically first 20 rows)
-                foreach (var row in sheet.Rows.Take(20))
+                foreach (var summaryField in sheet.Summary.Fields)
                 {
-                    if (row.Cells != null && row.Cells.Count >= 2)
+                    var fieldName = summaryField.Title ?? $"Field_{summaryField.Id}";
+                    var fieldValue = summaryField.DisplayValue ?? summaryField.ObjectValue?.ToString() ?? "";
+                    
+                    if (!string.IsNullOrEmpty(fieldName))
                     {
-                        // Find cells with actual values
-                        var cellsWithValues = row.Cells.Where(c => 
-                            !string.IsNullOrEmpty(c?.DisplayValue) || 
-                            (c?.Value != null && !string.IsNullOrEmpty(c.Value.ToString()))).ToList();
-                        
-                        if (cellsWithValues.Count >= 2)
-                        {
-                            // Try first two cells with values as key-value pair
-                            var keyCell = cellsWithValues[0];
-                            var valueCell = cellsWithValues[1];
-                            
-                            var key = keyCell.DisplayValue ?? keyCell.Value?.ToString() ?? "";
-                            var value = valueCell.DisplayValue ?? valueCell.Value?.ToString() ?? "";
-                            
-                            if (!string.IsNullOrEmpty(key) && !string.IsNullOrEmpty(value))
-                            {
-                                // Clean up key (remove special characters that might cause issues)
-                                key = key.Trim().TrimEnd(':');
-                                result.Summary[key] = value;
-                            }
-                        }
+                        result.Summary[fieldName] = fieldValue;
                     }
                 }
-                
-                // Also extract column headers as metadata
-                if (columns.Any())
-                {
-                    result.Summary["__ColumnCount"] = columns.Count.ToString();
-                    result.Summary["__Columns"] = string.Join(", ", columns.Select(c => c.Title ?? "Untitled").Take(10));
-                }
-                
-                if (sheet.Rows.Any())
-                {
-                    result.Summary["__RowCount"] = sheet.Rows.Count.ToString();
-                }
             }
+            // If no Summary fields exist, result.Summary will remain empty (which is correct)
 
             // Get attachments
             var attachments = await Task.Run(() => smartsheet.SheetResources.AttachmentResources.ListAttachments(sheetId, new PaginationParameters(true, null, null)));
@@ -645,18 +615,25 @@ public class SmartSheetService
                 Url = a.Url
             }).ToList() ?? new List<AttachmentInfo>();
 
-            // Get comments (get them from rows with discussions)
+            // Get comments from discussions
             var allComments = new List<CommentInfo>();
+            
+            _logger.LogInformation("Processing comments for sheet {SheetId}. Sheet has {RowCount} rows", sheetId, sheet.Rows?.Count ?? 0);
+            
             if (sheet.Rows != null)
             {
                 foreach (var row in sheet.Rows)
                 {
                     if (row.Discussions != null && row.Discussions.Any())
                     {
+                        _logger.LogInformation("Row {RowNumber} has {DiscussionCount} discussions", row.RowNumber, row.Discussions.Count);
+                        
                         foreach (var discussion in row.Discussions)
                         {
                             if (discussion.Comments != null)
                             {
+                                _logger.LogInformation("Discussion {DiscussionId} has {CommentCount} comments", discussion.Id, discussion.Comments.Count);
+                                
                                 foreach (var comment in discussion.Comments)
                                 {
                                     allComments.Add(new CommentInfo
@@ -667,12 +644,20 @@ public class SmartSheetService
                                         CreatedBy = comment.CreatedBy?.Email,
                                         RowNumber = row.RowNumber
                                     });
+                                    
+                                    _logger.LogInformation("Added comment: {CommentText} by {CreatedBy}", comment.Text, comment.CreatedBy?.Email);
                                 }
+                            }
+                            else
+                            {
+                                _logger.LogInformation("Discussion {DiscussionId} has no comments", discussion.Id);
                             }
                         }
                     }
                 }
             }
+            
+            _logger.LogInformation("Total comments extracted: {CommentCount}", allComments.Count);
             result.Comments = allComments;
 
             return result;
