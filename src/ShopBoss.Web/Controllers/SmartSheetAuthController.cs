@@ -97,10 +97,12 @@ public class SmartSheetAuthController : Controller
                 return BadRequest("Failed to obtain access token");
             }
 
-            // Store tokens in session (temporary session-based approach)
+            // Store tokens in session with expiry tracking
+            var expiresAt = DateTime.UtcNow.AddSeconds(tokens.ExpiresIn ?? 3600); // Default to 1 hour if not provided
             HttpContext.Session.SetString("ss_token", tokens.AccessToken);
             HttpContext.Session.SetString("ss_refresh", tokens.RefreshToken ?? "");
             HttpContext.Session.SetString("ss_user", tokens.UserEmail ?? "SmartSheet User");
+            HttpContext.Session.SetString("ss_expires", expiresAt.ToString("O")); // ISO 8601 format
 
             _logger.LogInformation("SmartSheet OAuth successful for user {UserEmail}", tokens.UserEmail);
 
@@ -162,7 +164,8 @@ public class SmartSheetAuthController : Controller
             {
                 AccessToken = tokenResponse.AccessToken,
                 RefreshToken = tokenResponse.RefreshToken,
-                UserEmail = userEmail
+                UserEmail = userEmail,
+                ExpiresIn = tokenResponse.ExpiresIn
             };
         }
         catch (Exception ex)
@@ -214,8 +217,128 @@ public class SmartSheetAuthController : Controller
         HttpContext.Session.Remove("ss_token");
         HttpContext.Session.Remove("ss_refresh");
         HttpContext.Session.Remove("ss_user");
+        HttpContext.Session.Remove("ss_expires");
 
         return Json(new { success = true, message = "Logged out successfully" });
+    }
+
+    /// <summary>
+    /// Check OAuth authentication status
+    /// </summary>
+    [HttpGet("smartsheet/auth/status")]
+    public IActionResult GetStatus()
+    {
+        try
+        {
+            var token = HttpContext.Session.GetString("ss_token");
+            var userEmail = HttpContext.Session.GetString("ss_user");
+            var expiresString = HttpContext.Session.GetString("ss_expires");
+
+            if (string.IsNullOrEmpty(token))
+            {
+                return Json(new { 
+                    isAuthenticated = false, 
+                    userEmail = (string?)null, 
+                    expiresAt = (DateTime?)null 
+                });
+            }
+
+            DateTime? expiresAt = null;
+            if (!string.IsNullOrEmpty(expiresString) && DateTime.TryParse(expiresString, out var parsed))
+            {
+                expiresAt = parsed;
+            }
+
+            // Check if token is expired
+            var isExpired = expiresAt.HasValue && expiresAt.Value <= DateTime.UtcNow;
+
+            return Json(new { 
+                isAuthenticated = !isExpired, 
+                userEmail = userEmail, 
+                expiresAt = expiresAt,
+                isExpired = isExpired
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error checking SmartSheet auth status");
+            return Json(new { 
+                isAuthenticated = false, 
+                userEmail = (string?)null, 
+                expiresAt = (DateTime?)null,
+                error = "Error checking authentication status" 
+            });
+        }
+    }
+
+    /// <summary>
+    /// Refresh access token using refresh token
+    /// </summary>
+    [HttpPost("smartsheet/auth/refresh")]
+    public async Task<IActionResult> RefreshToken()
+    {
+        try
+        {
+            var refreshToken = HttpContext.Session.GetString("ss_refresh");
+            if (string.IsNullOrEmpty(refreshToken))
+            {
+                return Json(new { success = false, message = "No refresh token available" });
+            }
+
+            var clientId = _configuration["SmartSheet:ClientId"];
+            var clientSecret = _configuration["SmartSheet:ClientSecret"];
+
+            var refreshRequest = new FormUrlEncodedContent(new[]
+            {
+                new KeyValuePair<string, string>("grant_type", "refresh_token"),
+                new KeyValuePair<string, string>("refresh_token", refreshToken),
+                new KeyValuePair<string, string>("client_id", clientId!),
+                new KeyValuePair<string, string>("client_secret", clientSecret!)
+            });
+
+            var response = await _httpClient.PostAsync("https://api.smartsheet.com/2.0/token", refreshRequest);
+            var responseContent = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogError("SmartSheet token refresh failed: {StatusCode} - {Content}", 
+                    response.StatusCode, responseContent);
+                
+                // Clear invalid tokens
+                await Task.Run(() => Logout());
+                
+                return Json(new { success = false, message = "Token refresh failed. Please re-authenticate." });
+            }
+
+            var tokenResponse = JsonSerializer.Deserialize<SmartSheetTokenResponse>(responseContent, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+
+            if (tokenResponse == null || string.IsNullOrEmpty(tokenResponse.AccessToken))
+            {
+                _logger.LogError("Invalid refresh token response from SmartSheet");
+                return Json(new { success = false, message = "Invalid refresh response" });
+            }
+
+            // Update tokens in session
+            var expiresAt = DateTime.UtcNow.AddSeconds(tokenResponse.ExpiresIn ?? 3600);
+            HttpContext.Session.SetString("ss_token", tokenResponse.AccessToken);
+            if (!string.IsNullOrEmpty(tokenResponse.RefreshToken))
+            {
+                HttpContext.Session.SetString("ss_refresh", tokenResponse.RefreshToken);
+            }
+            HttpContext.Session.SetString("ss_expires", expiresAt.ToString("O"));
+
+            _logger.LogInformation("SmartSheet token refreshed successfully");
+            
+            return Json(new { success = true, message = "Token refreshed successfully" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error refreshing SmartSheet token");
+            return Json(new { success = false, message = "Error refreshing token" });
+        }
     }
 }
 
@@ -247,4 +370,5 @@ public class SmartSheetTokens
     public string AccessToken { get; set; } = string.Empty;
     public string? RefreshToken { get; set; }
     public string? UserEmail { get; set; }
+    public int? ExpiresIn { get; set; }
 }
