@@ -307,3 +307,204 @@ function unlinkSmartSheet(projectId) {
         showNotification('Network error occurred', 'error');
     });
 }
+
+// ==========================================
+// Streamlined SmartSheet Import Functions
+// ==========================================
+
+function openSmartSheetImportModal() {
+    // Reset modal state
+    hideAllImportSections();
+    document.getElementById('import-loading').style.display = 'block';
+    document.getElementById('import-status').textContent = 'Checking SmartSheet authentication...';
+    
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('smartSheetImportModal'));
+    modal.show();
+    
+    // Check authentication and load active jobs
+    checkAuthAndLoadActiveJobs();
+}
+
+function hideAllImportSections() {
+    document.getElementById('import-loading').style.display = 'none';
+    document.getElementById('import-sheet-selection').style.display = 'none';
+    document.getElementById('import-complete').style.display = 'none';
+    document.getElementById('import-error').style.display = 'none';
+    document.getElementById('refresh-projects-btn').style.display = 'none';
+}
+
+function checkAuthAndLoadActiveJobs() {
+    // Check SmartSheet auth status using the existing endpoint
+    fetch('/smartsheet/auth/status')
+        .then(response => response.json())
+        .then(data => {
+            if (data.isAuthenticated) {  // Use correct property name
+                document.getElementById('import-status').textContent = 'Loading active jobs...';
+                loadActiveJobs();
+            } else {
+                // Need to authenticate
+                document.getElementById('import-status').textContent = 'SmartSheet authentication required...';
+                setTimeout(() => {
+                    triggerSmartSheetAuth().then(() => {
+                        document.getElementById('import-status').textContent = 'Loading active jobs...';
+                        loadActiveJobs();
+                    }).catch(error => {
+                        showImportError('Authentication failed: ' + error.message);
+                    });
+                }, 1000);
+            }
+        })
+        .catch(error => {
+            showImportError('Failed to check authentication: ' + error.message);
+        });
+}
+
+function loadActiveJobs() {
+    // Use the new endpoint that returns JSON directly
+    fetch('/SmartSheetMigration/GetActiveJobs')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                displayActiveJobs(data.activeJobs);
+            } else {
+                showImportError('Failed to load active jobs: ' + data.message);
+            }
+        })
+        .catch(error => {
+            showImportError('Failed to load active jobs: ' + error.message);
+        });
+}
+
+function displayActiveJobs(jobs) {
+    hideAllImportSections();
+    document.getElementById('import-sheet-selection').style.display = 'block';
+    
+    const jobsList = document.getElementById('active-jobs-list');
+    jobsList.innerHTML = '';
+    
+    if (jobs.length === 0) {
+        jobsList.innerHTML = '<div class="alert alert-info">No active jobs found in the Active Jobs workspace.</div>';
+        return;
+    }
+    
+    jobs.forEach(job => {
+        const jobItem = document.createElement('div');
+        jobItem.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center';
+        jobItem.innerHTML = `
+            <div>
+                <h6 class="mb-1">${job.name}</h6>
+                <small class="text-muted">Last modified: ${new Date(job.modifiedAt).toLocaleDateString()}</small>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="importSmartSheetJob(${job.id}, '${job.name.replace(/'/g, "\\'")}')">
+                <i class="fas fa-download me-1"></i>Import
+            </button>
+        `;
+        jobsList.appendChild(jobItem);
+    });
+}
+
+function importSmartSheetJob(sheetId, sheetName) {
+    // Show loading state
+    hideAllImportSections();
+    document.getElementById('import-loading').style.display = 'block';
+    document.getElementById('import-status').textContent = 'Importing project from SmartSheet...';
+    
+    // Show progress bar
+    const progressContainer = document.querySelector('#import-loading .progress');
+    const progressBar = document.querySelector('.progress-bar');
+    progressContainer.style.display = 'block';
+    progressBar.style.width = '10%';
+    
+    // Update progress periodically
+    const progressInterval = setInterval(() => {
+        const currentWidth = parseInt(progressBar.style.width) || 10;
+        if (currentWidth < 90) {
+            progressBar.style.width = (currentWidth + 5) + '%';
+        }
+    }, 1000);
+    
+    // Generate project ID from sheet name
+    const projectId = generateProjectIdFromName(sheetName);
+    
+    // Start import
+    const importRequest = {
+        sheetId: sheetId,
+        projectId: projectId,
+        projectName: sheetName,
+        projectManager: null, // Will be auto-populated from summary
+        importAttachments: true,
+        importComments: true
+    };
+    
+    fetch('/SmartSheetMigration/ImportProject', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(importRequest)
+    })
+    .then(response => response.json())
+    .then(data => {
+        clearInterval(progressInterval);
+        progressBar.style.width = '100%';
+        
+        if (data.success) {
+            showImportSuccess(data.message);
+        } else {
+            showImportError(data.message);
+        }
+    })
+    .catch(error => {
+        clearInterval(progressInterval);
+        showImportError('Import failed: ' + error.message);
+    });
+}
+
+function generateProjectIdFromName(sheetName) {
+    // Extract numbers from sheet name for project ID, or use timestamp as fallback
+    const numbers = sheetName.match(/\d+/);
+    return numbers ? numbers[0] : Date.now().toString().slice(-6);
+}
+
+function showImportSuccess(message) {
+    hideAllImportSections();
+    document.getElementById('import-complete').style.display = 'block';
+    document.getElementById('import-result-message').textContent = message;
+    document.getElementById('refresh-projects-btn').style.display = 'inline-block';
+}
+
+function showImportError(message) {
+    hideAllImportSections();
+    document.getElementById('import-error').style.display = 'block';
+    document.getElementById('import-error-message').textContent = message;
+}
+
+function triggerSmartSheetAuth() {
+    return new Promise((resolve, reject) => {
+        const popup = window.open('/smartsheet/auth/login', 'SmartSheetAuth', 'width=600,height=700,scrollbars=yes,resizable=yes');
+        
+        const messageListener = (event) => {
+            if (event.origin !== window.location.origin) return;
+            
+            if (event.data.type === 'smartsheet-auth-success') {
+                popup.close();
+                resolve();
+            } else if (event.data.type === 'smartsheet-auth-error') {
+                popup.close();
+                reject(new Error(event.data.error || 'Authentication failed'));
+            }
+        };
+        
+        window.addEventListener('message', messageListener);
+        
+        // Check if popup was closed manually
+        const checkClosed = setInterval(() => {
+            if (popup.closed) {
+                clearInterval(checkClosed);
+                window.removeEventListener('message', messageListener);
+                reject(new Error('Authentication cancelled'));
+            }
+        }, 1000);
+    });
+}

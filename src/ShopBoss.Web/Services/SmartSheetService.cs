@@ -28,10 +28,6 @@ public class SmartSheetService
         _attachmentService = attachmentService;
     }
 
-    /// <summary>
-    /// Get SmartSheet client using session token (session-based OAuth)
-    /// Automatically handles token refresh if needed
-    /// </summary>
     private async Task<SmartsheetClient?> GetSmartSheetClientAsync()
     {
         var session = _httpContextAccessor.HttpContext?.Session;
@@ -56,9 +52,6 @@ public class SmartSheetService
             .Build();
     }
 
-    /// <summary>
-    /// Synchronous version for backward compatibility
-    /// </summary>
     private SmartsheetClient? GetSmartSheetClient()
     {
         var session = _httpContextAccessor.HttpContext?.Session;
@@ -72,9 +65,6 @@ public class SmartSheetService
             .Build();
     }
 
-    /// <summary>
-    /// Check if the current session token is expired
-    /// </summary>
     private Task<bool> IsTokenExpiredAsync()
     {
         var session = _httpContextAccessor.HttpContext?.Session;
@@ -92,9 +82,6 @@ public class SmartSheetService
         return Task.FromResult(true); // If we can't parse, assume expired
     }
 
-    /// <summary>
-    /// Refresh the access token using the refresh token
-    /// </summary>
     private async Task<bool> RefreshTokenAsync()
     {
         try
@@ -287,8 +274,7 @@ public class SmartSheetService
 
             await _context.SaveChangesAsync();
 
-            _logger.LogInformation("Successfully linked project {ProjectId} ({ProjectName}) to SmartSheet {SheetId} ({SheetName})", 
-                projectId, project.ProjectName, sheetId, sheetInfo.Name);
+            _logger.LogInformation("Linked project {ProjectId} to SmartSheet {SheetId}", projectId, sheetId);
 
             return true;
         }
@@ -451,94 +437,7 @@ public class SmartSheetService
         }
     }
 
-    /// <summary>
-    /// Get detailed sheet data including columns and rows
-    /// </summary>
-    public async Task<object?> GetSheetDataAsync(long sheetId)
-    {
-        try
-        {
-            var smartsheet = GetSmartSheetClient();
-            if (smartsheet == null) return null;
 
-            // Get sheet with all data
-            var sheet = await Task.Run(() => 
-                smartsheet.SheetResources.GetSheet(sheetId, null, null, null, null, null, null, null));
-
-            if (sheet == null) return null;
-
-            return new
-            {
-                id = sheet.Id ?? 0,
-                name = sheet.Name ?? "",
-                totalRowCount = sheet.TotalRowCount ?? 0,
-                columns = sheet.Columns?.Select(c => new
-                {
-                    id = c.Id ?? 0,
-                    title = c.Title ?? "",
-                    type = c.Type?.ToString() ?? "",
-                    index = c.Index ?? 0,
-                    primary = c.Primary == true,
-                    options = c.Options?.ToList()
-                }).Cast<object>().ToList() ?? new List<object>(),
-                rows = sheet.Rows?.Select(r => new
-                {
-                    id = r.Id ?? 0,
-                    rowNumber = r.RowNumber ?? 0,
-                    cells = r.Cells?.ToDictionary(
-                        c => c.ColumnId ?? 0,
-                        c => c.Value ?? (object)"") ?? new Dictionary<long, object>(),
-                    createdAt = r.CreatedAt,
-                    modifiedAt = r.ModifiedAt,
-                    createdBy = r.CreatedBy?.Email,
-                    modifiedBy = r.ModifiedBy?.Email
-                }).Cast<object>().ToList() ?? new List<object>(),
-                createdAt = sheet.CreatedAt,
-                modifiedAt = sheet.ModifiedAt,
-                permalink = sheet.Permalink
-            };
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting sheet data for sheet {SheetId}", sheetId);
-            return null;
-        }
-    }
-
-    /// <summary>
-    /// Get basic sheet summary information
-    /// </summary>
-    public async Task<object?> GetSheetSummaryAsync(long sheetId)
-    {
-        try
-        {
-            var smartsheet = GetSmartSheetClient();
-            if (smartsheet == null) return null;
-
-            // Get sheet summary (without full rows/columns)
-            var sheet = await Task.Run(() => 
-                smartsheet.SheetResources.GetSheet(sheetId, null, null, null, null, null, null, null));
-
-            if (sheet == null) return null;
-
-            return new
-            {
-                id = sheet.Id ?? 0,
-                name = sheet.Name ?? "",
-                totalRowCount = sheet.TotalRowCount ?? 0,
-                columnCount = sheet.Columns?.Count ?? 0,
-                createdAt = sheet.CreatedAt,
-                modifiedAt = sheet.ModifiedAt,
-                permalink = sheet.Permalink,
-                columnNames = sheet.Columns?.Select(c => c.Title ?? "").ToList() ?? new List<string>()
-            };
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting sheet summary for sheet {SheetId}", sheetId);
-            return null;
-        }
-    }
 
     // Migration Tool Methods
 
@@ -583,78 +482,161 @@ public class SmartSheetService
                 }
             }
 
-            // Extract SmartSheet Summary fields (the official Summary feature)
-            if (sheet.Summary != null && sheet.Summary.Fields != null && sheet.Summary.Fields.Any())
+            // Get sheet summary using separate API call (like original working code)
+            try
             {
-                foreach (var summaryField in sheet.Summary.Fields)
+                var summary = await Task.Run(() => smartsheet.SheetResources.SummaryResources.GetSheetSummary(sheetId, null, null));
+                
+                if (summary?.Fields != null)
                 {
-                    var fieldName = summaryField.Title ?? $"Field_{summaryField.Id}";
-                    var fieldValue = summaryField.DisplayValue ?? summaryField.ObjectValue?.ToString() ?? "";
                     
-                    if (!string.IsNullOrEmpty(fieldName))
+                    foreach (var field in summary.Fields)
                     {
-                        result.Summary[fieldName] = fieldValue;
-                    }
-                }
-            }
-            // If no Summary fields exist, result.Summary will remain empty (which is correct)
-
-            // Get attachments
-            var attachments = await Task.Run(() => smartsheet.SheetResources.AttachmentResources.ListAttachments(sheetId, new PaginationParameters(true, null, null)));
-            result.Attachments = attachments.Data?.Select(a => new AttachmentInfo
-            {
-                Id = a.Id ?? 0,
-                Name = a.Name ?? "",
-                SizeInKb = a.SizeInKb,
-                CreatedAt = a.CreatedAt,
-                CreatedBy = a.CreatedBy?.Email,
-                RowNumber = a.ParentId.HasValue && rowIdToNumberMap.ContainsKey(a.ParentId.Value) 
-                    ? rowIdToNumberMap[a.ParentId.Value] : null,
-                AttachmentType = a.AttachmentType?.ToString(),
-                MimeType = a.MimeType,
-                Url = a.Url
-            }).ToList() ?? new List<AttachmentInfo>();
-
-            // Get comments from discussions
-            var allComments = new List<CommentInfo>();
-            
-            _logger.LogInformation("Processing comments for sheet {SheetId}. Sheet has {RowCount} rows", sheetId, sheet.Rows?.Count ?? 0);
-            
-            if (sheet.Rows != null)
-            {
-                foreach (var row in sheet.Rows)
-                {
-                    if (row.Discussions != null && row.Discussions.Any())
-                    {
-                        _logger.LogInformation("Row {RowNumber} has {DiscussionCount} discussions", row.RowNumber, row.Discussions.Count);
+                        var key = field.Title ?? "Unknown Field";
+                        var value = "";
                         
-                        foreach (var discussion in row.Discussions)
+                        if (field.ObjectValue != null)
                         {
-                            if (discussion.Comments != null)
+                            // Handle different object value types like the original code
+                            if (field.ObjectValue is Smartsheet.Api.Models.StringObjectValue stringValue)
                             {
-                                _logger.LogInformation("Discussion {DiscussionId} has {CommentCount} comments", discussion.Id, discussion.Comments.Count);
-                                
-                                foreach (var comment in discussion.Comments)
-                                {
-                                    allComments.Add(new CommentInfo
-                                    {
-                                        Id = comment.Id ?? 0,
-                                        Text = comment.Text ?? "",
-                                        CreatedAt = comment.CreatedAt,
-                                        CreatedBy = comment.CreatedBy?.Email,
-                                        RowNumber = row.RowNumber
-                                    });
-                                    
-                                    _logger.LogInformation("Added comment: {CommentText} by {CreatedBy}", comment.Text, comment.CreatedBy?.Email);
-                                }
+                                value = stringValue.Value ?? "";
+                            }
+                            else if (field.ObjectValue is Smartsheet.Api.Models.BooleanObjectValue boolValue)
+                            {
+                                value = boolValue.Value.ToString();
+                            }
+                            else if (field.ObjectValue is Smartsheet.Api.Models.NumberObjectValue numberValue)
+                            {
+                                value = numberValue.Value.ToString();
+                            }
+                            else if (field.ObjectValue is Smartsheet.Api.Models.DateObjectValue dateValue)
+                            {
+                                value = dateValue.Value.ToString();
                             }
                             else
                             {
-                                _logger.LogInformation("Discussion {DiscussionId} has no comments", discussion.Id);
+                                value = field.ObjectValue.ToString() ?? "";
                             }
+                        }
+                        else if (field.DisplayValue != null)
+                        {
+                            value = field.DisplayValue;
+                        }
+                        
+                        result.Summary[key] = value;
+                    }
+                }
+                else
+                {
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to get sheet summary for {SheetId}: {ErrorMessage}", sheetId, ex.Message);
+            }
+
+            // Get attachments using the original working approach
+            var attachmentsList = await Task.Run(() => smartsheet.SheetResources.AttachmentResources.ListAttachments(sheetId, new PaginationParameters(true, null, null)));
+            result.Attachments = new List<AttachmentInfo>();
+            
+            if (attachmentsList?.Data != null)
+            {
+                
+                foreach (var attachment in attachmentsList.Data)
+                {
+                    try
+                    {
+                        // Get full attachment details including URL - this is the key difference
+                        var attachmentDetails = await Task.Run(() => smartsheet.SheetResources.AttachmentResources.GetAttachment(sheetId, attachment.Id ?? 0));
+                        
+                        result.Attachments.Add(new AttachmentInfo
+                        {
+                            Id = attachmentDetails.Id ?? 0,
+                            Name = attachmentDetails.Name ?? "",
+                            SizeInKb = attachmentDetails.SizeInKb,
+                            CreatedAt = attachmentDetails.CreatedAt,
+                            CreatedBy = attachmentDetails.CreatedBy?.Email,
+                            RowNumber = attachmentDetails.ParentId.HasValue && rowIdToNumberMap.ContainsKey(attachmentDetails.ParentId.Value) 
+                                ? rowIdToNumberMap[attachmentDetails.ParentId.Value] : null,
+                            AttachmentType = attachmentDetails.AttachmentType?.ToString(),
+                            MimeType = attachmentDetails.MimeType,
+                            Url = attachmentDetails.Url // This will now have the actual download URL
+                        });
+                        
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to get details for attachment {AttachmentId}: {AttachmentName}", 
+                            attachment.Id, attachment.Name);
+                    }
+                }
+            }
+
+            // Get comments from discussions - use the original working approach
+            // Need to get discussions first, then fetch each discussion individually to get comments
+            var allComments = new List<CommentInfo>();
+            
+            
+            try
+            {
+                var discussionResult = await Task.Run(() => smartsheet.SheetResources.DiscussionResources.ListDiscussions(sheetId));
+                
+                if (discussionResult?.Data != null && discussionResult.Data.Any())
+                {
+                    
+                    foreach (var discussion in discussionResult.Data)
+                    {
+                        try
+                        {
+                            if (discussion.Id.HasValue)
+                            {
+                                
+                                // Fetch the full discussion to get comments - this is the key difference
+                                var fullDiscussion = await Task.Run(() => smartsheet.SheetResources.DiscussionResources.GetDiscussion(sheetId, discussion.Id.Value));
+                                
+                                if (fullDiscussion?.Comments != null && fullDiscussion.Comments.Any())
+                                {
+                                    _logger.LogInformation("Discussion {DiscussionId} has {CommentCount} comments", discussion.Id.Value, fullDiscussion.Comments.Count);
+                                    
+                                    // Get row number for this discussion - need to find the parent row
+                                    int? rowNumber = null;
+                                    if (fullDiscussion.ParentId.HasValue && rowIdToNumberMap.ContainsKey(fullDiscussion.ParentId.Value))
+                                    {
+                                        rowNumber = rowIdToNumberMap[fullDiscussion.ParentId.Value];
+                                    }
+                                    
+                                    foreach (var comment in fullDiscussion.Comments)
+                                    {
+                                        allComments.Add(new CommentInfo
+                                        {
+                                            Id = comment.Id ?? 0,
+                                            Text = comment.Text ?? "",
+                                            CreatedAt = comment.CreatedAt,
+                                            CreatedBy = comment.CreatedBy?.Email,
+                                            RowNumber = rowNumber
+                                        });
+                                        
+                                    }
+                                }
+                                else
+                                {
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Failed to fetch discussion {DiscussionId}: {ErrorMessage}", discussion.Id, ex.Message);
                         }
                     }
                 }
+                else
+                {
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to get discussions for sheet {SheetId}: {ErrorMessage}", sheetId, ex.Message);
             }
             
             _logger.LogInformation("Total comments extracted: {CommentCount}", allComments.Count);
@@ -689,13 +671,85 @@ public class SmartSheetService
             // Get sheet details
             var sheetDetails = await GetSheetDetailsAsync(request.SheetId);
 
-            // Create project
+            // Auto-populate request fields from SmartSheet Summary data if not already provided
+            if (sheetDetails.Summary.Any())
+            {
+                _logger.LogInformation("Auto-populating project fields from {SummaryCount} summary fields", sheetDetails.Summary.Count);
+                
+                foreach (var summaryField in sheetDetails.Summary)
+                {
+                    var key = summaryField.Key?.Trim() ?? "";
+                    var value = summaryField.Value?.Trim() ?? "";
+                    
+                    if (string.IsNullOrWhiteSpace(value)) continue;
+                    
+                    _logger.LogInformation("Processing summary field: '{Key}' = '{Value}'", key, value);
+                    
+                    // Auto-populate fields if they weren't provided in the request
+                    switch (key.ToLower())
+                    {
+                        case "project id" when string.IsNullOrWhiteSpace(request.ProjectId):
+                            request.ProjectId = value;
+                            _logger.LogInformation("Set ProjectId = '{Value}'", value);
+                            break;
+                        case "project name" when string.IsNullOrWhiteSpace(request.ProjectName):
+                            request.ProjectName = value;
+                            _logger.LogInformation("Set ProjectName = '{Value}'", value);
+                            break;
+                        case "job address" when string.IsNullOrWhiteSpace(request.ProjectAddress):
+                            request.ProjectAddress = value;
+                            _logger.LogInformation("Set ProjectAddress = '{Value}'", value);
+                            break;
+                        case "gc" when string.IsNullOrWhiteSpace(request.GeneralContractor):
+                            request.GeneralContractor = value;
+                            _logger.LogInformation("Set GeneralContractor = '{Value}'", value);
+                            break;
+                        case "job contact" when string.IsNullOrWhiteSpace(request.ProjectContact):
+                            request.ProjectContact = value;
+                            _logger.LogInformation("Set ProjectContact = '{Value}'", value);
+                            break;
+                        case "job contact phone" when string.IsNullOrWhiteSpace(request.ProjectContactPhone):
+                            request.ProjectContactPhone = value;
+                            _logger.LogInformation("Set ProjectContactPhone = '{Value}'", value);
+                            break;
+                        case "job contact email" when string.IsNullOrWhiteSpace(request.ProjectContactEmail):
+                            request.ProjectContactEmail = value;
+                            _logger.LogInformation("Set ProjectContactEmail = '{Value}'", value);
+                            break;
+                        case "project manager" when string.IsNullOrWhiteSpace(request.ProjectManager):
+                            request.ProjectManager = value;
+                            _logger.LogInformation("Set ProjectManager = '{Value}'", value);
+                            break;
+                        case "installer" when string.IsNullOrWhiteSpace(request.Installer):
+                            request.Installer = value;
+                            _logger.LogInformation("Set Installer = '{Value}'", value);
+                            break;
+                        case "target install date" when !request.TargetInstallDate.HasValue:
+                            if (DateTime.TryParse(value, out var installDate))
+                            {
+                                request.TargetInstallDate = installDate;
+                                _logger.LogInformation("Set TargetInstallDate = '{Value}'", installDate);
+                            }
+                            break;
+                    }
+                }
+            }
+
+            // Create project with data from the request (now populated with Summary data)
             var project = new Models.Project
             {
                 Id = Guid.NewGuid().ToString(),
                 ProjectId = request.ProjectId,
                 ProjectName = request.ProjectName,
                 ProjectManager = request.ProjectManager,
+                ProjectContact = request.ProjectContact,
+                ProjectContactPhone = request.ProjectContactPhone,
+                ProjectContactEmail = request.ProjectContactEmail,
+                ProjectAddress = request.ProjectAddress,
+                GeneralContractor = request.GeneralContractor,
+                Installer = request.Installer,
+                TargetInstallDate = request.TargetInstallDate,
+                ProjectCategory = request.ProjectCategory,
                 CreatedDate = DateTime.Now,
                 SmartSheetId = request.SheetId
             };
@@ -734,60 +788,81 @@ public class SmartSheetService
         }
     }
 
-    /// <summary>
-    /// Import attachments from SmartSheet to Project
-    /// </summary>
     private async Task ImportAttachmentsAsync(string projectId, List<AttachmentInfo> attachments, string userEmail)
     {
+        _logger.LogInformation("Starting import of {AttachmentCount} attachments for project {ProjectId}", attachments.Count, projectId);
+        
         var httpClient = new HttpClient();
         var smartsheet = GetSmartSheetClient();
-        if (smartsheet == null) return;
+        if (smartsheet == null) 
+        {
+            _logger.LogWarning("No SmartSheet client available for attachment import");
+            return;
+        }
 
+        var successfulImports = 0;
+        
         foreach (var attachment in attachments)
         {
             try
             {
-                if (string.IsNullOrEmpty(attachment.Url)) continue;
+                _logger.LogInformation("Processing attachment: {AttachmentName}, URL: {HasUrl}", 
+                    attachment.Name, !string.IsNullOrEmpty(attachment.Url));
+                
+                if (string.IsNullOrEmpty(attachment.Url))
+                {
+                    _logger.LogWarning("Skipping attachment {AttachmentName} - no URL available", attachment.Name);
+                    continue;
+                }
 
                 // Download attachment content
                 var fileBytes = await httpClient.GetByteArrayAsync(attachment.Url);
+                _logger.LogInformation("Downloaded {FileSize} bytes for {AttachmentName}", fileBytes.Length, attachment.Name);
                 
-                // Use ProjectAttachmentService to save
+                // Use ProjectAttachmentService to save with correct SmartSheet attribution
                 await _attachmentService.SaveAttachmentAsync(
                     projectId,
                     attachment.Name,
                     fileBytes,
                     attachment.MimeType ?? "application/octet-stream",
                     "SmartSheet Import",
-                    userEmail,
+                    attachment.CreatedBy ?? "SmartSheet Import", // Use SmartSheet author, not import user
                     attachment.CreatedAt,
                     $"Imported from SmartSheet row {attachment.RowNumber}");
                 
-                _logger.LogInformation("Imported attachment: {FileName} for project {ProjectId}", 
+                // ProjectAttachmentService already creates timeline events, so no need to create manually
+                successfulImports++;
+                
+                _logger.LogInformation("Successfully imported attachment: {FileName} for project {ProjectId}", 
                     attachment.Name, projectId);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error importing attachment {AttachmentName}", attachment.Name);
+                _logger.LogError(ex, "Error importing attachment {AttachmentName}: {ErrorMessage}", 
+                    attachment.Name, ex.Message);
             }
         }
+        
+        await _context.SaveChangesAsync();
+        _logger.LogInformation("Successfully saved {SuccessfulImports} of {TotalAttachments} attachment events to database", 
+            successfulImports, attachments.Count);
     }
 
-    /// <summary>
-    /// Import comments from SmartSheet as Project Events
-    /// </summary>
     private async Task ImportCommentsAsync(string projectId, List<CommentInfo> comments)
     {
+        _logger.LogInformation("Importing {CommentCount} comments for project {ProjectId}", comments.Count, projectId);
+        
         foreach (var comment in comments)
         {
             try
             {
                 var projectEvent = new Models.ProjectEvent
                 {
+                    Id = Guid.NewGuid().ToString(),
                     ProjectId = projectId,
                     EventDate = comment.CreatedAt ?? DateTime.UtcNow,
                     EventType = "comment",
-                    Description = comment.Text,
+                    Description = comment.Text ?? "",
                     CreatedBy = comment.CreatedBy ?? "SmartSheet Import",
                     RowNumber = comment.RowNumber
                 };
@@ -801,6 +876,7 @@ public class SmartSheetService
         }
         
         await _context.SaveChangesAsync();
+        _logger.LogInformation("Successfully saved {CommentCount} comment events to database", comments.Count);
     }
 }
 
@@ -893,6 +969,14 @@ public class ImportProjectRequest
     public string ProjectId { get; set; } = string.Empty;
     public string ProjectName { get; set; } = string.Empty;
     public string? ProjectManager { get; set; }
+    public string? ProjectContact { get; set; }
+    public string? ProjectContactPhone { get; set; }
+    public string? ProjectContactEmail { get; set; }
+    public string? ProjectAddress { get; set; }
+    public string? GeneralContractor { get; set; }
+    public string? Installer { get; set; }
+    public DateTime? TargetInstallDate { get; set; }
+    public ProjectCategory ProjectCategory { get; set; }
     public bool ImportAttachments { get; set; } = true;
     public bool ImportComments { get; set; } = true;
 }

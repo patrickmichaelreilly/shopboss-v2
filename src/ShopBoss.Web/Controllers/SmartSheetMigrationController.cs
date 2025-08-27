@@ -108,6 +108,52 @@ public class SmartSheetMigrationController : Controller
         }
     }
 
+    [HttpGet]
+    public async Task<IActionResult> GetActiveJobs()
+    {
+        try
+        {
+            // Check if user is authenticated with SmartSheet
+            if (!_smartSheetService.HasSmartSheetSession())
+            {
+                return Json(new { success = false, message = "Please authenticate with SmartSheet first." });
+            }
+
+            var workspaces = await _smartSheetService.GetAccessibleWorkspacesAsync();
+            
+            // Find Active Jobs workspace and extract sheets
+            var activeJobs = new List<object>();
+            
+            foreach (var workspace in workspaces)
+            {
+                var workspaceData = workspace as dynamic;
+                if ((string)workspaceData.name == "Active Jobs")
+                {
+                    var sheets = ((IEnumerable<object>)workspaceData.sheets).Select(s =>
+                    {
+                        var sheetData = s as dynamic;
+                        return new
+                        {
+                            id = (long)sheetData.id,
+                            name = (string)sheetData.name,
+                            modifiedAt = sheetData.modifiedAt as DateTime?
+                        };
+                    }).ToList();
+                    
+                    activeJobs.AddRange(sheets);
+                    break;
+                }
+            }
+            
+            return Json(new { success = true, activeJobs = activeJobs });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to load Active Jobs");
+            return Json(new { success = false, message = ex.Message });
+        }
+    }
+
     [HttpPost]
     public async Task<IActionResult> ImportProject([FromBody] ImportProjectRequest request)
     {

@@ -680,58 +680,7 @@ public class ProjectController : Controller
     /// <summary>
     /// Get detailed SmartSheet data for a specific sheet
     /// </summary>
-    [HttpGet]
-    public async Task<IActionResult> GetSheetData(long sheetId)
-    {
-        try
-        {
-            if (!_smartSheetService.HasSmartSheetSession())
-            {
-                return Json(new { success = false, message = "No SmartSheet session. Please authenticate first." });
-            }
 
-            var sheetData = await _smartSheetService.GetSheetDataAsync(sheetId);
-            if (sheetData == null)
-            {
-                return Json(new { success = false, message = "Sheet not found or inaccessible" });
-            }
-
-            return Json(new { success = true, sheetData = sheetData });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting SmartSheet data for sheet {SheetId}", sheetId);
-            return Json(new { success = false, message = "Error retrieving sheet data" });
-        }
-    }
-
-    /// <summary>
-    /// Get basic SmartSheet summary for a specific sheet
-    /// </summary>
-    [HttpGet]
-    public async Task<IActionResult> GetSheetSummary(long sheetId)
-    {
-        try
-        {
-            if (!_smartSheetService.HasSmartSheetSession())
-            {
-                return Json(new { success = false, message = "No SmartSheet session. Please authenticate first." });
-            }
-
-            var summary = await _smartSheetService.GetSheetSummaryAsync(sheetId);
-            if (summary == null)
-            {
-                return Json(new { success = false, message = "Sheet not found or inaccessible" });
-            }
-
-            return Json(new { success = true, summary = summary });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting SmartSheet summary for sheet {SheetId}", sheetId);
-            return Json(new { success = false, message = "Error retrieving sheet summary" });
-        }
-    }
 
 
     [HttpPost]
