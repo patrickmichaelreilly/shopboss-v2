@@ -12,7 +12,33 @@
             Manage project information, work orders, and file attachments
         </small>
     </div>
-    <div class="d-flex gap-2">
+    <div class="d-flex gap-2 align-items-center">
+        <!-- SmartSheet OAuth Status -->
+        <div class="dropdown me-2" id="smartsheetAuthStatus">
+            <button class="btn btn-outline-secondary dropdown-toggle d-flex align-items-center" type="button" data-bs-toggle="dropdown" aria-expanded="false" id="smartsheetAuthDropdown">
+                <i class="fas fa-table me-2" id="smartsheetIcon"></i>
+                <span id="smartsheetStatusText">SmartSheet</span>
+                <span class="badge ms-2" id="smartsheetStatusBadge">Checking...</span>
+            </button>
+            <ul class="dropdown-menu" id="smartsheetDropdownMenu">
+                <li id="smartsheetAuthInfo">
+                    <span class="dropdown-item-text">
+                        <small class="text-muted">Status: </small><span id="smartsheetDetailStatus">Checking...</span>
+                    </span>
+                </li>
+                <li id="smartsheetUserInfo" style="display: none;">
+                    <span class="dropdown-item-text">
+                        <small class="text-muted">User: </small><span id="smartsheetUserEmail"></span>
+                    </span>
+                </li>
+                <li><hr class="dropdown-divider"></li>
+                <li id="smartsheetAuthAction">
+                    <a class="dropdown-item" href="#" id="smartsheetActionButton">
+                        <i class="fas fa-sign-in-alt me-2"></i>Connect to SmartSheet
+                    </a>
+                </li>
+            </ul>
+        </div>
         <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createProjectModal" onclick="clearProjectForm()">
             <i class="fas fa-plus me-2"></i>Create New Project
         </button>

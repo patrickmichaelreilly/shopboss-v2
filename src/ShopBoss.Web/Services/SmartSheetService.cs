@@ -557,8 +557,13 @@ public class SmartSheetService
                 throw new InvalidOperationException("No SmartSheet session. Please authenticate first.");
             }
 
-            // Get basic sheet info
-            var sheet = await Task.Run(() => smartsheet.SheetResources.GetSheet(sheetId, null, null, null, null, null, null, null));
+            // Get sheet with all data including discussions/comments
+            var includes = new List<SheetLevelInclusion> 
+            { 
+                SheetLevelInclusion.ATTACHMENTS,
+                SheetLevelInclusion.DISCUSSIONS 
+            };
+            var sheet = await Task.Run(() => smartsheet.SheetResources.GetSheet(sheetId, includes, null, null, null, null, null, null));
             
             result.SheetId = sheetId;
             result.SheetName = sheet.Name ?? "";
@@ -581,21 +586,46 @@ public class SmartSheetService
             if (sheet.Rows != null && sheet.Columns != null)
             {
                 var columns = sheet.Columns.ToList();
-                foreach (var row in sheet.Rows.Take(20)) // First 20 rows for summary
+                
+                // Look for rows that appear to contain summary data (typically first 20 rows)
+                foreach (var row in sheet.Rows.Take(20))
                 {
                     if (row.Cells != null && row.Cells.Count >= 2)
                     {
-                        var keyCell = row.Cells[0];
-                        var valueCell = row.Cells[1];
+                        // Find cells with actual values
+                        var cellsWithValues = row.Cells.Where(c => 
+                            !string.IsNullOrEmpty(c?.DisplayValue) || 
+                            (c?.Value != null && !string.IsNullOrEmpty(c.Value.ToString()))).ToList();
                         
-                        var key = keyCell?.DisplayValue ?? keyCell?.Value?.ToString() ?? "";
-                        var value = valueCell?.DisplayValue ?? valueCell?.Value?.ToString() ?? "";
-                        
-                        if (!string.IsNullOrEmpty(key) && !string.IsNullOrEmpty(value))
+                        if (cellsWithValues.Count >= 2)
                         {
-                            result.Summary[key] = value;
+                            // Try first two cells with values as key-value pair
+                            var keyCell = cellsWithValues[0];
+                            var valueCell = cellsWithValues[1];
+                            
+                            var key = keyCell.DisplayValue ?? keyCell.Value?.ToString() ?? "";
+                            var value = valueCell.DisplayValue ?? valueCell.Value?.ToString() ?? "";
+                            
+                            if (!string.IsNullOrEmpty(key) && !string.IsNullOrEmpty(value))
+                            {
+                                // Clean up key (remove special characters that might cause issues)
+                                key = key.Trim().TrimEnd(':');
+                                result.Summary[key] = value;
+                            }
                         }
                     }
+                }
+                
+                // Also extract column headers as metadata
+                if (columns.Any())
+                {
+                    result.Summary["__ColumnCount"] = columns.Count.ToString();
+                    result.Summary["__Columns"] = string.Join(", ", columns.Select(c => c.Title ?? "Untitled").Take(10));
+                }
+                
+                if (sheet.Rows.Any())
+                {
+                    result.Summary["__RowCount"] = sheet.Rows.Count.ToString();
                 }
             }
 
