@@ -3,6 +3,8 @@ using Smartsheet.Api.Models;
 using ShopBoss.Web.Models;
 using ShopBoss.Web.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.SignalR;
+using ShopBoss.Web.Hubs;
 
 namespace ShopBoss.Web.Services;
 
@@ -13,19 +15,22 @@ public class SmartSheetService
     private readonly IConfiguration _configuration;
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly ProjectAttachmentService _attachmentService;
+    private readonly IHubContext<ImportProgressHub> _hubContext;
 
     public SmartSheetService(
         ShopBossDbContext context,
         ILogger<SmartSheetService> logger,
         IConfiguration configuration,
         IHttpContextAccessor httpContextAccessor,
-        ProjectAttachmentService attachmentService)
+        ProjectAttachmentService attachmentService,
+        IHubContext<ImportProgressHub> hubContext)
     {
         _context = context;
         _logger = logger;
         _configuration = configuration;
         _httpContextAccessor = httpContextAccessor;
         _attachmentService = attachmentService;
+        _hubContext = hubContext;
     }
 
     private async Task<SmartsheetClient?> GetSmartSheetClientAsync()
@@ -654,13 +659,25 @@ public class SmartSheetService
     /// <summary>
     /// Import a SmartSheet as a Project with attachments and comments
     /// </summary>
-    public async Task<ImportResult> ImportProjectAsync(ImportProjectRequest request)
+    public async Task<ImportResult> ImportProjectAsync(long sheetId, string importId = "")
     {
+        // Generate importId if not provided
+        if (string.IsNullOrEmpty(importId))
+        {
+            importId = Guid.NewGuid().ToString();
+        }
+        
         try
         {
+            await SendProgressUpdate(importId, 5, "Starting SmartSheet import...");
+            
+            // Define import steps for progress tracking
+            const int totalSteps = 7;
+            int currentStep = 0;
             var smartsheet = GetSmartSheetClient();
             if (smartsheet == null)
             {
+                await SendProgressUpdate(importId, 0, "Authentication failed - No SmartSheet session");
                 return new ImportResult 
                 { 
                     Success = false, 
@@ -668,13 +685,26 @@ public class SmartSheetService
                 };
             }
 
-            // Get sheet details
-            var sheetDetails = await GetSheetDetailsAsync(request.SheetId);
+            // Step 1: Get sheet details
+            currentStep++;
+            await SendProgressUpdate(importId, CalculateProgress(currentStep, totalSteps), "Fetching sheet details from SmartSheet...");
+            var sheetDetails = await GetSheetDetailsAsync(sheetId);
 
-            // Auto-populate request fields from SmartSheet Summary data if not already provided
+            // Initialize project data from SmartSheet Summary
+            var projectData = new ProjectData 
+            { 
+                ProjectName = sheetDetails.SheetName // Default fallback
+            };
+
+            // Step 2: Process Summary fields
+            currentStep++;
+            await SendProgressUpdate(importId, CalculateProgress(currentStep, totalSteps), "Processing SmartSheet Summary fields...");
+            
+            // Populate project fields from SmartSheet Summary
             if (sheetDetails.Summary.Any())
             {
                 _logger.LogInformation("Auto-populating project fields from {SummaryCount} summary fields", sheetDetails.Summary.Count);
+                await SendProgressUpdate(importId, CalculateProgress(currentStep, totalSteps), $"Mapping {sheetDetails.Summary.Count} summary fields to project data...");
                 
                 foreach (var summaryField in sheetDetails.Summary)
                 {
@@ -685,49 +715,49 @@ public class SmartSheetService
                     
                     _logger.LogInformation("Processing summary field: '{Key}' = '{Value}'", key, value);
                     
-                    // Auto-populate fields if they weren't provided in the request
+                    // Map SmartSheet Summary fields to project data
                     switch (key.ToLower())
                     {
-                        case "project id" when string.IsNullOrWhiteSpace(request.ProjectId):
-                            request.ProjectId = value;
+                        case "project id":
+                            projectData.ProjectId = value;
                             _logger.LogInformation("Set ProjectId = '{Value}'", value);
                             break;
-                        case "project name" when string.IsNullOrWhiteSpace(request.ProjectName):
-                            request.ProjectName = value;
+                        case "project name":
+                            projectData.ProjectName = value;
                             _logger.LogInformation("Set ProjectName = '{Value}'", value);
                             break;
-                        case "job address" when string.IsNullOrWhiteSpace(request.ProjectAddress):
-                            request.ProjectAddress = value;
+                        case "job address":
+                            projectData.ProjectAddress = value;
                             _logger.LogInformation("Set ProjectAddress = '{Value}'", value);
                             break;
-                        case "gc" when string.IsNullOrWhiteSpace(request.GeneralContractor):
-                            request.GeneralContractor = value;
+                        case "gc":
+                            projectData.GeneralContractor = value;
                             _logger.LogInformation("Set GeneralContractor = '{Value}'", value);
                             break;
-                        case "job contact" when string.IsNullOrWhiteSpace(request.ProjectContact):
-                            request.ProjectContact = value;
+                        case "job contact":
+                            projectData.ProjectContact = value;
                             _logger.LogInformation("Set ProjectContact = '{Value}'", value);
                             break;
-                        case "job contact phone" when string.IsNullOrWhiteSpace(request.ProjectContactPhone):
-                            request.ProjectContactPhone = value;
+                        case "job contact phone":
+                            projectData.ProjectContactPhone = value;
                             _logger.LogInformation("Set ProjectContactPhone = '{Value}'", value);
                             break;
-                        case "job contact email" when string.IsNullOrWhiteSpace(request.ProjectContactEmail):
-                            request.ProjectContactEmail = value;
+                        case "job contact email":
+                            projectData.ProjectContactEmail = value;
                             _logger.LogInformation("Set ProjectContactEmail = '{Value}'", value);
                             break;
-                        case "project manager" when string.IsNullOrWhiteSpace(request.ProjectManager):
-                            request.ProjectManager = value;
+                        case "project manager":
+                            projectData.ProjectManager = value;
                             _logger.LogInformation("Set ProjectManager = '{Value}'", value);
                             break;
-                        case "installer" when string.IsNullOrWhiteSpace(request.Installer):
-                            request.Installer = value;
+                        case "installer":
+                            projectData.Installer = value;
                             _logger.LogInformation("Set Installer = '{Value}'", value);
                             break;
-                        case "target install date" when !request.TargetInstallDate.HasValue:
+                        case "target install date":
                             if (DateTime.TryParse(value, out var installDate))
                             {
-                                request.TargetInstallDate = installDate;
+                                projectData.TargetInstallDate = installDate;
                                 _logger.LogInformation("Set TargetInstallDate = '{Value}'", installDate);
                             }
                             break;
@@ -735,51 +765,75 @@ public class SmartSheetService
                 }
             }
 
-            // Create project with data from the request (now populated with Summary data)
+            // Step 3: Create project in database
+            currentStep++;
+            await SendProgressUpdate(importId, CalculateProgress(currentStep, totalSteps), "Creating project in database...");
+            
+            // Create project with data from SmartSheet Summary
             var project = new Models.Project
             {
                 Id = Guid.NewGuid().ToString(),
-                ProjectId = request.ProjectId,
-                ProjectName = request.ProjectName,
-                ProjectManager = request.ProjectManager,
-                ProjectContact = request.ProjectContact,
-                ProjectContactPhone = request.ProjectContactPhone,
-                ProjectContactEmail = request.ProjectContactEmail,
-                ProjectAddress = request.ProjectAddress,
-                GeneralContractor = request.GeneralContractor,
-                Installer = request.Installer,
-                TargetInstallDate = request.TargetInstallDate,
-                ProjectCategory = request.ProjectCategory,
+                ProjectId = projectData.ProjectId,
+                ProjectName = projectData.ProjectName,
+                ProjectManager = projectData.ProjectManager,
+                ProjectContact = projectData.ProjectContact,
+                ProjectContactPhone = projectData.ProjectContactPhone,
+                ProjectContactEmail = projectData.ProjectContactEmail,
+                ProjectAddress = projectData.ProjectAddress,
+                GeneralContractor = projectData.GeneralContractor,
+                Installer = projectData.Installer,
+                TargetInstallDate = projectData.TargetInstallDate,
+                ProjectCategory = projectData.ProjectCategory,
                 CreatedDate = DateTime.Now,
-                SmartSheetId = request.SheetId
+                SmartSheetId = sheetId
             };
 
             _context.Projects.Add(project);
             await _context.SaveChangesAsync();
 
-            // Import attachments if requested
-            if (request.ImportAttachments && sheetDetails.Attachments.Any())
+            // Step 4: Import attachments 
+            currentStep++;
+            if (sheetDetails.Attachments.Any())
             {
+                await SendProgressUpdate(importId, CalculateProgress(currentStep, totalSteps), $"Importing {sheetDetails.Attachments.Count} attachments...");
                 var userEmail = GetCurrentUserEmail() ?? "SmartSheet Migration";
                 await ImportAttachmentsAsync(project.Id, sheetDetails.Attachments, userEmail);
             }
-
-            // Import comments if requested
-            if (request.ImportComments && sheetDetails.Comments.Any())
+            else
             {
+                await SendProgressUpdate(importId, CalculateProgress(currentStep, totalSteps), "No attachments to import");
+            }
+
+            // Step 5: Import comments
+            currentStep++;
+            if (sheetDetails.Comments.Any())
+            {
+                await SendProgressUpdate(importId, CalculateProgress(currentStep, totalSteps), $"Importing {sheetDetails.Comments.Count} comments...");
                 await ImportCommentsAsync(project.Id, sheetDetails.Comments);
             }
+            else
+            {
+                await SendProgressUpdate(importId, CalculateProgress(currentStep, totalSteps), "No comments to import");
+            }
+
+            // Step 6: Finalize import
+            currentStep++;
+            await SendProgressUpdate(importId, CalculateProgress(currentStep, totalSteps), "Finalizing project import...");
+
+            // Step 7: Complete
+            currentStep++;
+            await SendProgressUpdate(importId, 100, "Import completed successfully!");
 
             return new ImportResult
             {
                 Success = true,
-                Message = $"Successfully imported project '{request.ProjectName}' with {sheetDetails.Attachments.Count} attachments and {sheetDetails.Comments.Count} comments",
+                Message = $"Successfully imported project '{projectData.ProjectName}' with {sheetDetails.Attachments.Count} attachments and {sheetDetails.Comments.Count} comments",
                 ProjectId = project.Id
             };
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error importing project from sheet {SheetId}", request.SheetId);
+            _logger.LogError(ex, "Error importing project from sheet {SheetId}", sheetId);
             return new ImportResult
             {
                 Success = false,
@@ -878,105 +932,39 @@ public class SmartSheetService
         await _context.SaveChangesAsync();
         _logger.LogInformation("Successfully saved {CommentCount} comment events to database", comments.Count);
     }
+
+    /// <summary>
+    /// Send progress update via SignalR to the frontend
+    /// </summary>
+    private async Task SendProgressUpdate(string importId, int percentage, string message)
+    {
+        try
+        {
+            await _hubContext.Clients.Group($"import-{importId}")
+                .SendAsync("ProgressUpdate", new { 
+                    percentage = percentage, 
+                    message = message,
+                    timestamp = DateTime.UtcNow
+                });
+            
+            _logger.LogInformation("Import {ImportId} progress: {Percentage}% - {Message}", importId, percentage, message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to send progress update for import {ImportId}", importId);
+        }
+    }
+
+    /// <summary>
+    /// Calculate progress percentage based on current and total steps
+    /// </summary>
+    private static int CalculateProgress(int currentStep, int totalSteps)
+    {
+        if (totalSteps <= 0) return 0;
+        
+        // Calculate percentage, ensuring it doesn't exceed 95% until completion
+        var percentage = (int)Math.Floor((double)currentStep / totalSteps * 90);
+        return Math.Min(percentage, 95);
+    }
 }
 
-/// <summary>
-/// SmartSheet information for display in UI
-/// </summary>
-public class SmartSheetLinkInfo
-{
-    public long Id { get; set; }
-    public string Name { get; set; } = string.Empty;
-    public string? Permalink { get; set; }
-    public DateTime? CreatedAt { get; set; }
-    public DateTime? ModifiedAt { get; set; }
-    public int RowCount { get; set; }
-}
-
-/// <summary>
-/// Response model for SmartSheet token API
-/// </summary>
-public class SmartSheetTokenResponse
-{
-    [System.Text.Json.Serialization.JsonPropertyName("access_token")]
-    public string AccessToken { get; set; } = string.Empty;
-    
-    [System.Text.Json.Serialization.JsonPropertyName("refresh_token")]
-    public string? RefreshToken { get; set; }
-    
-    [System.Text.Json.Serialization.JsonPropertyName("token_type")]
-    public string? TokenType { get; set; }
-    
-    [System.Text.Json.Serialization.JsonPropertyName("expires_in")]
-    public int? ExpiresIn { get; set; }
-}
-
-// Migration Tool Models
-public class WorkspaceListResult
-{
-    public List<SheetInfo> ActiveJobs { get; set; } = new();
-    public List<SheetInfo> ArchivedJobs { get; set; } = new();
-}
-
-public class SheetInfo
-{
-    public long Id { get; set; }
-    public string Name { get; set; } = string.Empty;
-    public DateTime? ModifiedAt { get; set; }
-}
-
-public class SheetDetailsResult
-{
-    public long SheetId { get; set; }
-    public string SheetName { get; set; } = string.Empty;
-    public Dictionary<string, string> Summary { get; set; } = new();
-    public List<AttachmentInfo> Attachments { get; set; } = new();
-    public List<CommentInfo> Comments { get; set; } = new();
-}
-
-public class AttachmentInfo
-{
-    public long Id { get; set; }
-    public string Name { get; set; } = string.Empty;
-    public long? SizeInKb { get; set; }
-    public DateTime? CreatedAt { get; set; }
-    public string? CreatedBy { get; set; }
-    public int? RowNumber { get; set; }
-    public string? AttachmentType { get; set; }
-    public string? MimeType { get; set; }
-    public string? Url { get; set; }
-}
-
-public class CommentInfo
-{
-    public long Id { get; set; }
-    public string Text { get; set; } = string.Empty;
-    public DateTime? CreatedAt { get; set; }
-    public string? CreatedBy { get; set; }
-    public int? RowNumber { get; set; }
-}
-
-public class ImportResult
-{
-    public bool Success { get; set; }
-    public string Message { get; set; } = string.Empty;
-    public string? ProjectId { get; set; }
-}
-
-public class ImportProjectRequest
-{
-    public long SheetId { get; set; }
-    public string ProjectId { get; set; } = string.Empty;
-    public string ProjectName { get; set; } = string.Empty;
-    public string? ProjectManager { get; set; }
-    public string? ProjectContact { get; set; }
-    public string? ProjectContactPhone { get; set; }
-    public string? ProjectContactEmail { get; set; }
-    public string? ProjectAddress { get; set; }
-    public string? GeneralContractor { get; set; }
-    public string? Installer { get; set; }
-    public DateTime? TargetInstallDate { get; set; }
-    public ProjectCategory ProjectCategory { get; set; }
-    public bool ImportAttachments { get; set; } = true;
-    public bool ImportComments { get; set; } = true;
-}

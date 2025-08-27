@@ -54,11 +54,6 @@
                                         <small class="text-muted me-1">@evt.EventDate.ToString("yyyy-MM-dd HH:mm")</small>
                                         <small class="text-muted">by @(evt.CreatedBy ?? "Unknown")</small>
                                     </div>
-                                    <button type="button" class="btn btn-outline-warning btn-sm" 
-                                            onclick="unassignEventFromBlock('@evt.Id')" 
-                                            title="Remove from block">
-                                        <i class="fas fa-times"></i>
-                                    </button>
                                 </div>
                                 <div class="event-description mb-1">
                                     @if (evt.EventType == "attachment" && !string.IsNullOrEmpty(evt.AttachmentId) && evt.Attachment != null)
@@ -216,28 +211,12 @@
         }
 
         <!-- Unblocked Events -->
-        @if (Model.UnblockedEvents.Any())
-        {
-            <div class="unblocked-events">
-                <div class="section-header d-flex justify-content-between align-items-center mb-2">
-                    <h6 class="mb-0 text-muted">
-                        <i class="fas fa-clock me-1"></i>Unblocked Events (@Model.UnblockedEvents.Count)
-                    </h6>
-                    <button type="button" class="btn btn-outline-primary btn-sm" 
-                            onclick="showCreateTaskBlock('@projectId')" 
-                            title="Create new block">
-                        <i class="fas fa-plus me-1"></i>New Block
-                    </button>
-                </div>
-                
-                @foreach (var evt in Model.UnblockedEvents.OrderBy(e => e.EventDate))
+        @foreach (var evt in Model.UnblockedEvents.OrderBy(e => e.EventDate))
                 {
                     <div class="timeline-event unblocked-event" data-event-id="@evt.Id">
                         <div class="event-content">
                             <div class="event-header d-flex align-items-center mb-1">
                                 <i class="fas fa-grip-vertical event-drag-handle me-2 text-muted" style="cursor: grab; font-size: 0.8em;" title="Drag to assign to block"></i>
-                                <input type="checkbox" class="form-check-input me-2 event-selector" 
-                                       value="@evt.Id" title="Select for blocking">
                                 <div class="event-metadata flex-grow-1">
                                     <span class="badge bg-@(evt.EventType == "comment" ? "info" : "secondary") me-1">@evt.EventType</span>
                                     @if (evt.RowNumber.HasValue)
@@ -399,27 +378,6 @@
                         </div>
                     </div>
                 }
-                
-                <!-- Bulk Actions for Unblocked Events -->
-                <div class="bulk-actions mt-3 d-none" id="bulk-actions-@projectId">
-                    <div class="d-flex gap-2 align-items-center p-2 bg-light rounded">
-                        <small class="text-muted">Selected: <span id="selected-count-@projectId">0</span></small>
-                        <button type="button" class="btn btn-sm btn-primary" 
-                                onclick="assignSelectedToNewBlock('@projectId')">
-                            <i class="fas fa-plus me-1"></i>Create Block
-                        </button>
-                        <button type="button" class="btn btn-sm btn-secondary" 
-                                onclick="showAssignToExistingBlock('@projectId')">
-                            <i class="fas fa-folder-plus me-1"></i>Add to Existing
-                        </button>
-                        <button type="button" class="btn btn-sm btn-outline-secondary" 
-                                onclick="clearSelection('@projectId')">
-                            Clear
-                        </button>
-                    </div>
-                </div>
-            </div>
-        }
     }
     else
     {
@@ -477,15 +435,6 @@
         border-radius: 0 0 6px 6px;
     }
     
-    .event-selector {
-        cursor: pointer;
-    }
-    
-    .bulk-actions {
-        border-top: 1px solid #dee2e6;
-        margin-top: 8px;
-        padding-top: 5px;
-    }
     
     .section-header {
         border-bottom: 1px solid #e9ecef;

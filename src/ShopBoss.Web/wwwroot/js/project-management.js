@@ -113,14 +113,66 @@ function saveProject() {
 }
 
 function editProject(projectId) {
-    const displayContent = document.getElementById(`project-display-${projectId}`);
-    const editContent = document.getElementById(`project-edit-${projectId}`);
     const displayButtons = document.getElementById(`display-buttons-${projectId}`);
     const editButtons = document.getElementById(`edit-buttons-${projectId}`);
+    const editableFields = document.querySelectorAll(`#project-display-${projectId} .editable-field`);
     
-    // Hide display, show edit
-    displayContent.classList.add('d-none');
-    editContent.classList.remove('d-none');
+    // Store original values for cancel functionality
+    window.originalValues = window.originalValues || {};
+    window.originalValues[projectId] = {};
+    
+    // Convert each editable field to input
+    editableFields.forEach(field => {
+        const fieldName = field.dataset.field;
+        const fieldType = field.dataset.type;
+        const currentValue = field.dataset.value || field.textContent.trim();
+        
+        // Store original value and content
+        window.originalValues[projectId][fieldName] = {
+            value: currentValue === '-' ? '' : currentValue,
+            html: field.innerHTML
+        };
+        
+        // Create appropriate input element
+        let inputElement;
+        
+        switch (fieldType) {
+            case 'textarea':
+                inputElement = document.createElement('textarea');
+                inputElement.className = 'form-control form-control-sm';
+                inputElement.rows = fieldName === 'Notes' ? 3 : 2;
+                inputElement.value = currentValue === '-' ? '' : currentValue;
+                break;
+                
+            case 'select':
+                inputElement = document.createElement('select');
+                inputElement.className = 'form-select form-select-sm';
+                inputElement.innerHTML = `
+                    <option value="0" ${currentValue == '0' ? 'selected' : ''}>Standard Products</option>
+                    <option value="1" ${currentValue == '1' ? 'selected' : ''}>Custom Products</option>
+                    <option value="2" ${currentValue == '2' ? 'selected' : ''}>Small Project</option>
+                `;
+                break;
+                
+            case 'date':
+                inputElement = document.createElement('input');
+                inputElement.type = 'date';
+                inputElement.className = 'form-control form-control-sm';
+                inputElement.value = currentValue === '-' ? '' : currentValue;
+                break;
+                
+            default:
+                inputElement = document.createElement('input');
+                inputElement.type = fieldType || 'text';
+                inputElement.className = 'form-control form-control-sm';
+                inputElement.value = currentValue === '-' ? '' : currentValue;
+                break;
+        }
+        
+        inputElement.dataset.field = fieldName;
+        field.innerHTML = '';
+        field.appendChild(inputElement);
+    });
     
     // Switch buttons
     displayButtons.classList.add('d-none');
@@ -128,14 +180,22 @@ function editProject(projectId) {
 }
 
 function cancelProjectEdit(projectId) {
-    const displayContent = document.getElementById(`project-display-${projectId}`);
-    const editContent = document.getElementById(`project-edit-${projectId}`);
     const displayButtons = document.getElementById(`display-buttons-${projectId}`);
     const editButtons = document.getElementById(`edit-buttons-${projectId}`);
+    const editableFields = document.querySelectorAll(`#project-display-${projectId} .editable-field`);
     
-    // Hide edit, show display
-    editContent.classList.add('d-none');
-    displayContent.classList.remove('d-none');
+    // Restore original content for each field
+    editableFields.forEach(field => {
+        const fieldName = field.dataset.field;
+        if (window.originalValues && window.originalValues[projectId] && window.originalValues[projectId][fieldName]) {
+            field.innerHTML = window.originalValues[projectId][fieldName].html;
+        }
+    });
+    
+    // Clean up stored values
+    if (window.originalValues && window.originalValues[projectId]) {
+        delete window.originalValues[projectId];
+    }
     
     // Switch buttons
     editButtons.classList.add('d-none');
@@ -143,25 +203,26 @@ function cancelProjectEdit(projectId) {
 }
 
 function saveProjectEdit(projectId) {
-    const form = document.getElementById(`projectForm-${projectId}`);
-    const formData = new FormData(form);
+    const editableFields = document.querySelectorAll(`#project-display-${projectId} .editable-field input, #project-display-${projectId} .editable-field textarea, #project-display-${projectId} .editable-field select`);
     
+    // Collect values from inline inputs
     const project = {
-        Id: projectId,
-        ProjectId: formData.get('ProjectId'),
-        ProjectName: formData.get('ProjectName'),
-        ProjectCategory: parseInt(formData.get('ProjectCategory')),
-        BidRequestDate: formData.get('BidRequestDate') || null,
-        ProjectAddress: formData.get('ProjectAddress') || null,
-        ProjectContact: formData.get('ProjectContact') || null,
-        ProjectContactPhone: formData.get('ProjectContactPhone') || null,
-        ProjectContactEmail: formData.get('ProjectContactEmail') || null,
-        GeneralContractor: formData.get('GeneralContractor') || null,
-        ProjectManager: formData.get('ProjectManager') || null,
-        TargetInstallDate: formData.get('TargetInstallDate') || null,
-        Installer: formData.get('Installer') || null,
-        Notes: formData.get('Notes') || null
+        Id: projectId
     };
+    
+    editableFields.forEach(input => {
+        const fieldName = input.dataset.field;
+        let value = input.value.trim();
+        
+        // Handle different field types
+        if (fieldName === 'ProjectCategory') {
+            project[fieldName] = parseInt(value) || 0;
+        } else if (fieldName === 'BidRequestDate') {
+            project[fieldName] = value || null;
+        } else {
+            project[fieldName] = value || null;
+        }
+    });
 
     fetch('/Project/Update', {
         method: 'POST',
@@ -175,22 +236,40 @@ function saveProjectEdit(projectId) {
         if (data.success) {
             showNotification('Project updated successfully', 'success');
             
-            // Update the project ID and name in the table row if they changed
-            const projectRow = document.getElementById(`expand-icon-${projectId}`).closest('tr');
-            const projectIdCell = projectRow.querySelector('td:nth-child(2)');
-            const projectNameCell = projectRow.querySelector('td:nth-child(3) strong');
-            if (projectIdCell) {
-                projectIdCell.textContent = project.ProjectId;
-            }
-            if (projectNameCell) {
-                projectNameCell.textContent = project.ProjectName;
+            // Update display values for each field
+            const editableFields = document.querySelectorAll(`#project-display-${projectId} .editable-field`);
+            editableFields.forEach(field => {
+                const input = field.querySelector('input, textarea, select');
+                if (input) {
+                    const fieldName = input.dataset.field;
+                    const value = input.value.trim();
+                    
+                    // Update the field's display content
+                    if (fieldName === 'ProjectCategory') {
+                        const categoryNames = ['Standard Products', 'Custom Products', 'Small Project'];
+                        const categoryName = categoryNames[parseInt(value)] || 'Unknown';
+                        field.innerHTML = `<span class="badge bg-secondary">${categoryName}</span>`;
+                    } else if (fieldName === 'BidRequestDate' && value) {
+                        const date = new Date(value);
+                        const displayDate = date.toLocaleDateString('en-US', {month: '2-digit', day: '2-digit', year: '2-digit'});
+                        field.innerHTML = displayDate;
+                        field.dataset.value = value;
+                    } else {
+                        field.innerHTML = value || '-';
+                    }
+                }
+            });
+            
+            // Clean up stored values
+            if (window.originalValues && window.originalValues[projectId]) {
+                delete window.originalValues[projectId];
             }
             
-            // Update the display content with new values
-            updateProjectDisplayContent(projectId, project);
-            
-            // Switch back to display mode
-            cancelProjectEdit(projectId);
+            // Switch buttons back
+            const displayButtons = document.getElementById(`display-buttons-${projectId}`);
+            const editButtons = document.getElementById(`edit-buttons-${projectId}`);
+            editButtons.classList.add('d-none');
+            displayButtons.classList.remove('d-none');
         } else {
             showNotification(data.message || 'Error updating project', 'error');
         }
@@ -199,59 +278,6 @@ function saveProjectEdit(projectId) {
         console.error('Error:', error);
         showNotification('Network error occurred', 'error');
     });
-}
-
-// Helper function to update the display content after save
-function updateProjectDisplayContent(projectId, project) {
-    const displayContainer = document.getElementById(`project-display-${projectId}`);
-    const categoryBadges = {0: 'Standard Products', 1: 'Custom Products', 2: 'Small Project'};
-    
-    // Update the display table with new values
-    displayContainer.innerHTML = `
-        <table class="table table-sm table-borderless mb-0">
-            <tbody>
-                <!-- Left: Customer Info, Right: Internal Info -->
-                <tr>
-                    <td width="120" class="text-muted ps-3">Address:</td>
-                    <td>${project.ProjectAddress || '-'}</td>
-                    <td width="120" class="text-muted">Bid Date:</td>
-                    <td>${project.BidRequestDate ? new Date(project.BidRequestDate).toLocaleDateString('en-US', {month: '2-digit', day: '2-digit', year: '2-digit'}) : '-'}</td>
-                </tr>
-                <tr>
-                    <td class="text-muted ps-3">Contractor:</td>
-                    <td>${project.GeneralContractor || '-'}</td>
-                    <td class="text-muted">PM:</td>
-                    <td>${project.ProjectManager || '-'}</td>
-                </tr>
-                <tr>
-                    <td class="text-muted ps-3">Contact:</td>
-                    <td>${project.ProjectContact || '-'}</td>
-                    <td class="text-muted">Installer:</td>
-                    <td>${project.Installer || '-'}</td>
-                </tr>
-                <tr>
-                    <td class="text-muted ps-3">Email:</td>
-                    <td>${project.ProjectContactEmail || '-'}</td>
-                    <td class="text-muted">Category:</td>
-                    <td><span class="badge bg-secondary">${categoryBadges[project.ProjectCategory] || 'Unknown'}</span></td>
-                </tr>
-                <tr>
-                    <td class="text-muted ps-3">Phone:</td>
-                    <td>${project.ProjectContactPhone || '-'}</td>
-                    <td></td>
-                    <td></td>
-                </tr>
-                
-                ${project.Notes ? `
-                <tr><td colspan="4" class="py-2"></td></tr>
-                <tr>
-                    <td class="text-muted align-top ps-3">Notes:</td>
-                    <td colspan="3">${project.Notes}</td>
-                </tr>
-                ` : ''}
-            </tbody>
-        </table>
-    `;
 }
 
 function archiveProject(projectId) {

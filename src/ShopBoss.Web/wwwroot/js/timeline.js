@@ -31,57 +31,10 @@ function loadTimelineForProject(projectId) {
 
 // Initialize event handlers for timeline interactions
 function initializeTimelineInteractions(projectId) {
-    // Event selection handling
-    const timelineContainer = document.getElementById(`timeline-container-${projectId}`);
-    if (!timelineContainer) {
-        return;
-    }
-    
-    const eventSelectors = timelineContainer.querySelectorAll('.event-selector');
-    
-    eventSelectors.forEach(checkbox => {
-        // Remove any existing listeners to avoid duplicates
-        checkbox.removeEventListener('change', handleEventSelectionChange);
-        // Add new listener
-        checkbox.addEventListener('change', () => updateBulkActionsVisibility(projectId));
-    });
-    
-    // Initial update of bulk actions visibility
-    updateBulkActionsVisibility(projectId);
-    
     // Initialize drag-drop functionality
     initializeTimelineDragDrop(projectId);
 }
 
-// Handler function for event selection changes
-function handleEventSelectionChange(event) {
-    // This function is for removing duplicate listeners
-}
-
-// Update bulk actions visibility based on selected events
-function updateBulkActionsVisibility(projectId) {
-    const selectedCheckboxes = document.querySelectorAll(`#timeline-container-${projectId} .event-selector:checked`);
-    const bulkActions = document.getElementById(`bulk-actions-${projectId}`);
-    const selectedCount = document.getElementById(`selected-count-${projectId}`);
-    
-    if (bulkActions) {
-        if (selectedCheckboxes.length > 0) {
-            bulkActions.classList.remove('d-none');
-            if (selectedCount) {
-                selectedCount.textContent = selectedCheckboxes.length;
-            }
-        } else {
-            bulkActions.classList.add('d-none');
-        }
-    }
-}
-
-// Clear event selection
-function clearSelection(projectId) {
-    const checkboxes = document.querySelectorAll(`#timeline-container-${projectId} .event-selector`);
-    checkboxes.forEach(cb => cb.checked = false);
-    updateBulkActionsVisibility(projectId);
-}
 
 // Show create TaskBlock dialog
 function showCreateTaskBlock(projectId) {
@@ -200,89 +153,6 @@ function deleteTaskBlock(blockId) {
     });
 }
 
-// Assign selected events to new block
-function assignSelectedToNewBlock(projectId) {
-    const selectedEventIds = getSelectedEventIds(projectId);
-    if (selectedEventIds.length === 0) {
-        showNotification('Please select at least one event', 'error');
-        return;
-    }
-    
-    const blockName = prompt('Enter name for new Task Block:');
-    if (blockName && blockName.trim()) {
-        // First create the block
-        const requestData = {
-            ProjectId: projectId,
-            Name: blockName.trim()
-        };
-        
-        fetch('/Timeline/CreateBlock', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(requestData)
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success && data.block) {
-                // Now assign events to the block
-                return assignEventsToBlock(data.block.id, selectedEventIds);
-            } else {
-                throw new Error(data.message || 'Error creating task block');
-            }
-        })
-        .then(() => {
-            showNotification('Task block created and events assigned successfully', 'success');
-            loadTimelineForProject(projectId);
-        })
-        .catch(error => {
-            console.error('Error creating block and assigning events:', error);
-            showNotification(error.message || 'Network error occurred', 'error');
-        });
-    }
-}
-
-// Show dialog to assign to existing block
-function showAssignToExistingBlock(projectId) {
-    const selectedEventIds = getSelectedEventIds(projectId);
-    if (selectedEventIds.length === 0) {
-        showNotification('Please select at least one event', 'error');
-        return;
-    }
-    
-    // For now, use a simple approach - in the future we could create a proper modal
-    const blocks = document.querySelectorAll(`#timeline-container-${projectId} .task-block`);
-    if (blocks.length === 0) {
-        showNotification('No existing blocks found. Create a new block instead.', 'error');
-        return;
-    }
-    
-    let blockOptions = '';
-    blocks.forEach((block, index) => {
-        const blockName = block.querySelector('.task-block-header h6').textContent.trim();
-        const blockId = block.dataset.blockId;
-        blockOptions += `${index + 1}. ${blockName} (ID: ${blockId})\n`;
-    });
-    
-    const selection = prompt(`Select a block by entering its number:\n\n${blockOptions}`);
-    const blockIndex = parseInt(selection) - 1;
-    
-    if (blockIndex >= 0 && blockIndex < blocks.length) {
-        const selectedBlock = blocks[blockIndex];
-        const blockId = selectedBlock.dataset.blockId;
-        
-        assignEventsToBlock(blockId, selectedEventIds)
-            .then(() => {
-                showNotification('Events assigned to block successfully', 'success');
-                loadTimelineForProject(projectId);
-            })
-            .catch(error => {
-                console.error('Error assigning events to block:', error);
-                showNotification('Network error occurred', 'error');
-            });
-    }
-}
 
 // Assign events to a block
 function assignEventsToBlock(blockId, eventIds) {
@@ -307,48 +177,6 @@ function assignEventsToBlock(blockId, eventIds) {
     });
 }
 
-// Unassign event from block
-function unassignEventFromBlock(eventId) {
-    const requestData = {
-        EventIds: [eventId]
-    };
-    
-    fetch('/Timeline/UnassignEvents', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestData)
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showNotification('Event removed from block successfully', 'success');
-            // Find the project ID and reload timeline
-            const eventElement = document.querySelector(`[data-event-id="${eventId}"]`);
-            if (eventElement) {
-                const timelineContainer = eventElement.closest('[id^="timeline-container-"]');
-                if (timelineContainer) {
-                    const projectId = timelineContainer.id.replace('timeline-container-', '');
-                    loadTimelineForProject(projectId);
-                }
-            }
-        } else {
-            showNotification(data.message || 'Error removing event from block', 'error');
-        }
-    })
-    .catch(error => {
-        console.error('Error unassigning event from block:', error);
-        showNotification('Network error occurred', 'error');
-    });
-}
-
-// Get selected event IDs
-function getSelectedEventIds(projectId) {
-    const selectedCheckboxes = document.querySelectorAll(`#timeline-container-${projectId} .event-selector:checked`);
-    return Array.from(selectedCheckboxes).map(cb => cb.value);
-}
-
 // File management functions have been moved to timeline-files.js
 
 // Purchase Order management functions have been moved to timeline-purchases.js
@@ -362,14 +190,11 @@ function initializeTimelineDragDrop(projectId) {
     const timelineContainer = document.getElementById(`timeline-container-${projectId}`);
     if (!timelineContainer) return;
     
-    // Initialize TaskBlock reordering
+    // Initialize TaskBlock reordering and unblocked event handling
     initializeTaskBlockReordering(projectId);
     
     // Initialize event reordering within blocks
     initializeEventReordering(projectId);
-    
-    // Initialize unblocked events drag-drop
-    initializeUnblockedEventsDragDrop(projectId);
 }
 
 // Initialize TaskBlock drag-drop reordering
@@ -379,19 +204,47 @@ function initializeTaskBlockReordering(projectId) {
     if (!innerTimeline) return;
     
     new Sortable(innerTimeline, {
-        draggable: '.task-block', // Only TaskBlocks are draggable
-        handle: '.block-drag-handle',
+        draggable: '.task-block, .unblocked-event', // TaskBlocks and unblocked events are draggable
+        handle: '.block-drag-handle, .event-drag-handle',
         ghostClass: 'sortable-ghost',
         chosenClass: 'sortable-chosen',
         dragClass: 'sortable-drag',
         animation: 150,
+        group: {
+            name: `events-${projectId}`,
+            pull: true,
+            put: true
+        },
         onEnd: function(evt) {
-            // Get all TaskBlock IDs in new order
-            const blockElements = innerTimeline.querySelectorAll('.task-block[data-block-id]');
-            const blockIds = Array.from(blockElements).map(el => el.dataset.blockId);
-            
-            // Call API to persist the new order
-            reorderTaskBlocks(projectId, blockIds);
+            // Check if it was a task block being reordered
+            if (evt.item.classList.contains('task-block')) {
+                // Get all TaskBlock IDs in new order
+                const blockElements = innerTimeline.querySelectorAll('.task-block[data-block-id]');
+                const blockIds = Array.from(blockElements).map(el => el.dataset.blockId);
+                
+                // Call API to persist the new order
+                reorderTaskBlocks(projectId, blockIds);
+            }
+            // Check if an unblocked event was dropped into a TaskBlock
+            else if (evt.item.classList.contains('unblocked-event')) {
+                const targetBlock = evt.to.closest('[data-block-id]');
+                if (targetBlock) {
+                    const targetBlockId = targetBlock.dataset.blockId;
+                    const movedEventId = evt.item.dataset.eventId;
+                    
+                    // Assign the event to the target block
+                    assignEventsToBlock(targetBlockId, [movedEventId])
+                        .then(() => {
+                            showNotification('Event assigned to block successfully', 'success');
+                            loadTimelineForProject(projectId);
+                        })
+                        .catch(error => {
+                            console.error('Error assigning event to block:', error);
+                            showNotification('Error assigning event to block', 'error');
+                            loadTimelineForProject(projectId);
+                        });
+                }
+            }
         }
     });
 }
@@ -455,41 +308,6 @@ function initializeEventReordering(projectId) {
     });
 }
 
-// Initialize drag-drop for unblocked events
-function initializeUnblockedEventsDragDrop(projectId) {
-    const unblockedEventsContainer = document.querySelector(`#timeline-container-${projectId} .unblocked-events`);
-    if (!unblockedEventsContainer) return;
-    
-    new Sortable(unblockedEventsContainer, {
-        draggable: '.unblocked-event',
-        handle: '.event-drag-handle',
-        ghostClass: 'sortable-ghost',
-        chosenClass: 'sortable-chosen',
-        dragClass: 'sortable-drag',
-        animation: 150,
-        group: `events-${projectId}`, // Same group as blocked events to allow cross-container dragging
-        onEnd: function(evt) {
-            // Check if event was dropped into a TaskBlock
-            const targetBlock = evt.to.closest('[data-block-id]');
-            if (targetBlock) {
-                const targetBlockId = targetBlock.dataset.blockId;
-                const movedEventId = evt.item.dataset.eventId;
-                
-                // Assign the event to the target block
-                assignEventsToBlock(targetBlockId, [movedEventId])
-                    .then(() => {
-                        showNotification('Event assigned to block successfully', 'success');
-                        loadTimelineForProject(projectId);
-                    })
-                    .catch(error => {
-                        console.error('Error assigning event to block:', error);
-                        showNotification('Error assigning event to block', 'error');
-                        loadTimelineForProject(projectId);
-                    });
-            }
-        }
-    });
-}
 
 // API call to reorder TaskBlocks
 function reorderTaskBlocks(projectId, blockIds) {

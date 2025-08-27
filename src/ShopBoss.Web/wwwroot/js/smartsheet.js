@@ -396,7 +396,7 @@ function displayActiveJobs(jobs) {
                 <h6 class="mb-1">${job.name}</h6>
                 <small class="text-muted">Last modified: ${new Date(job.modifiedAt).toLocaleDateString()}</small>
             </div>
-            <button class="btn btn-primary btn-sm" onclick="importSmartSheetJob(${job.id}, '${job.name.replace(/'/g, "\\'")}')">
+            <button class="btn btn-primary btn-sm" onclick="importSmartSheetJob(${job.id})">
                 <i class="fas fa-download me-1"></i>Import
             </button>
         `;
@@ -404,68 +404,84 @@ function displayActiveJobs(jobs) {
     });
 }
 
-function importSmartSheetJob(sheetId, sheetName) {
+async function importSmartSheetJob(sheetId) {
     // Show loading state
     hideAllImportSections();
     document.getElementById('import-loading').style.display = 'block';
-    document.getElementById('import-status').textContent = 'Importing project from SmartSheet...';
+    document.getElementById('import-status').textContent = 'Starting SmartSheet import...';
     
     // Show progress bar
     const progressContainer = document.querySelector('#import-loading .progress');
     const progressBar = document.querySelector('.progress-bar');
     progressContainer.style.display = 'block';
-    progressBar.style.width = '10%';
+    progressBar.style.width = '5%';
     
-    // Update progress periodically
-    const progressInterval = setInterval(() => {
-        const currentWidth = parseInt(progressBar.style.width) || 10;
-        if (currentWidth < 90) {
-            progressBar.style.width = (currentWidth + 5) + '%';
-        }
-    }, 1000);
+    // Generate unique import ID for SignalR tracking
+    const importId = 'import_' + Date.now() + '_' + Math.random().toString(36).substring(2, 11);
     
-    // Generate project ID from sheet name
-    const projectId = generateProjectIdFromName(sheetName);
-    
-    // Start import
-    const importRequest = {
-        sheetId: sheetId,
-        projectId: projectId,
-        projectName: sheetName,
-        projectManager: null, // Will be auto-populated from summary
-        importAttachments: true,
-        importComments: true
-    };
-    
-    fetch('/SmartSheetMigration/ImportProject', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(importRequest)
-    })
-    .then(response => response.json())
-    .then(data => {
-        clearInterval(progressInterval);
-        progressBar.style.width = '100%';
+    // Setup SignalR connection for real-time progress updates
+    const connection = new signalR.HubConnectionBuilder()
+        .withUrl("/importProgress")
+        .build();
+
+    try {
+        await connection.start();
+        
+        // Join the import group for progress updates
+        await connection.invoke("JoinImportGroup", importId);
+        
+        // Listen for progress updates from server
+        connection.on("ProgressUpdate", function (progress) {
+            // Update progress bar
+            progressBar.style.width = progress.percentage + '%';
+            progressBar.textContent = progress.percentage + '%';
+            
+            // Update status message (single message, replace each time)
+            document.getElementById('import-status').textContent = progress.message;
+            
+            // Complete progress styling
+            if (progress.percentage >= 100) {
+                progressBar.classList.remove('progress-bar-animated');
+                progressBar.classList.add('bg-success');
+            }
+        });
+        
+        // Start import with importId for progress tracking
+        const importRequest = {
+            sheetId: sheetId,
+            importId: importId
+        };
+        
+        const response = await fetch('/SmartSheetMigration/ImportProject', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(importRequest)
+        });
+        
+        const data = await response.json();
+        
+        // Close SignalR connection
+        await connection.stop();
         
         if (data.success) {
             showImportSuccess(data.message);
         } else {
             showImportError(data.message);
         }
-    })
-    .catch(error => {
-        clearInterval(progressInterval);
+        
+    } catch (error) {
+        // Clean up SignalR connection on error
+        try {
+            await connection.stop();
+        } catch (stopError) {
+            console.error('Error stopping SignalR connection:', stopError);
+        }
         showImportError('Import failed: ' + error.message);
-    });
+    }
 }
 
-function generateProjectIdFromName(sheetName) {
-    // Extract numbers from sheet name for project ID, or use timestamp as fallback
-    const numbers = sheetName.match(/\d+/);
-    return numbers ? numbers[0] : Date.now().toString().slice(-6);
-}
 
 function showImportSuccess(message) {
     hideAllImportSections();

@@ -165,7 +165,7 @@ public class SmartSheetMigrationController : Controller
                 return Json(new { success = false, message = "Not authenticated with SmartSheet. Please authenticate first." });
             }
 
-            var result = await _smartSheetService.ImportProjectAsync(request);
+            var result = await _smartSheetService.ImportProjectAsync(request.SheetId, request.ImportId);
             return Json(result);
         }
         catch (Exception ex)
