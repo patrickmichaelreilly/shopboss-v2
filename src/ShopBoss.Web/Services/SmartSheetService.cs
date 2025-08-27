@@ -12,17 +12,20 @@ public class SmartSheetService
     private readonly ILogger<SmartSheetService> _logger;
     private readonly IConfiguration _configuration;
     private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly ProjectAttachmentService _attachmentService;
 
     public SmartSheetService(
         ShopBossDbContext context,
         ILogger<SmartSheetService> logger,
         IConfiguration configuration,
-        IHttpContextAccessor httpContextAccessor)
+        IHttpContextAccessor httpContextAccessor,
+        ProjectAttachmentService attachmentService)
     {
         _context = context;
         _logger = logger;
         _configuration = configuration;
         _httpContextAccessor = httpContextAccessor;
+        _attachmentService = attachmentService;
     }
 
     /// <summary>
@@ -536,6 +539,254 @@ public class SmartSheetService
             return null;
         }
     }
+
+    // Migration Tool Methods
+
+    /// <summary>
+    /// Get sheet details including summary, attachments, and comments for migration
+    /// </summary>
+    public async Task<SheetDetailsResult> GetSheetDetailsAsync(long sheetId)
+    {
+        var result = new SheetDetailsResult();
+        
+        try
+        {
+            var smartsheet = GetSmartSheetClient();
+            if (smartsheet == null)
+            {
+                throw new InvalidOperationException("No SmartSheet session. Please authenticate first.");
+            }
+
+            // Get basic sheet info
+            var sheet = await Task.Run(() => smartsheet.SheetResources.GetSheet(sheetId, null, null, null, null, null, null, null));
+            
+            result.SheetId = sheetId;
+            result.SheetName = sheet.Name ?? "";
+
+            // Build row ID to number mapping
+            var rowIdToNumberMap = new Dictionary<long, int>();
+            if (sheet.Rows != null)
+            {
+                for (int i = 0; i < sheet.Rows.Count; i++)
+                {
+                    var row = sheet.Rows[i];
+                    if (row.Id.HasValue)
+                    {
+                        rowIdToNumberMap[row.Id.Value] = row.RowNumber ?? (i + 1);
+                    }
+                }
+            }
+
+            // Extract sheet summary (key-value pairs from first few rows)
+            if (sheet.Rows != null && sheet.Columns != null)
+            {
+                var columns = sheet.Columns.ToList();
+                foreach (var row in sheet.Rows.Take(20)) // First 20 rows for summary
+                {
+                    if (row.Cells != null && row.Cells.Count >= 2)
+                    {
+                        var keyCell = row.Cells[0];
+                        var valueCell = row.Cells[1];
+                        
+                        var key = keyCell?.DisplayValue ?? keyCell?.Value?.ToString() ?? "";
+                        var value = valueCell?.DisplayValue ?? valueCell?.Value?.ToString() ?? "";
+                        
+                        if (!string.IsNullOrEmpty(key) && !string.IsNullOrEmpty(value))
+                        {
+                            result.Summary[key] = value;
+                        }
+                    }
+                }
+            }
+
+            // Get attachments
+            var attachments = await Task.Run(() => smartsheet.SheetResources.AttachmentResources.ListAttachments(sheetId, new PaginationParameters(true, null, null)));
+            result.Attachments = attachments.Data?.Select(a => new AttachmentInfo
+            {
+                Id = a.Id ?? 0,
+                Name = a.Name ?? "",
+                SizeInKb = a.SizeInKb,
+                CreatedAt = a.CreatedAt,
+                CreatedBy = a.CreatedBy?.Email,
+                RowNumber = a.ParentId.HasValue && rowIdToNumberMap.ContainsKey(a.ParentId.Value) 
+                    ? rowIdToNumberMap[a.ParentId.Value] : null,
+                AttachmentType = a.AttachmentType?.ToString(),
+                MimeType = a.MimeType,
+                Url = a.Url
+            }).ToList() ?? new List<AttachmentInfo>();
+
+            // Get comments (get them from rows with discussions)
+            var allComments = new List<CommentInfo>();
+            if (sheet.Rows != null)
+            {
+                foreach (var row in sheet.Rows)
+                {
+                    if (row.Discussions != null && row.Discussions.Any())
+                    {
+                        foreach (var discussion in row.Discussions)
+                        {
+                            if (discussion.Comments != null)
+                            {
+                                foreach (var comment in discussion.Comments)
+                                {
+                                    allComments.Add(new CommentInfo
+                                    {
+                                        Id = comment.Id ?? 0,
+                                        Text = comment.Text ?? "",
+                                        CreatedAt = comment.CreatedAt,
+                                        CreatedBy = comment.CreatedBy?.Email,
+                                        RowNumber = row.RowNumber
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            result.Comments = allComments;
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting sheet details for {SheetId}", sheetId);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Import a SmartSheet as a Project with attachments and comments
+    /// </summary>
+    public async Task<ImportResult> ImportProjectAsync(ImportProjectRequest request)
+    {
+        try
+        {
+            var smartsheet = GetSmartSheetClient();
+            if (smartsheet == null)
+            {
+                return new ImportResult 
+                { 
+                    Success = false, 
+                    Message = "No SmartSheet session. Please authenticate first." 
+                };
+            }
+
+            // Get sheet details
+            var sheetDetails = await GetSheetDetailsAsync(request.SheetId);
+
+            // Create project
+            var project = new Models.Project
+            {
+                Id = Guid.NewGuid().ToString(),
+                ProjectId = request.ProjectId,
+                ProjectName = request.ProjectName,
+                ProjectManager = request.ProjectManager,
+                CreatedDate = DateTime.Now,
+                SmartSheetId = request.SheetId
+            };
+
+            _context.Projects.Add(project);
+            await _context.SaveChangesAsync();
+
+            // Import attachments if requested
+            if (request.ImportAttachments && sheetDetails.Attachments.Any())
+            {
+                var userEmail = GetCurrentUserEmail() ?? "SmartSheet Migration";
+                await ImportAttachmentsAsync(project.Id, sheetDetails.Attachments, userEmail);
+            }
+
+            // Import comments if requested
+            if (request.ImportComments && sheetDetails.Comments.Any())
+            {
+                await ImportCommentsAsync(project.Id, sheetDetails.Comments);
+            }
+
+            return new ImportResult
+            {
+                Success = true,
+                Message = $"Successfully imported project '{request.ProjectName}' with {sheetDetails.Attachments.Count} attachments and {sheetDetails.Comments.Count} comments",
+                ProjectId = project.Id
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error importing project from sheet {SheetId}", request.SheetId);
+            return new ImportResult
+            {
+                Success = false,
+                Message = ex.Message
+            };
+        }
+    }
+
+    /// <summary>
+    /// Import attachments from SmartSheet to Project
+    /// </summary>
+    private async Task ImportAttachmentsAsync(string projectId, List<AttachmentInfo> attachments, string userEmail)
+    {
+        var httpClient = new HttpClient();
+        var smartsheet = GetSmartSheetClient();
+        if (smartsheet == null) return;
+
+        foreach (var attachment in attachments)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(attachment.Url)) continue;
+
+                // Download attachment content
+                var fileBytes = await httpClient.GetByteArrayAsync(attachment.Url);
+                
+                // Use ProjectAttachmentService to save
+                await _attachmentService.SaveAttachmentAsync(
+                    projectId,
+                    attachment.Name,
+                    fileBytes,
+                    attachment.MimeType ?? "application/octet-stream",
+                    "SmartSheet Import",
+                    userEmail,
+                    attachment.CreatedAt,
+                    $"Imported from SmartSheet row {attachment.RowNumber}");
+                
+                _logger.LogInformation("Imported attachment: {FileName} for project {ProjectId}", 
+                    attachment.Name, projectId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error importing attachment {AttachmentName}", attachment.Name);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Import comments from SmartSheet as Project Events
+    /// </summary>
+    private async Task ImportCommentsAsync(string projectId, List<CommentInfo> comments)
+    {
+        foreach (var comment in comments)
+        {
+            try
+            {
+                var projectEvent = new Models.ProjectEvent
+                {
+                    ProjectId = projectId,
+                    EventDate = comment.CreatedAt ?? DateTime.UtcNow,
+                    EventType = "comment",
+                    Description = comment.Text,
+                    CreatedBy = comment.CreatedBy ?? "SmartSheet Import",
+                    RowNumber = comment.RowNumber
+                };
+
+                _context.ProjectEvents.Add(projectEvent);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error importing comment for project {ProjectId}", projectId);
+            }
+        }
+        
+        await _context.SaveChangesAsync();
+    }
 }
 
 /// <summary>
@@ -567,4 +818,66 @@ public class SmartSheetTokenResponse
     
     [System.Text.Json.Serialization.JsonPropertyName("expires_in")]
     public int? ExpiresIn { get; set; }
+}
+
+// Migration Tool Models
+public class WorkspaceListResult
+{
+    public List<SheetInfo> ActiveJobs { get; set; } = new();
+    public List<SheetInfo> ArchivedJobs { get; set; } = new();
+}
+
+public class SheetInfo
+{
+    public long Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public DateTime? ModifiedAt { get; set; }
+}
+
+public class SheetDetailsResult
+{
+    public long SheetId { get; set; }
+    public string SheetName { get; set; } = string.Empty;
+    public Dictionary<string, string> Summary { get; set; } = new();
+    public List<AttachmentInfo> Attachments { get; set; } = new();
+    public List<CommentInfo> Comments { get; set; } = new();
+}
+
+public class AttachmentInfo
+{
+    public long Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public long? SizeInKb { get; set; }
+    public DateTime? CreatedAt { get; set; }
+    public string? CreatedBy { get; set; }
+    public int? RowNumber { get; set; }
+    public string? AttachmentType { get; set; }
+    public string? MimeType { get; set; }
+    public string? Url { get; set; }
+}
+
+public class CommentInfo
+{
+    public long Id { get; set; }
+    public string Text { get; set; } = string.Empty;
+    public DateTime? CreatedAt { get; set; }
+    public string? CreatedBy { get; set; }
+    public int? RowNumber { get; set; }
+}
+
+public class ImportResult
+{
+    public bool Success { get; set; }
+    public string Message { get; set; } = string.Empty;
+    public string? ProjectId { get; set; }
+}
+
+public class ImportProjectRequest
+{
+    public long SheetId { get; set; }
+    public string ProjectId { get; set; } = string.Empty;
+    public string ProjectName { get; set; } = string.Empty;
+    public string? ProjectManager { get; set; }
+    public bool ImportAttachments { get; set; } = true;
+    public bool ImportComments { get; set; } = true;
 }

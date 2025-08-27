@@ -3,21 +3,26 @@ using ShopBoss.Web.Services;
 using ShopBoss.Web.Models;
 using ShopBoss.Web.Data;
 using Microsoft.EntityFrameworkCore;
+using Smartsheet.Api;
+using Smartsheet.Api.Models;
 
 namespace ShopBoss.Web.Controllers;
 
 public class SmartSheetMigrationController : Controller
 {
-    private readonly SmartSheetImportService _smartSheetService;
+    private readonly SmartSheetService _smartSheetService;
+    private readonly ProjectAttachmentService _attachmentService;
     private readonly ShopBossDbContext _context;
     private readonly ILogger<SmartSheetMigrationController> _logger;
 
     public SmartSheetMigrationController(
-        SmartSheetImportService smartSheetService,
+        SmartSheetService smartSheetService,
+        ProjectAttachmentService attachmentService,
         ShopBossDbContext context,
         ILogger<SmartSheetMigrationController> logger)
     {
         _smartSheetService = smartSheetService;
+        _attachmentService = attachmentService;
         _context = context;
         _logger = logger;
     }
@@ -26,8 +31,43 @@ public class SmartSheetMigrationController : Controller
     {
         try
         {
-            var workspaces = await _smartSheetService.GetWorkspacesAsync();
-            return View(workspaces);
+            // Check if user is authenticated with SmartSheet
+            if (!_smartSheetService.HasSmartSheetSession())
+            {
+                ViewBag.Error = "Please authenticate with SmartSheet first. Use the SmartSheet indicator in the header.";
+                return View();
+            }
+
+            var workspaces = await _smartSheetService.GetAccessibleWorkspacesAsync();
+            
+            // Transform to the format expected by the view
+            var result = new WorkspaceListResult();
+            
+            foreach (var workspace in workspaces)
+            {
+                var workspaceData = workspace as dynamic;
+                var sheets = ((IEnumerable<object>)workspaceData.sheets).Select(s =>
+                {
+                    var sheetData = s as dynamic;
+                    return new SheetInfo
+                    {
+                        Id = (long)sheetData.id,
+                        Name = (string)sheetData.name,
+                        ModifiedAt = sheetData.modifiedAt as DateTime?
+                    };
+                }).ToList();
+
+                if ((string)workspaceData.name == "Active Jobs")
+                {
+                    result.ActiveJobs = sheets;
+                }
+                else if ((string)workspaceData.name == "_Archived Jobs")
+                {
+                    result.ArchivedJobs = sheets;
+                }
+            }
+            
+            return View(result);
         }
         catch (Exception ex)
         {
@@ -44,6 +84,12 @@ public class SmartSheetMigrationController : Controller
         
         try
         {
+            // Check if user is authenticated
+            if (!_smartSheetService.HasSmartSheetSession())
+            {
+                return Json(new { error = "Not authenticated with SmartSheet. Please authenticate first." });
+            }
+
             _logger.LogInformation("Calling SmartSheetService.GetSheetDetailsAsync for sheet {SheetId}", sheetId);
             var details = await _smartSheetService.GetSheetDetailsAsync(sheetId);
             
@@ -67,6 +113,12 @@ public class SmartSheetMigrationController : Controller
     {
         try
         {
+            // Check if user is authenticated
+            if (!_smartSheetService.HasSmartSheetSession())
+            {
+                return Json(new { success = false, message = "Not authenticated with SmartSheet. Please authenticate first." });
+            }
+
             var result = await _smartSheetService.ImportProjectAsync(request);
             return Json(result);
         }

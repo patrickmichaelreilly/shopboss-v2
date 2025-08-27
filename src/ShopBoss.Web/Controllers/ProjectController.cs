@@ -12,7 +12,6 @@ public class ProjectController : Controller
     private readonly ProjectAttachmentService _attachmentService;
     private readonly PurchaseOrderService _purchaseOrderService;
     private readonly CustomWorkOrderService _customWorkOrderService;
-    private readonly SmartSheetImportService _smartSheetImportService;
     private readonly SmartSheetService _smartSheetService;
     private readonly ShopBossDbContext _context;
     private readonly ILogger<ProjectController> _logger;
@@ -22,7 +21,6 @@ public class ProjectController : Controller
         ProjectAttachmentService attachmentService,
         PurchaseOrderService purchaseOrderService,
         CustomWorkOrderService customWorkOrderService,
-        SmartSheetImportService smartSheetImportService,
         SmartSheetService smartSheetService,
         ShopBossDbContext context,
         ILogger<ProjectController> logger)
@@ -31,7 +29,6 @@ public class ProjectController : Controller
         _attachmentService = attachmentService;
         _purchaseOrderService = purchaseOrderService;
         _customWorkOrderService = customWorkOrderService;
-        _smartSheetImportService = smartSheetImportService;
         _smartSheetService = smartSheetService;
         _context = context;
         _logger = logger;
