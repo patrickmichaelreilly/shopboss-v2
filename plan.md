@@ -1,154 +1,278 @@
-# SmartSheet Integration - Vision & Implementation Plan (UPDATED)
+# Phase 3: SmartSheet OAuth Consolidation Plan
 
-## VISION: ShopBoss as Visual Process Composition Platform
+## Overview
 
-Transform ShopBoss from a tracking system into a **visual workflow composition platform** where:
-- **Task Chunks** capture reusable process patterns with inputs/outputs
-- **Business entities** (POs, Approvals, Drawings) flow between chunks and systems  
-- **SmartSheet** provides communication and coordination layer
-- **ShopBoss** orchestrates the overall workflow and business entity management
+Consolidate all SmartSheet integration into a single, session-based OAuth system with true user attribution. Remove deprecated caching infrastructure and duplicate API systems.
 
-**Core Innovation:** Instead of rigid templates, enable **modular process composition** where workflows are built from reusable, interconnected Task Chunks that reflect real shop operations.
+**Goals:**
+-  True user attribution for all SmartSheet operations
+-  Unified SmartSheet integration architecture
+-  Remove ~500+ lines of deprecated code
+-  Improve UX with persistent OAuth status indicator
+-  Maintain migration functionality for importing whole sheets
 
-## Product Requirements Document (PRD) - REVISED
+## Current State Analysis
 
-### Core Objectives (Updated)
-1. **Use SmartSheet as flexible data backend** while ShopBoss provides process-aware interface
-2. **Enable bi-directional sync** between ShopBoss projects and SmartSheet workspace
-3. **Compose modular processes** per project instead of rigid templates
-4. **Parse SmartSheet data** for enhanced visibility and reporting
+### Existing SmartSheet Systems
 
-### Key Features (Revised)
+#### System 1: Direct API Integration (TO BE REMOVED)
+**Files:**
+- `Services/SmartSheetCacheService.cs` (433 lines) - **DELETE COMPLETELY**
+- `Services/SmartSheetImportService.cs` (partial) - **REFACTOR** to use OAuth
+- `Controllers/ProjectController.cs` (cache methods) - **REMOVE METHODS**
 
-#### 1. Timeline-Centric Project Dashboard (Evolution in Progress)
-- **Core Discovery:** Chronological comment/attachment timeline tells the real project story
-- SmartSheet grid templates are inconsistent - timeline is the source of truth
-- Answers key questions: current status, waiting states, next actions, recent activity
-- **Status:** ✅ Foundation (SmartSheet Migration import) built, enhancing with intelligence
+**Methods to Remove from ProjectController:**
+- `CacheSheet(long sheetId)`
+- `CacheWorkspace(long? workspaceId, string? workspaceName)` 
+- `ExecuteCacheQuery([FromBody] CacheQueryRequest request)`
+- `GetCacheStats()`
+- `ClearCache()`
+- All cache-related endpoints (~200 lines)
 
-#### 2. Project-Sheet Linking (Completed)
-- Link projects to corresponding SmartSheet using manual ID entry
-- Session-based OAuth authentication for user attribution
-- Display SmartSheet metadata in project cards
-- **Status:** ✅ Complete in Phase 1
+**Database Cleanup:**
+- Remove cache-related tables from database schema
+- Remove SmartSheetCacheService registration from Program.cs
 
-#### 3. Modular Process Composition (Future)
-- Create bespoke workflows by composing process modules per project
-- Library of reusable process chunks (CNC, Finishing, Installation, etc.)
-- Add/remove process steps based on job requirements
-- Write process modules as rows to SmartSheet via OAuth
+#### System 2: OAuth Integration (TO BE ENHANCED)
+**Files:**
+- `Controllers/SmartSheetAuthController.cs` - **ENHANCE** with session management
+- `Services/SmartSheetService.cs` - **ENHANCE** to be session-aware
+- `Controllers/SmartSheetMigrationController.cs` - **MIGRATE** to OAuth
 
-#### 4. Bi-directional Authoring
-- Edit project data in ShopBoss dashboard
-- Changes sync to SmartSheet grid automatically
-- "View in SmartSheet" for familiar grid access
-- Users can work in either interface seamlessly
+**Current Issues:**
+- OAuth only triggers during sheet linking
+- No persistent auth status indicator
+- Tokens stored globally, not per-user session
 
-### Technical Requirements (Updated)
-- SmartSheet API for all data operations (no embed SDK needed)
-- Session-based OAuth for user attribution
-- SignalR for real-time updates within ShopBoss
-- Memory caching for performance
-- Direct SmartSheet grid access via external links
+### Code to Keep but Migrate
 
-## PHASED IMPLEMENTATION PLAN (UPDATED)
+**SmartSheetMigrationController:**
+- Import whole sheets functionality (currently used for development)
+- Data transformation logic from SmartSheetImportService
+- Need to convert from API key to OAuth per-user
 
-### Phase 0: Research & Documentation Foundation ✅ COMPLETED
-**Objective:** Collect and curate documentation to guide implementation
+## Target Architecture
 
-**Status:** ✅ **Complete** - Comprehensive documentation created including:
-- `docs/SmartSheet-Embed-SDK-Guide.md` (determined no embed SDK exists)
-- `docs/SmartSheet-Authentication-Flows.md` 
-- `docs/SmartSheet-Session-OAuth-Flow.md`
-- `docs/SmartSheet-Architecture-Decisions.md`
-- All architectural patterns and decisions documented
+### Per-User Session-Based OAuth
 
-### Phase 1: SmartSheet OAuth & Project Linking ✅ COMPLETED  
-**Objective:** Implement session-based OAuth and project-sheet linking
+**Session Storage Pattern:**
+```csharp
+// Store per user session
+HttpContext.Session.SetString($"SmartSheet_AccessToken_{userId}", accessToken);
+HttpContext.Session.SetString($"SmartSheet_RefreshToken_{userId}", refreshToken);
+HttpContext.Session.SetString($"SmartSheet_TokenExpiry_{userId}", expiry.ToString());
 
-**Status:** ✅ **Complete** - Full OAuth implementation delivered:
-- Session-based OAuth authentication working
-- Project-SmartSheet linking via manual ID entry
-- SmartSheet metadata display in project cards
-- Link/unlink functionality operational
-- User attribution preserved in session
+// Retrieve for operations
+var userToken = HttpContext.Session.GetString($"SmartSheet_AccessToken_{userId}");
+```
 
-**Key Achievement:** Foundation established for all future SmartSheet operations
+**OAuth Status Management:**
+- Check authentication status on every Project page load
+- Display auth status in header with visual indicator
+- One-click re-authentication flow
+- Handle token refresh transparently
 
-### Phase 2: Task Chunk Discovery & Manual Organization (CURRENT)
-**Objective:** Enable manual organization of timeline events into **Task Chunks** - reusable process building blocks that will become the foundation for workflow composition
+### Unified SmartSheet Service
 
-**Key Insight:** The groups users create aren't just organization tools - they're **process templates** that capture reusable patterns of work with inputs and outputs that connect to business entities.
+**Single Service Pattern:**
+```csharp
+public class SmartSheetOAuthService
+{
+    // Session-aware client instantiation
+    public SmartsheetClient GetUserClient(HttpContext context)
+    
+    // All operations use user's token
+    public async Task<Sheet> GetSheetAsync(long sheetId, HttpContext context)
+    public async Task AddCommentAsync(long sheetId, string comment, HttpContext context)
+    public async Task UploadAttachmentAsync(long sheetId, IFormFile file, HttpContext context)
+}
+```
 
-**Task Chunk Concept:** Process modules with inputs/outputs containing SmartSheet activities (comments/attachments) that produce business entities (POs, Approvals, Drawings) flowing to other systems.
+## Implementation Plan
 
-**Implementation Tasks:**
-1. **Restructure Project Cards** - Consolidate SmartSheet status, eliminate Files card, streamline Purchase Orders
-2. **Add Manual Grouping UI** - Create Task Chunks by organizing timeline events with grouping
-3. **Simple Visual Hierarchy** - Groups show as process headers with bounding boxes around constituent events
-4. **No Validation** - Complete flexibility for users to discover natural process patterns
+### Phase 3.1: Remove Deprecated Cache System
+**Scope:** ~2 days
+**Files Modified:** 4 files
+**Lines Removed:** ~500 lines
 
-**Technical Foundation - CRITICAL ARCHITECTURE INSIGHT:**
-- **TaskChunk as Separate Entity**: TaskChunk must be its own entity, NOT special ProjectEvents
-- **Entity Relationship**: TaskChunk -> ProjectEvents via FK (TaskChunkId field on ProjectEvent)
-- **Proper Data Model**: 
-  ```
-  TaskChunk {
-    Id, ProjectId, Name, Description, DisplayOrder, IsTemplate
-    Events: List<ProjectEvent> (navigation property)
-  }
-  
-  ProjectEvent {
-    // existing fields...
-    TaskChunkId: string? (FK to TaskChunk)
-    ChunkDisplayOrder: int (order within chunk)
-  }
-  ```
-- Simple UI for drag-and-drop selection, chunk creation, reordering
-- Build on existing SmartSheet Migration functionality (chronological import already works)
-- Foundation for business entity connections and template system (future)
-
-**Learning Phase Goal:**
-- Users manually organize existing project data into logical Task Chunks
-- Discover patterns of work that naturally emerge from real projects
-- Build library of common chunks through hands-on organization
+**Tasks:**
+1. Remove SmartSheetCacheService.cs entirely
+2. Remove cache-related methods from ProjectController
+3. Remove cache service registration from Program.cs
+4. Remove cache database tables (create migration)
+5. Update any UI that references caching
 
 **Validation:**
-- Users can organize timeline events in any hierarchy they want
-- Groups are collapsible and clearly show relationships through indentation
-- All organization persists correctly and displays consistently
-- No restrictions on what can be grouped together
+-  Project builds successfully
+-  No broken references to SmartSheetCacheService
+-  Cache-related UI elements removed
 
-### Phase 3: Task Chunk Composition & Deployment (FUTURE)
-**Objective:** Deploy discovered Task Chunks as reusable process templates for new project creation
+### Phase 3.2: Enhance OAuth System for Sessions  
+**Scope:** ~3 days
+**Files Modified:** 3 files
+**Lines Added:** ~200 lines
 
-**Approach:** Convert discovered chunks into templates → Visual workflow composition → Business entity flow between chunks and systems → Bi-directional SmartSheet sync
+**Tasks:**
+1. **SmartSheetAuthController Enhancement:**
+   - Add session-based token storage
+   - Add token refresh logic
+   - Add auth status checking endpoint
+   - Add logout/clear session endpoint
 
-### Phase 4: Advanced Bi-directional Sync (FUTURE)
-**Objective:** Full synchronization between ShopBoss and SmartSheet
+2. **SmartSheetService Enhancement:**
+   - Make all methods session-aware
+   - Add HttpContext parameter to methods
+   - Implement per-request client instantiation
+   - Add token validation/refresh
 
-**Focus:**
-- Real-time updates via webhooks
-- Conflict resolution strategies  
-- Comprehensive data mapping
-- Performance optimization
+3. **OAuth Status Header:**
+   - Add auth status indicator to _Layout.cshtml
+   - Add JavaScript for status checking
+   - Style connected/disconnected states
+   - Add one-click auth/re-auth
 
-## Foundation Complete ✅
-**OAuth, project linking, timeline import, SmartSheet analysis tools** - Ready for TaskChunk implementation
+**Validation:**
+-  Multiple users can authenticate independently
+-  Tokens persist across page loads
+-  Token refresh works automatically
+-  Auth status shows correctly in header
 
-**Key Insight:** Timeline > Grid - SmartSheet timelines tell the real project story, process-aware UI beats generic grid interface.
+### Phase 3.3: Migrate SmartSheet Migration to OAuth
+**Scope:** ~2 days  
+**Files Modified:** 2 files
+**Lines Modified:** ~150 lines
 
-## Ready for Phase 2: Task Chunk Discovery
-**Current Objective:** Enable manual organization of timeline events into Task Chunks - the building blocks for future process composition
+**Tasks:**
+1. **SmartSheetMigrationController Updates:**
+   - Remove SmartSheetImportService dependency
+   - Add SmartSheetOAuthService dependency
+   - Update all methods to use session-based auth
+   - Maintain existing import functionality
 
-**Key Insight:** Timeline events from SmartSheet (comments/attachments) represent the **activities within process chunks**. By letting users manually group these activities, we discover natural process patterns that become reusable templates.
+2. **Data Transformation Migration:**
+   - Extract useful logic from SmartSheetImportService
+   - Move to SmartSheetOAuthService or helper classes
+   - Remove SmartSheetImportService.cs entirely
 
-**Implementation Steps (Corrected Architecture):**
-1. **Create TaskChunk Entity** - Separate model with proper relationships
-2. **Add TaskChunk DbSet** - Configure in DbContext with navigation properties  
-3. **Create Migration** - Add TaskChunks table with FK relationships
-4. **Update Timeline Rendering** - Display TaskChunks with their contained events
-5. **Add Chunk Management UI** - Multi-select events, create chunks, drag-and-drop
-6. **Server-Side Persistence** - Controller endpoints for chunk CRUD operations
+**Validation:**
+-  SmartSheet Migration page works with OAuth
+-  Whole sheet import functionality preserved
+-  User attribution works for imported data
+-  No references to old import service remain
 
-**Key Lesson Learned:** Avoid implementing groups as special ProjectEvents - use proper entity separation for future extensibility and template support.
+### Phase 3.4: UX Polish and Testing
+**Scope:** ~1 day
+**Files Modified:** 2-3 files
+**Lines Added:** ~100 lines
+
+**Tasks:**
+1. **Enhanced UX:**
+   - OAuth onboarding flow for new users
+   - Better error messages for auth failures
+   - Loading states for SmartSheet operations
+   - Toast notifications for auth status changes
+
+2. **Integration Testing:**
+   - Test multiple users authenticating simultaneously
+   - Test token refresh scenarios  
+   - Test session timeout scenarios
+   - Test all SmartSheet operations with attribution
+
+**Validation:**
+-  Multiple concurrent users work correctly
+-  Auth flows are intuitive and reliable
+-  All SmartSheet operations show proper user attribution
+-  Error handling is robust
+
+## Risk Mitigation
+
+### Technical Risks
+
+**Risk:** Session-based tokens don't refresh properly
+**Mitigation:** 
+- Implement token refresh before each API call
+- Add retry logic with re-auth if refresh fails
+- Store refresh token expiry separately
+
+**Risk:** Multiple browser tabs cause auth conflicts  
+**Mitigation:**
+- Use consistent session keys across tabs
+- Implement session sharing across browser instances
+- Add UI warnings about concurrent sessions
+
+**Risk:** SmartSheet API rate limiting with multiple users
+**Mitigation:**
+- Implement request queuing/throttling
+- Add retry logic with exponential backoff
+- Monitor API usage patterns
+
+### UX Risks
+
+**Risk:** Users forget to authenticate before using features
+**Mitigation:**
+- Prominent auth status in header
+- Auto-redirect to auth flow when needed
+- Clear messaging about SmartSheet features requiring auth
+
+**Risk:** Complex re-authentication flow
+**Mitigation:**
+- One-click re-auth from header
+- Remember user context during re-auth
+- Return to original page after successful auth
+
+## Success Criteria
+
+### Functional Requirements
+-  All SmartSheet operations use per-user OAuth tokens
+-  Comments and attachments show correct user attribution in SmartSheet
+-  Multiple users can be authenticated simultaneously  
+-  SmartSheet Migration functionality preserved
+-  No deprecated cache code remains
+
+### Technical Requirements  
+-  ~500 lines of deprecated code removed
+-  Zero compilation errors or warnings
+-  All existing SmartSheet features work
+-  Session management is robust and reliable
+
+### UX Requirements
+-  OAuth status clearly visible in header
+-  One-click authentication/re-authentication
+-  Smooth user experience with proper loading states
+-  Clear error messages for auth failures
+
+## File Impact Summary
+
+### Files to Delete Completely
+- `Services/SmartSheetCacheService.cs` (433 lines)
+- `Services/SmartSheetImportService.cs` (after migration)
+
+### Files to Modify Significantly  
+- `Controllers/ProjectController.cs` (~200 lines removed)
+- `Controllers/SmartSheetAuthController.cs` (~100 lines added)
+- `Services/SmartSheetService.cs` (~100 lines modified)
+- `Controllers/SmartSheetMigrationController.cs` (~50 lines modified)
+- `Views/Shared/_Layout.cshtml` (~20 lines added)
+
+### New Files to Create
+- `Services/SmartSheetOAuthService.cs` (~300 lines) - Unified OAuth service
+- `wwwroot/js/smartsheet-auth.js` (~100 lines) - Auth status management
+
+### Database Changes
+- Remove cache-related tables via migration
+- No new tables needed (using sessions for tokens)
+
+## Next Steps
+
+1. **Review and Approve Plan** - Discuss any concerns or modifications needed
+2. **Begin Phase 3.1** - Start with removal of deprecated cache system  
+3. **Incremental Development** - Complete each phase fully before moving to next
+4. **User Testing** - Test with real SmartSheet accounts after Phase 3.2
+5. **Production Deployment** - Deploy incrementally with rollback plan
+
+---
+
+**Estimated Total Effort:** 8 development days
+**Estimated Total Impact:** Remove ~700 lines, Add ~500 lines, Net reduction ~200 lines
+**Risk Level:** Medium (session management complexity)
+**Business Value:** High (true user attribution, simplified architecture)

@@ -14,7 +14,6 @@ public class ProjectController : Controller
     private readonly CustomWorkOrderService _customWorkOrderService;
     private readonly SmartSheetImportService _smartSheetImportService;
     private readonly SmartSheetService _smartSheetService;
-    private readonly SmartSheetCacheService _smartSheetCacheService;
     private readonly ShopBossDbContext _context;
     private readonly ILogger<ProjectController> _logger;
 
@@ -25,7 +24,6 @@ public class ProjectController : Controller
         CustomWorkOrderService customWorkOrderService,
         SmartSheetImportService smartSheetImportService,
         SmartSheetService smartSheetService,
-        SmartSheetCacheService smartSheetCacheService,
         ShopBossDbContext context,
         ILogger<ProjectController> logger)
     {
@@ -35,7 +33,6 @@ public class ProjectController : Controller
         _customWorkOrderService = customWorkOrderService;
         _smartSheetImportService = smartSheetImportService;
         _smartSheetService = smartSheetService;
-        _smartSheetCacheService = smartSheetCacheService;
         _context = context;
         _logger = logger;
     }
@@ -739,167 +736,6 @@ public class ProjectController : Controller
         }
     }
 
-    // SmartSheet Cache Management Endpoints (Development/Research Only)
-
-    /// <summary>
-    /// Cache a specific SmartSheet to local database for analysis
-    /// </summary>
-    [HttpPost]
-    public async Task<IActionResult> CacheSheet(long sheetId)
-    {
-        try
-        {
-            if (!_smartSheetService.HasSmartSheetSession())
-            {
-                return Json(new { success = false, message = "No SmartSheet session. Please authenticate first." });
-            }
-
-            var success = await _smartSheetCacheService.CacheSheetAsync(sheetId);
-            
-            if (success)
-            {
-                return Json(new { success = true, message = $"Sheet {sheetId} cached successfully" });
-            }
-            else
-            {
-                return Json(new { success = false, message = "Failed to cache sheet" });
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error caching sheet {SheetId}", sheetId);
-            return Json(new { success = false, message = "Error caching sheet" });
-        }
-    }
-
-    /// <summary>
-    /// Cache all sheets in a workspace to local database for analysis
-    /// </summary>
-    [HttpPost]
-    public async Task<IActionResult> CacheWorkspace(long? workspaceId, string? workspaceName)
-    {
-        try
-        {
-            if (!_smartSheetService.HasSmartSheetSession())
-            {
-                return Json(new { success = false, message = "No SmartSheet session. Please authenticate first." });
-            }
-
-            long actualWorkspaceId;
-            
-            if (workspaceId.HasValue)
-            {
-                actualWorkspaceId = workspaceId.Value;
-            }
-            else if (!string.IsNullOrEmpty(workspaceName))
-            {
-                // Get workspace ID by name
-                var workspace = await _smartSheetService.GetWorkspaceByNameAsync(workspaceName);
-                if (workspace == null)
-                {
-                    return Json(new { success = false, message = "Workspace not found" });
-                }
-                var workspaceData = Newtonsoft.Json.JsonConvert.DeserializeObject<dynamic>(
-                    Newtonsoft.Json.JsonConvert.SerializeObject(workspace));
-                actualWorkspaceId = workspaceData?.id != null ? (long)workspaceData.id : 0;
-            }
-            else
-            {
-                return Json(new { success = false, message = "Either workspaceId or workspaceName must be provided" });
-            }
-
-            var result = await _smartSheetCacheService.CacheWorkspaceAsync(actualWorkspaceId);
-            
-            return Json(new { 
-                success = result.Success, 
-                message = result.Message,
-                workspaceName = result.WorkspaceName,
-                totalSheets = result.TotalSheets,
-                cachedSheets = result.CachedSheets.Count,
-                failedSheets = result.FailedSheets.Count,
-                failedSheetNames = result.FailedSheets
-            });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error caching workspace {WorkspaceId}/{WorkspaceName}", workspaceId, workspaceName);
-            return Json(new { success = false, message = "Error caching workspace" });
-        }
-    }
-
-    /// <summary>
-    /// Execute SQL query against cached SmartSheet data
-    /// </summary>
-    [HttpPost]
-    public IActionResult QueryCache([FromBody] QueryCacheRequest request)
-    {
-        try
-        {
-            if (string.IsNullOrEmpty(request.Sql))
-            {
-                return Json(new { success = false, message = "SQL query is required" });
-            }
-
-            // Basic SQL injection protection - only allow SELECT statements
-            var sqlTrimmed = request.Sql.Trim().ToUpper();
-            if (!sqlTrimmed.StartsWith("SELECT") && !sqlTrimmed.StartsWith("WITH"))
-            {
-                return Json(new { success = false, message = "Only SELECT and WITH queries are allowed" });
-            }
-
-            var results = _smartSheetCacheService.ExecuteQuery(request.Sql);
-            
-            return Json(new { 
-                success = true, 
-                results = results,
-                rowCount = results.Count 
-            });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error executing cache query: {SQL}", request.Sql);
-            return Json(new { success = false, message = ex.Message });
-        }
-    }
-
-    /// <summary>
-    /// Get cache statistics and status
-    /// </summary>
-    [HttpGet]
-    public IActionResult GetCacheStats()
-    {
-        try
-        {
-            var stats = _smartSheetCacheService.GetCacheStats();
-            return Json(new { success = true, stats = stats });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting cache stats");
-            return Json(new { success = false, message = "Error retrieving cache stats" });
-        }
-    }
-
-    /// <summary>
-    /// Clear all cached SmartSheet data
-    /// </summary>
-    [HttpPost]
-    public IActionResult ClearCache()
-    {
-        try
-        {
-            var success = _smartSheetCacheService.ClearCache();
-            return Json(new { 
-                success = success, 
-                message = success ? "Cache cleared successfully" : "Failed to clear cache" 
-            });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error clearing cache");
-            return Json(new { success = false, message = "Error clearing cache" });
-        }
-    }
 
     [HttpPost]
     public async Task<IActionResult> CreateComment([FromBody] CreateCommentRequest request)
@@ -995,10 +831,6 @@ public class ProjectController : Controller
         public string ProjectId { get; set; } = string.Empty;
     }
 
-    public class QueryCacheRequest
-    {
-        public string Sql { get; set; } = string.Empty;
-    }
 
     public class CreateCommentRequest
     {
