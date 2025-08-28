@@ -1,0 +1,149 @@
+@model ShopBoss.Web.Models.TaskBlock
+
+@{
+    var nestingLevel = ViewData["NestingLevel"] as int? ?? 0;
+    var indentClass = nestingLevel > 0 ? $"ms-{Math.Min(nestingLevel * 3, 12)}" : "";
+    var folderIcon = Model.ChildTaskBlocks.Any() ? "fas fa-folder" : "fas fa-folder";
+}
+
+<div class="task-block mb-2 @indentClass" data-block-id="@Model.Id" data-nesting-level="@nestingLevel">
+    <div class="task-block-header d-flex justify-content-between align-items-center p-2 bg-light border rounded" 
+         data-bs-toggle="collapse" 
+         data-bs-target="#collapse-@Model.Id" 
+         role="button"
+         aria-expanded="true" 
+         aria-controls="collapse-@Model.Id">
+        <div class="d-flex align-items-center">
+            <i class="fas fa-grip-vertical block-drag-handle me-2 text-muted" style="cursor: grab;" title="Drag to reorder blocks" onclick="event.stopPropagation();"></i>
+            <i class="fas fa-chevron-down collapse-icon me-2 text-muted transition-transform" title="Collapse/Expand block"></i>
+            <i class="@folderIcon me-2 text-primary"></i>
+            <h6 class="mb-0 fw-bold">@Model.Name</h6>
+            @if (!string.IsNullOrEmpty(Model.Description))
+            {
+                <small class="text-muted ms-2">• @Model.Description</small>
+            }
+            <span class="badge bg-info ms-2">@Model.Events.Count events</span>
+            @if (Model.ChildTaskBlocks.Any())
+            {
+                <span class="badge bg-secondary ms-1">@Model.ChildTaskBlocks.Count nested</span>
+            }
+        </div>
+        <div class="btn-group btn-group-sm" role="group" onclick="event.stopPropagation();">
+            <button type="button" class="btn btn-outline-secondary btn-sm" 
+                    onclick="editTaskBlock('@Model.Id', '@Model.Name', '@(Model.Description ?? "")')" 
+                    title="Edit block">
+                <i class="fas fa-edit"></i>
+            </button>
+            <button type="button" class="btn btn-outline-danger btn-sm" 
+                    onclick="deleteTaskBlock('@Model.Id')" 
+                    title="Delete block">
+                <i class="fas fa-trash"></i>
+            </button>
+            @if (nestingLevel > 0)
+            {
+                <button type="button" class="btn btn-outline-warning btn-sm" 
+                        onclick="unnestTaskBlock('@Model.Id')" 
+                        title="Move to root level">
+                    <i class="fas fa-level-up-alt"></i>
+                </button>
+            }
+        </div>
+    </div>
+    
+    <!-- Events and nested blocks within this block (unified container for mixed ordering) -->
+    <div class="collapse show" id="collapse-@Model.Id">
+        <div class="task-block-content ms-3 mt-1" data-block-id="@Model.Id">
+            @{
+                // Create a unified list of items (events and child blocks) for mixed ordering
+                var allItems = new List<object>();
+                
+                // Add events
+                foreach (var evt in Model.Events.OrderBy(e => e.BlockDisplayOrder ?? 0).ThenBy(e => e.EventDate))
+                {
+                    allItems.Add(new { Type = "Event", Item = evt, Order = evt.BlockDisplayOrder ?? 0 });
+                }
+                
+                // Add child TaskBlocks  
+                foreach (var childBlock in Model.ChildTaskBlocks.OrderBy(cb => cb.DisplayOrder))
+                {
+                    allItems.Add(new { Type = "TaskBlock", Item = childBlock, Order = childBlock.DisplayOrder });
+                }
+                
+                // Sort by order for mixed display
+                allItems = allItems.OrderBy(item => ((dynamic)item).Order).ToList();
+            }
+            
+            @foreach (var item in allItems)
+            {
+                @if (((dynamic)item).Type == "Event")
+                {
+                    var evt = (ShopBoss.Web.Models.ProjectEvent)((dynamic)item).Item;
+                    <div class="timeline-event blocked-event" data-event-id="@evt.Id">
+                        <div class="event-content">
+                            <div class="event-header d-flex justify-content-between align-items-center mb-1">
+                                <div class="event-metadata">
+                                    <i class="fas fa-grip-vertical event-drag-handle me-2 text-muted" style="cursor: grab; font-size: 0.8em;" title="Drag to reorder events"></i>
+                                    <span class="badge bg-@(evt.EventType == "comment" ? "info" : "secondary") me-1">@evt.EventType</span>
+                                    @if (evt.RowNumber.HasValue)
+                                    {
+                                        <span class="badge bg-primary me-1">Row @evt.RowNumber</span>
+                                    }
+                                    <small class="text-muted me-1">@evt.EventDate.ToString("yyyy-MM-dd HH:mm")</small>
+                                    <small class="text-muted">by @(evt.CreatedBy ?? "Unknown")</small>
+                                </div>
+                                <div class="event-actions">
+                                    <button type="button" class="btn btn-sm btn-link text-danger p-0" 
+                                            onclick="removeEventFromBlock('@evt.Id')" title="Remove from block">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="event-description">
+                                @if (evt.EventType == "attachment" && evt.Attachment != null)
+                                {
+                                    <div class="d-flex align-items-start">
+                                        <div class="d-flex align-items-center me-3">
+                                            <i class="fas fa-paperclip me-1 text-muted"></i>
+                                            <a href="/Project/DownloadFile/@evt.Attachment.Id" class="text-decoration-none" title="Download @evt.Attachment.FileName">
+                                                <strong>@evt.Attachment.OriginalFileName</strong>
+                                            </a>
+                                            <small class="text-muted ms-2">
+                                                (@((evt.Attachment.FileSize / 1024.0 / 1024.0).ToString("F2")) MB)
+                                            </small>
+                                        </div>
+                                        @if (evt.Attachment.Category == "SmartSheet Import")
+                                        {
+                                            <div class="ms-auto">
+                                                <input type="text" class="form-control form-control-sm" 
+                                                       style="width: 200px; font-size: 0.8em;" 
+                                                       value="@evt.Description" 
+                                                       onblur="updateAttachmentComment('@evt.Id', this.value)"
+                                                       placeholder="Add comment..."
+                                                       title="Edit comment for this SmartSheet attachment">
+                                            </div>
+                                        }
+                                    </div>
+                                    
+                                    @if (!string.IsNullOrEmpty(evt.Description) && evt.Attachment.Category != "SmartSheet Import")
+                                    {
+                                        <div class="mt-1 text-muted small">@evt.Description</div>
+                                    }
+                                }
+                                else
+                                {
+                                    @evt.Description
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+                else if (((dynamic)item).Type == "TaskBlock")
+                {
+                    var childBlock = (ShopBoss.Web.Models.TaskBlock)((dynamic)item).Item;
+                    ViewData["NestingLevel"] = nestingLevel + 1;
+                    @await Html.PartialAsync("_TaskBlockRecursive", childBlock, ViewData)
+                }
+            }
+        </div>
+    </div>
+</div>

@@ -23,9 +23,14 @@ public class TaskBlock
     // Global timeline ordering (for mixed TaskBlock/Event ordering)
     public int? GlobalDisplayOrder { get; set; }
     
+    // Nesting support - self-referencing relationship
+    public string? ParentTaskBlockId { get; set; }
+    
     public bool IsTemplate { get; set; } = false;
     
     // Navigation properties
     public Project Project { get; set; } = null!;
+    public TaskBlock? ParentTaskBlock { get; set; }
+    public ICollection<TaskBlock> ChildTaskBlocks { get; set; } = new List<TaskBlock>();
     public ICollection<ProjectEvent> Events { get; set; } = new List<ProjectEvent>();
 }

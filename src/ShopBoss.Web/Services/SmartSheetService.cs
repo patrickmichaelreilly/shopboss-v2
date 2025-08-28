@@ -999,7 +999,7 @@ public class SmartSheetService
             }
 
             // Group events by row number
-            var eventsByRow = eventsWithRows.GroupBy(pe => pe.RowNumber.Value).ToList();
+            var eventsByRow = eventsWithRows.GroupBy(pe => pe.RowNumber!.Value).ToList();
             _logger.LogInformation("Found {RowCount} unique rows with {EventCount} total events", 
                 eventsByRow.Count, eventsWithRows.Count);
 

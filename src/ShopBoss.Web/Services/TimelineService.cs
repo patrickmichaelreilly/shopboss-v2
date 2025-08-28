@@ -27,13 +27,19 @@ public class TimelineService
             if (project == null)
                 throw new ArgumentException($"Project not found: {projectId}", nameof(projectId));
 
-            // Get all blocks for this project ordered by GlobalDisplayOrder, then DisplayOrder
+            // Get only root-level blocks (no parent) with their full hierarchy
             var blocks = await _context.TaskBlocks
-                .Where(tb => tb.ProjectId == projectId)
+                .Where(tb => tb.ProjectId == projectId && tb.ParentTaskBlockId == null)
                 .Include(tb => tb.Events)
                     .ThenInclude(e => e.Attachment)
+                .Include(tb => tb.ChildTaskBlocks)
+                    .ThenInclude(child => child.Events)
+                        .ThenInclude(e => e.Attachment)
                 .OrderBy(tb => tb.GlobalDisplayOrder ?? tb.DisplayOrder)
                 .ToListAsync();
+
+            // For deeper nesting, we need to recursively load child blocks
+            await LoadAllChildrenRecursively(blocks);
 
             // Get all events for this project, ordered by GlobalDisplayOrder, then chronologically
             var allEvents = await _context.ProjectEvents
@@ -43,8 +49,8 @@ public class TimelineService
                 .ThenBy(pe => pe.EventDate)
                 .ToListAsync();
 
-            // Separate events into blocked and unblocked
-            var blockedEventIds = blocks.SelectMany(tb => tb.Events.Select(e => e.Id)).ToHashSet();
+            // Separate events into blocked and unblocked (including nested block events)
+            var blockedEventIds = GetAllEventsFromBlocksRecursively(blocks).Select(e => e.Id).ToHashSet();
             var unblockedEvents = allEvents.Where(e => !blockedEventIds.Contains(e.Id)).ToList();
 
             return new TimelineData
@@ -289,6 +295,83 @@ public class TimelineService
             _logger.LogError(ex, "Error reordering mixed timeline items for project: {ProjectId}", projectId);
             throw;
         }
+    }
+
+    public async Task<bool> NestTaskBlockAsync(string childBlockId, string? parentBlockId)
+    {
+        try
+        {
+            var childBlock = await _context.TaskBlocks.FindAsync(childBlockId);
+            if (childBlock == null) return false;
+
+            // Prevent circular references
+            if (parentBlockId != null && await WouldCreateCircularReference(childBlockId, parentBlockId))
+            {
+                _logger.LogWarning("Prevented circular reference: Block {ChildId} cannot be nested under {ParentId}", childBlockId, parentBlockId);
+                return false;
+            }
+
+            childBlock.ParentTaskBlockId = parentBlockId;
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Nested TaskBlock {ChildId} under {ParentId}", childBlockId, parentBlockId ?? "root");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error nesting TaskBlock {ChildId} under {ParentId}", childBlockId, parentBlockId);
+            throw;
+        }
+    }
+
+    private async Task<bool> WouldCreateCircularReference(string childId, string potentialParentId)
+    {
+        // Check if potentialParent is actually a descendant of child
+        var potentialParent = await _context.TaskBlocks
+            .Include(tb => tb.ParentTaskBlock)
+            .FirstOrDefaultAsync(tb => tb.Id == potentialParentId);
+
+        while (potentialParent?.ParentTaskBlock != null)
+        {
+            if (potentialParent.ParentTaskBlockId == childId) return true;
+            potentialParent = potentialParent.ParentTaskBlock;
+        }
+
+        return false;
+    }
+
+    private async Task LoadAllChildrenRecursively(IEnumerable<TaskBlock> taskBlocks)
+    {
+        foreach (var block in taskBlocks)
+        {
+            if (block.ChildTaskBlocks.Any())
+            {
+                // Load next level of children for each child block
+                await _context.Entry(block)
+                    .Collection(b => b.ChildTaskBlocks)
+                    .Query()
+                    .Include(child => child.Events)
+                        .ThenInclude(e => e.Attachment)
+                    .Include(child => child.ChildTaskBlocks)
+                    .LoadAsync();
+
+                // Recursively load deeper levels
+                await LoadAllChildrenRecursively(block.ChildTaskBlocks);
+            }
+        }
+    }
+
+    private IEnumerable<ProjectEvent> GetAllEventsFromBlocksRecursively(IEnumerable<TaskBlock> blocks)
+    {
+        var allEvents = new List<ProjectEvent>();
+        
+        foreach (var block in blocks)
+        {
+            allEvents.AddRange(block.Events);
+            allEvents.AddRange(GetAllEventsFromBlocksRecursively(block.ChildTaskBlocks));
+        }
+        
+        return allEvents;
     }
 }
 

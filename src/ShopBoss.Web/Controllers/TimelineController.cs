@@ -194,6 +194,28 @@ public class TimelineController : Controller
             return Json(new { success = false, message = "Error reordering timeline items. Please try again." });
         }
     }
+
+    [HttpPost]
+    public async Task<IActionResult> NestTaskBlock([FromBody] NestTaskBlockRequest request)
+    {
+        try
+        {
+            var success = await _timelineService.NestTaskBlockAsync(request.ChildBlockId, request.ParentBlockId);
+            if (success)
+            {
+                return Json(new { success = true });
+            }
+            else
+            {
+                return Json(new { success = false, message = "Could not nest task block. Check for circular references." });
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error nesting TaskBlock {ChildId} under {ParentId}", request.ChildBlockId, request.ParentBlockId);
+            return Json(new { success = false, message = "Error nesting task block. Please try again." });
+        }
+    }
 }
 
 // Request DTOs
@@ -245,4 +267,10 @@ public class MixedTimelineItemOrder
     public string Type { get; set; } = string.Empty; // "TaskBlock" or "Event"
     public string Id { get; set; } = string.Empty;
     public int Order { get; set; }
+}
+
+public class NestTaskBlockRequest
+{
+    public string ChildBlockId { get; set; } = string.Empty;
+    public string? ParentBlockId { get; set; } // null to unnest (move to root)
 }
