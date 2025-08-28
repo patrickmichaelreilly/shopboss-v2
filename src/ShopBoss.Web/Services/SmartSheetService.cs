@@ -16,6 +16,7 @@ public class SmartSheetService
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly ProjectAttachmentService _attachmentService;
     private readonly IHubContext<ImportProgressHub> _hubContext;
+    private readonly TimelineService _timelineService;
 
     public SmartSheetService(
         ShopBossDbContext context,
@@ -23,7 +24,8 @@ public class SmartSheetService
         IConfiguration configuration,
         IHttpContextAccessor httpContextAccessor,
         ProjectAttachmentService attachmentService,
-        IHubContext<ImportProgressHub> hubContext)
+        IHubContext<ImportProgressHub> hubContext,
+        TimelineService timelineService)
     {
         _context = context;
         _logger = logger;
@@ -31,6 +33,7 @@ public class SmartSheetService
         _httpContextAccessor = httpContextAccessor;
         _attachmentService = attachmentService;
         _hubContext = hubContext;
+        _timelineService = timelineService;
     }
 
     private async Task<SmartsheetClient?> GetSmartSheetClientAsync()
@@ -816,11 +819,16 @@ public class SmartSheetService
                 await SendProgressUpdate(importId, CalculateProgress(currentStep, totalSteps), "No comments to import");
             }
 
-            // Step 6: Finalize import
+            // Step 6: Auto-group events by SmartSheet row number
+            currentStep++;
+            await SendProgressUpdate(importId, CalculateProgress(currentStep, totalSteps), "Auto-grouping events by SmartSheet row...");
+            await AutoGroupEventsByRowAsync(project.Id);
+
+            // Step 7: Finalize import
             currentStep++;
             await SendProgressUpdate(importId, CalculateProgress(currentStep, totalSteps), "Finalizing project import...");
 
-            // Step 7: Complete
+            // Step 8: Complete
             currentStep++;
             await SendProgressUpdate(importId, 100, "Import completed successfully!");
 
@@ -882,7 +890,8 @@ public class SmartSheetService
                     "SmartSheet Import",
                     attachment.CreatedBy ?? "SmartSheet Import", // Use SmartSheet author, not import user
                     attachment.CreatedAt,
-                    $"Imported from SmartSheet row {attachment.RowNumber}");
+                    $"Imported from SmartSheet row {attachment.RowNumber}",
+                    attachment.RowNumber); // Pass the row number for auto-grouping
                 
                 // ProjectAttachmentService already creates timeline events, so no need to create manually
                 successfulImports++;
@@ -965,6 +974,69 @@ public class SmartSheetService
         // Calculate percentage, ensuring it doesn't exceed 95% until completion
         var percentage = (int)Math.Floor((double)currentStep / totalSteps * 90);
         return Math.Min(percentage, 95);
+    }
+
+    /// <summary>
+    /// Auto-group events by SmartSheet row number into TaskBlocks
+    /// </summary>
+    private async Task AutoGroupEventsByRowAsync(string projectId)
+    {
+        try
+        {
+            _logger.LogInformation("Starting auto-grouping of events by row number for project {ProjectId}", projectId);
+
+            // Get all events with row numbers that aren't already assigned to blocks
+            var eventsWithRows = await _context.ProjectEvents
+                .Where(pe => pe.ProjectId == projectId && pe.RowNumber.HasValue && pe.TaskBlockId == null)
+                .OrderBy(pe => pe.RowNumber)
+                .ThenBy(pe => pe.EventDate)
+                .ToListAsync();
+
+            if (!eventsWithRows.Any())
+            {
+                _logger.LogInformation("No unassigned events with row numbers found for project {ProjectId}", projectId);
+                return;
+            }
+
+            // Group events by row number
+            var eventsByRow = eventsWithRows.GroupBy(pe => pe.RowNumber.Value).ToList();
+            _logger.LogInformation("Found {RowCount} unique rows with {EventCount} total events", 
+                eventsByRow.Count, eventsWithRows.Count);
+
+            var createdBlocks = 0;
+            foreach (var rowGroup in eventsByRow)
+            {
+                var rowNumber = rowGroup.Key;
+                var rowEvents = rowGroup.ToList();
+
+                // Only create a block if there are events for this row
+                if (rowEvents.Any())
+                {
+                    // Create TaskBlock for this row
+                    var taskBlock = await _timelineService.CreateTaskBlockAsync(
+                        projectId, 
+                        $"Row {rowNumber}", 
+                        null // No description
+                    );
+
+                    // Assign all events from this row to the block
+                    var eventIds = rowEvents.Select(e => e.Id).ToList();
+                    await _timelineService.AssignEventsToBlockAsync(taskBlock.Id, eventIds);
+
+                    createdBlocks++;
+                    _logger.LogInformation("Created TaskBlock '{BlockName}' with {EventCount} events for row {RowNumber}", 
+                        taskBlock.Name, rowEvents.Count, rowNumber);
+                }
+            }
+
+            _logger.LogInformation("Auto-grouping complete: created {BlockCount} TaskBlocks for project {ProjectId}", 
+                createdBlocks, projectId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during auto-grouping of events by row for project {ProjectId}", projectId);
+            // Don't rethrow - this is a nice-to-have feature that shouldn't break the import
+        }
     }
 }
 

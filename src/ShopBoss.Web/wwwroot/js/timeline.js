@@ -33,6 +33,9 @@ function loadTimelineForProject(projectId) {
 function initializeTimelineInteractions(projectId) {
     // Initialize drag-drop functionality
     initializeTimelineDragDrop(projectId);
+    
+    // Initialize collapse functionality
+    initializeTaskBlockCollapse(projectId);
 }
 
 
@@ -204,7 +207,7 @@ function initializeTaskBlockReordering(projectId) {
     if (!innerTimeline) return;
     
     new Sortable(innerTimeline, {
-        draggable: '.task-block, .unblocked-event', // TaskBlocks and unblocked events are draggable
+        draggable: '.task-block, .unblocked-event',
         handle: '.block-drag-handle, .event-drag-handle',
         ghostClass: 'sortable-ghost',
         chosenClass: 'sortable-chosen',
@@ -216,17 +219,31 @@ function initializeTaskBlockReordering(projectId) {
             put: true
         },
         onEnd: function(evt) {
-            // Check if it was a task block being reordered
-            if (evt.item.classList.contains('task-block')) {
-                // Get all TaskBlock IDs in new order
-                const blockElements = innerTimeline.querySelectorAll('.task-block[data-block-id]');
-                const blockIds = Array.from(blockElements).map(el => el.dataset.blockId);
-                
-                // Call API to persist the new order
-                reorderTaskBlocks(projectId, blockIds);
-            }
+            // Handle mixed reordering - get all items in new order
+            const allItems = Array.from(innerTimeline.children);
+            const reorderedItems = [];
+            
+            allItems.forEach((item, index) => {
+                if (item.classList.contains('task-block')) {
+                    reorderedItems.push({
+                        Type: 'TaskBlock',
+                        Id: item.dataset.blockId,
+                        Order: index + 1
+                    });
+                } else if (item.classList.contains('unblocked-event')) {
+                    reorderedItems.push({
+                        Type: 'Event',
+                        Id: item.dataset.eventId,
+                        Order: index + 1
+                    });
+                }
+            });
+            
+            // Call API to update mixed ordering
+            reorderMixedTimelineItems(projectId, reorderedItems);
+            
             // Check if an unblocked event was dropped into a TaskBlock
-            else if (evt.item.classList.contains('unblocked-event')) {
+            if (evt.item.classList.contains('unblocked-event')) {
                 const targetBlock = evt.to.closest('[data-block-id]');
                 if (targetBlock) {
                     const targetBlockId = targetBlock.dataset.blockId;
@@ -477,5 +494,79 @@ function saveAttachmentComment(projectId) {
     .catch(error => {
         console.error('Error updating attachment comment:', error);
         showNotification('Network error occurred', 'error');
+    });
+}
+
+// ==================== COLLAPSE FUNCTIONALITY ====================
+
+// Initialize TaskBlock collapse functionality with localStorage persistence
+function initializeTaskBlockCollapse(projectId) {
+    const timelineContainer = document.getElementById(`timeline-container-${projectId}`);
+    if (!timelineContainer) return;
+    
+    // Restore collapsed states from localStorage
+    const taskBlocks = timelineContainer.querySelectorAll('.task-block[data-block-id]');
+    taskBlocks.forEach(taskBlock => {
+        const blockId = taskBlock.dataset.blockId;
+        const collapseElement = taskBlock.querySelector(`#collapse-${blockId}`);
+        const headerElement = taskBlock.querySelector('.task-block-header');
+        
+        if (!collapseElement || !headerElement) return;
+        
+        // Get saved state from localStorage
+        const storageKey = `timeline-collapsed-${blockId}`;
+        const isCollapsed = localStorage.getItem(storageKey) === 'true';
+        
+        if (isCollapsed) {
+            collapseElement.classList.remove('show');
+            headerElement.setAttribute('aria-expanded', 'false');
+        }
+    });
+    
+    // Add event listeners for collapse state changes
+    timelineContainer.addEventListener('hidden.bs.collapse', function(event) {
+        const collapseElement = event.target;
+        const blockId = collapseElement.id.replace('collapse-', '');
+        const storageKey = `timeline-collapsed-${blockId}`;
+        localStorage.setItem(storageKey, 'true');
+    });
+    
+    timelineContainer.addEventListener('shown.bs.collapse', function(event) {
+        const collapseElement = event.target;
+        const blockId = collapseElement.id.replace('collapse-', '');
+        const storageKey = `timeline-collapsed-${blockId}`;
+        localStorage.setItem(storageKey, 'false');
+    });
+}
+
+// API call to reorder mixed timeline items (TaskBlocks and unblocked events)
+function reorderMixedTimelineItems(projectId, items) {
+    const requestData = {
+        ProjectId: projectId,
+        Items: items
+    };
+    
+    fetch('/Timeline/ReorderMixedItems', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('Timeline reordered successfully', 'success');
+        } else {
+            showNotification(data.message || 'Error reordering timeline', 'error');
+            // Reload timeline to reset state
+            loadTimelineForProject(projectId);
+        }
+    })
+    .catch(error => {
+        console.error('Error reordering mixed timeline items:', error);
+        showNotification('Network error occurred', 'error');
+        // Reload timeline to reset state  
+        loadTimelineForProject(projectId);
     });
 }

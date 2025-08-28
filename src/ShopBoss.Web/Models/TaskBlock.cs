@@ -20,6 +20,9 @@ public class TaskBlock
     [Required]
     public int DisplayOrder { get; set; }
     
+    // Global timeline ordering (for mixed TaskBlock/Event ordering)
+    public int? GlobalDisplayOrder { get; set; }
+    
     public bool IsTemplate { get; set; } = false;
     
     // Navigation properties

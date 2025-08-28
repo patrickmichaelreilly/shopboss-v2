@@ -29,7 +29,8 @@ public class ProjectAttachmentService
         string category,
         string? uploadedBy = null,
         DateTime? uploadDate = null,
-        string? comment = null)
+        string? comment = null,
+        int? rowNumber = null)
     {
         try
         {
@@ -70,7 +71,8 @@ public class ProjectAttachmentService
                 EventType = "attachment",
                 Description = comment ?? "",  // Only the user's comment
                 CreatedBy = uploadedBy,
-                AttachmentId = attachment.Id
+                AttachmentId = attachment.Id,
+                RowNumber = rowNumber
             };
             _context.ProjectEvents.Add(projectEvent);
             

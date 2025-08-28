@@ -27,19 +27,20 @@ public class TimelineService
             if (project == null)
                 throw new ArgumentException($"Project not found: {projectId}", nameof(projectId));
 
-            // Get all blocks for this project ordered by DisplayOrder
+            // Get all blocks for this project ordered by GlobalDisplayOrder, then DisplayOrder
             var blocks = await _context.TaskBlocks
                 .Where(tb => tb.ProjectId == projectId)
                 .Include(tb => tb.Events)
                     .ThenInclude(e => e.Attachment)
-                .OrderBy(tb => tb.DisplayOrder)
+                .OrderBy(tb => tb.GlobalDisplayOrder ?? tb.DisplayOrder)
                 .ToListAsync();
 
-            // Get all events for this project, ordered chronologically
+            // Get all events for this project, ordered by GlobalDisplayOrder, then chronologically
             var allEvents = await _context.ProjectEvents
                 .Where(pe => pe.ProjectId == projectId)
                 .Include(pe => pe.Attachment)
-                .OrderBy(pe => pe.EventDate)
+                .OrderBy(pe => pe.GlobalDisplayOrder ?? int.MaxValue)
+                .ThenBy(pe => pe.EventDate)
                 .ToListAsync();
 
             // Separate events into blocked and unblocked
@@ -257,6 +258,35 @@ public class TimelineService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error reordering events in TaskBlock: {BlockId}", blockId);
+            throw;
+        }
+    }
+
+    public async Task<bool> ReorderMixedTimelineItemsAsync(string projectId, List<(string Type, string Id, int Order)> items)
+    {
+        try
+        {
+            foreach (var (type, id, order) in items)
+            {
+                if (type == "TaskBlock")
+                {
+                    var block = await _context.TaskBlocks.FindAsync(id);
+                    if (block != null) block.GlobalDisplayOrder = order;
+                }
+                else if (type == "Event")
+                {
+                    var evt = await _context.ProjectEvents.FindAsync(id);
+                    if (evt != null) evt.GlobalDisplayOrder = order;
+                }
+            }
+
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Reordered {Count} mixed timeline items for project: {ProjectId}", items.Count, projectId);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error reordering mixed timeline items for project: {ProjectId}", projectId);
             throw;
         }
     }

@@ -178,6 +178,22 @@ public class TimelineController : Controller
             return Json(new { success = false, message = "Error reordering events. Please try again." });
         }
     }
+
+    [HttpPost]
+    public async Task<IActionResult> ReorderMixedItems([FromBody] ReorderMixedItemsRequest request)
+    {
+        try
+        {
+            var items = request.Items.Select(i => (i.Type, i.Id, i.Order)).ToList();
+            await _timelineService.ReorderMixedTimelineItemsAsync(request.ProjectId, items);
+            return Json(new { success = true });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error reordering mixed timeline items for project: {ProjectId}", request.ProjectId);
+            return Json(new { success = false, message = "Error reordering timeline items. Please try again." });
+        }
+    }
 }
 
 // Request DTOs
@@ -216,4 +232,17 @@ public class ReorderEventsRequest
 {
     public string BlockId { get; set; } = string.Empty;
     public List<string> EventIds { get; set; } = new();
+}
+
+public class ReorderMixedItemsRequest
+{
+    public string ProjectId { get; set; } = string.Empty;
+    public List<MixedTimelineItemOrder> Items { get; set; } = new();
+}
+
+public class MixedTimelineItemOrder
+{
+    public string Type { get; set; } = string.Empty; // "TaskBlock" or "Event"
+    public string Id { get; set; } = string.Empty;
+    public int Order { get; set; }
 }

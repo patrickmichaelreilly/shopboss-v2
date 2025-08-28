@@ -42,6 +42,9 @@ public class ProjectEvent
     public string? TaskBlockId { get; set; }
     public int? BlockDisplayOrder { get; set; }
     
+    // Global timeline ordering (for mixed TaskBlock/Event ordering)
+    public int? GlobalDisplayOrder { get; set; }
+    
     // Navigation properties
     public Project Project { get; set; } = null!;
     public ProjectAttachment? Attachment { get; set; }
