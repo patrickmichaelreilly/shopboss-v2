@@ -47,14 +47,16 @@
                                 </div>
                                 @if (evt.Attachment.Category == "SmartSheet Import")
                                 {
-                                    <div class="ms-auto">
-                                        <input type="text" class="form-control form-control-sm" 
-                                               style="width: 200px; font-size: 0.8em;" 
-                                               value="@evt.Description" 
-                                               onblur="updateAttachmentComment('@evt.Id', this.value)"
-                                               placeholder="Add comment..."
-                                               title="Edit comment for this SmartSheet attachment">
-                                    </div>
+                                <div class="ms-auto">
+                                    <input type="text" class="form-control form-control-sm" 
+                                           style="width: 200px; font-size: 0.8em;" 
+                                           value="@evt.Description"
+                                           data-action="attachment-comment-input"
+                                           data-event-id="@evt.Id"
+                                           data-project-id="@projectId"
+                                           placeholder="Add comment..."
+                                           title="Edit comment for this SmartSheet attachment">
+                                </div>
                                 }
                             </div>
                             

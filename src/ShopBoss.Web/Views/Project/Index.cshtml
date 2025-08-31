@@ -39,10 +39,10 @@
                 </li>
             </ul>
         </div>
-        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createProjectModal" onclick="clearProjectForm()">
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createProjectModal" data-action="clear-project-form">
             <i class="fas fa-plus me-2"></i>Create New Project
         </button>
-        <button type="button" class="btn btn-info" onclick="openSmartSheetImportModal()">
+        <button type="button" class="btn btn-info" data-action="open-smartsheet-import">
             <i class="fas fa-cloud-download-alt me-2"></i>SmartSheet Import
         </button>
     </div>
@@ -72,7 +72,7 @@
                 </form>
             </div>
             <div class="col-md-3">
-                <select class="form-select" onchange="filterByCategory(this.value)">
+                <select class="form-select" data-action="project-filter-category">
                     <option value="">All Categories</option>
                     @{
                         var selectedCategory = ViewBag.ProjectCategory?.ToString();
@@ -106,7 +106,7 @@
             <div class="col-md-3">
                 <div class="form-check form-switch">
                     <input class="form-check-input" type="checkbox" id="includeArchivedToggle" 
-                           onchange="toggleArchiveFilter()" @(ViewBag.IncludeArchived == true ? "checked" : "")>
+                           data-action="project-toggle-archived" @(ViewBag.IncludeArchived == true ? "checked" : "")>
                     <label class="form-check-label" for="includeArchivedToggle">
                         <i class="fas fa-archive me-1"></i>Show Archived
                     </label>
@@ -146,7 +146,7 @@ else
                     <tr class="@rowClass">
                         <td class="text-center">
                             <i class="fas fa-chevron-right expand-icon" id="expand-icon-@project.Id" 
-                               onclick="toggleProject('@project.Id')" style="cursor: pointer;"></i>
+                               data-action="toggle-project" data-project-id="@project.Id" style="cursor: pointer;"></i>
                         </td>
                         <td class="text-muted small">@project.ProjectId</td>
                         <td>
@@ -188,17 +188,17 @@ else
                             <div class="btn-group" role="group">
                                 @if (project.IsArchived)
                                 {
-                                    <button type="button" class="btn btn-sm btn-outline-success" onclick="unarchiveProject('@project.Id')" title="Unarchive">
+                                    <button type="button" class="btn btn-sm btn-outline-success" data-action="unarchive-project" data-project-id="@project.Id" title="Unarchive">
                                         <i class="fas fa-box-open"></i>
                                     </button>
                                 }
                                 else
                                 {
-                                    <button type="button" class="btn btn-sm btn-outline-warning" onclick="archiveProject('@project.Id')" title="Archive">
+                                    <button type="button" class="btn btn-sm btn-outline-warning" data-action="archive-project" data-project-id="@project.Id" title="Archive">
                                         <i class="fas fa-archive"></i>
                                     </button>
                                 }
-                                <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteProject('@project.Id', this)" 
+                                <button type="button" class="btn btn-sm btn-outline-danger" data-action="delete-project" data-project-id="@project.Id" 
                                         data-project-name="@project.ProjectName" title="Delete">
                                     <i class="fas fa-trash"></i>
                                 </button>
@@ -239,7 +239,7 @@ else
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="saveProject()">Create Project</button>
+                <button type="button" class="btn btn-primary" data-action="save-project">Create Project</button>
             </div>
         </div>
     </div>
@@ -276,7 +276,7 @@ else
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="associateSelectedWorkOrders()">Associate</button>
+                <button type="button" class="btn btn-primary" data-action="associate-selected-work-orders">Associate</button>
             </div>
         </div>
     </div>
@@ -295,7 +295,7 @@ else
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="savePurchaseOrder()">Create Purchase Order</button>
+                <button type="button" class="btn btn-primary" data-action="save-purchase-order">Create Purchase Order</button>
             </div>
         </div>
     </div>
@@ -314,7 +314,7 @@ else
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="savePurchaseOrderEdit()">Update Purchase Order</button>
+                <button type="button" class="btn btn-primary" data-action="save-purchase-order-edit">Update Purchase Order</button>
             </div>
         </div>
     </div>
@@ -333,7 +333,7 @@ else
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="saveCustomWorkOrder()">Create Custom Work Order</button>
+                <button type="button" class="btn btn-primary" data-action="save-custom-work-order">Create Custom Work Order</button>
             </div>
         </div>
     </div>
@@ -352,7 +352,7 @@ else
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="saveCustomWorkOrderEdit()">Update Custom Work Order</button>
+                <button type="button" class="btn btn-primary" data-action="save-custom-work-order-edit">Update Custom Work Order</button>
             </div>
         </div>
     </div>
@@ -400,7 +400,7 @@ else
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-primary" id="refresh-projects-btn" style="display: none;" onclick="location.reload()">
+                <button type="button" class="btn btn-primary" id="refresh-projects-btn" style="display: none;" data-action="refresh-page">
                     <i class="fas fa-sync me-2"></i>Refresh Page
                 </button>
             </div>
@@ -409,6 +409,7 @@ else
 </div>
 
 @section Scripts {
+    <script src="~/js/http-utils.js" asp-append-version="true"></script>
     <script src="~/js/project-management.js" asp-append-version="true"></script>
     <script src="~/js/smartsheet.js" asp-append-version="true"></script>
     <script src="~/js/timeline.js" asp-append-version="true"></script>

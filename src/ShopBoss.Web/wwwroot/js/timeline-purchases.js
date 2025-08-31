@@ -27,8 +27,7 @@
         currentProjectId = projectId;
         
         // Load purchase order data
-        fetch(`/Project/GetPurchaseOrder?id=${purchaseOrderId}`)
-            .then(response => response.json())
+        (typeof apiGetJson === 'function' ? apiGetJson(`/Project/GetPurchaseOrder?id=${purchaseOrderId}`) : fetch(`/Project/GetPurchaseOrder?id=${purchaseOrderId}`).then(r => r.json()))
             .then(data => {
                 if (data.success && data.purchaseOrder) {
                     const po = data.purchaseOrder;
@@ -83,14 +82,7 @@
             Notes: formData.get('Notes') || null
         };
 
-        fetch('/Project/CreatePurchaseOrder', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(purchaseOrder)
-        })
-        .then(response => response.json())
+        (typeof apiPostJson === 'function' ? apiPostJson('/Project/CreatePurchaseOrder', purchaseOrder) : fetch('/Project/CreatePurchaseOrder', { method: 'POST', headers: { 'Content-Type': 'application/json', }, body: JSON.stringify(purchaseOrder) }).then(r => r.json()))
         .then(data => {
             if (data.success) {
                 showNotification('Purchase order created successfully', 'success');
@@ -129,14 +121,7 @@
             Notes: formData.get('Notes') || null
         };
 
-        fetch('/Project/UpdatePurchaseOrder', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(purchaseOrder)
-        })
-        .then(response => response.json())
+        (typeof apiPostJson === 'function' ? apiPostJson('/Project/UpdatePurchaseOrder', purchaseOrder) : fetch('/Project/UpdatePurchaseOrder', { method: 'POST', headers: { 'Content-Type': 'application/json', }, body: JSON.stringify(purchaseOrder) }).then(r => r.json()))
         .then(data => {
             if (data.success) {
                 showNotification('Purchase order updated successfully', 'success');
@@ -156,14 +141,7 @@
 
     Timeline.Purchases.deletePurchaseOrder = function(purchaseOrderId, projectId) {
         if (confirm('Are you sure you want to delete this purchase order?')) {
-            fetch('/Project/DeletePurchaseOrder', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: `id=${purchaseOrderId}`
-            })
-            .then(response => response.json())
+            (typeof apiPostForm === 'function' ? apiPostForm('/Project/DeletePurchaseOrder', new URLSearchParams({ id: purchaseOrderId })) : fetch('/Project/DeletePurchaseOrder', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: `id=${purchaseOrderId}` }).then(r => r.json()))
             .then(data => {
                 if (data.success) {
                     showNotification('Purchase order deleted successfully', 'success');

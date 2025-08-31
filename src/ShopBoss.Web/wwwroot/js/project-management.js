@@ -1,16 +1,5 @@
-// Project Management JavaScript
-// 
-// ⚠️  WARNING: This file still contains 1,285+ lines and violates maintainability principles.
-// ✅  Timeline functions have been extracted to timeline.js (350+ lines removed).
-// ✅  SmartSheet functions have been extracted to smartsheet.js (295+ lines removed).
-// ⚠️  TODO: Extract remaining features into separate modules:
-//     - Purchase Order functions (200 lines) -> purchase-orders.js
-//     - File management functions (145 lines) -> file-management.js
-//     - Work Order functions (140 lines) -> work-orders.js
-//     - Convert DOM building to server-rendered partials
-//
+// Project Management JavaScript (Project list + CRUD only)
 let currentProjectId = null;
-
 // Toggle project expansion
 function toggleProject(projectId) {
     const details = document.getElementById(`details-${projectId}`);
@@ -87,14 +76,7 @@ function saveProject() {
         Notes: formData.get('Notes') || null
     };
 
-    fetch('/Project/Create', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(project)
-    })
-    .then(response => response.json())
+    (typeof apiPostJson === 'function' ? apiPostJson('/Project/Create', project) : fetch('/Project/Create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(project) }).then(r => r.json()))
     .then(data => {
         if (data.success) {
             // Clear the form
@@ -224,14 +206,7 @@ function saveProjectEdit(projectId) {
         }
     });
 
-    fetch('/Project/Update', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(project)
-    })
-    .then(response => response.json())
+    (typeof apiPostJson === 'function' ? apiPostJson('/Project/Update', project) : fetch('/Project/Update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(project) }).then(r => r.json()))
     .then(data => {
         if (data.success) {
             showNotification('Project updated successfully', 'success');
@@ -282,14 +257,7 @@ function saveProjectEdit(projectId) {
 
 function archiveProject(projectId) {
     if (confirm('Are you sure you want to archive this project?')) {
-        fetch('/Project/Archive', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: `id=${projectId}`
-        })
-        .then(response => response.json())
+        (typeof apiPostForm === 'function' ? apiPostForm('/Project/Archive', new URLSearchParams({ id: projectId })) : fetch('/Project/Archive', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: `id=${projectId}` }).then(r => r.json()))
         .then(data => {
             if (data.success) {
                 location.reload();
@@ -305,14 +273,7 @@ function archiveProject(projectId) {
 }
 
 function unarchiveProject(projectId) {
-    fetch('/Project/Unarchive', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: `id=${projectId}`
-    })
-    .then(response => response.json())
+    (typeof apiPostForm === 'function' ? apiPostForm('/Project/Unarchive', new URLSearchParams({ id: projectId })) : fetch('/Project/Unarchive', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: `id=${projectId}` }).then(r => r.json()))
     .then(data => {
         if (data.success) {
             location.reload();
@@ -329,14 +290,7 @@ function unarchiveProject(projectId) {
 function deleteProject(projectId, buttonElement) {
     const projectName = buttonElement.getAttribute('data-project-name');
     if (confirm(`Are you sure you want to delete project "${projectName}"? This action cannot be undone.`)) {
-        fetch('/Project/Delete', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: `id=${projectId}`
-        })
-        .then(response => response.json())
+        (typeof apiPostForm === 'function' ? apiPostForm('/Project/Delete', new URLSearchParams({ id: projectId })) : fetch('/Project/Delete', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: `id=${projectId}` }).then(r => r.json()))
         .then(data => {
             if (data.success) {
                 location.reload();
@@ -352,10 +306,7 @@ function deleteProject(projectId, buttonElement) {
 }
 
 
-function updatePurchaseOrderCountInTable(projectId, delta) {
-    // TODO: Update purchase order count in table header if needed
-    console.log('Update PO count', projectId, delta);
-}
+// (deprecated placeholder removed)
 
 // Notification system (kept here as it's used by multiple features)
 function showNotification(message, type) {
@@ -388,7 +339,7 @@ function showNotification(message, type) {
     }, 4000);
 }
 
-// SmartSheet Integration Functions have been moved to /js/smartsheet.js
+// SmartSheet Integration functions are in /js/smartsheet.js
 
 // Modify the existing toggleProject function to initialize SmartSheet status and load timeline
 const originalToggleProject = toggleProject;
@@ -410,4 +361,4 @@ toggleProject = function(projectId) {
 };
 
 // ============== END OF FILE ==============
-// Timeline management functions have been moved to /js/timeline.js
+// Timeline management functions are in /js/timeline.js

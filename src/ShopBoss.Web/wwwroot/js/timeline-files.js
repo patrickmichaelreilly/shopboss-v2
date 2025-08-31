@@ -97,14 +97,7 @@
 
     // Update file category
     Timeline.Files.updateFileCategory = function(fileId, category) {
-        fetch('/Project/UpdateFileCategory', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ id: fileId, category: category })
-        })
-        .then(response => response.json())
+        (typeof apiPostJson === 'function' ? apiPostJson('/Project/UpdateFileCategory', { id: fileId, category: category }) : fetch('/Project/UpdateFileCategory', { method: 'POST', headers: { 'Content-Type': 'application/json', }, body: JSON.stringify({ id: fileId, category: category }) }).then(r => r.json()))
         .then(data => {
             if (data.success) {
                 showNotification('Category updated', 'success');
@@ -120,14 +113,7 @@
 
     // Delete file
     Timeline.Files.deleteFile = function(fileId, projectId) {
-        fetch('/Project/DeleteFile', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: `id=${fileId}`
-        })
-        .then(response => response.json())
+        (typeof apiPostForm === 'function' ? apiPostForm('/Project/DeleteFile', new URLSearchParams({ id: fileId })) : fetch('/Project/DeleteFile', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: `id=${fileId}` }).then(r => r.json()))
         .then(data => {
             if (data.success) {
                 showNotification('File deleted successfully', 'success');

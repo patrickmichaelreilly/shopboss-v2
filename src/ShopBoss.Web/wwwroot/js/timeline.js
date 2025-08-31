@@ -36,6 +36,9 @@ function initializeTimelineInteractions(projectId) {
     
     // Initialize collapse functionality
     initializeTaskBlockCollapse(projectId);
+
+    // Initialize delegated event handlers (no inline JS)
+    initializeDelegatedTimelineEvents(projectId);
 }
 
 
@@ -55,14 +58,7 @@ function createTaskBlock(projectId, name, description = null) {
         Description: description
     };
     
-    fetch('/Timeline/CreateBlock', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestData)
-    })
-    .then(response => response.json())
+    (typeof apiPostJson === 'function' ? apiPostJson('/Timeline/CreateBlock', requestData) : fetch('/Timeline/CreateBlock', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestData) }).then(r => r.json()))
     .then(data => {
         if (data.success) {
             showNotification('Task block created successfully', 'success');
@@ -164,14 +160,7 @@ function assignEventsToBlock(blockId, eventIds) {
         EventIds: eventIds
     };
     
-    return fetch('/Timeline/AssignEvents', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestData)
-    })
-    .then(response => response.json())
+    return (typeof apiPostJson === 'function' ? apiPostJson('/Timeline/AssignEvents', requestData) : fetch('/Timeline/AssignEvents', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestData) }).then(r => r.json()))
     .then(data => {
         if (!data.success) {
             throw new Error(data.message || 'Error assigning events');
@@ -187,6 +176,201 @@ function assignEventsToBlock(blockId, eventIds) {
 // Work Order management functions have been moved to timeline-workorders.js
 
 // ==================== DRAG-DROP FUNCTIONALITY ====================
+
+// Delegated event handlers for timeline interactions
+function initializeDelegatedTimelineEvents(projectId) {
+    const timelineContainer = document.getElementById(`timeline-container-${projectId}`);
+    if (!timelineContainer) return;
+
+    // Save attachment comment on change/blur without full timeline reload
+    const saveComment = (target) => {
+        const eventId = target.getAttribute('data-event-id');
+        const description = target.value.trim();
+        if (!eventId) return;
+
+        updateEventDescription(eventId, description)
+            .then((ok) => {
+                if (ok) {
+                    showNotification('Comment updated', 'success');
+                } else {
+                    showNotification('Error updating comment', 'error');
+                }
+            })
+            .catch(() => showNotification('Network error occurred', 'error'));
+    };
+
+    // Use input "change" (fires on blur) and also catch explicit focusout
+    timelineContainer.addEventListener('change', (e) => {
+        const target = e.target;
+        if (target && target.matches('input[data-action="attachment-comment-input"]')) {
+            saveComment(target);
+        }
+    });
+
+    timelineContainer.addEventListener('focusout', (e) => {
+        const target = e.target;
+        if (target && target.matches('input[data-action="attachment-comment-input"]')) {
+            // In case some browsers don’t fire change
+            saveComment(target);
+        }
+    });
+
+    // Optional: Save on Enter without blurring
+    timelineContainer.addEventListener('keydown', (e) => {
+        const target = e.target;
+        if (target && target.matches('input[data-action="attachment-comment-input"]')) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                saveComment(target);
+                target.blur();
+            }
+        }
+    });
+}
+
+// Ensure a single global delegated action handler is registered
+if (!window.__globalActionDelegationInitialized) {
+    window.__globalActionDelegationInitialized = true;
+
+    // Global click delegation for elements with data-action
+    document.addEventListener('click', function(e) {
+        const el = e.target.closest('[data-action]');
+        if (!el) return;
+
+        const action = el.getAttribute('data-action');
+        const projectId = el.getAttribute('data-project-id');
+        if (!action) return;
+
+        switch (action) {
+            // Project Index actions
+            case 'clear-project-form':
+                if (typeof clearProjectForm === 'function') clearProjectForm();
+                break;
+            case 'open-smartsheet-import':
+                if (typeof openSmartSheetImportModal === 'function') openSmartSheetImportModal();
+                break;
+            case 'toggle-project':
+                if (typeof toggleProject === 'function') toggleProject(projectId);
+                break;
+            case 'unarchive-project':
+                if (typeof unarchiveProject === 'function') unarchiveProject(projectId);
+                break;
+            case 'archive-project':
+                if (typeof archiveProject === 'function') archiveProject(projectId);
+                break;
+            case 'delete-project':
+                if (typeof deleteProject === 'function') deleteProject(projectId, el);
+                break;
+            case 'save-project':
+                if (typeof saveProject === 'function') saveProject();
+                break;
+            case 'associate-selected-work-orders':
+                if (window.Timeline?.WorkOrders?.associateSelectedWorkOrders) Timeline.WorkOrders.associateSelectedWorkOrders();
+                break;
+            case 'save-purchase-order':
+                if (window.Timeline?.Purchases?.savePurchaseOrder) Timeline.Purchases.savePurchaseOrder();
+                break;
+            case 'save-purchase-order-edit':
+                if (window.Timeline?.Purchases?.savePurchaseOrderEdit) Timeline.Purchases.savePurchaseOrderEdit();
+                break;
+            case 'save-custom-work-order':
+                if (window.Timeline?.WorkOrders?.saveCustomWorkOrder) Timeline.WorkOrders.saveCustomWorkOrder();
+                break;
+            case 'save-custom-work-order-edit':
+                if (window.Timeline?.WorkOrders?.saveCustomWorkOrderEdit) Timeline.WorkOrders.saveCustomWorkOrderEdit();
+                break;
+            case 'refresh-page':
+                window.location.reload();
+                break;
+            case 'project-edit':
+                if (typeof editProject === 'function') editProject(projectId);
+                break;
+            case 'project-save':
+                if (typeof saveProjectEdit === 'function') saveProjectEdit(projectId);
+                break;
+            case 'project-cancel':
+                if (typeof cancelProjectEdit === 'function') cancelProjectEdit(projectId);
+                break;
+            case 'unlink-smartsheet':
+                if (typeof unlinkSmartSheet === 'function') unlinkSmartSheet(projectId);
+                break;
+            case 'link-smartsheet':
+                if (typeof showSmartSheetLinking === 'function') showSmartSheetLinking(projectId);
+                break;
+            case 'show-upload-file-modal':
+                if (window.Timeline?.Files?.showUploadFileModal) Timeline.Files.showUploadFileModal(projectId);
+                break;
+            case 'show-create-purchase-order':
+                if (window.Timeline?.Purchases?.showCreatePurchaseOrder) Timeline.Purchases.showCreatePurchaseOrder(projectId);
+                break;
+            case 'show-associate-work-orders':
+                if (window.Timeline?.WorkOrders?.showAssociateWorkOrders) Timeline.WorkOrders.showAssociateWorkOrders(projectId);
+                break;
+            case 'show-create-custom-work-order':
+                if (window.Timeline?.WorkOrders?.showCreateCustomWorkOrder) Timeline.WorkOrders.showCreateCustomWorkOrder(projectId);
+                break;
+            case 'show-add-comment':
+                if (typeof showAddComment === 'function') showAddComment(projectId);
+                break;
+            case 'show-create-task-block':
+                if (typeof showCreateTaskBlock === 'function') showCreateTaskBlock(projectId);
+                break;
+            case 'save-comment':
+                if (typeof saveComment === 'function') saveComment(projectId);
+                break;
+            case 'upload-files-with-comment':
+                if (window.Timeline?.Files?.uploadFilesWithComment) Timeline.Files.uploadFilesWithComment(projectId);
+                break;
+            case 'save-attachment-comment':
+                if (typeof saveAttachmentComment === 'function') saveAttachmentComment(projectId);
+                break;
+            default:
+                break;
+        }
+    }, true);
+
+    // Global change delegation for inputs/selects that need element reference
+    document.addEventListener('change', function(e) {
+        const el = e.target;
+        if (!el || !el.matches('[data-action]')) return;
+        const action = el.getAttribute('data-action');
+        const projectId = el.getAttribute('data-project-id');
+        if (action === 'upload-files-direct' && window.Timeline?.Files?.uploadFilesDirectly) {
+            Timeline.Files.uploadFilesDirectly(projectId, el);
+        }
+        if (action === 'project-filter-category' && typeof filterByCategory === 'function') {
+            filterByCategory(el.value);
+        }
+        if (action === 'project-toggle-archived' && typeof toggleArchiveFilter === 'function') {
+            toggleArchiveFilter();
+        }
+    }, true);
+}
+
+// Helper to update event description via API
+function updateEventDescription(eventId, description) {
+    if (typeof apiPostJson === 'function') {
+        return apiPostJson('/Project/UpdateEventDescription', {
+            eventId: eventId,
+            description: description
+        }).then(res => !!res.success).catch(() => false);
+    }
+    // Fallback if http-utils.js not loaded
+    return fetch(`/Project/UpdateEventDescription`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({
+            eventId: eventId,
+            description: description
+        })
+    })
+    .then(r => r.json())
+    .then(data => Boolean(data && data.success))
+    .catch(() => false);
+}
 
 // Initialize drag-drop functionality for timeline reordering
 function initializeTimelineDragDrop(projectId) {
@@ -391,14 +575,7 @@ function reorderTaskBlocks(projectId, blockIds) {
         BlockIds: blockIds
     };
     
-    fetch('/Timeline/ReorderBlocks', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestData)
-    })
-    .then(response => response.json())
+    (typeof apiPostJson === 'function' ? apiPostJson('/Timeline/ReorderBlocks', requestData) : fetch('/Timeline/ReorderBlocks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestData) }).then(r => r.json()))
     .then(data => {
         if (data.success) {
             showNotification('Task blocks reordered successfully', 'success');
@@ -423,14 +600,7 @@ function reorderEventsInBlock(blockId, eventIds) {
         EventIds: eventIds
     };
     
-    fetch('/Timeline/ReorderEventsInBlock', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestData)
-    })
-    .then(response => response.json())
+    (typeof apiPostJson === 'function' ? apiPostJson('/Timeline/ReorderEventsInBlock', requestData) : fetch('/Timeline/ReorderEventsInBlock', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestData) }).then(r => r.json()))
     .then(data => {
         if (data.success) {
             showNotification('Events reordered successfully', 'success');
@@ -467,20 +637,7 @@ function saveComment(projectId) {
     
     const modal = bootstrap.Modal.getInstance(document.getElementById(`addCommentModal-${projectId}`));
     
-    fetch(`/Project/CreateComment`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest'
-        },
-        body: JSON.stringify({
-            projectId: projectId,
-            description: commentText,
-            eventDate: commentDate,
-            createdBy: commentAuthor || null
-        })
-    })
-    .then(response => response.json())
+    (typeof apiPostJson === 'function' ? apiPostJson('/Project/CreateComment', { projectId, description: commentText, eventDate: commentDate, createdBy: commentAuthor || null }) : fetch('/Project/CreateComment', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, body: JSON.stringify({ projectId, description: commentText, eventDate: commentDate, createdBy: commentAuthor || null }) }).then(r => r.json()))
     .then(data => {
         if (data.success) {
             modal.hide();
@@ -524,18 +681,7 @@ function saveAttachmentComment(projectId) {
     const description = document.getElementById(`editAttachmentCommentText-${projectId}`).value.trim();
     const modal = bootstrap.Modal.getInstance(document.getElementById(`editAttachmentCommentModal-${projectId}`));
     
-    fetch(`/Project/UpdateEventDescription`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest'
-        },
-        body: JSON.stringify({
-            eventId: currentEditingEventId,
-            description: description
-        })
-    })
-    .then(response => response.json())
+    (typeof apiPostJson === 'function' ? apiPostJson('/Project/UpdateEventDescription', { eventId: currentEditingEventId, description }) : fetch('/Project/UpdateEventDescription', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, body: JSON.stringify({ eventId: currentEditingEventId, description }) }).then(r => r.json()))
     .then(data => {
         if (data.success) {
             modal.hide();
@@ -604,14 +750,7 @@ function reorderMixedTimelineItems(projectId, items) {
         Items: items
     };
     
-    fetch('/Timeline/ReorderMixedItems', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestData)
-    })
-    .then(response => response.json())
+    (typeof apiPostJson === 'function' ? apiPostJson('/Timeline/ReorderMixedItems', requestData) : fetch('/Timeline/ReorderMixedItems', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestData) }).then(r => r.json()))
     .then(data => {
         if (data.success) {
             showNotification('Timeline reordered successfully', 'success');
@@ -636,14 +775,7 @@ function nestTaskBlock(childBlockId, parentBlockId) {
         ParentBlockId: parentBlockId
     };
     
-    return fetch('/Timeline/NestTaskBlock', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestData)
-    })
-    .then(response => response.json())
+    return (typeof apiPostJson === 'function' ? apiPostJson('/Timeline/NestTaskBlock', requestData) : fetch('/Timeline/NestTaskBlock', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestData) }).then(r => r.json()))
     .then(data => {
         if (!data.success) {
             throw new Error(data.message || 'Error nesting TaskBlock');
@@ -659,14 +791,7 @@ function unnestTaskBlock(blockId) {
         ParentBlockId: null // null means move to root
     };
     
-    return fetch('/Timeline/NestTaskBlock', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestData)
-    })
-    .then(response => response.json())
+    return (typeof apiPostJson === 'function' ? apiPostJson('/Timeline/NestTaskBlock', requestData) : fetch('/Timeline/NestTaskBlock', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestData) }).then(r => r.json()))
     .then(data => {
         if (data.success) {
             showNotification('TaskBlock moved to root level', 'success');
@@ -692,14 +817,7 @@ function unassignEventsFromBlocks(eventIds) {
         EventIds: eventIds
     };
     
-    return fetch('/Timeline/UnassignEvents', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestData)
-    })
-    .then(response => response.json())
+    return (typeof apiPostJson === 'function' ? apiPostJson('/Timeline/UnassignEvents', requestData) : fetch('/Timeline/UnassignEvents', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestData) }).then(r => r.json()))
     .then(data => {
         if (!data.success) {
             throw new Error(data.message || 'Error unassigning events');

@@ -9,15 +9,15 @@
                 <small class="fw-bold">Project Information</small>
             </div>
             <div id="display-buttons-@Model.Id">
-                <button type="button" class="btn btn-sm btn-outline-primary" onclick="editProject('@Model.Id')">
+                <button type="button" class="btn btn-sm btn-outline-primary" data-action="project-edit" data-project-id="@Model.Id">
                     <i class="fas fa-edit me-1"></i>Edit
                 </button>
             </div>
             <div id="edit-buttons-@Model.Id" class="d-none">
-                <button type="button" class="btn btn-sm btn-success me-1" onclick="saveProjectEdit('@Model.Id')">
+                <button type="button" class="btn btn-sm btn-success me-1" data-action="project-save" data-project-id="@Model.Id">
                     <i class="fas fa-save me-1"></i>Save
                 </button>
-                <button type="button" class="btn btn-sm btn-secondary" onclick="cancelProjectEdit('@Model.Id')">
+                <button type="button" class="btn btn-sm btn-secondary" data-action="project-cancel" data-project-id="@Model.Id">
                     <i class="fas fa-times me-1"></i>Cancel
                 </button>
             </div>
@@ -63,7 +63,7 @@
                             {
                                 <div class="d-flex align-items-center">
                                     <span class="badge bg-success me-2" style="font-size: 0.7em;">Linked</span>
-                                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="unlinkSmartSheet('@Model.Id')">
+                                    <button type="button" class="btn btn-sm btn-outline-danger" data-action="unlink-smartsheet" data-project-id="@Model.Id">
                                         <i class="fas fa-unlink me-1"></i>Unlink
                                     </button>
                                 </div>
@@ -72,7 +72,7 @@
                             {
                                 <div class="d-flex align-items-center">
                                     <span class="badge bg-secondary me-2" style="font-size: 0.7em;">Not Linked</span>
-                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="showSmartSheetLinking('@Model.Id')">
+                                    <button type="button" class="btn btn-sm btn-outline-primary" data-action="link-smartsheet" data-project-id="@Model.Id">
                                         <i class="fas fa-link me-1"></i>Link
                                     </button>
                                 </div>
@@ -104,27 +104,27 @@
                 <small class="fw-bold">Project Timeline (@Model.Events.Count)</small>
             </div>
             <div class="btn-group" role="group">
-                <button type="button" class="btn btn-sm btn-outline-primary" onclick="showUploadFileModal('@Model.Id')">
+                <button type="button" class="btn btn-sm btn-outline-primary" data-action="show-upload-file-modal" data-project-id="@Model.Id">
                     <i class="fas fa-upload me-1"></i>Upload File
                 </button>
-                <button type="button" class="btn btn-sm btn-outline-success" onclick="showCreatePurchaseOrder('@Model.Id')">
+                <button type="button" class="btn btn-sm btn-outline-success" data-action="show-create-purchase-order" data-project-id="@Model.Id">
                     <i class="fas fa-plus me-1"></i>Add PO
                 </button>
-                <button type="button" class="btn btn-sm btn-outline-success" onclick="showAssociateWorkOrders('@Model.Id')" title="Add Manufacturing Work Order">
+                <button type="button" class="btn btn-sm btn-outline-success" data-action="show-associate-work-orders" data-project-id="@Model.Id" title="Add Manufacturing Work Order">
                     <i class="fas fa-plus me-1"></i>Add WO
                 </button>
-                <button type="button" class="btn btn-sm btn-outline-info" onclick="showCreateCustomWorkOrder('@Model.Id')" title="Add Custom Work Order">
+                <button type="button" class="btn btn-sm btn-outline-info" data-action="show-create-custom-work-order" data-project-id="@Model.Id" title="Add Custom Work Order">
                     <i class="fas fa-plus me-1"></i>Custom
                 </button>
-                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="showAddComment('@Model.Id')" title="Add Comment">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-action="show-add-comment" data-project-id="@Model.Id" title="Add Comment">
                     <i class="fas fa-comment me-1"></i>Comment
                 </button>
-                <button type="button" class="btn btn-sm btn-outline-warning" onclick="showCreateTaskBlock('@Model.Id')" title="Create timeline block">
+                <button type="button" class="btn btn-sm btn-outline-warning" data-action="show-create-task-block" data-project-id="@Model.Id" title="Create timeline block">
                     <i class="fas fa-folder-plus me-1"></i>New Block
                 </button>
             </div>
             <input type="file" id="fileInputHidden-@Model.Id" class="d-none" multiple 
-                   onchange="uploadFilesDirectly('@Model.Id', this)">
+                   data-action="upload-files-direct" data-project-id="@Model.Id">
         </div>
         
         <div id="timeline-container-@Model.Id">
@@ -168,7 +168,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="saveComment('@Model.Id')">
+                <button type="button" class="btn btn-primary" data-action="save-comment" data-project-id="@Model.Id">
                     <i class="fas fa-comment me-1"></i>Add Comment
                 </button>
             </div>
@@ -210,7 +210,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="uploadFilesWithComment('@Model.Id')">
+                <button type="button" class="btn btn-primary" data-action="upload-files-with-comment" data-project-id="@Model.Id">
                     <i class="fas fa-upload me-1"></i>Upload Files
                 </button>
             </div>
@@ -237,7 +237,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="saveAttachmentComment('@Model.Id')">
+                <button type="button" class="btn btn-primary" data-action="save-attachment-comment" data-project-id="@Model.Id">
                     <i class="fas fa-save me-1"></i>Save Comment
                 </button>
             </div>
