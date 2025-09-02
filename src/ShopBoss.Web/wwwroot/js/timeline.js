@@ -107,6 +107,30 @@ function createNestedTaskBlock(projectId, parentBlockId) {
     }
 }
 
+// Collapse all blocks in project timeline
+function collapseAllBlocks(projectId) {
+    const timelineContainer = document.getElementById(`timeline-container-${projectId}`);
+    if (!timelineContainer) return;
+    
+    const collapseElements = timelineContainer.querySelectorAll('.task-block .collapse.show');
+    collapseElements.forEach(element => {
+        const bsCollapse = new bootstrap.Collapse(element, { toggle: false });
+        bsCollapse.hide();
+    });
+}
+
+// Expand all blocks in project timeline  
+function expandAllBlocks(projectId) {
+    const timelineContainer = document.getElementById(`timeline-container-${projectId}`);
+    if (!timelineContainer) return;
+    
+    const collapseElements = timelineContainer.querySelectorAll('.task-block .collapse:not(.show)');
+    collapseElements.forEach(element => {
+        const bsCollapse = new bootstrap.Collapse(element, { toggle: false });
+        bsCollapse.show();
+    });
+}
+
 // Edit TaskBlock
 function editTaskBlock(blockId, currentName, currentDescription) {
     const newName = prompt('Enter new name for Task Block:', currentName);
@@ -349,6 +373,12 @@ if (!window.__globalActionDelegationInitialized) {
                 break;
             case 'show-create-task-block':
                 if (typeof showCreateTaskBlock === 'function') showCreateTaskBlock(projectId);
+                break;
+            case 'collapse-all-blocks':
+                if (typeof collapseAllBlocks === 'function') collapseAllBlocks(projectId);
+                break;
+            case 'expand-all-blocks':
+                if (typeof expandAllBlocks === 'function') expandAllBlocks(projectId);
                 break;
             case 'save-comment':
                 if (typeof saveComment === 'function') saveComment(projectId);
@@ -650,7 +680,10 @@ function reorderEventsInBlock(blockId, eventIds) {
 }
 
 // Comment functionality
-function showAddComment(projectId) {
+let currentCommentBlockId = null; // Store blockId for comment creation
+
+function showAddComment(projectId, blockId = null) {
+    currentCommentBlockId = blockId; // Store for use in saveComment
     const modal = new bootstrap.Modal(document.getElementById(`addCommentModal-${projectId}`));
     modal.show();
 }
@@ -672,7 +705,7 @@ function saveComment(projectId) {
     
     const modal = bootstrap.Modal.getInstance(document.getElementById(`addCommentModal-${projectId}`));
     
-    (typeof apiPostJson === 'function' ? apiPostJson('/Project/CreateComment', { projectId, description: commentText, eventDate: commentDate, createdBy: commentAuthor || null }) : fetch('/Project/CreateComment', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, body: JSON.stringify({ projectId, description: commentText, eventDate: commentDate, createdBy: commentAuthor || null }) }).then(r => r.json()))
+    (typeof apiPostJson === 'function' ? apiPostJson('/Project/CreateComment', { projectId, description: commentText, eventDate: commentDate, createdBy: commentAuthor || null, taskBlockId: currentCommentBlockId }) : fetch('/Project/CreateComment', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, body: JSON.stringify({ projectId, description: commentText, eventDate: commentDate, createdBy: commentAuthor || null, taskBlockId: currentCommentBlockId }) }).then(r => r.json()))
     .then(data => {
         if (data.success) {
             modal.hide();
@@ -819,32 +852,6 @@ function nestTaskBlock(childBlockId, parentBlockId) {
     });
 }
 
-// API call to unnest a TaskBlock (move to root level)
-function unnestTaskBlock(blockId) {
-    const requestData = {
-        ChildBlockId: blockId,
-        ParentBlockId: null // null means move to root
-    };
-    
-    return (typeof apiPostJson === 'function' ? apiPostJson('/Timeline/NestTaskBlock', requestData) : fetch('/Timeline/NestTaskBlock', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestData) }).then(r => r.json()))
-    .then(data => {
-        if (data.success) {
-            showNotification('TaskBlock moved to root level', 'success');
-            // Reload timeline to reflect changes
-            const timelineContainer = document.querySelector('.timeline-container');
-            if (timelineContainer) {
-                const projectId = timelineContainer.id.replace('timeline-', '');
-                loadTimelineForProject(projectId);
-            }
-        } else {
-            showNotification(data.message || 'Error unnesting TaskBlock', 'error');
-        }
-    })
-    .catch(error => {
-        console.error('Error unnesting TaskBlock:', error);
-        showNotification('Network error occurred', 'error');
-    });
-}
 
 // API call to unassign events from any TaskBlock (move to unblocked)
 function unassignEventsFromBlocks(eventIds) {

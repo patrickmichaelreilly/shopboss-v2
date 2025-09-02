@@ -30,7 +30,8 @@ public class ProjectAttachmentService
         string? uploadedBy = null,
         DateTime? uploadDate = null,
         string? comment = null,
-        int? rowNumber = null)
+        int? rowNumber = null,
+        string? taskBlockId = null)
     {
         try
         {
@@ -72,7 +73,8 @@ public class ProjectAttachmentService
                 Description = comment ?? "",  // Only the user's comment
                 CreatedBy = uploadedBy,
                 AttachmentId = attachment.Id,
-                RowNumber = rowNumber
+                RowNumber = rowNumber,
+                TaskBlockId = taskBlockId
             };
             _context.ProjectEvents.Add(projectEvent);
             
@@ -105,7 +107,7 @@ public class ProjectAttachmentService
         return fileName;
     }
 
-    public async Task<ProjectAttachment> UploadAttachmentAsync(string projectId, IFormFile file, string category, string? uploadedBy = null, string? comment = null)
+    public async Task<ProjectAttachment> UploadAttachmentAsync(string projectId, IFormFile file, string category, string? uploadedBy = null, string? comment = null, string? taskBlockId = null)
     {
         try
         {
@@ -122,7 +124,8 @@ public class ProjectAttachmentService
                 file.ContentType,
                 category,
                 uploadedBy,
-                comment: comment);
+                comment: comment,
+                taskBlockId: taskBlockId);
         }
         catch (Exception ex)
         {

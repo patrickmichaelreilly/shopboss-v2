@@ -75,14 +75,6 @@
                         title="Delete block">
                     <i class="fas fa-trash"></i>
                 </button>
-                @if (nestingLevel > 0)
-                {
-                    <button type="button" class="btn btn-outline-warning btn-sm" 
-                            onclick="unnestTaskBlock('@Model.Id')" 
-                            title="Move to root level">
-                        <i class="fas fa-level-up-alt"></i>
-                    </button>
-                }
             </div>
         </div>
     </div>
@@ -127,12 +119,6 @@
                                     }
                                     <small class="text-muted me-1">@evt.EventDate.ToString("yyyy-MM-dd HH:mm")</small>
                                     <small class="text-muted">by @(evt.CreatedBy ?? "Unknown")</small>
-                                </div>
-                                <div class="event-actions">
-                                    <button type="button" class="btn btn-sm btn-link text-danger p-0" 
-                                            onclick="removeEventFromBlock('@evt.Id')" title="Remove from block">
-                                        <i class="fas fa-times"></i>
-                                    </button>
                                 </div>
                             </div>
                             <div class="event-description">

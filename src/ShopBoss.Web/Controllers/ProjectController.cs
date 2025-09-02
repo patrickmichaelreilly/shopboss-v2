@@ -230,7 +230,7 @@ public class ProjectController : Controller
     }
 
     [HttpPost]
-    public async Task<IActionResult> UploadFile(string projectId, string category, IFormFile file, string? comment = null)
+    public async Task<IActionResult> UploadFile(string projectId, string category, IFormFile file, string? comment = null, string? taskBlockId = null)
     {
         try
         {
@@ -239,7 +239,7 @@ public class ProjectController : Controller
                 return Json(new { success = false, message = "No file selected" });
             }
 
-            var attachment = await _attachmentService.UploadAttachmentAsync(projectId, file, category, comment: comment);
+            var attachment = await _attachmentService.UploadAttachmentAsync(projectId, file, category, comment: comment, taskBlockId: taskBlockId);
             return Json(new { success = true, attachment = attachment });
         }
         catch (Exception ex)
@@ -705,7 +705,8 @@ public class ProjectController : Controller
                 EventDate = request.EventDate,
                 EventType = "comment",
                 Description = request.Description,
-                CreatedBy = request.CreatedBy
+                CreatedBy = request.CreatedBy,
+                TaskBlockId = request.TaskBlockId
             };
 
             var success = await _projectService.AddProjectEventAsync(projectEvent);
@@ -784,6 +785,7 @@ public class ProjectController : Controller
         public string Description { get; set; } = string.Empty;
         public DateTime EventDate { get; set; }
         public string? CreatedBy { get; set; }
+        public string? TaskBlockId { get; set; }
     }
 
     public class UpdateEventDescriptionRequest

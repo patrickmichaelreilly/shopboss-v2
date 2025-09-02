@@ -5,7 +5,10 @@
     Timeline.Files = Timeline.Files || {};
 
     // Show upload file modal
-    Timeline.Files.showUploadFileModal = function(projectId) {
+    Timeline.Files.currentBlockId = null; // Store blockId for file uploads
+    
+    Timeline.Files.showUploadFileModal = function(projectId, blockId = null) {
+        Timeline.Files.currentBlockId = blockId; // Store for use in upload functions
         const modal = new bootstrap.Modal(document.getElementById(`uploadFileModal-${projectId}`));
         modal.show();
     };
@@ -26,6 +29,9 @@
         formData.append('category', category);
         if (comment) {
             formData.append('comment', comment);
+        }
+        if (Timeline.Files.currentBlockId) {
+            formData.append('taskBlockId', Timeline.Files.currentBlockId);
         }
         
         for (let i = 0; i < fileInput.files.length; i++) {
