@@ -57,6 +57,24 @@ function apiGetJson(url) {
         .then(normalizeResponse);
 }
 
+// JSON PUT helper
+function apiPutJson(url, body, headers = {}) {
+    return fetch(url, {
+        method: 'PUT',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, headers),
+        body: JSON.stringify(body || {})
+    })
+    .then(r => r.json())
+    .then(normalizeResponse);
+}
+
+// JSON DELETE helper
+function apiDeleteJson(url) {
+    return fetch(url, { method: 'DELETE' })
+        .then(r => r.json())
+        .then(normalizeResponse);
+}
+
 // Small helper to bubble errors via notification when available
 function notifyError(message) {
     if (typeof showNotification === 'function') {
@@ -65,4 +83,3 @@ function notifyError(message) {
         console.error(message || 'An error occurred');
     }
 }
-

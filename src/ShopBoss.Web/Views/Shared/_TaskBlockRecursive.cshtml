@@ -9,7 +9,7 @@
 <div class="task-block mb-2 @indentClass" data-block-id="@Model.Id" data-nesting-level="@nestingLevel">
     <div class="task-block-header d-flex justify-content-between align-items-center p-2 bg-light border rounded">
         <div class="d-flex align-items-center">
-            <i class="fas fa-grip-vertical block-drag-handle me-2 text-muted" style="cursor: grab;" title="Drag to reorder blocks" onclick="event.stopPropagation();"></i>
+            <i class="fas fa-grip-vertical block-drag-handle me-2 text-muted" style="cursor: grab;" title="Drag to reorder blocks"></i>
             <div class="d-flex align-items-center" 
                  data-bs-toggle="collapse" 
                  data-bs-target="#collapse-@Model.Id" 
@@ -31,7 +31,7 @@
                 <span class="badge bg-secondary ms-1">@Model.ChildTaskBlocks.Count nested</span>
             }
         </div>
-        <div class="d-flex align-items-center gap-1" onclick="event.stopPropagation();">
+        <div class="d-flex align-items-center gap-1">
             <!-- Component Creation Buttons -->
             <div class="btn-group btn-group-sm me-2" role="group">
                 <button type="button" class="btn btn-outline-primary btn-sm" 
@@ -60,7 +60,7 @@
                     <i class="fas fa-comment"></i>
                 </button>
                 <button type="button" class="btn btn-outline-warning btn-sm" 
-                        onclick="createNestedTaskBlock('@Model.ProjectId', '@Model.Id')"
+                        data-action="create-nested-task-block" data-project-id="@Model.ProjectId" data-block-id="@Model.Id"
                         title="Add Nested Block">
                     <i class="fas fa-cube"></i>
                 </button>
@@ -69,12 +69,13 @@
             <!-- Block Management Buttons -->
             <div class="btn-group btn-group-sm" role="group">
                 <button type="button" class="btn btn-outline-secondary btn-sm" 
-                        onclick="editTaskBlock('@Model.Id', '@Model.Name', '@(Model.Description ?? "")')" 
+                        data-action="edit-task-block" data-block-id="@Model.Id" 
+                        data-block-name="@Model.Name" data-block-description="@(Model.Description ?? "")"
                         title="Edit block">
                     <i class="fas fa-edit"></i>
                 </button>
                 <button type="button" class="btn btn-outline-danger btn-sm" 
-                        onclick="deleteTaskBlock('@Model.Id')" 
+                        data-action="delete-task-block" data-block-id="@Model.Id"
                         title="Delete block">
                     <i class="fas fa-trash"></i>
                 </button>
@@ -143,7 +144,8 @@
                                                 <input type="text" class="form-control form-control-sm" 
                                                        style="width: 200px; font-size: 0.8em;" 
                                                        value="@evt.Description" 
-                                                       onblur="updateAttachmentComment('@evt.Id', this.value)"
+                                                       data-action="attachment-comment-input"
+                                                       data-event-id="@evt.Id"
                                                        placeholder="Add comment..."
                                                        title="Edit comment for this SmartSheet attachment">
                                             </div>

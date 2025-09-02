@@ -58,7 +58,7 @@ function createTaskBlock(projectId, name, description = null) {
         Description: description
     };
     
-    (typeof apiPostJson === 'function' ? apiPostJson('/Timeline/CreateBlock', requestData) : fetch('/Timeline/CreateBlock', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestData) }).then(r => r.json()))
+    apiPostJson('/Timeline/CreateBlock', requestData)
     .then(data => {
         if (data.success) {
             showNotification('Task block created successfully', 'success');
@@ -79,18 +79,18 @@ function createNestedTaskBlock(projectId, parentBlockId) {
     if (blockName && blockName.trim()) {
         const requestData = { ProjectId: projectId, Name: blockName.trim(), Description: null };
         
-        (typeof apiPostJson === 'function' ? apiPostJson('/Timeline/CreateBlock', requestData) : fetch('/Timeline/CreateBlock', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestData) }).then(r => r.json()))
-        .then(data => {
-            if (data.success) {
-                // Nest the new block under the parent
-                return fetch('/Timeline/NestTaskBlock', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ChildBlockId: data.block.id, ParentBlockId: parentBlockId })
-                }).then(r => r.json());
-            } else {
-                throw new Error(data.message || 'Error creating block');
+        apiPostJson('/Timeline/CreateBlock', requestData)
+        .then(res => {
+            if (!res.success) {
+                throw new Error(res.message || 'Error creating block');
             }
+            const createdBlock = (res.data && res.data.block) || res.block || null;
+            const newBlockId = createdBlock && (createdBlock.Id || createdBlock.id);
+            if (!newBlockId) {
+                throw new Error('CreateBlock response missing block Id');
+            }
+            // Nest the new block under the parent using existing helper
+            return nestTaskBlock(newBlockId, parentBlockId);
         })
         .then(data => {
             if (data.success) {
@@ -148,14 +148,7 @@ function updateTaskBlock(blockId, name, description) {
         Description: description
     };
     
-    fetch('/Timeline/UpdateBlock', {
-        method: 'PUT',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestData)
-    })
-    .then(response => response.json())
+    apiPutJson('/Timeline/UpdateBlock', requestData)
     .then(data => {
         if (data.success) {
             showNotification('Task block updated successfully', 'success');
@@ -184,10 +177,7 @@ function deleteTaskBlock(blockId) {
         return;
     }
     
-    fetch(`/Timeline/DeleteBlock?blockId=${blockId}`, {
-        method: 'DELETE'
-    })
-    .then(response => response.json())
+    apiDeleteJson(`/Timeline/DeleteBlock?blockId=${blockId}`)
     .then(data => {
         if (data.success) {
             showNotification('Task block deleted successfully', 'success');
@@ -218,7 +208,7 @@ function assignEventsToBlock(blockId, eventIds) {
         EventIds: eventIds
     };
     
-    return (typeof apiPostJson === 'function' ? apiPostJson('/Timeline/AssignEvents', requestData) : fetch('/Timeline/AssignEvents', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestData) }).then(r => r.json()))
+    return apiPostJson('/Timeline/AssignEvents', requestData)
     .then(data => {
         if (!data.success) {
             throw new Error(data.message || 'Error assigning events');
@@ -374,11 +364,23 @@ if (!window.__globalActionDelegationInitialized) {
             case 'show-create-task-block':
                 if (typeof showCreateTaskBlock === 'function') showCreateTaskBlock(projectId);
                 break;
+            case 'create-nested-task-block':
+                if (typeof createNestedTaskBlock === 'function') createNestedTaskBlock(projectId, blockId);
+                break;
             case 'collapse-all-blocks':
                 if (typeof collapseAllBlocks === 'function') collapseAllBlocks(projectId);
                 break;
             case 'expand-all-blocks':
                 if (typeof expandAllBlocks === 'function') expandAllBlocks(projectId);
+                break;
+            case 'edit-task-block': {
+                const currentName = el.getAttribute('data-block-name') || (el.closest('.task-block')?.querySelector('h6')?.textContent?.trim()) || '';
+                const currentDescription = el.getAttribute('data-block-description') || '';
+                if (typeof editTaskBlock === 'function') editTaskBlock(blockId, currentName, currentDescription);
+                break;
+            }
+            case 'delete-task-block':
+                if (typeof deleteTaskBlock === 'function') deleteTaskBlock(blockId);
                 break;
             case 'save-comment':
                 if (typeof saveComment === 'function') saveComment(projectId);
@@ -414,27 +416,10 @@ if (!window.__globalActionDelegationInitialized) {
 
 // Helper to update event description via API
 function updateEventDescription(eventId, description) {
-    if (typeof apiPostJson === 'function') {
-        return apiPostJson('/Project/UpdateEventDescription', {
-            eventId: eventId,
-            description: description
-        }).then(res => !!res.success).catch(() => false);
-    }
-    // Fallback if http-utils.js not loaded
-    return fetch(`/Project/UpdateEventDescription`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest'
-        },
-        body: JSON.stringify({
-            eventId: eventId,
-            description: description
-        })
-    })
-    .then(r => r.json())
-    .then(data => Boolean(data && data.success))
-    .catch(() => false);
+    return apiPostJson('/Project/UpdateEventDescription', {
+        eventId: eventId,
+        description: description
+    }).then(res => !!res.success).catch(() => false);
 }
 
 // Initialize drag-drop functionality for timeline reordering
@@ -640,7 +625,7 @@ function reorderTaskBlocks(projectId, blockIds) {
         BlockIds: blockIds
     };
     
-    (typeof apiPostJson === 'function' ? apiPostJson('/Timeline/ReorderBlocks', requestData) : fetch('/Timeline/ReorderBlocks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestData) }).then(r => r.json()))
+    apiPostJson('/Timeline/ReorderBlocks', requestData)
     .then(data => {
         if (data.success) {
             showNotification('Task blocks reordered successfully', 'success');
@@ -665,7 +650,7 @@ function reorderEventsInBlock(blockId, eventIds) {
         EventIds: eventIds
     };
     
-    (typeof apiPostJson === 'function' ? apiPostJson('/Timeline/ReorderEventsInBlock', requestData) : fetch('/Timeline/ReorderEventsInBlock', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestData) }).then(r => r.json()))
+    apiPostJson('/Timeline/ReorderEventsInBlock', requestData)
     .then(data => {
         if (data.success) {
             showNotification('Events reordered successfully', 'success');
@@ -705,7 +690,7 @@ function saveComment(projectId) {
     
     const modal = bootstrap.Modal.getInstance(document.getElementById(`addCommentModal-${projectId}`));
     
-    (typeof apiPostJson === 'function' ? apiPostJson('/Project/CreateComment', { projectId, description: commentText, eventDate: commentDate, createdBy: commentAuthor || null, taskBlockId: currentCommentBlockId }) : fetch('/Project/CreateComment', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, body: JSON.stringify({ projectId, description: commentText, eventDate: commentDate, createdBy: commentAuthor || null, taskBlockId: currentCommentBlockId }) }).then(r => r.json()))
+    apiPostJson('/Project/CreateComment', { projectId, description: commentText, eventDate: commentDate, createdBy: commentAuthor || null, taskBlockId: currentCommentBlockId })
     .then(data => {
         if (data.success) {
             modal.hide();
@@ -749,7 +734,7 @@ function saveAttachmentComment(projectId) {
     const description = document.getElementById(`editAttachmentCommentText-${projectId}`).value.trim();
     const modal = bootstrap.Modal.getInstance(document.getElementById(`editAttachmentCommentModal-${projectId}`));
     
-    (typeof apiPostJson === 'function' ? apiPostJson('/Project/UpdateEventDescription', { eventId: currentEditingEventId, description }) : fetch('/Project/UpdateEventDescription', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, body: JSON.stringify({ eventId: currentEditingEventId, description }) }).then(r => r.json()))
+    apiPostJson('/Project/UpdateEventDescription', { eventId: currentEditingEventId, description })
     .then(data => {
         if (data.success) {
             modal.hide();
@@ -818,7 +803,7 @@ function reorderMixedTimelineItems(projectId, items) {
         Items: items
     };
     
-    (typeof apiPostJson === 'function' ? apiPostJson('/Timeline/ReorderMixedItems', requestData) : fetch('/Timeline/ReorderMixedItems', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestData) }).then(r => r.json()))
+    apiPostJson('/Timeline/ReorderMixedItems', requestData)
     .then(data => {
         if (data.success) {
             showNotification('Timeline reordered successfully', 'success');
@@ -843,7 +828,7 @@ function nestTaskBlock(childBlockId, parentBlockId) {
         ParentBlockId: parentBlockId
     };
     
-    return (typeof apiPostJson === 'function' ? apiPostJson('/Timeline/NestTaskBlock', requestData) : fetch('/Timeline/NestTaskBlock', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestData) }).then(r => r.json()))
+    return apiPostJson('/Timeline/NestTaskBlock', requestData)
     .then(data => {
         if (!data.success) {
             throw new Error(data.message || 'Error nesting TaskBlock');
@@ -859,7 +844,7 @@ function unassignEventsFromBlocks(eventIds) {
         EventIds: eventIds
     };
     
-    return (typeof apiPostJson === 'function' ? apiPostJson('/Timeline/UnassignEvents', requestData) : fetch('/Timeline/UnassignEvents', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestData) }).then(r => r.json()))
+    return apiPostJson('/Timeline/UnassignEvents', requestData)
     .then(data => {
         if (!data.success) {
             throw new Error(data.message || 'Error unassigning events');

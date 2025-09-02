@@ -12,17 +12,18 @@
         currentProjectId = projectId;
         
         // Fetch fresh unassigned work orders
-        (typeof apiGetJson === 'function' ? apiGetJson('/Project/GetUnassignedWorkOrders') : fetch('/Project/GetUnassignedWorkOrders').then(r => r.json()))
-        .then(data => {
-            if (data.success) {
+        apiGetJson('/Project/GetUnassignedWorkOrders')
+        .then(res => {
+            const workOrders = (res.data && res.data.workOrders) || res.workOrders || [];
+            if (res.success) {
                 const unassignedList = document.getElementById('unassignedWorkOrdersList');
                 
                 // Clear existing content
                 unassignedList.innerHTML = '';
                 
-                if (data.workOrders && data.workOrders.length > 0) {
+                if (workOrders.length > 0) {
                     // Populate with fresh work orders
-                    data.workOrders.forEach(workOrder => {
+                    workOrders.forEach(workOrder => {
                         const workOrderDiv = document.createElement('div');
                         workOrderDiv.className = 'form-check';
                         workOrderDiv.innerHTML = `
@@ -43,7 +44,7 @@
                 const modal = new bootstrap.Modal(document.getElementById('associateWorkOrdersModal'));
                 modal.show();
             } else {
-                showNotification(data.message || 'Error loading unassigned work orders', 'error');
+                showNotification(res.message || 'Error loading unassigned work orders', 'error');
             }
         })
         .catch(error => {
@@ -66,7 +67,7 @@
             WorkOrderIds: workOrderIds
         };
 
-        (typeof apiPostJson === 'function' ? apiPostJson('/Project/AttachWorkOrders', request) : fetch('/Project/AttachWorkOrders', { method: 'POST', headers: { 'Content-Type': 'application/json', }, body: JSON.stringify(request) }).then(r => r.json()))
+        apiPostJson('/Project/AttachWorkOrders', request)
         .then(data => {
             if (data.success) {
                 bootstrap.Modal.getInstance(document.getElementById('associateWorkOrdersModal')).hide();
@@ -89,7 +90,7 @@
 
     Timeline.WorkOrders.detachWorkOrder = function(workOrderId, projectId) {
         if (confirm('Are you sure you want to detach this work order from the project?')) {
-            (typeof apiPostForm === 'function' ? apiPostForm('/Project/DetachWorkOrder', new URLSearchParams({ workOrderId })) : fetch('/Project/DetachWorkOrder', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: `workOrderId=${workOrderId}` }).then(r => r.json()))
+            apiPostForm('/Project/DetachWorkOrder', new URLSearchParams({ workOrderId }))
             .then(data => {
                 if (data.success) {
                     showNotification('Work order detached successfully', 'success');
@@ -132,10 +133,10 @@
         currentProjectId = projectId;
         
         // Load custom work order data
-        (typeof apiGetJson === 'function' ? apiGetJson(`/Project/GetCustomWorkOrder?id=${customWorkOrderId}`) : fetch(`/Project/GetCustomWorkOrder?id=${customWorkOrderId}`).then(r => r.json()))
-            .then(data => {
-                if (data.success && data.customWorkOrder) {
-                    const cwo = data.customWorkOrder;
+        apiGetJson(`/Project/GetCustomWorkOrder?id=${customWorkOrderId}`)
+            .then(res => {
+                const cwo = (res.data && res.data.customWorkOrder) || res.customWorkOrder;
+                if (res.success && cwo) {
                     const form = document.getElementById('editCustomWorkOrderModal').querySelector('#customWorkOrderForm');
                     
                     // Populate form fields
@@ -188,7 +189,7 @@
             TaskBlockId: Timeline.WorkOrders.currentBlockId
         };
         
-        (typeof apiPostJson === 'function' ? apiPostJson('/Project/CreateCustomWorkOrder', requestData) : fetch('/Project/CreateCustomWorkOrder', { method: 'POST', headers: { 'Content-Type': 'application/json', }, body: JSON.stringify(requestData) }).then(r => r.json()))
+        apiPostJson('/Project/CreateCustomWorkOrder', requestData)
         .then(data => {
             if (data.success) {
                 showNotification('Custom work order created successfully', 'success');
@@ -225,7 +226,7 @@
             Notes: formData.get('Notes') || null
         };
 
-        (typeof apiPostJson === 'function' ? apiPostJson('/Project/UpdateCustomWorkOrder', customWorkOrder) : fetch('/Project/UpdateCustomWorkOrder', { method: 'POST', headers: { 'Content-Type': 'application/json', }, body: JSON.stringify(customWorkOrder) }).then(r => r.json()))
+        apiPostJson('/Project/UpdateCustomWorkOrder', customWorkOrder)
         .then(data => {
             if (data.success) {
                 showNotification('Custom work order updated successfully', 'success');
@@ -245,7 +246,7 @@
 
     Timeline.WorkOrders.deleteCustomWorkOrder = function(customWorkOrderId, projectId) {
         if (confirm('Are you sure you want to delete this custom work order?')) {
-            (typeof apiPostForm === 'function' ? apiPostForm('/Project/DeleteCustomWorkOrder', new URLSearchParams({ id: customWorkOrderId })) : fetch('/Project/DeleteCustomWorkOrder', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: `id=${customWorkOrderId}` }).then(r => r.json()))
+            apiPostForm('/Project/DeleteCustomWorkOrder', new URLSearchParams({ id: customWorkOrderId }))
             .then(data => {
                 if (data.success) {
                     showNotification('Custom work order deleted successfully', 'success');
