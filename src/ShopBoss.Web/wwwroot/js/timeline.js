@@ -73,6 +73,40 @@ function createTaskBlock(projectId, name, description = null) {
     });
 }
 
+// Create a nested TaskBlock
+function createNestedTaskBlock(projectId, parentBlockId) {
+    const blockName = prompt('Enter name for new nested block:');
+    if (blockName && blockName.trim()) {
+        const requestData = { ProjectId: projectId, Name: blockName.trim(), Description: null };
+        
+        (typeof apiPostJson === 'function' ? apiPostJson('/Timeline/CreateBlock', requestData) : fetch('/Timeline/CreateBlock', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestData) }).then(r => r.json()))
+        .then(data => {
+            if (data.success) {
+                // Nest the new block under the parent
+                return fetch('/Timeline/NestTaskBlock', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ChildBlockId: data.block.Id, ParentBlockId: parentBlockId })
+                }).then(r => r.json());
+            } else {
+                throw new Error(data.message || 'Error creating block');
+            }
+        })
+        .then(data => {
+            if (data.success) {
+                showNotification('Nested block created successfully', 'success');
+                loadTimelineForProject(projectId);
+            } else {
+                showNotification(data.message || 'Error nesting block', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error creating nested task block:', error);
+            showNotification('Network error occurred', 'error');
+        });
+    }
+}
+
 // Edit TaskBlock
 function editTaskBlock(blockId, currentName, currentDescription) {
     const newName = prompt('Enter new name for Task Block:', currentName);
@@ -239,6 +273,7 @@ if (!window.__globalActionDelegationInitialized) {
 
         const action = el.getAttribute('data-action');
         const projectId = el.getAttribute('data-project-id');
+        const blockId = el.getAttribute('data-block-id');
         if (!action) return;
 
         switch (action) {
@@ -298,19 +333,19 @@ if (!window.__globalActionDelegationInitialized) {
                 if (typeof showSmartSheetLinking === 'function') showSmartSheetLinking(projectId);
                 break;
             case 'show-upload-file-modal':
-                if (window.Timeline?.Files?.showUploadFileModal) Timeline.Files.showUploadFileModal(projectId);
+                if (window.Timeline?.Files?.showUploadFileModal) Timeline.Files.showUploadFileModal(projectId, blockId);
                 break;
             case 'show-create-purchase-order':
-                if (window.Timeline?.Purchases?.showCreatePurchaseOrder) Timeline.Purchases.showCreatePurchaseOrder(projectId);
+                if (window.Timeline?.Purchases?.showCreatePurchaseOrder) Timeline.Purchases.showCreatePurchaseOrder(projectId, blockId);
                 break;
             case 'show-associate-work-orders':
-                if (window.Timeline?.WorkOrders?.showAssociateWorkOrders) Timeline.WorkOrders.showAssociateWorkOrders(projectId);
+                if (window.Timeline?.WorkOrders?.showAssociateWorkOrders) Timeline.WorkOrders.showAssociateWorkOrders(projectId, blockId);
                 break;
             case 'show-create-custom-work-order':
-                if (window.Timeline?.WorkOrders?.showCreateCustomWorkOrder) Timeline.WorkOrders.showCreateCustomWorkOrder(projectId);
+                if (window.Timeline?.WorkOrders?.showCreateCustomWorkOrder) Timeline.WorkOrders.showCreateCustomWorkOrder(projectId, blockId);
                 break;
             case 'show-add-comment':
-                if (typeof showAddComment === 'function') showAddComment(projectId);
+                if (typeof showAddComment === 'function') showAddComment(projectId, blockId);
                 break;
             case 'show-create-task-block':
                 if (typeof showCreateTaskBlock === 'function') showCreateTaskBlock(projectId);

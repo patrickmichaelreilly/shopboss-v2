@@ -103,25 +103,18 @@
                 <i class="fas fa-history me-2 text-muted"></i>
                 <small class="fw-bold">Project Timeline (@Model.Events.Count)</small>
             </div>
-            <div class="btn-group" role="group">
-                <button type="button" class="btn btn-sm btn-outline-primary" data-action="show-upload-file-modal" data-project-id="@Model.Id">
-                    <i class="fas fa-upload me-1"></i>Upload File
+            <div class="d-flex align-items-center gap-2">
+                <button type="button" class="btn btn-sm btn-primary" data-action="show-create-task-block" data-project-id="@Model.Id" title="Create timeline block">
+                    <i class="fas fa-cube me-1"></i>New Block
                 </button>
-                <button type="button" class="btn btn-sm btn-outline-success" data-action="show-create-purchase-order" data-project-id="@Model.Id">
-                    <i class="fas fa-plus me-1"></i>Add PO
-                </button>
-                <button type="button" class="btn btn-sm btn-outline-success" data-action="show-associate-work-orders" data-project-id="@Model.Id" title="Add Manufacturing Work Order">
-                    <i class="fas fa-plus me-1"></i>Add WO
-                </button>
-                <button type="button" class="btn btn-sm btn-outline-info" data-action="show-create-custom-work-order" data-project-id="@Model.Id" title="Add Custom Work Order">
-                    <i class="fas fa-plus me-1"></i>Custom
-                </button>
-                <button type="button" class="btn btn-sm btn-outline-secondary" data-action="show-add-comment" data-project-id="@Model.Id" title="Add Comment">
-                    <i class="fas fa-comment me-1"></i>Comment
-                </button>
-                <button type="button" class="btn btn-sm btn-outline-warning" data-action="show-create-task-block" data-project-id="@Model.Id" title="Create timeline block">
-                    <i class="fas fa-folder-plus me-1"></i>New Block
-                </button>
+                <div class="btn-group btn-group-sm" role="group">
+                    <button type="button" class="btn btn-outline-secondary" title="Collapse all blocks">
+                        <i class="fas fa-compress-alt"></i>
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" title="Expand all blocks">
+                        <i class="fas fa-expand-alt"></i>
+                    </button>
+                </div>
             </div>
             <input type="file" id="fileInputHidden-@Model.Id" class="d-none" multiple 
                    data-action="upload-files-direct" data-project-id="@Model.Id">
