@@ -166,7 +166,7 @@
                                         <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-2"
                                                 data-action="delete-event" data-project-id="@Model.ProjectId"
                                                 data-event-id="@evt.Id"
-                                                @(evt.Attachment != null ? $"data-attachment-id=\"{evt.Attachment.Id}\"" : "")
+                                                @if (evt.Attachment != null) { <text>data-attachment-id="@evt.Attachment.Id"</text>; }
                                                 title="Delete">
                                             <i class="fas fa-times"></i>
                                         </button>

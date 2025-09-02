@@ -240,7 +240,8 @@ public class ProjectController : Controller
             }
 
             var attachment = await _attachmentService.UploadAttachmentAsync(projectId, file, category, comment: comment, taskBlockId: taskBlockId);
-            return Json(new { success = true, attachment = attachment });
+            // Return a trimmed payload to avoid JSON cycles
+            return Json(new { success = true, attachment = new { attachment.Id, attachment.OriginalFileName, attachment.FileSize, attachment.Category } });
         }
         catch (Exception ex)
         {
@@ -275,21 +276,12 @@ public class ProjectController : Controller
     {
         try
         {
+            // Expect an Attachment Id; delete both the file and any linked timeline events
             var success = await _attachmentService.DeleteAttachmentAsync(id);
-            if (!success)
-            {
-                // Fallback: if a ProjectEvent Id was provided instead of Attachment Id, resolve it
-                var evt = await _context.ProjectEvents.FindAsync(id);
-                if (evt?.AttachmentId != null)
-                {
-                    success = await _attachmentService.DeleteAttachmentAsync(evt.AttachmentId);
-                }
-            }
             if (success)
             {
                 return Json(new { success = true });
             }
-            
             return Json(new { success = false, message = "File not found" });
         }
         catch (Exception ex)

@@ -198,18 +198,16 @@ public class ProjectAttachmentService
                 File.Delete(filePath);
             }
 
-            // Create timeline event for file deletion
-            var projectEvent = new ProjectEvent
+            // Remove any timeline events linked to this attachment
+            var linkedEvents = await _context.ProjectEvents
+                .Where(e => e.AttachmentId == attachment.Id)
+                .ToListAsync();
+            if (linkedEvents.Count > 0)
             {
-                ProjectId = attachment.ProjectId,
-                EventDate = DateTime.UtcNow,
-                EventType = "attachment",
-                Description = $"File deleted: {attachment.OriginalFileName}",
-                CreatedBy = null // Could be passed as parameter if needed
-            };
-            _context.ProjectEvents.Add(projectEvent);
+                _context.ProjectEvents.RemoveRange(linkedEvents);
+            }
 
-            // Remove from database
+            // Remove attachment from database
             _context.ProjectAttachments.Remove(attachment);
             await _context.SaveChangesAsync();
 
