@@ -109,8 +109,11 @@
 
     // ==================== CUSTOM WORK ORDER FUNCTIONS ====================
 
-    Timeline.WorkOrders.showCreateCustomWorkOrder = function(projectId) {
+    Timeline.WorkOrders.currentBlockId = null; // Store blockId for work order context
+    
+    Timeline.WorkOrders.showCreateCustomWorkOrder = function(projectId, blockId = null) {
         currentProjectId = projectId;
+        Timeline.WorkOrders.currentBlockId = blockId;
         
         // Clear the form
         const form = document.getElementById('customWorkOrderForm');
@@ -180,7 +183,12 @@
             Notes: formData.get('Notes') || null
         };
 
-        (typeof apiPostJson === 'function' ? apiPostJson('/Project/CreateCustomWorkOrder', customWorkOrder) : fetch('/Project/CreateCustomWorkOrder', { method: 'POST', headers: { 'Content-Type': 'application/json', }, body: JSON.stringify(customWorkOrder) }).then(r => r.json()))
+        const requestData = {
+            CustomWorkOrder: customWorkOrder,
+            TaskBlockId: Timeline.WorkOrders.currentBlockId
+        };
+        
+        (typeof apiPostJson === 'function' ? apiPostJson('/Project/CreateCustomWorkOrder', requestData) : fetch('/Project/CreateCustomWorkOrder', { method: 'POST', headers: { 'Content-Type': 'application/json', }, body: JSON.stringify(requestData) }).then(r => r.json()))
         .then(data => {
             if (data.success) {
                 showNotification('Custom work order created successfully', 'success');

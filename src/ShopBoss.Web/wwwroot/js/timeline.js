@@ -86,7 +86,7 @@ function createNestedTaskBlock(projectId, parentBlockId) {
                 return fetch('/Timeline/NestTaskBlock', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ChildBlockId: data.block.Id, ParentBlockId: parentBlockId })
+                    body: JSON.stringify({ ChildBlockId: data.block.id, ParentBlockId: parentBlockId })
                 }).then(r => r.json());
             } else {
                 throw new Error(data.message || 'Error creating block');

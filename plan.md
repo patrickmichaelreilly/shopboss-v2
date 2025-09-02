@@ -1,189 +1,186 @@
 # Project Module UI/UX Improvement Plan
 
-## Phase 1: Code Organization and Redundancy Elimination (PRIORITY - START HERE)
+## Core UX/UI Principles from User Vision
 
-### Implementation Instructions for Developer
-This phase establishes the foundation for all UI/UX improvements by cleaning up the codebase and eliminating redundancies. Complete this phase before any visual changes.
+**Hierarchical Action Architecture**: Timeline manages blocks, blocks manage components. This creates clear contextual boundaries where users know exactly what level they're operating at - timeline-level actions (creating blocks) vs block-level actions (adding components).
 
-#### Step 1: Complete JavaScript Modularization (project-management.js refactor)
-**Target File:** wwwroot/js/project-management.js (currently 1,285+ lines)
+**Generic-to-Specialized Evolution**: Start with one flexible block template that can handle any content, then observe real usage patterns to identify which combinations of components are used together. This user-driven approach lets specialized block templates (like Materials Schedule tables) emerge naturally from actual workflows rather than assumptions.
 
-**Actions Required:**
-1. Extract Purchase Order functions (lines ~200) � create `purchase-orders.js`
-   - Move: `showCreatePurchaseOrder`, `editPurchaseOrder`, `savePurchaseOrder`, `savePurchaseOrderEdit`, `deletePurchaseOrder`
-   - Maintain Timeline.Purchases namespace pattern from timeline-purchases.js
-   
-2. Extract File Management functions (lines ~145) � create `file-management.js`
-   - Move: `uploadFilesDirectly`, `uploadFilesWithComment`, `showUploadFileModal`, `deleteAttachment`, `updateAttachmentComment`
-   - Create Timeline.Files namespace
-   
-3. Extract Work Order functions (lines ~140) � create `work-orders.js`
-   - Move: `showAssociateWorkOrders`, `associateSelectedWorkOrders`, `showCreateCustomWorkOrder`, `saveCustomWorkOrder`
-   - Create Timeline.WorkOrders namespace
+**Contextual Component Authoring**: Instead of global "add anything anywhere" buttons, component creation is scoped to specific blocks. This reduces cognitive load and makes the relationship between components and their containers explicit in the interface.
 
-4. Keep in project-management.js only:
-   - Core project CRUD operations
-   - Project list management (expand/collapse, filtering)
-   - Project edit inline functionality
+**Compact, Meaningful Controls**: Shrink button sizes to accommodate full functionality without overwhelming the interface. Every block gets all component options initially, but in a visually manageable way that prepares for future template-specific button sets.
 
-#### Step 2: Consolidate Duplicate Event Handlers
-**Target Files:** timeline.js, timeline-purchases.js, timeline-workorders.js, timeline-files.js
+**Visual Consistency & Self-Training**: 
+- Nested and top-level blocks use identical styling to reinforce they're the same entity type
+- Button icons match their corresponding timeline component icons for intuitive self-training  
+- Each component type has a unique, distinguishable icon (no +PO/+WO confusion)
+- Use precise terminology: blocks are represented by cube icons, not folders
 
-**Actions Required:**
-1. Create unified event delegation system in timeline.js
-2. Remove duplicate modal handling code
-3. Consolidate notification/feedback functions into single module
-4. Standardize AJAX error handling patterns
-
-#### Step 3: API Endpoint Consolidation
-**Target Files:** Controllers/ProjectController.cs, Controllers/TimelineController.cs
-
-**Actions Required:**
-1. Combine Create/Update endpoints using upsert pattern
-2. Standardize all responses to: `{ success: bool, data: object, message: string }`
-3. Implement batch operations endpoint for timeline reordering
-4. Add consistent error response structure
-
-#### Step 4: Eliminate Redundant Timeline Loading
-**Current Issue:** Timeline is reloaded completely after every small change
-
-**Actions Required:**
-1. Implement partial timeline updates for single event changes
-2. Add SignalR real-time updates for collaborative editing
-3. Cache timeline HTML and update only changed elements
-4. Create `updateTimelineEvent(eventId)` and `updateTaskBlock(blockId)` functions
-
-#### Step 5: Clean Up Inline JavaScript
-**Target Files:** All .cshtml files in Views/Project and Views/Shared
-
-**Actions Required:**
-1. Replace all onclick handlers with data attributes
-2. Move inline scripts to external files
-3. Use event delegation from parent containers
-4. Implement data-action and data-target attributes pattern
-
-### Success Criteria:
-- [ ] project-management.js reduced to under 400 lines
-- [ ] No duplicate code between timeline-*.js modules
-- [ ] All API responses follow consistent format
-- [ ] Zero inline onclick handlers in views
-- [ ] Timeline updates without full reload for simple operations
+**Proven Recursive Architecture**: Current nested TaskBlock implementation works excellently with smooth drag-and-drop. Keep the self-referencing model and recursive rendering - just enhance the authoring UI.
 
 ---
 
-## Phase 2: Visual Hierarchy and Layout Improvements
-
-### Overview
-Enhance the visual design of the Project List, Project Details, and Timeline components to improve readability and user orientation.
-
-### 2.1 Project List Visual Hierarchy
-- Add subtle row alternating colors for better readability
-- Enhance the expanded project detail view with better spacing and borders
-- Add visual indicators for project status/priority
-- Improve the hover states and transitions
-
-### 2.2 Timeline Visual Design
-- Create distinct visual styles for different event types (comments, attachments, POs, WOs)
-- Add color-coded timeline markers for quick visual scanning
-- Improve TaskBlock header design with better icons and status indicators
-- Add smooth animations for collapse/expand interactions
-
-### 2.3 Responsive Design Refinements
-- Optimize the layout for tablet and mobile views
-- Make the timeline scrollable horizontally on small screens
-- Add touch-friendly drag handles for mobile devices
+## Phase 1: Code Organization ✅ **COMPLETED**
+All JavaScript modularization and API consolidation is complete and pushed.
 
 ---
 
-## Phase 3: Interactive Features Enhancement
+## Phase 2: Timeline UI Restructure (NEW PRIORITY)
 
-### Overview
-Improve the drag-and-drop experience and add advanced timeline interaction capabilities.
+#### 2.1: Move Component Buttons to Block Headers
+**Target Files:** Views/Shared/_ProjectDetails.cshtml, Views/Shared/_TaskBlockRecursive.cshtml
 
-### 3.1 Improved Drag-and-Drop Experience
-- Add visual drop zones when dragging
-- Implement auto-scroll when dragging near edges
-- Add undo/redo functionality for timeline operations
-- Show real-time preview of where items will be dropped
+**Current State:** All component buttons (Upload File, Add PO, Add WO, Custom, Comment) are in Timeline header
+**New State:** Move these buttons into each block header as compact, icon-focused controls
 
-### 3.2 Enhanced Timeline Interactions
-- Add keyboard navigation support
-- Implement bulk selection and operations
-- Add context menus for quick actions
-- Enable inline editing for event descriptions
+**Implementation:**
+- Remove large button group from Timeline header (lines 106-125 in _ProjectDetails.cshtml)
+- Add compact button toolbar to each TaskBlock header in _TaskBlockRecursive.cshtml
+- Use consistent icons: 📎Upload 🏪PO ⚙️WO ✏️Custom 💬Comment 🧊Add Nested Block
+- Scope button actions to the specific block context
+- Icons must match corresponding timeline component icons for self-training
 
-### 3.3 Smart Timeline Grouping
-- Auto-suggest TaskBlock creation based on event patterns
-- Add timeline filtering and search capabilities
-- Implement timeline zoom/density controls
-- Add date-based grouping options
+#### 2.2: Simplify Timeline Header
+**Target Files:** Views/Shared/_ProjectDetails.cshtml
 
----
+**New Timeline Header Contents:**
+- Block management: "🧊 New Block" button (primary action)
+- View controls: collapse/expand all, view density toggles
+- Timeline title with event count
+- Clean, minimal interface focused on block-level operations
 
-## Phase 4: Performance and State Management
+#### 2.3: Enhance Block Headers with Nested Block Support
+**Target Files:** Views/Shared/_TaskBlockRecursive.cshtml, wwwroot/css/site.css
 
-### Overview
-Optimize client-side state management and server-side performance for better responsiveness.
+**Block Header Components:**
+- 🧊 Block icon with block name/title (editable inline)
+- Compact component buttons: 📎Upload 🏪PO ⚙️WO ✏️Custom 💬Comment
+- **NEW**: 🧊Add Nested Block (automatically sets ParentTaskBlockId)
+- Block controls: edit, delete, collapse/expand, unnest (if nested)
+- Drag handle for reordering
+- Event count badge
 
-### 4.1 Client-Side State Management
-- Implement local state caching to reduce server calls
-- Add optimistic UI updates for better perceived performance
-- Use debouncing for drag operations to reduce API calls
-
-### 4.2 Server-Side Optimizations
-- Implement efficient batch update operations
-- Add caching for frequently accessed timeline data
-- Optimize database queries with proper indexing
-
----
-
-## Phase 5: UI Polish and Consistency
-
-### Overview
-Apply final visual polish and ensure consistency across all project-related interfaces.
-
-### 5.1 Consistent Design Language
-- Create a unified color palette for all project-related elements
-- Standardize spacing, typography, and icon usage
-- Add loading states and skeleton screens
-- Implement smooth transitions throughout
-
-### 5.2 User Feedback Improvements
-- Add tooltips for all interactive elements
-- Implement progress indicators for long operations
-- Add confirmation dialogs with clear consequences
-- Show success/error states inline where appropriate
-
-### 5.3 Accessibility Enhancements
-- Add proper ARIA labels for all interactive elements
-- Ensure keyboard navigation works throughout
-- Implement focus management for modals and dynamic content
-- Add screen reader announcements for state changes
+**Visual Design:**
+- All component buttons available in each block (generic template approach)
+- Nested blocks use identical styling to top-level blocks (unified entity appearance)
+- Cube icons reinforce correct "block" terminology
+- Icons with tooltips to save space
+- Consistent styling that prepares for future specialized block templates
 
 ---
 
-## Implementation Notes
+## Phase 3: Block Management Enhancement
 
-### Development Workflow
-1. Complete Phase 1 (Code Organization) entirely before moving to visual changes
-2. Test each refactoring step to ensure no functionality is broken
-3. Use feature flags if needed to gradually roll out changes
-4. Document new patterns and conventions as they're established
+#### 3.1: Improved Block Creation
+**Target Files:** wwwroot/js/timeline.js, Controllers/TimelineController.cs
 
-### Testing Checklist After Each Phase
-- [ ] All existing functionality works as before
-- [ ] No console errors in browser
-- [ ] Timeline drag-and-drop works correctly
-- [ ] All modals open and close properly
-- [ ] Data saves correctly to database
-- [ ] File uploads work as expected
-- [ ] No visual regressions on mobile devices
+**Features:**
+- Quick block creation from Timeline header (top-level blocks)
+- Quick nested block creation from any block header (child blocks)
+- Inline block name editing
+- Block description support
+- Auto-focus on new block name field
 
-### Questions for Product Owner Review
-1. What is the priority order for event types in the timeline?
-2. Should timeline events be groupable by date ranges?
-3. Do we need collaborative editing (multiple users on same project)?
-4. What level of undo/redo history is needed?
-5. Should we implement timeline templates for common project types?
-6. Are there specific color preferences for the visual design?
-7. What is the expected maximum number of timeline events per project?
+#### 3.2: Component-to-Block Context
+**Target Files:** wwwroot/js/timeline-*.js modules
+
+**Implementation:**
+- All component creation functions receive block context
+- Components are automatically assigned to their originating block
+- No more "unblocked" components by default
+- Drag-and-drop between blocks for reorganization
+
+#### 3.3: Block Template Foundation
+**Target Files:** Models/TaskBlock.cs, Services/TimelineService.cs
+
+**Prepare for Future:**
+- Add `BlockType` field to TaskBlock model
+- Start with "Generic" type only
+- Design extensible system for future specialized templates
+- Maintain backward compatibility
+
+---
+
+## Phase 4: Visual Polish and Interaction
+
+#### 4.1: Icon System Consistency
+**Target Files:** wwwroot/css/site.css, all timeline views
+
+**Design Goals:**
+- Unique, distinguishable icons for each component type
+- Button icons exactly match timeline component icons
+- Cube icons for all block-related actions
+- Proper contrast and accessibility
+- Consistent icon sizing across all contexts
+
+#### 4.2: Block Visual Hierarchy
+**Target Files:** Views/Shared/_TaskBlockRecursive.cshtml, wwwroot/css/site.css
+
+**Enhancements:**
+- Clear visual separation between block header and content
+- Consistent nesting indicators (indentation only, no different styling)
+- Improved collapse/expand animations
+- Block type indicators (preparing for future templates)
+
+#### 4.3: Responsive Design
+**Target Files:** wwwroot/css/site.css
+
+**Mobile Optimization:**
+- Compact button handling on small screens
+- Touch-friendly drag handles
+- Collapsible block headers on mobile
+- Horizontal scroll for timeline if needed
+
+---
+
+## Phase 5: Future Block Template System
+
+#### 5.1: Template Architecture
+**Target Files:** New block template system
+
+**Block Types to Implement Based on Usage Patterns:**
+- **Materials Schedule Block**: Table view with sortable columns
+- **Checklist Block**: Progress tracking with checkboxes
+- **Documentation Block**: File-focused with preview capabilities
+- **Communication Block**: Comment-focused with threading
+- **Milestone Block**: Date-focused with progress indicators
+
+#### 5.2: Template Selection
+**Features:**
+- Block type selector when creating new blocks
+- Template library for common workflows
+- Custom template creation and sharing
+- Migration from generic to specialized blocks
+
+---
+
+## Implementation Strategy
+
+### **Start Here (Phase 2)**
+1. **Timeline Header Cleanup**: Remove component buttons, focus on block management
+2. **Block Header Enhancement**: Add compact component + nested block button groups
+3. **Contextual Actions**: Ensure all component creation is scoped to blocks
+4. **Icon Consistency**: Match button icons to timeline component icons
+
+### **Key Design Principles**
+- **Generic First**: All blocks have same capabilities initially
+- **Usage-Driven Templates**: Specialized blocks emerge from observed patterns
+- **Contextual Actions**: Components belong to blocks, blocks belong to timeline
+- **Visual Unity**: Same entity types look the same regardless of nesting
+- **Self-Training Interface**: Consistent icons teach interaction patterns
+- **Precise Terminology**: Cube icons for blocks, not folder icons
+
+### **Success Criteria**
+- [ ] No component buttons in Timeline header
+- [ ] All blocks have compact component + nested block button groups
+- [ ] Button icons match corresponding timeline component icons
+- [ ] Nested blocks visually identical to top-level blocks
+- [ ] Cube icons used consistently for all block-related actions
+- [ ] Block creation is streamlined and intuitive
+- [ ] Visual hierarchy clearly separates timeline → blocks → components
+- [ ] System is prepared for future block template specialization
+
+### **Real-World Validation**
+Your sketch shows exactly what we're building toward - users like you are already creating meaningful block organization manually. This UI change will make that workflow much more intuitive and efficient.
+
+The "Initial Setup" and other named blocks you've created demonstrate the natural patterns that will inform our future template system. We're designing the interface to support the workflows you're already using.

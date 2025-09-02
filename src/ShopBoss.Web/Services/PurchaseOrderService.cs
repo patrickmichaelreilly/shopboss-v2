@@ -45,7 +45,7 @@ public class PurchaseOrderService
         }
     }
 
-    public async Task<PurchaseOrder> CreatePurchaseOrderAsync(PurchaseOrder purchaseOrder)
+    public async Task<PurchaseOrder> CreatePurchaseOrderAsync(PurchaseOrder purchaseOrder, string? taskBlockId = null)
     {
         try
         {
@@ -62,7 +62,8 @@ public class PurchaseOrderService
                 EventType = "purchase_order",
                 Description = $"Purchase Order created: {purchaseOrder.PurchaseOrderNumber} - {purchaseOrder.VendorName}",
                 CreatedBy = null, // Could be passed as parameter if needed
-                PurchaseOrderId = purchaseOrder.Id
+                PurchaseOrderId = purchaseOrder.Id,
+                TaskBlockId = taskBlockId
             };
             _context.ProjectEvents.Add(createEvent);
             

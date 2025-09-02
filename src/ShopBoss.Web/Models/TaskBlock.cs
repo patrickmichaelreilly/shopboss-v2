@@ -2,6 +2,12 @@ using System.ComponentModel.DataAnnotations;
 
 namespace ShopBoss.Web.Models;
 
+public enum BlockType
+{
+    Generic = 0
+    // Future types: Materials, Checklist, Documentation, Communication, Milestone
+}
+
 public class TaskBlock
 {
     [Key]
@@ -27,6 +33,9 @@ public class TaskBlock
     public string? ParentTaskBlockId { get; set; }
     
     public bool IsTemplate { get; set; } = false;
+    
+    // Block template type (for future specialization)
+    public BlockType BlockType { get; set; } = BlockType.Generic;
     
     // Navigation properties
     public Project Project { get; set; } = null!;

@@ -7,17 +7,20 @@
 }
 
 <div class="task-block mb-2 @indentClass" data-block-id="@Model.Id" data-nesting-level="@nestingLevel">
-    <div class="task-block-header d-flex justify-content-between align-items-center p-2 bg-light border rounded" 
-         data-bs-toggle="collapse" 
-         data-bs-target="#collapse-@Model.Id" 
-         role="button"
-         aria-expanded="true" 
-         aria-controls="collapse-@Model.Id">
+    <div class="task-block-header d-flex justify-content-between align-items-center p-2 bg-light border rounded">
         <div class="d-flex align-items-center">
             <i class="fas fa-grip-vertical block-drag-handle me-2 text-muted" style="cursor: grab;" title="Drag to reorder blocks" onclick="event.stopPropagation();"></i>
-            <i class="fas fa-chevron-down collapse-icon me-2 text-muted transition-transform" title="Collapse/Expand block"></i>
-            <i class="@blockIcon me-2 text-primary"></i>
-            <h6 class="mb-0 fw-bold">@Model.Name</h6>
+            <div class="d-flex align-items-center" 
+                 data-bs-toggle="collapse" 
+                 data-bs-target="#collapse-@Model.Id" 
+                 role="button"
+                 style="cursor: pointer;"
+                 aria-expanded="true" 
+                 aria-controls="collapse-@Model.Id">
+                <i class="fas fa-chevron-down collapse-icon me-2 text-muted transition-transform" title="Collapse/Expand block"></i>
+                <i class="@blockIcon me-2 text-primary"></i>
+                <h6 class="mb-0 fw-bold">@Model.Name</h6>
+            </div>
             @if (!string.IsNullOrEmpty(Model.Description))
             {
                 <small class="text-muted ms-2">• @Model.Description</small>

@@ -6,8 +6,11 @@
 
     let currentPurchaseOrderId = null;
 
-    Timeline.Purchases.showCreatePurchaseOrder = function(projectId) {
+    Timeline.Purchases.currentBlockId = null; // Store blockId for purchase order context
+    
+    Timeline.Purchases.showCreatePurchaseOrder = function(projectId, blockId = null) {
         currentProjectId = projectId;
+        Timeline.Purchases.currentBlockId = blockId;
         
         // Clear the form
         const form = document.getElementById('purchaseOrderForm');
@@ -82,7 +85,12 @@
             Notes: formData.get('Notes') || null
         };
 
-        (typeof apiPostJson === 'function' ? apiPostJson('/Project/CreatePurchaseOrder', purchaseOrder) : fetch('/Project/CreatePurchaseOrder', { method: 'POST', headers: { 'Content-Type': 'application/json', }, body: JSON.stringify(purchaseOrder) }).then(r => r.json()))
+        const requestData = {
+            PurchaseOrder: purchaseOrder,
+            TaskBlockId: Timeline.Purchases.currentBlockId
+        };
+
+        (typeof apiPostJson === 'function' ? apiPostJson('/Project/CreatePurchaseOrder', requestData) : fetch('/Project/CreatePurchaseOrder', { method: 'POST', headers: { 'Content-Type': 'application/json', }, body: JSON.stringify(requestData) }).then(r => r.json()))
         .then(data => {
             if (data.success) {
                 showNotification('Purchase order created successfully', 'success');

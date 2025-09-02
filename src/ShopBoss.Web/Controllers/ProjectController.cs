@@ -311,7 +311,7 @@ public class ProjectController : Controller
     }
 
     [HttpPost]
-    public async Task<IActionResult> CreatePurchaseOrder([FromBody] PurchaseOrder purchaseOrder)
+    public async Task<IActionResult> CreatePurchaseOrder([FromBody] CreatePurchaseOrderRequest request)
     {
         try
         {
@@ -322,12 +322,12 @@ public class ProjectController : Controller
                 return Json(new { success = false, message = $"Invalid purchase order data: {string.Join(", ", errors)}" });
             }
 
-            var createdPurchaseOrder = await _purchaseOrderService.CreatePurchaseOrderAsync(purchaseOrder);
+            var createdPurchaseOrder = await _purchaseOrderService.CreatePurchaseOrderAsync(request.PurchaseOrder, request.TaskBlockId);
             return Json(new { success = true, purchaseOrder = createdPurchaseOrder });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error creating purchase order for project {ProjectId}", purchaseOrder.ProjectId);
+            _logger.LogError(ex, "Error creating purchase order for project {ProjectId}", request.PurchaseOrder.ProjectId);
             return Json(new { success = false, message = "Error creating purchase order" });
         }
     }
@@ -378,7 +378,7 @@ public class ProjectController : Controller
     }
 
     [HttpPost]
-    public async Task<IActionResult> CreateCustomWorkOrder([FromBody] CustomWorkOrder customWorkOrder)
+    public async Task<IActionResult> CreateCustomWorkOrder([FromBody] CreateCustomWorkOrderRequest request)
     {
         try
         {
@@ -389,12 +389,12 @@ public class ProjectController : Controller
                 return Json(new { success = false, message = $"Invalid custom work order data: {string.Join(", ", errors)}" });
             }
 
-            var createdCustomWorkOrder = await _customWorkOrderService.CreateCustomWorkOrderAsync(customWorkOrder);
+            var createdCustomWorkOrder = await _customWorkOrderService.CreateCustomWorkOrderAsync(request.CustomWorkOrder, request.TaskBlockId);
             return Json(new { success = true, customWorkOrder = createdCustomWorkOrder });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error creating custom work order for project {ProjectId}", customWorkOrder.ProjectId);
+            _logger.LogError(ex, "Error creating custom work order for project {ProjectId}", request.CustomWorkOrder.ProjectId);
             return Json(new { success = false, message = "Error creating custom work order" });
         }
     }
@@ -792,6 +792,18 @@ public class ProjectController : Controller
     {
         public string EventId { get; set; } = string.Empty;
         public string? Description { get; set; }
+    }
+
+    public class CreateCustomWorkOrderRequest
+    {
+        public CustomWorkOrder CustomWorkOrder { get; set; } = new();
+        public string? TaskBlockId { get; set; }
+    }
+
+    public class CreatePurchaseOrderRequest
+    {
+        public PurchaseOrder PurchaseOrder { get; set; } = new();
+        public string? TaskBlockId { get; set; }
     }
 
 }
