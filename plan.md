@@ -1,186 +1,149 @@
 # Project Module UI/UX Improvement Plan
 
-## Core UX/UI Principles from User Vision
-
-**Hierarchical Action Architecture**: Timeline manages blocks, blocks manage components. This creates clear contextual boundaries where users know exactly what level they're operating at - timeline-level actions (creating blocks) vs block-level actions (adding components).
-
-**Generic-to-Specialized Evolution**: Start with one flexible block template that can handle any content, then observe real usage patterns to identify which combinations of components are used together. This user-driven approach lets specialized block templates (like Materials Schedule tables) emerge naturally from actual workflows rather than assumptions.
-
-**Contextual Component Authoring**: Instead of global "add anything anywhere" buttons, component creation is scoped to specific blocks. This reduces cognitive load and makes the relationship between components and their containers explicit in the interface.
-
-**Compact, Meaningful Controls**: Shrink button sizes to accommodate full functionality without overwhelming the interface. Every block gets all component options initially, but in a visually manageable way that prepares for future template-specific button sets.
-
-**Visual Consistency & Self-Training**: 
-- Nested and top-level blocks use identical styling to reinforce they're the same entity type
-- Button icons match their corresponding timeline component icons for intuitive self-training  
-- Each component type has a unique, distinguishable icon (no +PO/+WO confusion)
-- Use precise terminology: blocks are represented by cube icons, not folders
+**Hierarchical Action Architecture**: Timeline manages blocks, blocks manage components. 
 
 **Proven Recursive Architecture**: Current nested TaskBlock implementation works excellently with smooth drag-and-drop. Keep the self-referencing model and recursive rendering - just enhance the authoring UI.
 
 ---
 
-## Phase 1: Code Organization ✅ **COMPLETED**
-All JavaScript modularization and API consolidation is complete and pushed.
+## Phase 1: Code Organization **COMPLETED**
+## Phase 2: Timeline UI Restructure **COMPLETED**
+## Phase 3: Block Management Enhancement **COMPLETED**
 
----
+## Phase 4: Event Display Redesign
 
-## Phase 2: Timeline UI Restructure (NEW PRIORITY)
+### Event Layout Changes
 
-#### 2.1: Move Component Buttons to Block Headers
-**Target Files:** Views/Shared/_ProjectDetails.cshtml, Views/Shared/_TaskBlockRecursive.cshtml
+**Attachment:**
+```
+📎 [Row 2] Benchmark Permit Plans 3.28.25.pdf (47.60 MB)    [X]
+    The text content of the entity would go here.
+    2025-04-07 20:11 by steven@eurotexmfg.com
+```
 
-**Current State:** All component buttons (Upload File, Add PO, Add WO, Custom, Comment) are in Timeline header
-**New State:** Move these buttons into each block header as compact, icon-focused controls
+**Comment:**
+```
+💬 [Row 5] Project kickoff meeting notes                     [X]
+    Discussed timeline, deliverables, and budget concerns.
+    Need to follow up with vendor on materials.
+    2025-04-08 14:30 by project.manager@company.com
+```
 
-**Implementation:**
-- Remove large button group from Timeline header (lines 106-125 in _ProjectDetails.cshtml)
-- Add compact button toolbar to each TaskBlock header in _TaskBlockRecursive.cshtml
-- Use consistent icons: 📎Upload 🏪PO ⚙️WO ✏️Custom 💬Comment 🧊Add Nested Block
-- Scope button actions to the specific block context
-- Icons must match corresponding timeline component icons for self-training
+**Purchase Order:**
+```
+🛒 PO #12345 - Acme Supply Co. ($4,500.00)                  [X]
+    Hardware and fasteners for assembly
+    Expected delivery: 2025-04-15
+    2025-04-07 09:15 by purchasing@company.com
+```
 
-#### 2.2: Simplify Timeline Header
-**Target Files:** Views/Shared/_ProjectDetails.cshtml
+**Work Order:**
+```
+⚙️ WO #5678 - CNC Cutting Operation                         [X]
+    Cut panels per specification sheet
+    Priority: High | Due: 2025-04-10
+    2025-04-06 11:00 by shop.floor@company.com
+```
 
-**New Timeline Header Contents:**
-- Block management: "🧊 New Block" button (primary action)
-- View controls: collapse/expand all, view density toggles
-- Timeline title with event count
-- Clean, minimal interface focused on block-level operations
+**Custom Work Order:**
+```
+✏️ Installation Phase 1                                      [X]
+    Site preparation and foundation work
+    Assigned to: Field Team A
+    2025-04-05 08:00 by field.supervisor@company.com
+```
 
-#### 2.3: Enhance Block Headers with Nested Block Support
-**Target Files:** Views/Shared/_TaskBlockRecursive.cshtml, wwwroot/css/site.css
+- Remove text badges (attachment, comment, etc.) - use icons only
+- Move event type icon to leftmost position 
+- Place primary content (filename/title) on same line as icon
+- Indent all secondary content (descriptions, dates, metadata)
+- Add consistent delete button on every event
+- Event icons double as drag handles (remove separate drag handle)
+- TaskBlock cube icons also act as drag handles (consistency)
 
-**Block Header Components:**
-- 🧊 Block icon with block name/title (editable inline)
-- Compact component buttons: 📎Upload 🏪PO ⚙️WO ✏️Custom 💬Comment
-- **NEW**: 🧊Add Nested Block (automatically sets ParentTaskBlockId)
-- Block controls: edit, delete, collapse/expand, unnest (if nested)
-- Drag handle for reordering
-- Event count badge
+### Delete Functionality Requirements
+- Every event must have a delete button
+- Deletes must cascade properly (e.g., attachment deletion removes both event AND file)
+- Confirm before destructive actions
+- Handle all event types: attachments, comments, POs, WOs, custom WOs
+- Clean up any orphaned relationships
 
-**Visual Design:**
-- All component buttons available in each block (generic template approach)
-- Nested blocks use identical styling to top-level blocks (unified entity appearance)
-- Cube icons reinforce correct "block" terminology
-- Icons with tooltips to save space
-- Consistent styling that prepares for future specialized block templates
+### Visual Hierarchy
+- Icon + Row badge + Primary content on top line
+- Secondary details indented below
+- Consistent spacing and alignment
+- Clear visual separation between events
+- Compact but readable layout
 
----
-
-## Phase 3: Block Management Enhancement
-
-#### 3.1: Improved Block Creation
-**Target Files:** wwwroot/js/timeline.js, Controllers/TimelineController.cs
-
-**Features:**
-- Quick block creation from Timeline header (top-level blocks)
-- Quick nested block creation from any block header (child blocks)
-- Inline block name editing
-- Block description support
-- Auto-focus on new block name field
-
-#### 3.2: Component-to-Block Context
-**Target Files:** wwwroot/js/timeline-*.js modules
-
-**Implementation:**
-- All component creation functions receive block context
-- Components are automatically assigned to their originating block
-- No more "unblocked" components by default
-- Drag-and-drop between blocks for reorganization
-
-#### 3.3: Block Template Foundation
-**Target Files:** Models/TaskBlock.cs, Services/TimelineService.cs
-
-**Prepare for Future:**
-- Add `BlockType` field to TaskBlock model
-- Start with "Generic" type only
-- Design extensible system for future specialized templates
-- Maintain backward compatibility
-
----
-
-## Phase 4: Visual Polish and Interaction
-
-#### 4.1: Icon System Consistency
-**Target Files:** wwwroot/css/site.css, all timeline views
-
-**Design Goals:**
-- Unique, distinguishable icons for each component type
-- Button icons exactly match timeline component icons
-- Cube icons for all block-related actions
-- Proper contrast and accessibility
-- Consistent icon sizing across all contexts
-
-#### 4.2: Block Visual Hierarchy
-**Target Files:** Views/Shared/_TaskBlockRecursive.cshtml, wwwroot/css/site.css
-
-**Enhancements:**
-- Clear visual separation between block header and content
-- Consistent nesting indicators (indentation only, no different styling)
-- Improved collapse/expand animations
-- Block type indicators (preparing for future templates)
-
-#### 4.3: Responsive Design
-**Target Files:** wwwroot/css/site.css
-
-**Mobile Optimization:**
-- Compact button handling on small screens
-- Touch-friendly drag handles
-- Collapsible block headers on mobile
-- Horizontal scroll for timeline if needed
-
----
-
-## Phase 5: Future Block Template System
-
-#### 5.1: Template Architecture
-**Target Files:** New block template system
-
-**Block Types to Implement Based on Usage Patterns:**
-- **Materials Schedule Block**: Table view with sortable columns
-- **Checklist Block**: Progress tracking with checkboxes
-- **Documentation Block**: File-focused with preview capabilities
-- **Communication Block**: Comment-focused with threading
-- **Milestone Block**: Date-focused with progress indicators
-
-#### 5.2: Template Selection
-**Features:**
-- Block type selector when creating new blocks
-- Template library for common workflows
-- Custom template creation and sharing
-- Migration from generic to specialized blocks
-
----
-
-## Implementation Strategy
-
-### **Start Here (Phase 2)**
-1. **Timeline Header Cleanup**: Remove component buttons, focus on block management
-2. **Block Header Enhancement**: Add compact component + nested block button groups
-3. **Contextual Actions**: Ensure all component creation is scoped to blocks
-4. **Icon Consistency**: Match button icons to timeline component icons
-
-### **Key Design Principles**
-- **Generic First**: All blocks have same capabilities initially
-- **Usage-Driven Templates**: Specialized blocks emerge from observed patterns
-- **Contextual Actions**: Components belong to blocks, blocks belong to timeline
-- **Visual Unity**: Same entity types look the same regardless of nesting
-- **Self-Training Interface**: Consistent icons teach interaction patterns
-- **Precise Terminology**: Cube icons for blocks, not folder icons
-
-### **Success Criteria**
-- [ ] No component buttons in Timeline header
-- [ ] All blocks have compact component + nested block button groups
-- [ ] Button icons match corresponding timeline component icons
-- [ ] Nested blocks visually identical to top-level blocks
-- [ ] Cube icons used consistently for all block-related actions
-- [ ] Block creation is streamlined and intuitive
-- [ ] Visual hierarchy clearly separates timeline → blocks → components
-- [ ] System is prepared for future block template specialization
 
 ### **Real-World Validation**
-Your sketch shows exactly what we're building toward - users like you are already creating meaningful block organization manually. This UI change will make that workflow much more intuitive and efficient.
+Your sketch shows exactly what we're building toward. sketch.jpg
 
-The "Initial Setup" and other named blocks you've created demonstrate the natural patterns that will inform our future template system. We're designing the interface to support the workflows you're already using.
+---
+
+## Phase 4 Implementation Details (Actionable)
+
+**Target Files**
+- Views: `src/ShopBoss.Web/Views/Shared/_Timeline.cshtml`, `src/ShopBoss.Web/Views/Shared/_TaskBlockRecursive.cshtml`
+- JS: `src/ShopBoss.Web/wwwroot/js/timeline.js`, `timeline-files.js`, `timeline-purchases.js`, `timeline-workorders.js`
+- CSS: `wwwroot/css/site.css` (move inline timeline styles here)
+
+**Drag Handles**
+- Event handle: use `.event-icon` (left icon) as the Sortable handle; remove `.event-drag-handle`.
+- Block handle: use `.block-icon` (cube) in TaskBlock headers as handle.
+- JS: update Sortable config to `handle: '.event-icon, .block-icon'` in `timeline.js`.
+
+**Delete Actions**
+- Use a single delegated action: `data-action="delete-event"`.
+- Required attributes by type:
+  - Attachment: `data-event-id`, `data-attachment-id`
+  - Purchase Order: `data-event-id`, `data-po-id`
+  - Work Order (association): `data-event-id`, `data-wo-id`
+  - Custom Work Order: `data-event-id`, `data-cwo-id`
+  - Comment: `data-event-id`
+- Router in `timeline.js` dispatches by presence of these data attributes to:
+  - Attachments → `Timeline.Files.deleteFile(attachmentId, projectId)`
+  - Purchase Orders → `Timeline.Purchases.deletePurchaseOrder(poId, projectId)`
+  - Work Orders → `Timeline.WorkOrders.detachWorkOrder(woId, projectId)`
+  - Custom Work Orders → `Timeline.WorkOrders.deleteCustomWorkOrder(cwoId, projectId)`
+  - Comments → `deleteComment(eventId)` (new helper)
+
+**Comment Delete Endpoint**
+- Add `POST /Project/DeleteComment` (or `DeleteEvent`) to `ProjectController`:
+  - Input: `{ eventId: string }`
+  - Effect: deletes the comment event; no orphaned references
+  - Return: `{ success: bool, message?: string }`
+- Add service method to remove the event safely and persist.
+- Client: `apiPostJson('/Project/DeleteComment', { eventId })` with confirm.
+
+**Row Badge Policy**
+- Show `Row N` only when available (e.g., attachments with `RowNumber`).
+- Do not synthesize row numbers for POs/WO/Comments; omit badge when not present.
+
+**CSS Consolidation**
+- Move event and block styles from `_Timeline.cshtml` into `site.css` under a `/* Timeline */` section.
+- Add utility classes:
+  - `.event-icon { cursor: grab; margin-right: 6px; }`
+  - `.block-icon { cursor: grab; }`
+  - `.event-primary { display: flex; align-items: center; }`
+  - `.event-secondary { margin-left: 22px; }`  // aligns under primary text
+  - `.row-badge { margin-left: 6px; }`
+
+**Action Checklist**
+- Update markup in `_Timeline.cshtml` and `_TaskBlockRecursive.cshtml`:
+  - Icon-first line: icon `.event-icon` + optional row badge + primary text + delete button (`data-action="delete-event"`).
+  - Secondary text indented below with `.event-secondary`.
+  - Replace separate drag handles with the icon itself.
+- Update `timeline.js`:
+  - Sortable `handle: '.event-icon, .block-icon'` and keep mixed ordering.
+  - Add delegated `delete-event` handler; read data-ids; dispatch to the correct module/API.
+  - Add `deleteComment(eventId)` helper using `apiPostJson`.
+- Implement `ProjectController.DeleteComment` and service method.
+- Move styles to `site.css`, remove inline `<style>` block from `_Timeline.cshtml`.
+
+**Acceptance Criteria**
+- Dragging by icon works for all events (root and in blocks) and for TaskBlocks.
+- Every event shows a delete button that confirms and deletes the correct entity (attachments delete file + event; WOs detach).
+- Comments can be deleted via API; no orphaned relationships remain.
+- Event first line: icon + primary text; secondary details indented; badges only when data exists.
+- No inline JS; all actions use `data-action` delegation.

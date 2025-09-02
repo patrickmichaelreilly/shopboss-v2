@@ -391,6 +391,46 @@ if (!window.__globalActionDelegationInitialized) {
             case 'save-attachment-comment':
                 if (typeof saveAttachmentComment === 'function') saveAttachmentComment(projectId);
                 break;
+            case 'delete-event': {
+                const eventId = el.getAttribute('data-event-id');
+                const attachmentId = el.getAttribute('data-attachment-id');
+                const poId = el.getAttribute('data-po-id');
+                const woId = el.getAttribute('data-wo-id');
+                const cwoId = el.getAttribute('data-cwo-id');
+                if (!eventId) return;
+
+                if (!confirm('Are you sure you want to delete this item?')) return;
+
+                // Dispatch by available identifiers
+                if (attachmentId && window.Timeline?.Files?.deleteFile) {
+                    Timeline.Files.deleteFile(attachmentId, projectId);
+                    break;
+                }
+                if (poId && window.Timeline?.Purchases?.deletePurchaseOrder) {
+                    Timeline.Purchases.deletePurchaseOrder(poId, projectId);
+                    break;
+                }
+                if (cwoId && window.Timeline?.WorkOrders?.deleteCustomWorkOrder) {
+                    Timeline.WorkOrders.deleteCustomWorkOrder(cwoId, projectId);
+                    break;
+                }
+                if (woId && window.Timeline?.WorkOrders?.detachWorkOrder) {
+                    Timeline.WorkOrders.detachWorkOrder(woId, projectId);
+                    break;
+                }
+                // Default: treat as comment delete
+                deleteComment(eventId)
+                    .then((ok) => {
+                        if (ok) {
+                            showNotification('Deleted successfully', 'success');
+                            loadTimelineForProject(projectId);
+                        } else {
+                            showNotification('Error deleting item', 'error');
+                        }
+                    })
+                    .catch(() => showNotification('Network error occurred', 'error'));
+                break;
+            }
             default:
                 break;
         }
@@ -420,6 +460,12 @@ function updateEventDescription(eventId, description) {
         eventId: eventId,
         description: description
     }).then(res => !!res.success).catch(() => false);
+}
+
+// Helper to delete a comment event
+function deleteComment(eventId) {
+    return apiPostJson('/Project/DeleteComment', { eventId })
+        .then(res => !!res.success);
 }
 
 // Initialize drag-drop functionality for timeline reordering
@@ -454,7 +500,7 @@ function initializeTaskBlockReordering(projectId) {
 function initializeSortableContainer(container, projectId) {
     new Sortable(container, {
         draggable: '.task-block, .timeline-event', // Include all timeline events, not just unblocked ones
-        handle: '.block-drag-handle, .event-drag-handle',
+        handle: '.block-icon, .event-icon',
         ghostClass: 'sortable-ghost',
         chosenClass: 'sortable-chosen',
         dragClass: 'sortable-drag',

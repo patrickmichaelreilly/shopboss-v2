@@ -9,16 +9,23 @@
 <div class="task-block mb-2 @indentClass" data-block-id="@Model.Id" data-nesting-level="@nestingLevel">
     <div class="task-block-header d-flex justify-content-between align-items-center p-2 bg-light border rounded">
         <div class="d-flex align-items-center">
-            <i class="fas fa-grip-vertical block-drag-handle me-2 text-muted" style="cursor: grab;" title="Drag to reorder blocks"></i>
-            <div class="d-flex align-items-center" 
+            <div class="chevron-col d-flex align-items-center" 
                  data-bs-toggle="collapse" 
                  data-bs-target="#collapse-@Model.Id" 
                  role="button"
                  style="cursor: pointer;"
                  aria-expanded="true" 
                  aria-controls="collapse-@Model.Id">
-                <i class="fas fa-chevron-down collapse-icon me-2 text-muted transition-transform" title="Collapse/Expand block"></i>
-                <i class="@blockIcon me-2 text-primary"></i>
+                <i class="fas fa-chevron-down collapse-icon text-muted transition-transform" title="Collapse/Expand block"></i>
+            </div>
+            <div class="d-flex align-items-center"
+                 data-bs-toggle="collapse"
+                 data-bs-target="#collapse-@Model.Id"
+                 role="button"
+                 style="cursor: pointer;"
+                 aria-expanded="true"
+                 aria-controls="collapse-@Model.Id">
+                <i class="@blockIcon block-icon me-2 text-primary" title="Drag to reorder block"></i>
                 <h6 class="mb-0 fw-bold">@Model.Name</h6>
             </div>
             @if (!string.IsNullOrEmpty(Model.Description))
@@ -85,7 +92,7 @@
     
     <!-- Events and nested blocks within this block (unified container for mixed ordering) -->
     <div class="collapse show" id="collapse-@Model.Id">
-        <div class="task-block-content ms-3 mt-1" data-block-id="@Model.Id">
+        <div class="task-block-content mt-1" data-block-id="@Model.Id">
             @{
                 // Create a unified list of items (events and child blocks) for mixed ordering
                 var allItems = new List<object>();
@@ -113,56 +120,72 @@
                     var evt = (ShopBoss.Web.Models.ProjectEvent)((dynamic)item).Item;
                     <div class="timeline-event blocked-event" data-event-id="@evt.Id">
                         <div class="event-content">
-                            <div class="event-header d-flex justify-content-between align-items-center mb-1">
-                                <div class="event-metadata">
-                                    <i class="fas fa-grip-vertical event-drag-handle me-2 text-muted" style="cursor: grab; font-size: 0.8em;" title="Drag to reorder events"></i>
-                                    <span class="badge bg-@(evt.EventType == "comment" ? "info" : "secondary") me-1">@evt.EventType</span>
-                                    @if (evt.RowNumber.HasValue)
-                                    {
-                                        <span class="badge bg-primary me-1">Row @evt.RowNumber</span>
-                                    }
-                                    <small class="text-muted me-1">@evt.EventDate.ToString("yyyy-MM-dd HH:mm")</small>
-                                    <small class="text-muted">by @(evt.CreatedBy ?? "Unknown")</small>
-                                </div>
-                            </div>
                             <div class="event-description">
-                                @if (evt.EventType == "attachment" && evt.Attachment != null)
-                                {
-                                    <div class="d-flex align-items-start">
-                                        <div class="d-flex align-items-center me-3">
-                                            <i class="fas fa-paperclip me-1 text-muted"></i>
+                                <div class="event-primary d-flex align-items-center">
+                                    @if (evt.EventType == "attachment")
+                                    {
+                                        <i class="fas fa-paperclip event-icon text-muted" title="Attachment"></i>
+                                    }
+                                    else if (evt.EventType == "comment")
+                                    {
+                                        <i class="fas fa-comment event-icon text-muted" title="Comment"></i>
+                                    }
+                                    else if (evt.EventType == "purchase-order")
+                                    {
+                                        <i class="fas fa-shopping-cart event-icon text-muted" title="Purchase Order"></i>
+                                    }
+                                    else if (evt.EventType == "work-order")
+                                    {
+                                        <i class="fas fa-cog event-icon text-muted" title="Work Order"></i>
+                                    }
+                                    else
+                                    {
+                                        <i class="fas fa-clipboard-list event-icon text-muted" title="Event"></i>
+                                    }
+
+                                    <div>
+                                        @if (evt.EventType == "attachment" && evt.Attachment != null)
+                                        {
                                             <a href="/Project/DownloadFile/@evt.Attachment.Id" class="text-decoration-none" title="Download @evt.Attachment.FileName">
                                                 <strong>@evt.Attachment.OriginalFileName</strong>
                                             </a>
-                                            <small class="text-muted ms-2">
-                                                (@((evt.Attachment.FileSize / 1024.0 / 1024.0).ToString("F2")) MB)
-                                            </small>
-                                        </div>
-                                        @if (evt.Attachment.Category == "SmartSheet Import")
-                                        {
-                                            <div class="ms-auto">
-                                                <input type="text" class="form-control form-control-sm" 
-                                                       style="width: 200px; font-size: 0.8em;" 
-                                                       value="@evt.Description" 
-                                                       data-action="attachment-comment-input"
-                                                       data-event-id="@evt.Id"
-                                                       placeholder="Add comment..."
-                                                       title="Edit comment for this SmartSheet attachment">
-                                            </div>
+                                            @if (evt.RowNumber.HasValue)
+                                            {
+                                                <span class="badge bg-primary row-badge">Row @evt.RowNumber</span>
+                                            }
                                         }
+                                        else
+                                        {
+                                            <strong>@(String.IsNullOrEmpty(evt.Description) ? evt.EventType : evt.Description.Split('\n')[0])</strong>
+                                            @if (evt.RowNumber.HasValue)
+                                            {
+                                                <span class="badge bg-primary row-badge">Row @evt.RowNumber</span>
+                                            }
+                                        }
+
+                                        <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-2"
+                                                data-action="delete-event" data-project-id="@Model.ProjectId"
+                                                data-event-id="@evt.Id"
+                                                @(evt.Attachment != null ? $"data-attachment-id=\"{evt.Attachment.Id}\"" : "")
+                                                title="Delete">
+                                            <i class="fas fa-times"></i>
+                                        </button>
                                     </div>
-                                    
-                                    @if (!string.IsNullOrEmpty(evt.Description) && evt.Attachment.Category != "SmartSheet Import")
+                                </div>
+
+                                <div class="event-secondary text-muted small mt-1">
+                                    @if (evt.EventType == "attachment" && evt.Attachment != null)
                                     {
-                                        <div class="mt-1 text-muted small">@evt.Description</div>
+                                        <span>@((evt.Attachment.FileSize / 1024.0 / 1024.0).ToString("F2")) MB</span>
                                     }
-                                }
-                                else
-                                {
-                                    @evt.Description
-                                }
+                                    @if (!string.IsNullOrEmpty(evt.Description))
+                                    {
+                                        <div>@evt.Description</div>
+                                    }
+                                    <div>@evt.EventDate.ToString("yyyy-MM-dd HH:mm") by @(evt.CreatedBy ?? "Unknown")</div>
                             </div>
                         </div>
+                    </div>
                     </div>
                 }
                 else if (((dynamic)item).Type == "TaskBlock")

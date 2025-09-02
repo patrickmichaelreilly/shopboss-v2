@@ -276,6 +276,15 @@ public class ProjectController : Controller
         try
         {
             var success = await _attachmentService.DeleteAttachmentAsync(id);
+            if (!success)
+            {
+                // Fallback: if a ProjectEvent Id was provided instead of Attachment Id, resolve it
+                var evt = await _context.ProjectEvents.FindAsync(id);
+                if (evt?.AttachmentId != null)
+                {
+                    success = await _attachmentService.DeleteAttachmentAsync(evt.AttachmentId);
+                }
+            }
             if (success)
             {
                 return Json(new { success = true });
@@ -792,6 +801,43 @@ public class ProjectController : Controller
     {
         public string EventId { get; set; } = string.Empty;
         public string? Description { get; set; }
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> DeleteComment([FromBody] DeleteCommentRequest request)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(request.EventId))
+            {
+                return Json(new { success = false, message = "Event ID is required" });
+            }
+
+            var projectEvent = await _context.ProjectEvents.FindAsync(request.EventId);
+            if (projectEvent == null)
+            {
+                return Json(new { success = false, message = "Event not found" });
+            }
+
+            if (!string.Equals(projectEvent.EventType, "comment", StringComparison.OrdinalIgnoreCase))
+            {
+                return Json(new { success = false, message = "Unsupported event type for this endpoint" });
+            }
+
+            _context.ProjectEvents.Remove(projectEvent);
+            await _context.SaveChangesAsync();
+            return Json(new { success = true });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting comment event {EventId}", request.EventId);
+            return Json(new { success = false, message = "An error occurred while deleting the comment" });
+        }
+    }
+
+    public class DeleteCommentRequest
+    {
+        public string EventId { get; set; } = string.Empty;
     }
 
     public class CreateCustomWorkOrderRequest
