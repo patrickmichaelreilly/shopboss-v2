@@ -237,8 +237,7 @@ public class SmartSheetSyncService
             var createRequest = new
             {
                 name = $"ShopBoss - {project.ProjectName}",
-                fromId = long.Parse(templateSheetId),
-                include = new[] { "data", "attachments", "discussions", "cellLinks" }
+                fromId = long.Parse(templateSheetId)
             };
 
             var json = JsonSerializer.Serialize(createRequest);
