@@ -42,6 +42,9 @@ public class Project
     // SmartSheet integration fields
     public long? SmartSheetId { get; set; }
     
+    // SmartSheet linked project sheet ID (separate from imported sheet)
+    public long? SmartsheetSheetId { get; set; }
+    
     public DateTime? SmartSheetLastSync { get; set; }
     
     // Navigation properties
@@ -54,4 +57,6 @@ public class Project
     public List<CustomWorkOrder> CustomWorkOrders { get; set; } = new();
     
     public List<ProjectEvent> Events { get; set; } = new();
+    
+    public List<TaskBlock> TaskBlocks { get; set; } = new();
 }

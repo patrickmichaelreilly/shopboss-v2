@@ -30,11 +30,8 @@ Issues (for discussion)
 8) Naming consistency
 - Normalize user-facing text to “Smartsheet” (Phase 2 reintroduced “SmartSheet” in places).
 
-9) Remove unused Project Details view (prescription)
-- Delete `Views/Project/Details.cshtml` and remove the unused `ProjectController.Details(string id)` action. Verify no references to the route exist (links, JS). Timeline remains rendered via partials on the index.
-
-10) Service consolidation
+9) Service consolidation
 - Reuse SmartSheetService for auth/client setup (and future refresh), keep SyncService focused on mapping + payloads.
 
-11) Config
+10) Config
 - Use TemplateSheetId=2455059368464260 and WorkspaceId=6590163225732996 from config; no hardcoded defaults in code.

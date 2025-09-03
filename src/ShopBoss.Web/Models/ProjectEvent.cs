@@ -24,7 +24,10 @@ public class ProjectEvent
     public string? CreatedBy { get; set; }
     
     // SmartSheet row ID for synced events
-    public long? RowNumber { get; set; }
+    public long? SmartsheetRowId { get; set; }
+    
+    // Optional row number for events imported from SmartSheet (display only)
+    public int? RowNumber { get; set; }
     
     // Optional attachment reference for file/attachment events
     public string? AttachmentId { get; set; }

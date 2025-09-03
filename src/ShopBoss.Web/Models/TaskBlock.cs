@@ -37,6 +37,9 @@ public class TaskBlock
     // Block template type (for future specialization)
     public BlockType BlockType { get; set; } = BlockType.Generic;
     
+    // SmartSheet integration - row ID for this TaskBlock in linked sheet
+    public long? SmartsheetRowId { get; set; }
+    
     // Navigation properties
     public Project Project { get; set; } = null!;
     public TaskBlock? ParentTaskBlock { get; set; }

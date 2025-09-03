@@ -32,6 +32,7 @@ public class SmartSheetSyncService
         {
             var project = await _context.Projects
                 .Include(p => p.Events)
+                .Include(p => p.TaskBlocks)
                 .FirstOrDefaultAsync(p => p.Id == projectId);
 
             if (project == null)
@@ -42,17 +43,40 @@ public class SmartSheetSyncService
             if (sheetId == null)
                 return SmartSheetSyncResult.CreateError("Failed to create/access SmartSheet");
 
-            // Sync events to SmartSheet
+            // First, sync TaskBlocks as parent rows
+            int blocksCreated = 0, blocksUpdated = 0;
+            foreach (var taskBlock in project.TaskBlocks.OrderBy(b => b.DisplayOrder))
+            {
+                if (taskBlock.SmartsheetRowId == null)
+                {
+                    // Create new parent row for TaskBlock
+                    var rowId = await CreateTaskBlockRowAsync(sheetId.Value, taskBlock, accessToken);
+                    if (rowId != null)
+                    {
+                        taskBlock.SmartsheetRowId = rowId;
+                        blocksCreated++;
+                    }
+                }
+                else
+                {
+                    // Update existing TaskBlock row
+                    var success = await UpdateTaskBlockRowAsync(sheetId.Value, taskBlock, accessToken);
+                    if (success) blocksUpdated++;
+                }
+            }
+
+            // Then, sync events to SmartSheet
             int created = 0, updated = 0;
             foreach (var eventItem in project.Events.OrderBy(e => e.EventDate))
             {
-                if (eventItem.RowNumber == null)
+                if (eventItem.SmartsheetRowId == null)
                 {
-                    // Create new row
-                    var rowId = await CreateRowAsync(sheetId.Value, eventItem, accessToken);
+                    // Create new row - check if it belongs to a TaskBlock for parentId
+                    var parentRowId = GetParentRowIdForEvent(eventItem, project.TaskBlocks);
+                    var rowId = await CreateRowAsync(sheetId.Value, eventItem, parentRowId, accessToken);
                     if (rowId != null)
                     {
-                        eventItem.RowNumber = rowId;
+                        eventItem.SmartsheetRowId = rowId;
                         created++;
                     }
                 }
@@ -82,9 +106,25 @@ public class SmartSheetSyncService
     {
         try
         {
-            // For now, create a new sheet each time
-            // TODO: Store sheet ID on Project model for reuse
-            return await CreateProjectSheetAsync(project, accessToken);
+            // Check if project already has a linked sheet
+            if (project.SmartsheetSheetId.HasValue)
+            {
+                _logger.LogInformation("Using existing SmartSheet {SheetId} for project {ProjectId}", 
+                    project.SmartsheetSheetId, project.Id);
+                return project.SmartsheetSheetId.Value;
+            }
+
+            // Create new sheet and store ID
+            var sheetId = await CreateProjectSheetAsync(project, accessToken);
+            if (sheetId.HasValue)
+            {
+                project.SmartsheetSheetId = sheetId.Value;
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Created and linked new SmartSheet {SheetId} for project {ProjectId}", 
+                    sheetId.Value, project.Id);
+            }
+            
+            return sheetId;
         }
         catch (Exception ex)
         {
@@ -139,7 +179,78 @@ public class SmartSheetSyncService
         }
     }
 
-    private async Task<long?> CreateRowAsync(long sheetId, ProjectEvent eventItem, string accessToken)
+    private async Task<long?> CreateTaskBlockRowAsync(long sheetId, TaskBlock taskBlock, string accessToken)
+    {
+        try
+        {
+            _httpClient.DefaultRequestHeaders.Clear();
+            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+            var row = TransformTaskBlockToRow(taskBlock);
+            var addRowsRequest = new { toBottom = true, rows = new[] { row } };
+
+            var json = JsonSerializer.Serialize(addRowsRequest);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            var response = await _httpClient.PostAsync($"https://api.smartsheet.com/2.0/sheets/{sheetId}/rows", content);
+            var responseContent = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                var result = JsonSerializer.Deserialize<SmartSheetRowResponse>(responseContent);
+                return result?.Result?.FirstOrDefault()?.Id;
+            }
+            else
+            {
+                _logger.LogError("Failed to create SmartSheet TaskBlock row: {StatusCode} - {Content}", 
+                    response.StatusCode, responseContent);
+                return null;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating SmartSheet TaskBlock row for block {BlockId}", taskBlock.Id);
+            return null;
+        }
+    }
+
+    private async Task<bool> UpdateTaskBlockRowAsync(long sheetId, TaskBlock taskBlock, string accessToken)
+    {
+        try
+        {
+            _httpClient.DefaultRequestHeaders.Clear();
+            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+            var row = TransformTaskBlockToRow(taskBlock);
+            row.Id = taskBlock.SmartsheetRowId!.Value; // Set the row ID for update
+
+            var updateRowsRequest = new { rows = new[] { row } };
+
+            var json = JsonSerializer.Serialize(updateRowsRequest);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            var response = await _httpClient.PutAsync($"https://api.smartsheet.com/2.0/sheets/{sheetId}/rows", content);
+
+            if (response.IsSuccessStatusCode)
+            {
+                return true;
+            }
+            else
+            {
+                var responseContent = await response.Content.ReadAsStringAsync();
+                _logger.LogError("Failed to update SmartSheet TaskBlock row: {StatusCode} - {Content}", 
+                    response.StatusCode, responseContent);
+                return false;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating SmartSheet TaskBlock row for block {BlockId}", taskBlock.Id);
+            return false;
+        }
+    }
+
+    private async Task<long?> CreateRowAsync(long sheetId, ProjectEvent eventItem, long? parentRowId, string accessToken)
     {
         try
         {
@@ -147,6 +258,10 @@ public class SmartSheetSyncService
             _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
             var row = TransformEventToRow(eventItem);
+            if (parentRowId.HasValue)
+            {
+                row.ParentId = parentRowId.Value;
+            }
             var addRowsRequest = new { toBottom = true, rows = new[] { row } };
 
             var json = JsonSerializer.Serialize(addRowsRequest);
@@ -182,7 +297,7 @@ public class SmartSheetSyncService
             _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
             var row = TransformEventToRow(eventItem);
-            row.Id = eventItem.RowNumber!.Value; // Set the row ID for update
+            row.Id = eventItem.SmartsheetRowId!.Value; // Set the row ID for update
 
             var updateRowsRequest = new { rows = new[] { row } };
 
@@ -233,6 +348,32 @@ public class SmartSheetSyncService
         };
 
         return new SmartSheetRow { Cells = cells };
+    }
+
+    private SmartSheetRow TransformTaskBlockToRow(TaskBlock taskBlock)
+    {
+        // Column IDs from template sheet (2455059368464260)
+        const long TASK_NAME_COLUMN = 7794572675207044L; // "Task Name"
+        const long STATUS_COLUMN = 2165073140993924L; // "Status" 
+        const long SHOPBOSS_TYPE_COLUMN = 6524743708266372L; // "ShopBoss Type"
+
+        var cells = new List<SmartSheetCell>
+        {
+            new SmartSheetCell { ColumnId = TASK_NAME_COLUMN, Value = taskBlock.Name },
+            new SmartSheetCell { ColumnId = STATUS_COLUMN, Value = "Open" },
+            new SmartSheetCell { ColumnId = SHOPBOSS_TYPE_COLUMN, Value = "TaskBlock" }
+        };
+
+        return new SmartSheetRow { Cells = cells };
+    }
+
+    private long? GetParentRowIdForEvent(ProjectEvent eventItem, ICollection<TaskBlock> taskBlocks)
+    {
+        if (string.IsNullOrEmpty(eventItem.TaskBlockId))
+            return null;
+
+        var parentBlock = taskBlocks.FirstOrDefault(b => b.Id == eventItem.TaskBlockId);
+        return parentBlock?.SmartsheetRowId;
     }
 
     private string GetTaskName(ProjectEvent eventItem)
@@ -307,6 +448,7 @@ public class SmartSheetRowResult
 public class SmartSheetRow
 {
     public long? Id { get; set; }
+    public long? ParentId { get; set; }
     public List<SmartSheetCell> Cells { get; set; } = new();
 }
 
