@@ -1,0 +1,102 @@
+@model ShopBoss.Web.Models.ProjectEvent
+@{
+    var projectId = (string?)(ViewData["ProjectId"]) ?? Model.ProjectId;
+}
+
+@if (Model.EventType == "work_order" && Model.WorkOrder != null)
+{
+    <div class="event-primary d-flex align-items-center">
+        <i class="fas fa-cog event-icon text-muted" title="Work Order"></i>
+        <div>
+            <strong>@Model.Description</strong>
+            @if (Model.RowNumber.HasValue)
+            {
+                <span class="badge bg-primary row-badge">Row @Model.RowNumber</span>
+            }
+            <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-2"
+                    data-action="delete-event" data-project-id="@projectId"
+                    data-event-id="@Model.Id"
+                    @if (!string.IsNullOrEmpty(Model.WorkOrderId)) { <text>data-wo-id="@Model.WorkOrderId"</text> }
+                    title="Delete">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    </div>
+    <div class="event-secondary text-muted small mt-1">
+        @if (Model.WorkOrder.NestSheets.Any())
+        {
+            var totalSheets = Model.WorkOrder.NestSheets.Count;
+            var cutSheets = Model.WorkOrder.NestSheets.Count(ns => ns.Status >= PartStatus.Cut);
+            <div>@cutSheets / @totalSheets Nest Sheets Cut</div>
+        }
+        <div>@Model.EventDate.ToString("yyyy-MM-dd HH:mm") by @(Model.CreatedBy ?? "Unknown")</div>
+    </div>
+}
+else
+{
+    <div class="event-primary d-flex align-items-center">
+        @if (Model.EventType == "attachment")
+        {
+            <i class="fas fa-paperclip event-icon text-muted" title="Attachment"></i>
+        }
+        else if (Model.EventType == "comment")
+        {
+            <i class="fas fa-comment event-icon text-muted" title="Comment"></i>
+        }
+        else if (Model.EventType == "purchase-order")
+        {
+            <i class="fas fa-shopping-cart event-icon text-muted" title="Purchase Order"></i>
+        }
+        else if (Model.EventType == "work_order")
+        {
+            <i class="fas fa-cog event-icon text-muted" title="Work Order"></i>
+        }
+        else
+        {
+            <i class="fas fa-clipboard-list event-icon text-muted" title="Event"></i>
+        }
+
+        <div>
+            @if (Model.EventType == "attachment" && Model.Attachment != null)
+            {
+                <a href="/Project/DownloadFile/@Model.Attachment.Id" class="text-decoration-none" title="Download @Model.Attachment.FileName">
+                    <strong>@Model.Attachment.OriginalFileName</strong>
+                </a>
+                @if (Model.RowNumber.HasValue)
+                {
+                    <span class="badge bg-primary row-badge">Row @Model.RowNumber</span>
+                }
+            }
+            else
+            {
+                <strong>@(String.IsNullOrEmpty(Model.Description) ? Model.EventType : Model.Description.Split('\n')[0])</strong>
+                @if (Model.RowNumber.HasValue)
+                {
+                    <span class="badge bg-primary row-badge">Row @Model.RowNumber</span>
+                }
+            }
+
+            <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-2"
+                    data-action="delete-event" data-project-id="@projectId"
+                    data-event-id="@Model.Id"
+                    @if (Model.Attachment != null) { <text>data-attachment-id="@Model.Attachment.Id"</text>; }
+                    @if (Model.PurchaseOrderId != null) { <text>data-po-id="@Model.PurchaseOrderId"</text> }
+                    @if (Model.CustomWorkOrderId != null) { <text>data-cwo-id="@Model.CustomWorkOrderId"</text> }
+                    title="Delete">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    </div>
+
+    <div class="event-secondary text-muted small mt-1">
+        @if (Model.EventType == "attachment" && Model.Attachment != null)
+        {
+            <span>@((Model.Attachment.FileSize / 1024.0 / 1024.0).ToString("F2")) MB</span>
+        }
+        @if (!string.IsNullOrEmpty(Model.Description))
+        {
+            <div>@Model.Description</div>
+        }
+        <div>@Model.EventDate.ToString("yyyy-MM-dd HH:mm") by @(Model.CreatedBy ?? "Unknown")</div>
+    </div>
+}
