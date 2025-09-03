@@ -80,6 +80,65 @@ public class SmartSheetSyncController : ControllerBase
     }
 
     /// <summary>
+    /// Sync FROM Smartsheet - read sheet and update ShopBoss
+    /// </summary>
+    [HttpPost("sync-from/{projectId}")]
+    public async Task<IActionResult> SyncFromSmartsheet(string projectId)
+    {
+        try
+        {
+            // Validate SmartSheet authentication
+            var accessToken = HttpContext.Session.GetString("ss_token");
+            if (string.IsNullOrEmpty(accessToken))
+            {
+                return Ok(new { 
+                    success = false, 
+                    message = "Smartsheet authentication required. Please connect to Smartsheet first." 
+                });
+            }
+
+            // Check if token is expired
+            var expiresString = HttpContext.Session.GetString("ss_expires");
+            if (!string.IsNullOrEmpty(expiresString) && 
+                DateTime.TryParse(expiresString, out var expiresAt) &&
+                expiresAt <= DateTime.UtcNow)
+            {
+                return Ok(new { 
+                    success = false, 
+                    message = "Smartsheet token expired. Please re-authenticate." 
+                });
+            }
+
+            // Perform inbound sync
+            var result = await _syncService.SyncFromSmartsheetAsync(projectId, accessToken);
+
+            if (result.Success)
+            {
+                return Ok(new { 
+                    success = true, 
+                    message = $"Sync from Smartsheet completed: {result.Updated} updated",
+                    updated = result.Updated
+                });
+            }
+            else
+            {
+                return Ok(new { 
+                    success = false, 
+                    message = result.Message 
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error syncing from Smartsheet for project {ProjectId}", projectId);
+            return Ok(new { 
+                success = false, 
+                message = "An error occurred during sync from Smartsheet. Please try again." 
+            });
+        }
+    }
+
+    /// <summary>
     /// Get sync status for a project
     /// </summary>
     [HttpGet("status/{projectId}")]

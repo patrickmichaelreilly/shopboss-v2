@@ -102,6 +102,43 @@ public class SmartSheetSyncService
         }
     }
 
+    public async Task<SmartSheetSyncResult> SyncFromSmartsheetAsync(string projectId, string accessToken)
+    {
+        try
+        {
+            var project = await _context.Projects
+                .Include(p => p.Events)
+                .Include(p => p.TaskBlocks)
+                .FirstOrDefaultAsync(p => p.Id == projectId);
+
+            if (project == null)
+                return SmartSheetSyncResult.CreateError("Project not found");
+
+            if (!project.SmartsheetSheetId.HasValue)
+                return SmartSheetSyncResult.CreateError("Project has no linked Smartsheet. Use 'To Smartsheet' first.");
+
+            // Read rows from Smartsheet and update row numbers
+            var updated = await UpdateRowNumbersFromSheetAsync(project, accessToken);
+            
+            if (updated >= 0)
+            {
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Smartsheet inbound sync completed for project {ProjectId}: {Updated} updated", 
+                    projectId, updated);
+                return SmartSheetSyncResult.CreateSuccess(0, updated, project.SmartsheetSheetId.Value);
+            }
+            else
+            {
+                return SmartSheetSyncResult.CreateError("Failed to read from Smartsheet");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error syncing from Smartsheet for project {ProjectId}", projectId);
+            return SmartSheetSyncResult.CreateError($"Inbound sync failed: {ex.Message}");
+        }
+    }
+
     private async Task<long?> GetOrCreateProjectSheetAsync(Project project, string accessToken)
     {
         try
@@ -406,6 +443,87 @@ public class SmartSheetSyncService
 
         return string.Join(" | ", notes);
     }
+
+    private async Task<int> UpdateRowNumbersFromSheetAsync(Project project, string accessToken)
+    {
+        try
+        {
+            _httpClient.DefaultRequestHeaders.Clear();
+            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+            // Read all rows from the sheet
+            var response = await _httpClient.GetAsync($"https://api.smartsheet.com/2.0/sheets/{project.SmartsheetSheetId}");
+            var responseContent = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogError("Failed to read Smartsheet: {StatusCode} - {Content}", response.StatusCode, responseContent);
+                return -1;
+            }
+
+            var sheet = JsonSerializer.Deserialize<SmartSheetReadResponse>(responseContent, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+
+            if (sheet?.Rows == null)
+            {
+                _logger.LogWarning("No rows returned from Smartsheet");
+                return 0;
+            }
+
+            // Build a map of SmartsheetRowId -> RowNumber
+            var rowIdToRowNumber = new Dictionary<long, int>();
+            foreach (var row in sheet.Rows)
+            {
+                rowIdToRowNumber[row.Id] = row.RowNumber;
+            }
+
+            // Update RowNumber for all events and TaskBlocks with SmartsheetRowId
+            int updated = 0;
+            
+            foreach (var eventItem in project.Events.Where(e => e.SmartsheetRowId.HasValue))
+            {
+                if (rowIdToRowNumber.TryGetValue(eventItem.SmartsheetRowId.Value, out var rowNumber))
+                {
+                    if (eventItem.RowNumber != rowNumber)
+                    {
+                        eventItem.RowNumber = rowNumber;
+                        updated++;
+                    }
+                }
+            }
+
+            foreach (var taskBlock in project.TaskBlocks.Where(b => b.SmartsheetRowId.HasValue))
+            {
+                // TaskBlocks don't have RowNumber field, but we could add one if needed
+                // For now, just log that we found it
+                if (rowIdToRowNumber.TryGetValue(taskBlock.SmartsheetRowId.Value, out var rowNumber))
+                {
+                    _logger.LogDebug("TaskBlock {BlockName} is at row {RowNumber}", taskBlock.Name, rowNumber);
+                }
+            }
+
+            return updated;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error reading row numbers from Smartsheet");
+            return -1;
+        }
+    }
+}
+
+// Response models for reading sheet
+public class SmartSheetReadResponse
+{
+    public List<SmartSheetReadRow>? Rows { get; set; }
+}
+
+public class SmartSheetReadRow
+{
+    public long Id { get; set; }
+    public int RowNumber { get; set; }
 }
 
 // Response models for SmartSheet API

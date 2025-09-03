@@ -8,13 +8,15 @@ async function initializeSmartSheetSyncUI(projectId) {
         const data = await response.json();
         
         const syncBtn = document.getElementById(`smartsheet-sync-btn-${projectId}`);
+        const syncFromBtn = document.getElementById(`smartsheet-sync-from-btn-${projectId}`);
         const syncStatus = document.getElementById(`smartsheet-sync-status-${projectId}`);
         
         if (data.isAuthenticated && !data.isExpired) {
-            syncBtn.style.display = 'inline-block';
-            syncStatus.textContent = `Connected as ${data.userEmail}`;
+            if (syncBtn) syncBtn.style.display = 'inline-block';
+            if (syncFromBtn) syncFromBtn.style.display = 'inline-block';
+            if (syncStatus) syncStatus.textContent = '';
         } else {
-            syncStatus.textContent = 'Smartsheet not connected';
+            if (syncStatus) syncStatus.textContent = 'Smartsheet not connected';
         }
     } catch (error) {
         console.error('Error checking SmartSheet auth status:', error);
@@ -57,7 +59,47 @@ async function syncToSmartSheet(projectId) {
         status.className = 'text-danger small ms-2';
     } finally {
         btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-sync me-1"></i>Sync';
+        btn.innerHTML = '<i class="fas fa-upload me-1"></i>To Smartsheet';
+    }
+}
+
+async function syncFromSmartSheet(projectId) {
+    const btn = document.getElementById(`smartsheet-sync-from-btn-${projectId}`);
+    const status = document.getElementById(`smartsheet-sync-status-${projectId}`);
+    
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Syncing...';
+    status.textContent = 'Syncing from Smartsheet...';
+    
+    try {
+        const response = await fetch(`/api/smartsheet/sync-from/${projectId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            status.textContent = `Sync from Smartsheet completed: ${data.updated || 0} updated`;
+            status.className = 'text-success small ms-2';
+            
+            // Refresh timeline to show updated data
+            if (typeof loadTimelineForProject === 'function') {
+                loadTimelineForProject(projectId);
+            }
+        } else {
+            status.textContent = `Sync from Smartsheet failed: ${data.message}`;
+            status.className = 'text-danger small ms-2';
+        }
+    } catch (error) {
+        console.error('Error syncing from Smartsheet:', error);
+        status.textContent = 'Error during sync from Smartsheet. Please try again.';
+        status.className = 'text-danger small ms-2';
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-download me-1"></i>From Smartsheet';
     }
 }
 // Toggle project expansion
