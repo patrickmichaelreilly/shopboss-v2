@@ -1,28 +1,40 @@
-Issues
+Issues (for discussion)
 
-- Column IDs hardcoded: 
-    \\ User Comment: Do we need to ever have the Colum IDs or can we always just address columns by Name? That would be fine by me.
+1) Column targeting (prescription)
+- Resolve column IDs by Title per target sheet: on first use of a sheet, GET its columns, build a Title→Id map, and cache it in memory keyed by sheetId; use this map for all writes/updates. On 4xx invalid-column errors, refresh the map and retry once. Do not hardcode template column IDs.
 
-- Sheet not persisted: GetOrCreateProjectSheetAsync always creates a new sheet (TODO comment). This will create a new sheet on every sync.
-    - Fix: Store created sheet ID on Project.SmartSheetId and reuse. Respect provided workspace ID.
+2) Persist linked sheet per project (prescription)
+- Enforce 1:1 mapping: if `Project.SmartSheetId` is null, copy the template (2455059368464260) into workspace 6590163225732996, name it `ShopBoss - {ProjectName}`, store the new sheetId on the project, and reuse it for all subsequent syncs. Never write back to any source sheet used during migration.
 
-- Row mapping field misuse: ProjectEvent.RowNumber is now long? holding Smartsheet row IDs, but the rest of the codebase (imports, grouping, timeline badges) treats it as a row number (display order).
-    - Fix: Introduce a distinct RowId (long) for Smartsheet row IDs. Keep RowNumber (int?) only if you still display “Row N” from imports. Otherwise, rename for clarity and update usages.
+3) Row mapping and badges (prescription)
+- Model: Add `RowId` (long?) on ProjectEvent to store Smartsheet row ID. Keep `RowNumber` (int?) solely for UI display.
+- Outbound sync: Use `RowId` for updates; when creating new rows, set `RowId` from the API result. After batch writes, fetch the sheet once and build an `id→rowNumber` map; update `RowNumber` for affected events and save.
+- Inbound/refresh: On “Sync from Smartsheet” or timeline load, fetch rows and refresh `RowNumber` for all events with a `RowId` so badges stay accurate after moves/reorders.
+- UI: Badges render `RowNumber` if present; if null, omit the badge.
 
-- Hierarchy/indentation ignored: No parent rows for TaskBlocks, no parentId on child rows. This breaks the nesting requirement.
-    - Fix: Ensure parent TaskBlock rows exist; set parentId on event rows. Persist parent row IDs (e.g., on TaskBlock or a mapping table).
+4) Hierarchy and indentation (prescription)
+- Parent rows: Each TaskBlock corresponds to a parent Smartsheet row; all its events are children (indentation under that row).
+- Storage: Add `SmartsheetRowId` (long?) to TaskBlock to store the parent row ID (simple and fast; DB recreated so no migration concerns).
+- Outbound: Ensure/create parent row for each TaskBlock; update its title when the block name changes. For child events, set `parentId` to the TaskBlock’s `SmartsheetRowId` and batch create/update.
+- Inbound/refresh: Read sheet, rebuild `rowId → parentId` map, and verify TaskBlock parent rows still exist; optionally refresh event `RowNumber` as in item 3.
 
+5) Manual inbound sync (from Smartsheet)
+- Add second button and endpoint: read rows, match by RowId, update known events; summarize Unmapped rows (ignore in MVP).
 
-- Batching
-- Inbound path missing: Commit title says “bi-directional” but there’s no “Sync from Smartsheet”. MVP calls for two manual buttons (to/from) at the timeline.
-    - Add minimal “from” sync: Read sheet, diff by rowId (and optionally row version), map known rows to events, summarize unknown rows as Unmapped.
-- Token refresh: Controller returns “expired” without trying refresh. Optionally call your refresh endpoint, then proceed, to reduce friction.
+6) Batching and limits
+- Batch add/update rows (e.g., 200–400/request); add basic retry with backoff for 429/5xx.
 
-- Naming: New strings use “SmartSheet”. Standardize to “Smartsheet” (we already normalized elsewhere).
+7) Token refresh on sync
+- If expired, attempt refresh once then proceed; otherwise surface re‑auth message.
 
-- Changing ProjectEvent.RowNumber type to long? requires an EF migration. No migration included.
-    \\ User comment: No migration is required, there is no data, we will create the DB from scratch. Never do a migration. Ever.
+8) Naming consistency
+- Normalize user-facing text to “Smartsheet” (Phase 2 reintroduced “SmartSheet” in places).
 
-- Duplication: This service hand-rolls HTTP to Smartsheet while SmartSheetService uses the SDK and session handling. Consider centralizing auth/token refresh and client setup to SmartSheetService to avoid drift.
+9) Remove unused Project Details view (prescription)
+- Delete `Views/Project/Details.cshtml` and remove the unused `ProjectController.Details(string id)` action. Verify no references to the route exist (links, JS). Timeline remains rendered via partials on the index.
 
-- Config keys: Uses SmartSheet:TemplateSheetId and SmartSheet:WorkspaceId. Good. Ensure values are set; defaults match what you provided.
+10) Service consolidation
+- Reuse SmartSheetService for auth/client setup (and future refresh), keep SyncService focused on mapping + payloads.
+
+11) Config
+- Use TemplateSheetId=2455059368464260 and WorkspaceId=6590163225732996 from config; no hardcoded defaults in code.

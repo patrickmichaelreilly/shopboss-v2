@@ -56,26 +56,7 @@ public class ProjectController : Controller
         }
     }
 
-    public async Task<IActionResult> Details(string id)
-    {
-        try
-        {
-            var project = await _projectService.GetProjectByIdAsync(id);
-            if (project == null)
-            {
-                TempData["Error"] = "Project not found.";
-                return RedirectToAction(nameof(Index));
-            }
-
-            return View(project);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error loading project details for {ProjectId}", id);
-            TempData["Error"] = "Error loading project details. Please try again.";
-            return RedirectToAction(nameof(Index));
-        }
-    }
+    // Details view is deprecated; project details render via partials on index.
 
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] Project project)
