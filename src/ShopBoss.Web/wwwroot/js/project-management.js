@@ -14,7 +14,7 @@ async function initializeSmartSheetSyncUI(projectId) {
             syncBtn.style.display = 'inline-block';
             syncStatus.textContent = `Connected as ${data.userEmail}`;
         } else {
-            syncStatus.textContent = 'SmartSheet not connected';
+            syncStatus.textContent = 'Smartsheet not connected';
         }
     } catch (error) {
         console.error('Error checking SmartSheet auth status:', error);
@@ -27,7 +27,7 @@ async function syncToSmartSheet(projectId) {
     
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Syncing...';
-    status.textContent = 'Syncing events to SmartSheet...';
+    status.textContent = 'Syncing events to Smartsheet...';
     
     try {
         const response = await fetch(`/api/smartsheet/sync/${projectId}`, {

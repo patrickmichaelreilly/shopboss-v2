@@ -799,7 +799,7 @@ public class SmartSheetService
             if (sheetDetails.Attachments.Any())
             {
                 await SendProgressUpdate(importId, CalculateProgress(currentStep, totalSteps), $"Importing {sheetDetails.Attachments.Count} attachments...");
-                var userEmail = GetCurrentUserEmail() ?? "SmartSheet Migration";
+                var userEmail = GetCurrentUserEmail() ?? "Smartsheet Migration";
                 await ImportAttachmentsAsync(project.Id, sheetDetails.Attachments, userEmail);
             }
             else
@@ -887,10 +887,10 @@ public class SmartSheetService
                     attachment.Name,
                     fileBytes,
                     attachment.MimeType ?? "application/octet-stream",
-                    "SmartSheet Import",
-                    attachment.CreatedBy ?? "SmartSheet Import", // Use SmartSheet author, not import user
+                    "Smartsheet Import",
+                    attachment.CreatedBy ?? "Smartsheet Import", // Use Smartsheet author, not import user
                     attachment.CreatedAt,
-                    $"Imported from SmartSheet row {attachment.RowNumber}",
+                    $"Imported from Smartsheet row {attachment.RowNumber}",
                     attachment.RowNumber); // Pass the row number for auto-grouping
                 
                 // ProjectAttachmentService already creates timeline events, so no need to create manually

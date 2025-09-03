@@ -32,7 +32,7 @@ public class SmartSheetSyncController : ControllerBase
             {
                 return Ok(new { 
                     success = false, 
-                    message = "SmartSheet authentication required. Please connect to SmartSheet first." 
+                    message = "Smartsheet authentication required. Please connect to Smartsheet first." 
                 });
             }
 
@@ -44,7 +44,7 @@ public class SmartSheetSyncController : ControllerBase
             {
                 return Ok(new { 
                     success = false, 
-                    message = "SmartSheet token expired. Please re-authenticate." 
+                    message = "Smartsheet token expired. Please re-authenticate." 
                 });
             }
 
