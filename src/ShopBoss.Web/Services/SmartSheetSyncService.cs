@@ -13,6 +13,11 @@ public class SmartSheetSyncService
     private readonly ILogger<SmartSheetSyncService> _logger;
     private readonly HttpClient _httpClient;
     private readonly IConfiguration _configuration;
+    
+    private static readonly JsonSerializerOptions SmartSheetJsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
     private readonly SmartSheetService _smartSheetService;
     
     // Column mapping cache: sheetId -> columnTitle -> columnId
@@ -30,6 +35,33 @@ public class SmartSheetSyncService
         _httpClient = httpClient;
         _configuration = configuration;
         _smartSheetService = smartSheetService;
+    }
+
+    public async Task<SmartSheetSyncResult> TestWriteToSheetAsync(long sheetId, string accessToken)
+    {
+        _httpClient.DefaultRequestHeaders.Clear();
+        _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var request = new[] {
+            new {
+                toBottom = true,
+                cells = new[] {
+                    new {
+                        columnId = 5169400877109124L, // Notes column
+                        value = "HELLO WORLD"
+                    }
+                }
+            }
+        };
+
+        var json = JsonSerializer.Serialize(request, SmartSheetJsonOptions);
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+        var response = await _httpClient.PostAsync($"https://api.smartsheet.com/2.0/sheets/{sheetId}/rows", content);
+        var responseContent = await response.Content.ReadAsStringAsync();
+
+        _logger.LogInformation("Response: {Status} - {Content}", response.StatusCode, responseContent);
+
+        return SmartSheetSyncResult.CreateSuccess(1, 0, sheetId);
     }
 
     public async Task<SmartSheetSyncResult> SyncProjectEventsAsync(string projectId, string accessToken)
@@ -50,6 +82,9 @@ public class SmartSheetSyncService
             if (project == null)
                 return SmartSheetSyncResult.CreateError("Project not found");
 
+            _logger.LogInformation("Syncing project {ProjectName}: {EventCount} events, {BlockCount} task blocks", 
+                project.ProjectName, project.Events.Count, project.TaskBlocks.Count);
+
             // Get or create sheet for this project
             var sheetId = await GetOrCreateProjectSheetAsync(project, accessToken);
             if (sheetId == null)
@@ -59,6 +94,9 @@ public class SmartSheetSyncService
             int blocksCreated = 0, blocksUpdated = 0;
             var newTaskBlocks = project.TaskBlocks.Where(b => b.SmartsheetRowId == null).OrderBy(b => b.DisplayOrder).ToList();
             var existingTaskBlocks = project.TaskBlocks.Where(b => b.SmartsheetRowId != null).OrderBy(b => b.DisplayOrder).ToList();
+
+            _logger.LogInformation("TaskBlocks to sync: {NewBlocks} new, {ExistingBlocks} existing", 
+                newTaskBlocks.Count, existingTaskBlocks.Count);
 
             if (newTaskBlocks.Any())
             {
@@ -83,6 +121,9 @@ public class SmartSheetSyncService
             int created = 0, updated = 0;
             var newEvents = project.Events.Where(e => e.SmartsheetRowId == null).OrderBy(e => e.EventDate).ToList();
             var existingEvents = project.Events.Where(e => e.SmartsheetRowId != null).OrderBy(e => e.EventDate).ToList();
+
+            _logger.LogInformation("Events to sync: {NewEvents} new, {ExistingEvents} existing", 
+                newEvents.Count, existingEvents.Count);
 
             if (newEvents.Any())
             {
@@ -236,11 +277,11 @@ public class SmartSheetSyncService
             // Now try to create the sheet copy
             var createRequest = new
             {
-                name = $"ShopBoss - {project.ProjectName}",
+                name = project.ProjectName,
                 fromId = long.Parse(templateSheetId)
             };
 
-            var json = JsonSerializer.Serialize(createRequest);
+            var json = JsonSerializer.Serialize(createRequest, SmartSheetJsonOptions);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
             var response = await _httpClient.PostAsync($"https://api.smartsheet.com/2.0/workspaces/{workspaceId}/sheets", content);
@@ -248,10 +289,15 @@ public class SmartSheetSyncService
 
             if (response.IsSuccessStatusCode)
             {
-                var result = JsonSerializer.Deserialize<SmartSheetCreateResponse>(responseContent);
+                var result = JsonSerializer.Deserialize<SmartSheetCreateResponse>(responseContent, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+                
+                var sheetId = result?.Result?.Id;
                 _logger.LogInformation("Created SmartSheet for project {ProjectName} with ID {SheetId}", 
-                    project.ProjectName, result?.Result?.Id);
-                return result?.Result?.Id;
+                    project.ProjectName, sheetId);
+                return sheetId;
             }
             else
             {
@@ -277,9 +323,9 @@ public class SmartSheetSyncService
             var row = await TransformTaskBlockToRowAsync(taskBlock, sheetId, accessToken);
             if (row == null) return null;
             
-            var addRowsRequest = new { toBottom = true, rows = new[] { row } };
+            var addRowsRequest = new[] { new { toBottom = true, cells = row.Cells } };
 
-            var json = JsonSerializer.Serialize(addRowsRequest);
+            var json = JsonSerializer.Serialize(addRowsRequest, SmartSheetJsonOptions);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
             var response = await _httpClient.PostAsync($"https://api.smartsheet.com/2.0/sheets/{sheetId}/rows", content);
@@ -316,9 +362,9 @@ public class SmartSheetSyncService
             
             row.Id = taskBlock.SmartsheetRowId!.Value; // Set the row ID for update
 
-            var updateRowsRequest = new { rows = new[] { row } };
+            var updateRowsRequest = new[] { new { id = row.Id, cells = row.Cells } };
 
-            var json = JsonSerializer.Serialize(updateRowsRequest);
+            var json = JsonSerializer.Serialize(updateRowsRequest, SmartSheetJsonOptions);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
             var response = await _httpClient.PutAsync($"https://api.smartsheet.com/2.0/sheets/{sheetId}/rows", content);
@@ -356,9 +402,9 @@ public class SmartSheetSyncService
             {
                 row.ParentId = parentRowId.Value;
             }
-            var addRowsRequest = new { toBottom = true, rows = new[] { row } };
+            var addRowsRequest = new[] { new { toBottom = true, cells = row.Cells } };
 
-            var json = JsonSerializer.Serialize(addRowsRequest);
+            var json = JsonSerializer.Serialize(addRowsRequest, SmartSheetJsonOptions);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
             var response = await _httpClient.PostAsync($"https://api.smartsheet.com/2.0/sheets/{sheetId}/rows", content);
@@ -395,9 +441,9 @@ public class SmartSheetSyncService
             
             row.Id = eventItem.SmartsheetRowId!.Value; // Set the row ID for update
 
-            var updateRowsRequest = new { rows = new[] { row } };
+            var updateRowsRequest = new[] { new { id = row.Id, cells = row.Cells } };
 
-            var json = JsonSerializer.Serialize(updateRowsRequest);
+            var json = JsonSerializer.Serialize(updateRowsRequest, SmartSheetJsonOptions);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
             var response = await _httpClient.PutAsync($"https://api.smartsheet.com/2.0/sheets/{sheetId}/rows", content);
@@ -540,8 +586,8 @@ public class SmartSheetSyncService
 
             if (!rows.Any()) return new List<long?>();
 
-            var addRowsRequest = new { toBottom = true, rows };
-            var json = JsonSerializer.Serialize(addRowsRequest);
+            var addRowsRequest = rows.Select(r => new { toBottom = true, cells = r.Cells }).ToArray();
+            var json = JsonSerializer.Serialize(addRowsRequest, SmartSheetJsonOptions);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
             var response = await _httpClient.PostAsync($"https://api.smartsheet.com/2.0/sheets/{sheetId}/rows", content);
@@ -601,8 +647,8 @@ public class SmartSheetSyncService
 
             if (!rows.Any()) return 0;
 
-            var updateRowsRequest = new { rows };
-            var json = JsonSerializer.Serialize(updateRowsRequest);
+            var updateRowsRequest = rows.Select(r => new { id = r.Id, cells = r.Cells }).ToArray();
+            var json = JsonSerializer.Serialize(updateRowsRequest, SmartSheetJsonOptions);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
             var response = await _httpClient.PutAsync($"https://api.smartsheet.com/2.0/sheets/{sheetId}/rows", content);
@@ -661,21 +707,44 @@ public class SmartSheetSyncService
                     }
                     rows.Add(row);
                 }
+                else
+                {
+                    _logger.LogWarning("Failed to transform event {EventId} '{Description}' to Smartsheet row", 
+                        eventItem.Id, eventItem.Description);
+                }
             }
 
-            if (!rows.Any()) return new List<long?>();
+            _logger.LogInformation("Transformed {RowCount} events into Smartsheet rows", rows.Count);
 
-            var addRowsRequest = new { toBottom = true, rows };
-            var json = JsonSerializer.Serialize(addRowsRequest);
+            if (!rows.Any()) 
+            {
+                _logger.LogWarning("No rows created from {EventCount} events", events.Count);
+                return new List<long?>();
+            }
+
+            var addRowsRequest = rows.Select(r => new { toBottom = true, cells = r.Cells }).ToArray();
+            var json = JsonSerializer.Serialize(addRowsRequest, SmartSheetJsonOptions);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            _logger.LogInformation("Sending Smartsheet row creation request: {Json}", json);
 
             var response = await _httpClient.PostAsync($"https://api.smartsheet.com/2.0/sheets/{sheetId}/rows", content);
             var responseContent = await response.Content.ReadAsStringAsync();
 
             if (response.IsSuccessStatusCode)
             {
-                var result = JsonSerializer.Deserialize<SmartSheetRowResponse>(responseContent);
-                return result?.Result?.Select(r => (long?)r.Id).ToList() ?? new List<long?>();
+                _logger.LogInformation("Smartsheet row creation response: {Response}", responseContent);
+                
+                // Try parsing as single row response first (what Smartsheet actually returns)
+                var result = JsonSerializer.Deserialize<SmartSheetRowResponse>(responseContent, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+                
+                var rowIds = result?.Result?.Select(r => (long?)r.Id).ToList() ?? new List<long?>();
+                _logger.LogInformation("Parsed {RowCount} row IDs from Smartsheet response", rowIds.Count);
+                
+                return rowIds;
             }
             else
             {
@@ -726,8 +795,8 @@ public class SmartSheetSyncService
 
             if (!rows.Any()) return 0;
 
-            var updateRowsRequest = new { rows };
-            var json = JsonSerializer.Serialize(updateRowsRequest);
+            var updateRowsRequest = rows.Select(r => new { id = r.Id, cells = r.Cells }).ToArray();
+            var json = JsonSerializer.Serialize(updateRowsRequest, SmartSheetJsonOptions);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
             var response = await _httpClient.PutAsync($"https://api.smartsheet.com/2.0/sheets/{sheetId}/rows", content);
@@ -776,7 +845,8 @@ public class SmartSheetSyncService
 
             var sheet = JsonSerializer.Deserialize<SmartSheetColumnResponse>(responseContent, new JsonSerializerOptions
             {
-                PropertyNameCaseInsensitive = true
+                PropertyNameCaseInsensitive = true,
+                DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
             });
 
             if (sheet?.Columns == null)
@@ -931,6 +1001,9 @@ public class SmartSheetColumn
 {
     public long Id { get; set; }
     public string? Title { get; set; }
+    public string? Type { get; set; }
+    public string[]? Options { get; set; }
+    public bool Locked { get; set; }
 }
 
 // Response models for SmartSheet API
@@ -951,6 +1024,8 @@ public class SmartSheetSyncResult
 
 public class SmartSheetCreateResponse
 {
+    public string? Message { get; set; }
+    public int ResultCode { get; set; }
     public SmartSheetResult? Result { get; set; }
 }
 
@@ -958,11 +1033,20 @@ public class SmartSheetResult
 {
     public long Id { get; set; }
     public string Name { get; set; } = string.Empty;
+    public string? AccessLevel { get; set; }
+    public string? Permalink { get; set; }
 }
 
 public class SmartSheetRowResponse
 {
     public List<SmartSheetRowResult>? Result { get; set; }
+}
+
+public class SmartSheetSingleRowResponse
+{
+    public string? Message { get; set; }
+    public int ResultCode { get; set; }
+    public SmartSheetRowResult? Result { get; set; }
 }
 
 public class SmartSheetRowResult

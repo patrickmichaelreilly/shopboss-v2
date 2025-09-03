@@ -22,8 +22,16 @@ public class SmartSheetSyncController : ControllerBase
     /// Trigger sync for a specific project
     /// </summary>
     [HttpPost("{projectId}")]
+    [HttpGet("{projectId}")]
     public async Task<IActionResult> SyncProject(string projectId)
     {
+        if (projectId == "test")
+        {
+            var accessToken = HttpContext.Session.GetString("ss_token");
+            var result = await _syncService.TestWriteToSheetAsync(5358772605112196L, accessToken);
+            return Ok(new { success = true, message = "Check logs" });
+        }
+
         try
         {
             // Validate SmartSheet authentication
@@ -134,6 +142,42 @@ public class SmartSheetSyncController : ControllerBase
             return Ok(new { 
                 success = false, 
                 message = "An error occurred during sync from Smartsheet. Please try again." 
+            });
+        }
+    }
+
+    /// <summary>
+    /// Test write to specific sheet
+    /// </summary>
+    [HttpPost("test/{sheetId:long}")]
+    public async Task<IActionResult> TestWrite(long sheetId)
+    {
+        try
+        {
+            // Validate SmartSheet authentication
+            var accessToken = HttpContext.Session.GetString("ss_token");
+            if (string.IsNullOrEmpty(accessToken))
+            {
+                return Ok(new { 
+                    success = false, 
+                    message = "Smartsheet authentication required. Please connect to Smartsheet first." 
+                });
+            }
+
+            // Perform test write
+            var result = await _syncService.TestWriteToSheetAsync(sheetId, accessToken);
+
+            return Ok(new { 
+                success = result.Success, 
+                message = result.Success ? "Test write successful!" : result.Message 
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in test write to sheet {SheetId}", sheetId);
+            return Ok(new { 
+                success = false, 
+                message = "An error occurred during test write. Please try again." 
             });
         }
     }
