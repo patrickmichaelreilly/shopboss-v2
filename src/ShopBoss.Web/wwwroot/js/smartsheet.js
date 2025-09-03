@@ -500,26 +500,54 @@ function triggerSmartSheetAuth() {
     return new Promise((resolve, reject) => {
         const popup = window.open('/smartsheet/auth/login', 'SmartSheetAuth', 'width=600,height=700,scrollbars=yes,resizable=yes');
         
+        if (!popup) {
+            reject(new Error('Popup blocked. Please allow popups for this site and try again.'));
+            return;
+        }
+        
+        let authCompleted = false;
+        
         const messageListener = (event) => {
+            // Ensure the message is from our OAuth popup
+            if (event.source !== popup) return;
+            // Additional origin validation for security
             if (event.origin !== window.location.origin) return;
             
             if (event.data.type === 'smartsheet-auth-success') {
-                popup.close();
+                authCompleted = true;
+                window.removeEventListener('message', messageListener);
                 resolve();
             } else if (event.data.type === 'smartsheet-auth-error') {
-                popup.close();
+                authCompleted = true;
+                window.removeEventListener('message', messageListener);
                 reject(new Error(event.data.error || 'Authentication failed'));
             }
         };
         
         window.addEventListener('message', messageListener);
         
-        // Check if popup was closed manually
+        // Check if popup was closed manually (only reject if auth wasn't completed)
         const checkClosed = setInterval(() => {
             if (popup.closed) {
                 clearInterval(checkClosed);
                 window.removeEventListener('message', messageListener);
-                reject(new Error('Authentication cancelled'));
+                
+                if (!authCompleted) {
+                    // Popup was closed before receiving success/error message
+                    // Poll auth status as fallback to confirm if authentication actually succeeded
+                    fetch('/smartsheet/auth/status')
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.isAuthenticated) {
+                                resolve();
+                            } else {
+                                reject(new Error('Authentication cancelled'));
+                            }
+                        })
+                        .catch(() => {
+                            reject(new Error('Authentication cancelled'));
+                        });
+                }
             }
         }, 1000);
     });

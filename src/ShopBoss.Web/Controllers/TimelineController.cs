@@ -44,6 +44,13 @@ public class TimelineController : Controller
                 return Json(new { success = false, message = "Block name is required." });
             }
 
+            // Check SmartSheet authentication for event attribution
+            var smartSheetUser = HttpContext.Session.GetString("ss_user");
+            if (string.IsNullOrEmpty(smartSheetUser))
+            {
+                return Json(new { success = false, message = "SmartSheet authentication required. Please connect to SmartSheet to create task blocks." });
+            }
+
             var block = await _timelineService.CreateTaskBlockAsync(request.ProjectId, request.Name, request.Description);
             return Json(new { success = true, block = new { block.Id, block.Name, block.Description, block.DisplayOrder } });
         }

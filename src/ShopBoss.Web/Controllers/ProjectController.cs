@@ -239,7 +239,14 @@ public class ProjectController : Controller
                 return Json(new { success = false, message = "No file selected" });
             }
 
-            var attachment = await _attachmentService.UploadAttachmentAsync(projectId, file, category, comment: comment, taskBlockId: taskBlockId);
+            // Get SmartSheet user from session for attribution
+            var smartSheetUser = HttpContext.Session.GetString("ss_user");
+            if (string.IsNullOrEmpty(smartSheetUser))
+            {
+                return Json(new { success = false, message = "SmartSheet authentication required. Please connect to SmartSheet to upload files." });
+            }
+
+            var attachment = await _attachmentService.UploadAttachmentAsync(projectId, file, category, uploadedBy: smartSheetUser, comment: comment, taskBlockId: taskBlockId);
             // Return a trimmed payload to avoid JSON cycles
             return Json(new { success = true, attachment = new { attachment.Id, attachment.OriginalFileName, attachment.FileSize, attachment.Category } });
         }
@@ -323,7 +330,14 @@ public class ProjectController : Controller
                 return Json(new { success = false, message = $"Invalid purchase order data: {string.Join(", ", errors)}" });
             }
 
-            var createdPurchaseOrder = await _purchaseOrderService.CreatePurchaseOrderAsync(request.PurchaseOrder, request.TaskBlockId);
+            // Check SmartSheet authentication for event attribution
+            var smartSheetUser = HttpContext.Session.GetString("ss_user");
+            if (string.IsNullOrEmpty(smartSheetUser))
+            {
+                return Json(new { success = false, message = "SmartSheet authentication required. Please connect to SmartSheet to create purchase orders." });
+            }
+
+            var createdPurchaseOrder = await _purchaseOrderService.CreatePurchaseOrderAsync(request.PurchaseOrder, request.TaskBlockId, smartSheetUser);
             return Json(new { success = true, purchaseOrder = createdPurchaseOrder });
         }
         catch (Exception ex)
@@ -390,7 +404,14 @@ public class ProjectController : Controller
                 return Json(new { success = false, message = $"Invalid custom work order data: {string.Join(", ", errors)}" });
             }
 
-            var createdCustomWorkOrder = await _customWorkOrderService.CreateCustomWorkOrderAsync(request.CustomWorkOrder, request.TaskBlockId);
+            // Check SmartSheet authentication for event attribution
+            var smartSheetUser = HttpContext.Session.GetString("ss_user");
+            if (string.IsNullOrEmpty(smartSheetUser))
+            {
+                return Json(new { success = false, message = "SmartSheet authentication required. Please connect to SmartSheet to create custom work orders." });
+            }
+
+            var createdCustomWorkOrder = await _customWorkOrderService.CreateCustomWorkOrderAsync(request.CustomWorkOrder, request.TaskBlockId, smartSheetUser);
             return Json(new { success = true, customWorkOrder = createdCustomWorkOrder });
         }
         catch (Exception ex)
@@ -699,6 +720,13 @@ public class ProjectController : Controller
                 return Json(new { success = false, message = "Comment description is required" });
             }
 
+            // Get SmartSheet user from session for attribution
+            var smartSheetUser = HttpContext.Session.GetString("ss_user");
+            if (string.IsNullOrEmpty(smartSheetUser))
+            {
+                return Json(new { success = false, message = "SmartSheet authentication required. Please connect to SmartSheet to create comments." });
+            }
+
             // Create new ProjectEvent for the comment
             var projectEvent = new ProjectEvent
             {
@@ -706,7 +734,7 @@ public class ProjectController : Controller
                 EventDate = request.EventDate,
                 EventType = "comment",
                 Description = request.Description,
-                CreatedBy = request.CreatedBy,
+                CreatedBy = smartSheetUser, // Use SmartSheet user instead of client-provided value
                 TaskBlockId = request.TaskBlockId
             };
 
@@ -842,6 +870,76 @@ public class ProjectController : Controller
     {
         public PurchaseOrder PurchaseOrder { get; set; } = new();
         public string? TaskBlockId { get; set; }
+    }
+
+    /// <summary>
+    /// TEST ENDPOINT: Explore template sheet structure
+    /// </summary>
+    [HttpGet]
+    public async Task<IActionResult> ExploreTemplateSheet()
+    {
+        try
+        {
+            const long templateSheetId = 2455059368464260;
+            
+            // Get SmartSheet client directly to access full sheet data
+            var smartsheetClient = _smartSheetService.GetType()
+                .GetMethod("GetSmartSheetClient", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?
+                .Invoke(_smartSheetService, null) as Smartsheet.Api.SmartsheetClient;
+                
+            if (smartsheetClient == null)
+            {
+                return Json(new { success = false, message = "No SmartSheet session. Please authenticate first." });
+            }
+            
+            // Get full sheet data including columns
+            var sheet = await Task.Run(() => smartsheetClient.SheetResources.GetSheet(templateSheetId, null, null, null, null, null, null, null));
+            
+            // Extract column information
+            var columns = sheet.Columns?.Select(col => new {
+                Id = col.Id,
+                Title = col.Title,
+                Type = col.Type?.ToString(),
+                Primary = col.Primary,
+                Index = col.Index,
+                Width = col.Width,
+                Hidden = col.Hidden,
+                Symbol = col.Symbol?.ToString(),
+                SystemColumnType = col.SystemColumnType?.ToString(),
+                AutoNumberFormat = col.AutoNumberFormat,
+                Options = col.Options
+            }).ToList();
+            
+            // Get basic sheet info
+            var sheetInfo = await _smartSheetService.GetSheetInfoAsync(templateSheetId);
+            
+            // Get first few rows as examples
+            var exampleRows = sheet.Rows?.Take(3).Select(row => new {
+                Id = row.Id,
+                RowNumber = row.RowNumber,
+                ParentId = row.ParentId,
+                Cells = row.Cells?.Select(cell => new {
+                    ColumnId = cell.ColumnId,
+                    Value = cell.Value?.ToString(),
+                    DisplayValue = cell.DisplayValue
+                }).ToList()
+            }).ToList();
+            
+            return Json(new { 
+                success = true, 
+                templateSheetId = templateSheetId,
+                sheetInfo = sheetInfo,
+                sheetName = sheet.Name,
+                totalRowCount = sheet.TotalRowCount,
+                columns = columns,
+                exampleRows = exampleRows
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error exploring template sheet");
+            return Json(new { success = false, message = "Error exploring template sheet: " + ex.Message });
+        }
     }
 
 }

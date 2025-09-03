@@ -45,7 +45,7 @@ public class CustomWorkOrderService
         }
     }
 
-    public async Task<CustomWorkOrder> CreateCustomWorkOrderAsync(CustomWorkOrder customWorkOrder, string? taskBlockId = null)
+    public async Task<CustomWorkOrder> CreateCustomWorkOrderAsync(CustomWorkOrder customWorkOrder, string? taskBlockId = null, string? createdBy = null)
     {
         try
         {
@@ -61,7 +61,7 @@ public class CustomWorkOrderService
                 EventDate = customWorkOrder.CreatedDate,
                 EventType = "custom_work_order",
                 Description = customWorkOrder.Name,
-                CreatedBy = null, // Could be passed as parameter if needed
+                CreatedBy = createdBy,
                 CustomWorkOrderId = customWorkOrder.Id,
                 TaskBlockId = taskBlockId
             };

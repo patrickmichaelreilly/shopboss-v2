@@ -32,6 +32,23 @@ class SmartSheetAuth {
                 this.handleAuthAction();
             });
         }
+        
+        // Listen for OAuth success messages from popup windows
+        window.addEventListener('message', (event) => {
+            // Validate origin for security
+            if (event.origin !== window.location.origin) return;
+            
+            if (event.data.type === 'smartsheet-auth-success') {
+                // OAuth succeeded - refresh auth status immediately
+                console.log('Received SmartSheet auth success message');
+                this.checkAuthStatus();
+            } else if (event.data.type === 'smartsheet-auth-error') {
+                // OAuth failed - update UI to show error
+                console.log('Received SmartSheet auth error message:', event.data.error);
+                this.showNotification('SmartSheet authentication failed: ' + (event.data.error || 'Unknown error'), 'error');
+                this.checkAuthStatus(); // Still refresh to get current state
+            }
+        });
     }
 
     async checkAuthStatus() {
