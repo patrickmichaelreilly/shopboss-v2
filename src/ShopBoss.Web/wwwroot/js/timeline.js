@@ -16,7 +16,13 @@ function loadTimelineForProject(projectId) {
         .then(html => {
             timelineContainer.innerHTML = html;
             // Initialize interactions after HTML is loaded
-            setTimeout(() => initializeTimelineInteractions(projectId), 100);
+            setTimeout(() => {
+                initializeTimelineInteractions(projectId);
+                // Initialize SmartSheet sync UI if function exists
+                if (typeof initializeSmartSheetSyncUI === 'function') {
+                    initializeSmartSheetSyncUI(projectId);
+                }
+            }, 100);
         })
         .catch(error => {
             console.error('Error loading timeline:', error);

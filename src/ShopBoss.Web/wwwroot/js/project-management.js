@@ -1,5 +1,65 @@
 // Project Management JavaScript (Project list + CRUD only)
 let currentProjectId = null;
+
+// SmartSheet Sync Functions
+async function initializeSmartSheetSyncUI(projectId) {
+    try {
+        const response = await fetch('/smartsheet/auth/status');
+        const data = await response.json();
+        
+        const syncBtn = document.getElementById(`smartsheet-sync-btn-${projectId}`);
+        const syncStatus = document.getElementById(`smartsheet-sync-status-${projectId}`);
+        
+        if (data.isAuthenticated && !data.isExpired) {
+            syncBtn.style.display = 'inline-block';
+            syncStatus.textContent = `Connected as ${data.userEmail}`;
+        } else {
+            syncStatus.textContent = 'SmartSheet not connected';
+        }
+    } catch (error) {
+        console.error('Error checking SmartSheet auth status:', error);
+    }
+}
+
+async function syncToSmartSheet(projectId) {
+    const btn = document.getElementById(`smartsheet-sync-btn-${projectId}`);
+    const status = document.getElementById(`smartsheet-sync-status-${projectId}`);
+    
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Syncing...';
+    status.textContent = 'Syncing events to SmartSheet...';
+    
+    try {
+        const response = await fetch(`/api/smartsheet/sync/${projectId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            status.textContent = `Sync completed: ${data.created} created, ${data.updated} updated`;
+            status.className = 'text-success small ms-2';
+            
+            // Refresh timeline to show row numbers
+            if (typeof loadTimelineForProject === 'function') {
+                loadTimelineForProject(projectId);
+            }
+        } else {
+            status.textContent = `Sync failed: ${data.message}`;
+            status.className = 'text-danger small ms-2';
+        }
+    } catch (error) {
+        console.error('Error syncing to SmartSheet:', error);
+        status.textContent = 'Error during sync. Please try again.';
+        status.className = 'text-danger small ms-2';
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-sync me-1"></i>Sync';
+    }
+}
 // Toggle project expansion
 function toggleProject(projectId) {
     const details = document.getElementById(`details-${projectId}`);
