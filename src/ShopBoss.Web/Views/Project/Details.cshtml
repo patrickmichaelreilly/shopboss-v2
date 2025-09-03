@@ -47,19 +47,38 @@
                             <span class="text-muted">Install Date: Not Set</span>
                         }
                     </div>
-                    <div class="d-flex justify-content-end gap-2">
+                    <div class="d-flex justify-content-end gap-2 align-items-center">
                         <span class="badge bg-info">@Model.WorkOrders.Count WO</span>
                         <span class="badge bg-success">@Model.Attachments.Count Files</span>
                         <span class="badge bg-warning">@Model.PurchaseOrders.Count PO</span>
                         <span class="badge bg-secondary">@Model.Events.Count Events</span>
+                        
+                        <!-- SmartSheet Sync Button -->
+                        <button id="smartsheet-sync-btn" class="btn btn-outline-primary btn-sm" style="display: none;" onclick="syncToSmartSheet('@Model.Id')">
+                            <i class="fas fa-sync me-1"></i>Sync to SmartSheet
+                        </button>
+                        <span id="smartsheet-sync-status" class="text-muted small"></span>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Project Details Content -->
-    @await Html.PartialAsync("_ProjectDetails", Model)
+    <!-- Project Timeline -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">Project Timeline</h5>
+        </div>
+        <div class="card-body">
+            <div id="project-timeline">
+                <div class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading timeline...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 @section Scripts {
@@ -72,6 +91,65 @@
             if (typeof loadTimelineForProject === 'function') {
                 loadTimelineForProject('@Model.Id');
             }
+            
+            // Initialize SmartSheet sync UI
+            initializeSmartSheetSyncUI();
         });
+        
+        async function initializeSmartSheetSyncUI() {
+            try {
+                const response = await fetch('/smartsheet/auth/status');
+                const data = await response.json();
+                
+                if (data.isAuthenticated && !data.isExpired) {
+                    document.getElementById('smartsheet-sync-btn').style.display = 'inline-block';
+                    document.getElementById('smartsheet-sync-status').textContent = `Connected as ${data.userEmail}`;
+                } else {
+                    document.getElementById('smartsheet-sync-status').textContent = 'SmartSheet not connected';
+                }
+            } catch (error) {
+                console.error('Error checking SmartSheet auth status:', error);
+            }
+        }
+        
+        async function syncToSmartSheet(projectId) {
+            const btn = document.getElementById('smartsheet-sync-btn');
+            const status = document.getElementById('smartsheet-sync-status');
+            
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Syncing...';
+            status.textContent = 'Syncing events to SmartSheet...';
+            
+            try {
+                const response = await fetch(`/api/smartsheet/sync/${projectId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    status.textContent = `Sync completed: ${data.created} created, ${data.updated} updated`;
+                    status.className = 'text-success small';
+                    
+                    // Refresh timeline to show row numbers
+                    if (typeof loadTimelineForProject === 'function') {
+                        loadTimelineForProject('@Model.Id');
+                    }
+                } else {
+                    status.textContent = `Sync failed: ${data.message}`;
+                    status.className = 'text-danger small';
+                }
+            } catch (error) {
+                console.error('Error syncing to SmartSheet:', error);
+                status.textContent = 'Error during sync. Please try again.';
+                status.className = 'text-danger small';
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-sync me-1"></i>Sync to SmartSheet';
+            }
+        }
     </script>
 }
