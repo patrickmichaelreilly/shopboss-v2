@@ -45,6 +45,8 @@ public class TimelineService
             var allEvents = await _context.ProjectEvents
                 .Where(pe => pe.ProjectId == projectId)
                 .Include(pe => pe.Attachment)
+                .Include(pe => pe.WorkOrder!)
+                    .ThenInclude(wo => wo.NestSheets)
                 .OrderBy(pe => pe.GlobalDisplayOrder ?? int.MaxValue)
                 .ThenBy(pe => pe.EventDate)
                 .ToListAsync();

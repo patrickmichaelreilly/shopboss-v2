@@ -121,71 +121,103 @@
                     <div class="timeline-event blocked-event" data-event-id="@evt.Id">
                         <div class="event-content">
                             <div class="event-description">
-                                <div class="event-primary d-flex align-items-center">
-                                    @if (evt.EventType == "attachment")
-                                    {
-                                        <i class="fas fa-paperclip event-icon text-muted" title="Attachment"></i>
-                                    }
-                                    else if (evt.EventType == "comment")
-                                    {
-                                        <i class="fas fa-comment event-icon text-muted" title="Comment"></i>
-                                    }
-                                    else if (evt.EventType == "purchase-order")
-                                    {
-                                        <i class="fas fa-shopping-cart event-icon text-muted" title="Purchase Order"></i>
-                                    }
-                                    else if (evt.EventType == "work-order")
-                                    {
+                                @if (evt.EventType == "work_order" && evt.WorkOrder != null)
+                                {
+                                    @* Work Order Display *@
+                                    <div class="event-primary d-flex align-items-center">
                                         <i class="fas fa-cog event-icon text-muted" title="Work Order"></i>
-                                    }
-                                    else
-                                    {
-                                        <i class="fas fa-clipboard-list event-icon text-muted" title="Event"></i>
-                                    }
-
-                                    <div>
-                                        @if (evt.EventType == "attachment" && evt.Attachment != null)
-                                        {
-                                            <a href="/Project/DownloadFile/@evt.Attachment.Id" class="text-decoration-none" title="Download @evt.Attachment.FileName">
-                                                <strong>@evt.Attachment.OriginalFileName</strong>
-                                            </a>
+                                        <div>
+                                            <strong>@evt.Description</strong>
                                             @if (evt.RowNumber.HasValue)
                                             {
                                                 <span class="badge bg-primary row-badge">Row @evt.RowNumber</span>
                                             }
+                                            <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-2"
+                                                    data-action="delete-event" data-project-id="@Model.ProjectId"
+                                                    data-event-id="@evt.Id"
+                                                    @if (!string.IsNullOrEmpty(evt.WorkOrderId)) { <text>data-wo-id="@evt.WorkOrderId"</text> }
+                                                    title="Delete">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="event-secondary text-muted small mt-1">
+                                        @if (evt.WorkOrder.NestSheets.Any())
+                                        {
+                                            var totalSheets = evt.WorkOrder.NestSheets.Count;
+                                            var cutSheets = evt.WorkOrder.NestSheets.Count(ns => ns.Status >= PartStatus.Cut);
+                                            <div>@cutSheets / @totalSheets Nest Sheets Cut</div>
+                                        }
+                                        <div>@evt.EventDate.ToString("yyyy-MM-dd HH:mm") by @(evt.CreatedBy ?? "Unknown")</div>
+                                    </div>
+                                }
+                                else
+                                {
+                                    @* Generic Display (all other event types - unchanged) *@
+                                    <div class="event-primary d-flex align-items-center">
+                                        @if (evt.EventType == "attachment")
+                                        {
+                                            <i class="fas fa-paperclip event-icon text-muted" title="Attachment"></i>
+                                        }
+                                        else if (evt.EventType == "comment")
+                                        {
+                                            <i class="fas fa-comment event-icon text-muted" title="Comment"></i>
+                                        }
+                                        else if (evt.EventType == "purchase-order")
+                                        {
+                                            <i class="fas fa-shopping-cart event-icon text-muted" title="Purchase Order"></i>
                                         }
                                         else
                                         {
-                                            <strong>@(String.IsNullOrEmpty(evt.Description) ? evt.EventType : evt.Description.Split('\n')[0])</strong>
-                                            @if (evt.RowNumber.HasValue)
-                                            {
-                                                <span class="badge bg-primary row-badge">Row @evt.RowNumber</span>
-                                            }
+                                            <i class="fas fa-clipboard-list event-icon text-muted" title="Event"></i>
                                         }
 
-                                        <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-2"
-                                                data-action="delete-event" data-project-id="@Model.ProjectId"
-                                                data-event-id="@evt.Id"
-                                                @if (evt.Attachment != null) { <text>data-attachment-id="@evt.Attachment.Id"</text>; }
-                                                title="Delete">
-                                            <i class="fas fa-times"></i>
-                                        </button>
-                                    </div>
-                                </div>
+                                        <div>
+                                            @if (evt.EventType == "attachment" && evt.Attachment != null)
+                                            {
+                                                <a href="/Project/DownloadFile/@evt.Attachment.Id" class="text-decoration-none" title="Download @evt.Attachment.FileName">
+                                                    <strong>@evt.Attachment.OriginalFileName</strong>
+                                                </a>
+                                                @if (evt.RowNumber.HasValue)
+                                                {
+                                                    <span class="badge bg-primary row-badge">Row @evt.RowNumber</span>
+                                                }
+                                            }
+                                            else
+                                            {
+                                                <strong>@(String.IsNullOrEmpty(evt.Description) ? evt.EventType : evt.Description.Split('\n')[0])</strong>
+                                                @if (evt.RowNumber.HasValue)
+                                                {
+                                                    <span class="badge bg-primary row-badge">Row @evt.RowNumber</span>
+                                                }
+                                            }
 
-                                <div class="event-secondary text-muted small mt-1">
-                                    @if (evt.EventType == "attachment" && evt.Attachment != null)
-                                    {
-                                        <span>@((evt.Attachment.FileSize / 1024.0 / 1024.0).ToString("F2")) MB</span>
-                                    }
-                                    @if (!string.IsNullOrEmpty(evt.Description))
-                                    {
-                                        <div>@evt.Description</div>
-                                    }
-                                    <div>@evt.EventDate.ToString("yyyy-MM-dd HH:mm") by @(evt.CreatedBy ?? "Unknown")</div>
+                                            <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-2"
+                                                    data-action="delete-event" data-project-id="@Model.ProjectId"
+                                                    data-event-id="@evt.Id"
+                                                    @if (evt.Attachment != null) { <text>data-attachment-id="@evt.Attachment.Id"</text>; }
+                                                    @if (evt.PurchaseOrderId != null) { <text>data-po-id="@evt.PurchaseOrderId"</text> }
+                                                    @if (evt.CustomWorkOrderId != null) { <text>data-cwo-id="@evt.CustomWorkOrderId"</text> }
+                                                    title="Delete">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div class="event-secondary text-muted small mt-1">
+                                        @if (evt.EventType == "attachment" && evt.Attachment != null)
+                                        {
+                                            <span>@((evt.Attachment.FileSize / 1024.0 / 1024.0).ToString("F2")) MB</span>
+                                        }
+                                        @if (!string.IsNullOrEmpty(evt.Description))
+                                        {
+                                            <div>@evt.Description</div>
+                                        }
+                                        <div>@evt.EventDate.ToString("yyyy-MM-dd HH:mm") by @(evt.CreatedBy ?? "Unknown")</div>
+                                    </div>
+                                }
                             </div>
                         </div>
-                    </div>
                     </div>
                 }
                 else if (((dynamic)item).Type == "TaskBlock")
