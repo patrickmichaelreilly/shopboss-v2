@@ -6,6 +6,9 @@ using ShopBoss.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Load optional local settings for secrets/overrides (git-ignored)
+builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
+
 // Configure for Windows Service hosting
 builder.Host.UseWindowsService();
 
