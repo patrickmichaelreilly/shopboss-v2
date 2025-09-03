@@ -396,3 +396,7 @@ Thumbs.db
 
 # Zone Identifier files (Windows)
 *:Zone.Identifier
+# Local appsettings (ignored)
+src/ShopBoss.Web/appsettings.Local.json
+src/ShopBoss.Web/appsettings.*.local.json
+src/ShopBoss.Web/appsettings.Secrets.json

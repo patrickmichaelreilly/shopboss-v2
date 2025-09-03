@@ -37,32 +37,6 @@ public class SmartSheetSyncService
         _smartSheetService = smartSheetService;
     }
 
-    public async Task<SmartSheetSyncResult> TestWriteToSheetAsync(long sheetId, string accessToken)
-    {
-        _httpClient.DefaultRequestHeaders.Clear();
-        _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-
-        var request = new[] {
-            new {
-                toBottom = true,
-                cells = new[] {
-                    new {
-                        columnId = 5169400877109124L, // Notes column
-                        value = "HELLO WORLD"
-                    }
-                }
-            }
-        };
-
-        var json = JsonSerializer.Serialize(request, SmartSheetJsonOptions);
-        var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync($"https://api.smartsheet.com/2.0/sheets/{sheetId}/rows", content);
-        var responseContent = await response.Content.ReadAsStringAsync();
-
-        _logger.LogInformation("Response: {Status} - {Content}", response.StatusCode, responseContent);
-
-        return SmartSheetSyncResult.CreateSuccess(1, 0, sheetId);
-    }
 
     public async Task<SmartSheetSyncResult> SyncProjectEventsAsync(string projectId, string accessToken)
     {
