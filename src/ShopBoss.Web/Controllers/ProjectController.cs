@@ -243,7 +243,7 @@ public class ProjectController : Controller
             var smartSheetUser = HttpContext.Session.GetString("ss_user");
             if (string.IsNullOrEmpty(smartSheetUser))
             {
-                return Json(new { success = false, message = "SmartSheet authentication required. Please connect to SmartSheet to upload files." });
+                return Json(new { success = false, message = "Smartsheet authentication required. Please connect to Smartsheet to upload files." });
             }
 
             var attachment = await _attachmentService.UploadAttachmentAsync(projectId, file, category, uploadedBy: smartSheetUser, comment: comment, taskBlockId: taskBlockId);
@@ -334,7 +334,7 @@ public class ProjectController : Controller
             var smartSheetUser = HttpContext.Session.GetString("ss_user");
             if (string.IsNullOrEmpty(smartSheetUser))
             {
-                return Json(new { success = false, message = "SmartSheet authentication required. Please connect to SmartSheet to create purchase orders." });
+                return Json(new { success = false, message = "Smartsheet authentication required. Please connect to Smartsheet to create purchase orders." });
             }
 
             var createdPurchaseOrder = await _purchaseOrderService.CreatePurchaseOrderAsync(request.PurchaseOrder, request.TaskBlockId, smartSheetUser);
@@ -408,7 +408,7 @@ public class ProjectController : Controller
             var smartSheetUser = HttpContext.Session.GetString("ss_user");
             if (string.IsNullOrEmpty(smartSheetUser))
             {
-                return Json(new { success = false, message = "SmartSheet authentication required. Please connect to SmartSheet to create custom work orders." });
+                return Json(new { success = false, message = "Smartsheet authentication required. Please connect to Smartsheet to create custom work orders." });
             }
 
             var createdCustomWorkOrder = await _customWorkOrderService.CreateCustomWorkOrderAsync(request.CustomWorkOrder, request.TaskBlockId, smartSheetUser);
@@ -539,8 +539,8 @@ public class ProjectController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting SmartSheet session status");
-            return Json(new { success = false, message = "Error checking SmartSheet connection" });
+            _logger.LogError(ex, "Error getting Smartsheet session status");
+            return Json(new { success = false, message = "Error checking Smartsheet connection" });
         }
     }
 
@@ -555,12 +555,12 @@ public class ProjectController : Controller
                 return Json(new { success = true, sheet = sheetInfo });
             }
             
-            return Json(new { success = false, message = "SmartSheet not found or not accessible" });
+                return Json(new { success = false, message = "Smartsheet not found or not accessible" });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting SmartSheet info for sheet {SheetId}", sheetId);
-            return Json(new { success = false, message = "Error loading SmartSheet information" });
+            _logger.LogError(ex, "Error getting Smartsheet info for sheet {SheetId}", sheetId);
+            return Json(new { success = false, message = "Error loading Smartsheet information" });
         }
     }
 
@@ -579,8 +579,8 @@ public class ProjectController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error searching SmartSheets with term '{SearchTerm}'", searchTerm);
-            return Json(new { success = false, message = "Error searching SmartSheets" });
+            _logger.LogError(ex, "Error searching Smartsheets with term '{SearchTerm}'", searchTerm);
+            return Json(new { success = false, message = "Error searching Smartsheets" });
         }
     }
 
@@ -597,15 +597,15 @@ public class ProjectController : Controller
             var success = await _smartSheetService.LinkProjectToSheetAsync(request.ProjectId, request.SheetId);
             if (success)
             {
-                return Json(new { success = true, message = "Project successfully linked to SmartSheet" });
+                return Json(new { success = true, message = "Project successfully linked to Smartsheet" });
             }
             
-            return Json(new { success = false, message = "Failed to link project to SmartSheet" });
+            return Json(new { success = false, message = "Failed to link project to Smartsheet" });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error linking project {ProjectId} to SmartSheet {SheetId}", request.ProjectId, request.SheetId);
-            return Json(new { success = false, message = "Error linking to SmartSheet" });
+            _logger.LogError(ex, "Error linking project {ProjectId} to Smartsheet {SheetId}", request.ProjectId, request.SheetId);
+            return Json(new { success = false, message = "Error linking to Smartsheet" });
         }
     }
 
@@ -622,15 +622,15 @@ public class ProjectController : Controller
             var success = await _smartSheetService.UnlinkProjectFromSheetAsync(request.ProjectId);
             if (success)
             {
-                return Json(new { success = true, message = "Project successfully unlinked from SmartSheet" });
+                return Json(new { success = true, message = "Project successfully unlinked from Smartsheet" });
             }
             
-            return Json(new { success = false, message = "Failed to unlink project from SmartSheet" });
+            return Json(new { success = false, message = "Failed to unlink project from Smartsheet" });
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error unlinking project {ProjectId} from SmartSheet", request.ProjectId);
-            return Json(new { success = false, message = "Error unlinking from SmartSheet" });
+            return Json(new { success = false, message = "Error unlinking from Smartsheet" });
         }
     }
 
@@ -644,7 +644,7 @@ public class ProjectController : Controller
         {
             if (!_smartSheetService.HasSmartSheetSession())
             {
-                return Json(new { success = false, message = "No SmartSheet session. Please authenticate first." });
+                return Json(new { success = false, message = "No Smartsheet session. Please authenticate first." });
             }
 
             object? workspace = null;
@@ -686,7 +686,7 @@ public class ProjectController : Controller
         {
             if (!_smartSheetService.HasSmartSheetSession())
             {
-                return Json(new { success = false, message = "No SmartSheet session. Please authenticate first." });
+                return Json(new { success = false, message = "No Smartsheet session. Please authenticate first." });
             }
 
             var workspaces = await _smartSheetService.GetAccessibleWorkspacesAsync();
@@ -694,7 +694,7 @@ public class ProjectController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting SmartSheet workspaces");
+            _logger.LogError(ex, "Error getting Smartsheet workspaces");
             return Json(new { success = false, message = "Error retrieving workspaces" });
         }
     }
@@ -720,11 +720,11 @@ public class ProjectController : Controller
                 return Json(new { success = false, message = "Comment description is required" });
             }
 
-            // Get SmartSheet user from session for attribution
+            // Get Smartsheet user from session for attribution
             var smartSheetUser = HttpContext.Session.GetString("ss_user");
             if (string.IsNullOrEmpty(smartSheetUser))
             {
-                return Json(new { success = false, message = "SmartSheet authentication required. Please connect to SmartSheet to create comments." });
+                return Json(new { success = false, message = "Smartsheet authentication required. Please connect to Smartsheet to create comments." });
             }
 
             // Create new ProjectEvent for the comment
@@ -882,14 +882,14 @@ public class ProjectController : Controller
         {
             const long templateSheetId = 2455059368464260;
             
-            // Get SmartSheet client directly to access full sheet data
+            // Get Smartsheet client directly to access full sheet data
             var smartsheetClient = _smartSheetService.GetType()
                 .GetMethod("GetSmartSheetClient", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?
                 .Invoke(_smartSheetService, null) as Smartsheet.Api.SmartsheetClient;
                 
             if (smartsheetClient == null)
             {
-                return Json(new { success = false, message = "No SmartSheet session. Please authenticate first." });
+                return Json(new { success = false, message = "No Smartsheet session. Please authenticate first." });
             }
             
             // Get full sheet data including columns

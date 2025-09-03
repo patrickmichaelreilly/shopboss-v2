@@ -1,7 +1,7 @@
-// SmartSheet Integration JavaScript
+// Smartsheet Integration JavaScript
 // Extracted from project-management.js to reduce file size and improve maintainability
 
-// SmartSheet Import Functions
+// Smartsheet Import Functions
 function showSmartSheetImport() {
     // Reset modal state
     document.getElementById('smartSheetSelection').classList.remove('d-none');
@@ -57,24 +57,24 @@ function startSmartSheetImport() {
         } else {
             document.getElementById('smartSheetSelection').classList.remove('d-none');
             document.getElementById('startImportBtn').disabled = false;
-            showNotification(data.message || 'Error during SmartSheet import', 'error');
+            showNotification(data.message || 'Error during Smartsheet import', 'error');
         }
     })
     .catch(error => {
-        console.error('Error during SmartSheet import:', error);
+        console.error('Error during Smartsheet import:', error);
         document.getElementById('smartSheetImporting').classList.add('d-none');
         document.getElementById('smartSheetSelection').classList.remove('d-none');
         document.getElementById('startImportBtn').disabled = false;
-        showNotification('Network error during SmartSheet import', 'error');
+        showNotification('Network error during Smartsheet import', 'error');
     });
 }
 
-// Initialize SmartSheet status checking when projects are expanded
+// Initialize Smartsheet status checking when projects are expanded
 function initializeSmartSheetStatus(projectId) {
     // Check session status
     checkSmartSheetSessionStatus(projectId);
     
-    // Load SmartSheet info if project is linked
+    // Load Smartsheet info if project is linked
     const project = document.querySelector(`#details-${projectId}`);
     if (project) {
         const smartSheetInfo = project.querySelector(`#smartsheet-info-${projectId}`);

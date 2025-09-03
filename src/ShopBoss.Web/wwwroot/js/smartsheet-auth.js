@@ -1,4 +1,4 @@
-// SmartSheet OAuth Status Management
+// Smartsheet OAuth Status Management
 // Handles authentication status, token refresh, and UI updates
 
 class SmartSheetAuth {
@@ -20,7 +20,7 @@ class SmartSheetAuth {
         // Set up click handlers
         this.setupEventHandlers();
         
-        console.log('SmartSheet Auth manager initialized');
+        console.log('Smartsheet Auth manager initialized');
     }
 
     setupEventHandlers() {
@@ -40,12 +40,12 @@ class SmartSheetAuth {
             
             if (event.data.type === 'smartsheet-auth-success') {
                 // OAuth succeeded - refresh auth status immediately
-                console.log('Received SmartSheet auth success message');
+                console.log('Received Smartsheet auth success message');
                 this.checkAuthStatus();
             } else if (event.data.type === 'smartsheet-auth-error') {
                 // OAuth failed - update UI to show error
-                console.log('Received SmartSheet auth error message:', event.data.error);
-                this.showNotification('SmartSheet authentication failed: ' + (event.data.error || 'Unknown error'), 'error');
+                console.log('Received Smartsheet auth error message:', event.data.error);
+                this.showNotification('Smartsheet authentication failed: ' + (event.data.error || 'Unknown error'), 'error');
                 this.checkAuthStatus(); // Still refresh to get current state
             }
         });
@@ -61,7 +61,7 @@ class SmartSheetAuth {
             
             this.updateUI(data);
         } catch (error) {
-            console.error('Error checking SmartSheet auth status:', error);
+            console.error('Error checking Smartsheet auth status:', error);
             this.updateUI({
                 isAuthenticated: false,
                 userEmail: null,
@@ -93,7 +93,7 @@ class SmartSheetAuth {
             }
             
             actionButton.innerHTML = '<i class="fas fa-sign-out-alt me-2"></i>Disconnect';
-            actionButton.title = 'Disconnect from SmartSheet';
+            actionButton.title = 'Disconnect from Smartsheet';
             icon.className = 'fas fa-table text-success me-2';
             
         } else {
@@ -105,8 +105,8 @@ class SmartSheetAuth {
             userInfo.style.display = 'none';
             userEmail.textContent = '';
             
-            actionButton.innerHTML = '<i class="fas fa-sign-in-alt me-2"></i>Connect to SmartSheet';
-            actionButton.title = 'Connect to SmartSheet';
+            actionButton.innerHTML = '<i class="fas fa-sign-in-alt me-2"></i>Connect to Smartsheet';
+            actionButton.title = 'Connect to Smartsheet';
             icon.className = 'fas fa-table text-muted me-2';
         }
     }
@@ -135,7 +135,7 @@ class SmartSheetAuth {
             const data = await response.json();
             
             if (data.success) {
-                this.showNotification('Disconnected from SmartSheet', 'info');
+                this.showNotification('Disconnected from Smartsheet', 'info');
                 // Update UI immediately
                 this.updateUI({
                     isAuthenticated: false,
@@ -146,7 +146,7 @@ class SmartSheetAuth {
             }
         } catch (error) {
             console.error('Error during logout:', error);
-            this.showNotification('Error disconnecting from SmartSheet', 'error');
+                this.showNotification('Error disconnecting from Smartsheet', 'error');
         }
     }
 
@@ -172,7 +172,7 @@ class SmartSheetAuth {
         // Handle popup blocking
         if (!popup || popup.closed) {
             // Popup was blocked - redirect in same window
-            this.showNotification('Popup blocked. Redirecting to SmartSheet...', 'info');
+            this.showNotification('Popup blocked. Redirecting to Smartsheet...', 'info');
             window.location.href = '/smartsheet/auth/login';
         }
     }
@@ -189,11 +189,11 @@ class SmartSheetAuth {
             const data = await response.json();
             
             if (data.success) {
-                this.showNotification('SmartSheet connection refreshed', 'success');
+                this.showNotification('Smartsheet connection refreshed', 'success');
                 this.checkAuthStatus(); // Update UI
                 return true;
             } else {
-                this.showNotification('Please reconnect to SmartSheet', 'warning');
+                this.showNotification('Please reconnect to Smartsheet', 'warning');
                 // Update UI to show disconnected state
                 this.updateUI({
                     isAuthenticated: false,

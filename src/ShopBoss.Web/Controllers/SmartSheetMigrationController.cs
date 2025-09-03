@@ -31,10 +31,10 @@ public class SmartSheetMigrationController : Controller
     {
         try
         {
-            // Check if user is authenticated with SmartSheet
+            // Check if user is authenticated with Smartsheet
             if (!_smartSheetService.HasSmartSheetSession())
             {
-                ViewBag.Error = "Please authenticate with SmartSheet first. Use the SmartSheet indicator in the header.";
+                ViewBag.Error = "Please authenticate with Smartsheet first. Use the Smartsheet indicator in the header.";
                 return View();
             }
 
@@ -71,7 +71,7 @@ public class SmartSheetMigrationController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to load SmartSheet workspaces");
+            _logger.LogError(ex, "Failed to load Smartsheet workspaces");
             ViewBag.Error = $"Failed to load workspaces: {ex.Message}";
             return View();
         }
@@ -87,7 +87,7 @@ public class SmartSheetMigrationController : Controller
             // Check if user is authenticated
             if (!_smartSheetService.HasSmartSheetSession())
             {
-                return Json(new { error = "Not authenticated with SmartSheet. Please authenticate first." });
+                return Json(new { error = "Not authenticated with Smartsheet. Please authenticate first." });
             }
 
             _logger.LogInformation("Calling SmartSheetService.GetSheetDetailsAsync for sheet {SheetId}", sheetId);
@@ -113,10 +113,10 @@ public class SmartSheetMigrationController : Controller
     {
         try
         {
-            // Check if user is authenticated with SmartSheet
+            // Check if user is authenticated with Smartsheet
             if (!_smartSheetService.HasSmartSheetSession())
             {
-                return Json(new { success = false, message = "Please authenticate with SmartSheet first." });
+                return Json(new { success = false, message = "Please authenticate with Smartsheet first." });
             }
 
             var workspaces = await _smartSheetService.GetAccessibleWorkspacesAsync();
@@ -162,7 +162,7 @@ public class SmartSheetMigrationController : Controller
             // Check if user is authenticated
             if (!_smartSheetService.HasSmartSheetSession())
             {
-                return Json(new { success = false, message = "Not authenticated with SmartSheet. Please authenticate first." });
+                return Json(new { success = false, message = "Not authenticated with Smartsheet. Please authenticate first." });
             }
 
             var result = await _smartSheetService.ImportProjectAsync(request.SheetId, request.ImportId);

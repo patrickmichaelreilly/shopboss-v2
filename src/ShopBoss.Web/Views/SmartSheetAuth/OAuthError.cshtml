@@ -7,7 +7,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>SmartSheet Connection Error</title>
+    <title>Smartsheet Connection Error</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body class="bg-light">
@@ -25,7 +25,7 @@
                     }
                     else
                     {
-                        <text>Unable to connect to SmartSheet. Please try again.</text>
+                        <text>Unable to connect to Smartsheet. Please try again.</text>
                     }
                 </p>
                 <button type="button" class="btn btn-secondary" onclick="window.close()">
@@ -40,8 +40,8 @@
         // Auto-close the popup after 5 seconds
         setTimeout(() => {
             if (window.opener) {
-                // Notify parent window of failed authentication
-                window.opener.postMessage({ type: 'smartsheet-auth-error', error: '@Model' }, '*');
+                // Notify parent window of failed authentication (same-origin)
+                window.opener.postMessage({ type: 'smartsheet-auth-error', error: '@Model' }, window.location.origin);
             }
             window.close();
         }, 5000);

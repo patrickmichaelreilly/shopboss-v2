@@ -21,7 +21,7 @@ public class SmartSheetAuthController : Controller
     }
 
     /// <summary>
-    /// Initiate OAuth flow - redirect to SmartSheet authorization
+    /// Initiate OAuth flow - redirect to Smartsheet authorization
     /// </summary>
     [HttpGet("smartsheet/auth/login")]
     public IActionResult Login()
@@ -33,8 +33,8 @@ public class SmartSheetAuthController : Controller
 
             if (string.IsNullOrEmpty(clientId) || string.IsNullOrEmpty(redirectUri))
             {
-                _logger.LogError("SmartSheet OAuth configuration missing");
-                return BadRequest("SmartSheet not configured");
+                _logger.LogError("Smartsheet OAuth configuration missing");
+                return BadRequest("Smartsheet not configured");
             }
 
             // Generate and store state parameter for CSRF protection
@@ -53,13 +53,13 @@ public class SmartSheetAuthController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error initiating SmartSheet OAuth");
+            _logger.LogError(ex, "Error initiating Smartsheet OAuth");
             return BadRequest("Error starting authentication");
         }
     }
 
     /// <summary>
-    /// Handle OAuth callback from SmartSheet
+    /// Handle OAuth callback from Smartsheet
     /// </summary>
     [HttpGet("smartsheet/auth/callback")]
     public async Task<IActionResult> Callback(string? code, string? state, string? error)
@@ -69,7 +69,7 @@ public class SmartSheetAuthController : Controller
             // Check for errors
             if (!string.IsNullOrEmpty(error))
             {
-                _logger.LogWarning("SmartSheet OAuth error: {Error}", error);
+                _logger.LogWarning("Smartsheet OAuth error: {Error}", error);
                 return View("OAuthError", error);
             }
 
@@ -86,7 +86,7 @@ public class SmartSheetAuthController : Controller
 
             if (string.IsNullOrEmpty(code))
             {
-                _logger.LogWarning("No authorization code received from SmartSheet");
+                _logger.LogWarning("No authorization code received from Smartsheet");
                 return BadRequest("Authorization failed");
             }
 
@@ -101,10 +101,10 @@ public class SmartSheetAuthController : Controller
             var expiresAt = DateTime.UtcNow.AddSeconds(tokens.ExpiresIn ?? 3600); // Default to 1 hour if not provided
             HttpContext.Session.SetString("ss_token", tokens.AccessToken);
             HttpContext.Session.SetString("ss_refresh", tokens.RefreshToken ?? "");
-            HttpContext.Session.SetString("ss_user", tokens.UserEmail ?? "SmartSheet User");
+            HttpContext.Session.SetString("ss_user", tokens.UserEmail ?? "Smartsheet User");
             HttpContext.Session.SetString("ss_expires", expiresAt.ToString("O")); // ISO 8601 format
 
-            _logger.LogInformation("SmartSheet OAuth successful for user {UserEmail}", tokens.UserEmail);
+            _logger.LogInformation("Smartsheet OAuth successful for user {UserEmail}", tokens.UserEmail);
 
             // Return success page that will close the popup
             return View("OAuthSuccess");
