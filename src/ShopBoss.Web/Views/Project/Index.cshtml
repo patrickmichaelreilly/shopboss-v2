@@ -84,7 +84,7 @@ else
                 @foreach (var project in Model)
                 {
                     var rowClass = project.IsArchived ? "table-secondary" : "";
-                    <tr class="@rowClass">
+                    <tr class="@rowClass" data-project-id="@project.Id">
                         <td class="text-center">
                             <i class="fas fa-chevron-right expand-icon" id="expand-icon-@project.Id" 
                                data-action="toggle-project" data-project-id="@project.Id" style="cursor: pointer;"></i>

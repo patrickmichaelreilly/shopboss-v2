@@ -287,6 +287,16 @@ function saveProjectEdit(projectId) {
         }
     });
 
+    // Add ProjectId and ProjectName from the table row (not editable yet, but needed for update)
+    const projectRow = document.querySelector(`tr[data-project-id="${projectId}"]`);
+    if (projectRow) {
+        const projectIdCell = projectRow.children[1]; // 2nd column
+        const projectNameCell = projectRow.children[2]; // 3rd column
+        
+        project.ProjectId = projectIdCell?.textContent?.trim() || '';
+        project.ProjectName = projectNameCell?.querySelector('strong')?.textContent?.trim() || '';
+    }
+
     (typeof apiPostJson === 'function' ? apiPostJson('/Project/Update', project) : fetch('/Project/Update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(project) }).then(r => r.json()))
     .then(data => {
         if (data.success) {

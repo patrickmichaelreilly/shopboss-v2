@@ -220,12 +220,8 @@ public class ProjectController : Controller
                 return Json(new { success = false, message = "No file selected" });
             }
 
-            // Get SmartSheet user from session for attribution
-            var smartSheetUser = HttpContext.Session.GetString("ss_user");
-            if (string.IsNullOrEmpty(smartSheetUser))
-            {
-                return Json(new { success = false, message = "Smartsheet authentication required. Please connect to Smartsheet to upload files." });
-            }
+            // Get SmartSheet user from session for attribution, fallback to "Local User"
+            var smartSheetUser = HttpContext.Session.GetString("ss_user") ?? "Local User";
 
             var attachment = await _attachmentService.UploadAttachmentAsync(projectId, file, category, uploadedBy: smartSheetUser, comment: comment, taskBlockId: taskBlockId);
             // Return a trimmed payload to avoid JSON cycles
@@ -311,12 +307,8 @@ public class ProjectController : Controller
                 return Json(new { success = false, message = $"Invalid purchase order data: {string.Join(", ", errors)}" });
             }
 
-            // Check SmartSheet authentication for event attribution
-            var smartSheetUser = HttpContext.Session.GetString("ss_user");
-            if (string.IsNullOrEmpty(smartSheetUser))
-            {
-                return Json(new { success = false, message = "Smartsheet authentication required. Please connect to Smartsheet to create purchase orders." });
-            }
+            // Check SmartSheet authentication for event attribution, fallback to "Local User"
+            var smartSheetUser = HttpContext.Session.GetString("ss_user") ?? "Local User";
 
             var createdPurchaseOrder = await _purchaseOrderService.CreatePurchaseOrderAsync(request.PurchaseOrder, request.TaskBlockId, smartSheetUser);
             return Json(new { success = true, purchaseOrder = createdPurchaseOrder });
@@ -385,12 +377,8 @@ public class ProjectController : Controller
                 return Json(new { success = false, message = $"Invalid custom work order data: {string.Join(", ", errors)}" });
             }
 
-            // Check SmartSheet authentication for event attribution
-            var smartSheetUser = HttpContext.Session.GetString("ss_user");
-            if (string.IsNullOrEmpty(smartSheetUser))
-            {
-                return Json(new { success = false, message = "Smartsheet authentication required. Please connect to Smartsheet to create custom work orders." });
-            }
+            // Check SmartSheet authentication for event attribution, fallback to "Local User"
+            var smartSheetUser = HttpContext.Session.GetString("ss_user") ?? "Local User";
 
             var createdCustomWorkOrder = await _customWorkOrderService.CreateCustomWorkOrderAsync(request.CustomWorkOrder, request.TaskBlockId, smartSheetUser);
             return Json(new { success = true, customWorkOrder = createdCustomWorkOrder });
@@ -701,12 +689,8 @@ public class ProjectController : Controller
                 return Json(new { success = false, message = "Comment description is required" });
             }
 
-            // Get Smartsheet user from session for attribution
-            var smartSheetUser = HttpContext.Session.GetString("ss_user");
-            if (string.IsNullOrEmpty(smartSheetUser))
-            {
-                return Json(new { success = false, message = "Smartsheet authentication required. Please connect to Smartsheet to create comments." });
-            }
+            // Get Smartsheet user from session for attribution, fallback to "Local User"
+            var smartSheetUser = HttpContext.Session.GetString("ss_user") ?? "Local User";
 
             // Create new ProjectEvent for the comment
             var projectEvent = new ProjectEvent
