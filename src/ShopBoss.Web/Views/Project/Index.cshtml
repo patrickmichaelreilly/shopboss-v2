@@ -45,76 +45,17 @@
         <button type="button" class="btn btn-info" data-action="open-smartsheet-import">
             <i class="fas fa-cloud-download-alt me-2"></i>Smartsheet Import
         </button>
-    </div>
-</div>
-
-<!-- Search and Filter Controls -->
-<div class="card mb-4">
-    <div class="card-body">
-        <div class="row g-3">
-            <div class="col-md-6">
-                <form asp-action="Index" method="get" class="d-flex">
-                    <input type="text" name="search" class="form-control me-2" 
-                           placeholder="Search by project ID, name, address, contact, or contractor..." 
-                           value="@ViewBag.Search">
-                    <input type="hidden" name="includeArchived" value="@ViewBag.IncludeArchived" />
-                    <input type="hidden" name="projectCategory" value="@ViewBag.ProjectCategory" />
-                    <button type="submit" class="btn btn-outline-secondary">
-                        <i class="fas fa-search"></i>
-                    </button>
-                    @if (!string.IsNullOrEmpty(ViewBag.Search))
-                    {
-                        <a asp-action="Index" asp-route-includeArchived="@ViewBag.IncludeArchived" 
-                           asp-route-projectCategory="@ViewBag.ProjectCategory" class="btn btn-outline-secondary ms-2">
-                            <i class="fas fa-times"></i>
-                        </a>
-                    }
-                </form>
-            </div>
-            <div class="col-md-3">
-                <select class="form-select" data-action="project-filter-category">
-                    <option value="">All Categories</option>
-                    @{
-                        var selectedCategory = ViewBag.ProjectCategory?.ToString();
-                    }
-                    @if (selectedCategory == "0")
-                    {
-                        <option value="0" selected>Standard Products</option>
-                    }
-                    else
-                    {
-                        <option value="0">Standard Products</option>
-                    }
-                    @if (selectedCategory == "1")
-                    {
-                        <option value="1" selected>Custom Products</option>
-                    }
-                    else
-                    {
-                        <option value="1">Custom Products</option>
-                    }
-                    @if (selectedCategory == "2")
-                    {
-                        <option value="2" selected>Small Project</option>
-                    }
-                    else
-                    {
-                        <option value="2">Small Project</option>
-                    }
-                </select>
-            </div>
-            <div class="col-md-3">
-                <div class="form-check form-switch">
-                    <input class="form-check-input" type="checkbox" id="includeArchivedToggle" 
-                           data-action="project-toggle-archived" @(ViewBag.IncludeArchived == true ? "checked" : "")>
-                    <label class="form-check-label" for="includeArchivedToggle">
-                        <i class="fas fa-archive me-1"></i>Show Archived
-                    </label>
-                </div>
-            </div>
+        <!-- Show Archived toggle moved inline -->
+        <div class="form-check form-switch ms-2">
+            <input class="form-check-input" type="checkbox" id="includeArchivedToggle"
+                   data-action="project-toggle-archived" @(ViewBag.IncludeArchived == true ? "checked" : "")>
+            <label class="form-check-label" for="includeArchivedToggle" title="Show archived projects">
+                <i class="fas fa-archive me-1"></i>Show Archived
+            </label>
         </div>
     </div>
 </div>
+
 
 @if (!Model.Any())
 {

@@ -46,7 +46,7 @@ public class SmartSheetAuthController : Controller
                          $"?response_type=code" +
                          $"&client_id={Uri.EscapeDataString(clientId)}" +
                          $"&redirect_uri={Uri.EscapeDataString(redirectUri)}" +
-                         $"&scope=READ_SHEETS%20WRITE_SHEETS" +
+                         $"&scope=READ_SHEETS%20WRITE_SHEETS%20CREATE_SHEETS" +
                          $"&state={Uri.EscapeDataString(state)}";
 
             return Redirect(authUrl);
