@@ -32,11 +32,7 @@
             {
                 <small class="text-muted ms-2">• @Model.Description</small>
             }
-            <span class="badge bg-info ms-2">@Model.Events.Count events</span>
-            @if (Model.ChildTaskBlocks.Any())
-            {
-                <span class="badge bg-secondary ms-1">@Model.ChildTaskBlocks.Count nested</span>
-            }
+            @* Removed event and nested counts for a cleaner header *@
         </div>
         <div class="d-flex align-items-center gap-1">
             <!-- Component Creation Buttons -->
