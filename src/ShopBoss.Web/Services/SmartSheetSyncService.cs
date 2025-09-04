@@ -64,63 +64,39 @@ public class SmartSheetSyncService
             if (sheetId == null)
                 return SmartSheetSyncResult.CreateError("Failed to create/access SmartSheet");
 
-            // First, sync TaskBlocks as parent rows (batched)
-            int blocksCreated = 0, blocksUpdated = 0;
-            var newTaskBlocks = project.TaskBlocks.Where(b => b.SmartsheetRowId == null).OrderBy(b => b.DisplayOrder).ToList();
-            var existingTaskBlocks = project.TaskBlocks.Where(b => b.SmartsheetRowId != null).OrderBy(b => b.DisplayOrder).ToList();
+            // Build unified timeline matching exactly how Timeline displays items
+            var timelineItems = await BuildUnifiedTimelineAsync(projectId);
+            
+            _logger.LogInformation("Built unified timeline: {ItemCount} items total", timelineItems.Count);
+            
+            // Separate new and existing items
+            var newItems = timelineItems.Where(ti => ti.IsNew).ToList();
+            var existingItems = timelineItems.Where(ti => !ti.IsNew).ToList();
 
-            _logger.LogInformation("TaskBlocks to sync: {NewBlocks} new, {ExistingBlocks} existing", 
-                newTaskBlocks.Count, existingTaskBlocks.Count);
+            _logger.LogInformation("Timeline items to sync: {NewItems} new, {ExistingItems} existing", 
+                newItems.Count, existingItems.Count);
 
-            if (newTaskBlocks.Any())
-            {
-                var createdIds = await CreateTaskBlockRowsBatchAsync(sheetId.Value, newTaskBlocks, accessToken);
-                for (int i = 0; i < newTaskBlocks.Count && i < createdIds.Count; i++)
-                {
-                    if (createdIds[i] != null)
-                    {
-                        newTaskBlocks[i].SmartsheetRowId = createdIds[i];
-                        blocksCreated++;
-                    }
-                }
-            }
-
-            if (existingTaskBlocks.Any())
-            {
-                var updatedCount = await UpdateTaskBlockRowsBatchAsync(sheetId.Value, existingTaskBlocks, accessToken);
-                blocksUpdated = updatedCount;
-            }
-
-            // Then, sync events to SmartSheet (batched)
             int created = 0, updated = 0;
-            var newEvents = project.Events.Where(e => e.SmartsheetRowId == null).OrderBy(e => e.EventDate).ToList();
-            var existingEvents = project.Events.Where(e => e.SmartsheetRowId != null).OrderBy(e => e.EventDate).ToList();
 
-            _logger.LogInformation("Events to sync: {NewEvents} new, {ExistingEvents} existing", 
-                newEvents.Count, existingEvents.Count);
-
-            if (newEvents.Any())
+            // Create new items in proper Timeline order
+            if (newItems.Any())
             {
-                var createdIds = await CreateEventRowsBatchAsync(sheetId.Value, newEvents, project.TaskBlocks, accessToken);
-                for (int i = 0; i < newEvents.Count && i < createdIds.Count; i++)
-                {
-                    if (createdIds[i] != null)
-                    {
-                        newEvents[i].SmartsheetRowId = createdIds[i];
-                        created++;
-                    }
-                }
+                var createdIds = await CreateUnifiedTimelineRowsBatchAsync(sheetId.Value, newItems, accessToken);
+                created = createdIds.Count(id => id != null);
+                _logger.LogInformation("Created {CreatedCount} new Smartsheet rows", created);
             }
 
-            if (existingEvents.Any())
+            // Update existing items while maintaining hierarchy
+            if (existingItems.Any())
             {
-                var updatedCount = await UpdateEventRowsBatchAsync(sheetId.Value, existingEvents, accessToken);
+                var updatedCount = await UpdateUnifiedTimelineRowsBatchAsync(sheetId.Value, existingItems, accessToken);
                 updated = updatedCount;
+                _logger.LogInformation("Updated {UpdatedCount} existing Smartsheet rows", updated);
             }
 
             await _context.SaveChangesAsync();
 
-            _logger.LogInformation("SmartSheet sync completed for project {ProjectId}: {Created} created, {Updated} updated", 
+            _logger.LogInformation("SmartSheet unified sync completed for project {ProjectId}: {Created} created, {Updated} updated", 
                 projectId, created, updated);
 
             return SmartSheetSyncResult.CreateSuccess(created, updated, sheetId.Value);
@@ -527,6 +503,463 @@ public class SmartSheetSyncService
             notes.Add($"Custom Work Order ID: {eventItem.CustomWorkOrderId}");
 
         return string.Join(" | ", notes);
+    }
+
+    private async Task<List<TimelineItem>> BuildUnifiedTimelineAsync(string projectId)
+    {
+        var timelineItems = new List<TimelineItem>();
+        
+        // Get the timeline data using the same logic as TimelineService
+        var project = await _context.Projects
+            .Include(p => p.Events)
+            .FirstOrDefaultAsync(p => p.Id == projectId);
+
+        if (project == null) return timelineItems;
+
+        // Get root-level task blocks with full hierarchy
+        var rootBlocks = await _context.TaskBlocks
+            .Where(tb => tb.ProjectId == projectId && tb.ParentTaskBlockId == null)
+            .Include(tb => tb.Events)
+                .ThenInclude(e => e.Attachment)
+            .Include(tb => tb.Events)
+                .ThenInclude(e => e.WorkOrder)
+                    .ThenInclude(wo => wo.NestSheets)
+            .Include(tb => tb.ChildTaskBlocks)
+                .ThenInclude(child => child.Events)
+                    .ThenInclude(e => e.Attachment)
+            .OrderBy(tb => tb.GlobalDisplayOrder ?? tb.DisplayOrder)
+            .ToListAsync();
+
+        // Load all children recursively
+        await LoadAllChildrenRecursivelyForSync(rootBlocks);
+
+        // Get all events for this project
+        var allEvents = await _context.ProjectEvents
+            .Where(pe => pe.ProjectId == projectId)
+            .Include(pe => pe.Attachment)
+            .Include(pe => pe.WorkOrder)
+                .ThenInclude(wo => wo.NestSheets)
+            .OrderBy(pe => pe.GlobalDisplayOrder ?? int.MaxValue)
+            .ThenBy(pe => pe.EventDate)
+            .ToListAsync();
+
+        // Build the timeline items recursively, preserving the exact Timeline display order
+        int orderCounter = 0;
+        orderCounter = await BuildTimelineItemsRecursively(rootBlocks, allEvents, timelineItems, 0, null, orderCounter);
+
+        // Add unblocked events at root level
+        var blockedEventIds = GetBlockedEventIds(rootBlocks);
+        var unblockedEvents = allEvents.Where(e => !blockedEventIds.Contains(e.Id))
+            .OrderBy(e => e.GlobalDisplayOrder ?? int.MaxValue)
+            .ThenBy(e => e.EventDate);
+
+        foreach (var evt in unblockedEvents)
+        {
+            timelineItems.Add(new TimelineItem
+            {
+                Id = evt.Id,
+                Type = "Event",
+                Item = evt,
+                DisplayOrder = orderCounter++,
+                HierarchyLevel = 0,
+                ParentSmartsheetRowId = null,
+                SmartsheetRowId = evt.SmartsheetRowId
+            });
+        }
+
+        return timelineItems.OrderBy(ti => ti.DisplayOrder).ToList();
+    }
+
+    private async Task LoadAllChildrenRecursivelyForSync(List<TaskBlock> blocks)
+    {
+        foreach (var block in blocks)
+        {
+            if (block.ChildTaskBlocks.Any())
+            {
+                // Load children of children
+                var childIds = block.ChildTaskBlocks.Select(c => c.Id).ToList();
+                var grandChildren = await _context.TaskBlocks
+                    .Where(tb => childIds.Contains(tb.ParentTaskBlockId))
+                    .Include(tb => tb.Events)
+                        .ThenInclude(e => e.Attachment)
+                    .Include(tb => tb.Events)
+                        .ThenInclude(e => e.WorkOrder)
+                            .ThenInclude(wo => wo.NestSheets)
+                    .Include(tb => tb.ChildTaskBlocks)
+                    .ToListAsync();
+
+                foreach (var child in block.ChildTaskBlocks)
+                {
+                    child.ChildTaskBlocks = grandChildren.Where(gc => gc.ParentTaskBlockId == child.Id).ToList();
+                }
+
+                await LoadAllChildrenRecursivelyForSync(block.ChildTaskBlocks.ToList());
+            }
+        }
+    }
+
+    private async Task<int> BuildTimelineItemsRecursively(
+        List<TaskBlock> taskBlocks, 
+        List<ProjectEvent> allEvents, 
+        List<TimelineItem> timelineItems, 
+        int hierarchyLevel, 
+        long? parentSmartsheetRowId,
+        int orderCounter)
+    {
+        // Create a mixed list of TaskBlocks and Events with their display orders
+        var mixedItems = new List<(object item, int order, string type)>();
+
+        // Add TaskBlocks
+        foreach (var block in taskBlocks)
+        {
+            mixedItems.Add((block, block.GlobalDisplayOrder ?? block.DisplayOrder, "TaskBlock"));
+        }
+
+        // Add Events that belong to the current level (unblocked at this level)
+        var currentLevelEvents = allEvents.Where(e => 
+            string.IsNullOrEmpty(e.TaskBlockId) && hierarchyLevel == 0 || // Root level events
+            taskBlocks.Any(tb => tb.Id == e.TaskBlockId) // Events in current TaskBlocks
+        );
+
+        foreach (var evt in currentLevelEvents)
+        {
+            if (!string.IsNullOrEmpty(evt.TaskBlockId))
+            {
+                // This event belongs to a TaskBlock - it will be handled when we process that TaskBlock
+                continue;
+            }
+            mixedItems.Add((evt, evt.GlobalDisplayOrder ?? int.MaxValue, "Event"));
+        }
+
+        // Sort mixed items by display order
+        var sortedMixedItems = mixedItems.OrderBy(item => item.order).ToList();
+
+        foreach (var (item, order, type) in sortedMixedItems)
+        {
+            if (type == "TaskBlock")
+            {
+                var taskBlock = (TaskBlock)item;
+                
+                // Add the TaskBlock
+                timelineItems.Add(new TimelineItem
+                {
+                    Id = taskBlock.Id,
+                    Type = "TaskBlock",
+                    Item = taskBlock,
+                    DisplayOrder = orderCounter++,
+                    HierarchyLevel = hierarchyLevel,
+                    ParentSmartsheetRowId = parentSmartsheetRowId,
+                    SmartsheetRowId = taskBlock.SmartsheetRowId
+                });
+
+                // Add events within this TaskBlock
+                var blockEvents = allEvents.Where(e => e.TaskBlockId == taskBlock.Id)
+                    .OrderBy(e => e.BlockDisplayOrder ?? 0)
+                    .ThenBy(e => e.EventDate)
+                    .ToList();
+
+                foreach (var evt in blockEvents)
+                {
+                    timelineItems.Add(new TimelineItem
+                    {
+                        Id = evt.Id,
+                        Type = "Event",
+                        Item = evt,
+                        DisplayOrder = orderCounter++,
+                        HierarchyLevel = hierarchyLevel + 1,
+                        ParentSmartsheetRowId = taskBlock.SmartsheetRowId,
+                        SmartsheetRowId = evt.SmartsheetRowId
+                    });
+                }
+
+                // Recursively add child TaskBlocks
+                if (taskBlock.ChildTaskBlocks.Any())
+                {
+                    orderCounter = await BuildTimelineItemsRecursively(
+                        taskBlock.ChildTaskBlocks.OrderBy(cb => cb.DisplayOrder).ToList(),
+                        allEvents,
+                        timelineItems,
+                        hierarchyLevel + 1,
+                        taskBlock.SmartsheetRowId,
+                        orderCounter
+                    );
+                }
+            }
+            else if (type == "Event" && hierarchyLevel == 0) // Only add root-level events here
+            {
+                var evt = (ProjectEvent)item;
+                timelineItems.Add(new TimelineItem
+                {
+                    Id = evt.Id,
+                    Type = "Event",
+                    Item = evt,
+                    DisplayOrder = orderCounter++,
+                    HierarchyLevel = hierarchyLevel,
+                    ParentSmartsheetRowId = parentSmartsheetRowId,
+                    SmartsheetRowId = evt.SmartsheetRowId
+                });
+            }
+        }
+
+        return orderCounter;
+    }
+
+    private HashSet<string> GetBlockedEventIds(List<TaskBlock> taskBlocks)
+    {
+        var blockedIds = new HashSet<string>();
+        
+        foreach (var block in taskBlocks)
+        {
+            foreach (var evt in block.Events)
+            {
+                blockedIds.Add(evt.Id);
+            }
+            
+            if (block.ChildTaskBlocks.Any())
+            {
+                var childBlockedIds = GetBlockedEventIds(block.ChildTaskBlocks.ToList());
+                blockedIds.UnionWith(childBlockedIds);
+            }
+        }
+        
+        return blockedIds;
+    }
+
+    private async Task<List<long?>> CreateUnifiedTimelineRowsBatchAsync(long sheetId, List<TimelineItem> timelineItems, string accessToken)
+    {
+        const int BATCH_SIZE = 300;
+        var allResults = new List<long?>();
+
+        for (int i = 0; i < timelineItems.Count; i += BATCH_SIZE)
+        {
+            var batch = timelineItems.Skip(i).Take(BATCH_SIZE).ToList();
+            var batchResults = await CreateUnifiedTimelineRowsBatch(sheetId, batch, accessToken);
+            allResults.AddRange(batchResults);
+
+            // Update the SmartsheetRowId for items in this batch so subsequent batches can reference them as parents
+            for (int j = 0; j < batch.Count && j < batchResults.Count; j++)
+            {
+                if (batchResults[j] != null)
+                {
+                    batch[j].SmartsheetRowId = batchResults[j];
+                    
+                    // Update the original entity
+                    if (batch[j].Type == "TaskBlock" && batch[j].Item is TaskBlock taskBlock)
+                    {
+                        taskBlock.SmartsheetRowId = batchResults[j];
+                    }
+                    else if (batch[j].Type == "Event" && batch[j].Item is ProjectEvent evt)
+                    {
+                        evt.SmartsheetRowId = batchResults[j];
+                    }
+                    
+                    // Update ParentSmartsheetRowId for any child items in subsequent batches
+                    UpdateChildParentReferences(timelineItems, batch[j]);
+                }
+            }
+        }
+
+        return allResults;
+    }
+
+    private async Task<List<long?>> CreateUnifiedTimelineRowsBatch(long sheetId, List<TimelineItem> timelineItems, string accessToken)
+    {
+        try
+        {
+            _httpClient.DefaultRequestHeaders.Clear();
+            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+            var rowRequests = new List<object>();
+            foreach (var item in timelineItems)
+            {
+                SmartSheetRow? row = null;
+                
+                if (item.Type == "TaskBlock" && item.Item is TaskBlock taskBlock)
+                {
+                    row = await TransformTaskBlockToRowAsync(taskBlock, sheetId, accessToken);
+                }
+                else if (item.Type == "Event" && item.Item is ProjectEvent evt)
+                {
+                    row = await TransformEventToRowAsync(evt, sheetId, accessToken);
+                }
+
+                if (row != null)
+                {
+                    var rowRequest = new Dictionary<string, object>
+                    {
+                        ["toBottom"] = true,
+                        ["cells"] = row.Cells
+                    };
+
+                    // Add parentId if this is a child item
+                    if (item.ParentSmartsheetRowId.HasValue)
+                    {
+                        rowRequest["parentId"] = item.ParentSmartsheetRowId.Value;
+                    }
+
+                    rowRequests.Add(rowRequest);
+                }
+                else
+                {
+                    _logger.LogWarning("Failed to transform timeline item {ItemType} '{ItemId}' to Smartsheet row", 
+                        item.Type, item.Id);
+                }
+            }
+
+            _logger.LogInformation("Transformed {RowCount} timeline items into Smartsheet rows", rowRequests.Count);
+
+            if (!rowRequests.Any())
+            {
+                _logger.LogWarning("No rows created from {ItemCount} timeline items", timelineItems.Count);
+                return new List<long?>();
+            }
+
+            var json = JsonSerializer.Serialize(rowRequests, SmartSheetJsonOptions);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            _logger.LogInformation("Sending Smartsheet unified row creation request: {Json}", json);
+
+            var response = await _httpClient.PostAsync($"https://api.smartsheet.com/2.0/sheets/{sheetId}/rows", content);
+            var responseContent = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                _logger.LogInformation("Smartsheet unified row creation response: {Response}", responseContent);
+                
+                var result = JsonSerializer.Deserialize<SmartSheetRowResponse>(responseContent, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+                
+                var rowIds = result?.Result?.Select(r => (long?)r.Id).ToList() ?? new List<long?>();
+                _logger.LogInformation("Parsed {RowCount} row IDs from Smartsheet response", rowIds.Count);
+                
+                return rowIds;
+            }
+            else
+            {
+                _logger.LogError("Failed to create SmartSheet unified timeline rows batch: {StatusCode} - {Content}", 
+                    response.StatusCode, responseContent);
+                return timelineItems.Select(e => (long?)null).ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating SmartSheet unified timeline rows batch");
+            return timelineItems.Select(e => (long?)null).ToList();
+        }
+    }
+
+    private void UpdateChildParentReferences(List<TimelineItem> allItems, TimelineItem parentItem)
+    {
+        if (!parentItem.SmartsheetRowId.HasValue) return;
+
+        foreach (var item in allItems.Where(i => i.DisplayOrder > parentItem.DisplayOrder))
+        {
+            // Update items that should have this item as their parent
+            if (item.HierarchyLevel == parentItem.HierarchyLevel + 1 && 
+                item.ParentSmartsheetRowId == null && // Not already set
+                ShouldBeChildOf(item, parentItem))
+            {
+                item.ParentSmartsheetRowId = parentItem.SmartsheetRowId;
+            }
+        }
+    }
+
+    private bool ShouldBeChildOf(TimelineItem child, TimelineItem potentialParent)
+    {
+        if (child.Type == "Event" && potentialParent.Type == "TaskBlock" && child.Item is ProjectEvent evt)
+        {
+            return evt.TaskBlockId == potentialParent.Id;
+        }
+        
+        if (child.Type == "TaskBlock" && potentialParent.Type == "TaskBlock" && child.Item is TaskBlock childBlock)
+        {
+            return childBlock.ParentTaskBlockId == potentialParent.Id;
+        }
+        
+        return false;
+    }
+
+    private async Task<int> UpdateUnifiedTimelineRowsBatchAsync(long sheetId, List<TimelineItem> timelineItems, string accessToken)
+    {
+        const int BATCH_SIZE = 300;
+        int totalUpdated = 0;
+
+        for (int i = 0; i < timelineItems.Count; i += BATCH_SIZE)
+        {
+            var batch = timelineItems.Skip(i).Take(BATCH_SIZE).ToList();
+            var updated = await UpdateUnifiedTimelineRowsBatch(sheetId, batch, accessToken);
+            totalUpdated += updated;
+        }
+
+        return totalUpdated;
+    }
+
+    private async Task<int> UpdateUnifiedTimelineRowsBatch(long sheetId, List<TimelineItem> timelineItems, string accessToken)
+    {
+        try
+        {
+            _httpClient.DefaultRequestHeaders.Clear();
+            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+            var rowRequests = new List<object>();
+            
+            foreach (var item in timelineItems.Where(ti => ti.SmartsheetRowId.HasValue))
+            {
+                SmartSheetRow? row = null;
+                
+                if (item.Type == "TaskBlock" && item.Item is TaskBlock taskBlock)
+                {
+                    row = await TransformTaskBlockToRowAsync(taskBlock, sheetId, accessToken);
+                }
+                else if (item.Type == "Event" && item.Item is ProjectEvent evt)
+                {
+                    row = await TransformEventToRowAsync(evt, sheetId, accessToken);
+                }
+
+                if (row != null)
+                {
+                    var rowRequest = new Dictionary<string, object>
+                    {
+                        ["id"] = item.SmartsheetRowId!.Value,
+                        ["cells"] = row.Cells
+                    };
+
+                    // Note: We don't update parentId on existing rows as this could disrupt structure
+                    // Parent relationships should be established at creation time
+
+                    rowRequests.Add(rowRequest);
+                }
+            }
+
+            if (!rowRequests.Any()) return 0;
+
+            var json = JsonSerializer.Serialize(rowRequests, SmartSheetJsonOptions);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            _logger.LogInformation("Sending Smartsheet unified row update request: {Json}", json);
+
+            var response = await _httpClient.PutAsync($"https://api.smartsheet.com/2.0/sheets/{sheetId}/rows", content);
+
+            if (response.IsSuccessStatusCode)
+            {
+                _logger.LogInformation("Successfully updated {RowCount} Smartsheet rows", rowRequests.Count);
+                return rowRequests.Count;
+            }
+            else
+            {
+                var responseContent = await response.Content.ReadAsStringAsync();
+                _logger.LogError("Failed to update SmartSheet unified timeline rows batch: {StatusCode} - {Content}", 
+                    response.StatusCode, responseContent);
+                return 0;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating SmartSheet unified timeline rows batch");
+            return 0;
+        }
     }
 
     private async Task<List<long?>> CreateTaskBlockRowsBatchAsync(long sheetId, List<TaskBlock> taskBlocks, string accessToken)
@@ -1039,4 +1472,16 @@ public class SmartSheetCell
 {
     public long ColumnId { get; set; }
     public object? Value { get; set; }
+}
+
+public class TimelineItem
+{
+    public string Id { get; set; } = string.Empty;
+    public string Type { get; set; } = string.Empty; // "TaskBlock" or "Event"
+    public object Item { get; set; } = null!;
+    public int DisplayOrder { get; set; }
+    public int HierarchyLevel { get; set; }
+    public long? ParentSmartsheetRowId { get; set; }
+    public long? SmartsheetRowId { get; set; }
+    public bool IsNew => SmartsheetRowId == null;
 }

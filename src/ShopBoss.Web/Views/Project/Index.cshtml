@@ -76,7 +76,8 @@ else
                     <th width="120">Install Date</th>
                     <th width="80">WO</th>
                     <th width="80">Files</th>
-                    <th width="80">Smartsheet</th>
+                    <th width="80">POs</th>
+                    <th width="100">Custom WOs</th>
                     <th width="150">Actions</th>
                 </tr>
             </thead>
@@ -115,15 +116,11 @@ else
                         <td>
                             <span class="badge bg-success">@project.Attachments.Count</span>
                         </td>
-                        <td class="text-center">
-                            @if (project.SmartSheetId.HasValue)
-                            {
-                                <i class="fas fa-table text-success" title="Linked to Smartsheet ID: @project.SmartSheetId"></i>
-                            }
-                            else
-                            {
-                                <i class="fas fa-table text-muted" title="Not linked to Smartsheet"></i>
-                            }
+                        <td>
+                            <span class="badge bg-warning text-dark">@project.PurchaseOrders.Count</span>
+                        </td>
+                        <td>
+                            <span class="badge bg-secondary">@project.CustomWorkOrders.Count</span>
                         </td>
                         <td>
                             <div class="btn-group" role="group">
