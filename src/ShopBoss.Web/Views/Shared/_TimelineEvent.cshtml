@@ -8,7 +8,16 @@
     <div class="event-primary d-flex align-items-center">
         <i class="fas fa-cog event-icon text-muted" title="Work Order"></i>
         <div>
-            <strong>@Model.Description</strong>
+            @if (!string.IsNullOrEmpty(Model.WorkOrderId))
+            {
+                <a href="/Admin/ModifyWorkOrder/@Model.WorkOrderId" class="text-decoration-none" title="Open Work Order">
+                    <strong>@Model.Description</strong>
+                </a>
+            }
+            else
+            {
+                <strong>@Model.Description</strong>
+            }
             @if (Model.RowNumber.HasValue)
             {
                 <span class="badge bg-primary row-badge">Row @Model.RowNumber</span>
@@ -72,11 +81,20 @@ else
             }
             else
             {
-                <strong>@(String.IsNullOrEmpty(Model.Description) ? Model.EventType : Model.Description.Split('\n')[0])</strong>
-                @if (Model.RowNumber.HasValue)
+                @if (Model.EventType == "work_order" && !string.IsNullOrEmpty(Model.WorkOrderId))
                 {
-                    <span class="badge bg-primary row-badge">Row @Model.RowNumber</span>
+                    <a href="/Admin/ModifyWorkOrder/@Model.WorkOrderId" class="text-decoration-none" title="Open Work Order">
+                        <strong>@(String.IsNullOrEmpty(Model.Description) ? Model.EventType : Model.Description.Split('\n')[0])</strong>
+                    </a>
                 }
+                else
+                {
+                    <strong>@(String.IsNullOrEmpty(Model.Description) ? Model.EventType : Model.Description.Split('\n')[0])</strong>
+                }
+            @if (Model.RowNumber.HasValue)
+            {
+                <span class="badge bg-primary row-badge">Row @Model.RowNumber</span>
+            }
             }
 
             <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-2"
