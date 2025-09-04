@@ -29,7 +29,7 @@
             var cutSheets = Model.WorkOrder.NestSheets.Count(ns => ns.Status >= PartStatus.Cut);
             <div>@cutSheets / @totalSheets Nest Sheets Cut</div>
         }
-        <div>@Model.EventDate.ToString("yyyy-MM-dd HH:mm") by @(Model.CreatedBy ?? "Unknown")</div>
+        @* Intentionally omit date/author line for Work Orders *@
     </div>
 }
 else
