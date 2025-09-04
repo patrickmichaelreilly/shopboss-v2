@@ -334,9 +334,6 @@ public class SmartSheetSyncService
         if (columnMapping.TryGetValue("Task Name", out var taskNameCol))
             cells.Add(new Cell { ColumnId = taskNameCol, Value = GetTaskName(eventItem) });
 
-        if (columnMapping.TryGetValue("Status", out var statusCol))
-            cells.Add(new Cell { ColumnId = statusCol, Value = "Open" });
-
         if (columnMapping.TryGetValue("Start Date", out var startDateCol))
             cells.Add(new Cell { ColumnId = startDateCol, Value = eventItem.EventDate.ToString("yyyy-MM-dd") });
 
@@ -361,11 +358,13 @@ public class SmartSheetSyncService
         if (columnMapping.TryGetValue("Task Name", out var taskNameCol))
             cells.Add(new Cell { ColumnId = taskNameCol, Value = taskBlock.Name });
 
-        if (columnMapping.TryGetValue("Status", out var statusCol))
-            cells.Add(new Cell { ColumnId = statusCol, Value = "Open" });
-
         if (columnMapping.TryGetValue("ShopBoss Type", out var typeCol))
             cells.Add(new Cell { ColumnId = typeCol, Value = "TaskBlock" });
+
+        // Mark TaskBlocks (parent rows) to be omitted from reports
+        if (columnMapping.TryGetValue("Omit From Reports", out var omitCol))
+            cells.Add(new Cell { ColumnId = omitCol, Value = true });
+            
         return new Row { Cells = cells, ToBottom = true };
     }
 
@@ -375,7 +374,7 @@ public class SmartSheetSyncService
         return eventItem.EventType switch
         {
             "comment" => $"Comment: {eventItem.Description}",
-            "attachment" => $"File Upload: {eventItem.Description}",
+            "attachment" => eventItem.Attachment?.FileName ?? $"File Upload: {eventItem.Description}",
             "purchase_order" => $"Purchase Order: {eventItem.Description}",
             "custom_work_order" => $"Custom Work Order: {eventItem.Description}",
             _ => eventItem.Description
@@ -457,6 +456,7 @@ public class SmartSheetSyncService
                 .ThenInclude(child => child.Events)
                     .ThenInclude(e => e.Attachment)
             .OrderBy(tb => tb.GlobalDisplayOrder ?? tb.DisplayOrder)
+            .AsSplitQuery()
             .ToListAsync();
 
         // Load all children recursively
@@ -470,6 +470,7 @@ public class SmartSheetSyncService
                 .ThenInclude(wo => wo.NestSheets)
             .OrderBy(pe => pe.GlobalDisplayOrder ?? int.MaxValue)
             .ThenBy(pe => pe.EventDate)
+            .AsSplitQuery()
             .ToListAsync();
 
         // Build the timeline items recursively, preserving the exact Timeline display order
