@@ -715,7 +715,7 @@ public class SmartSheetSyncService
             try
             {
                 // Transform the item to a Smartsheet row
-                SmartSheetRow? row = null;
+                Row? row = null;
                 
                 if (item.Type == "TaskBlock" && item.Item is TaskBlock taskBlock)
                 {
@@ -733,20 +733,13 @@ public class SmartSheetSyncService
                     continue;
                 }
 
-                // Build the row request
-                var rowRequest = new Dictionary<string, object>
-                {
-                    ["toBottom"] = true,
-                    ["cells"] = row.Cells
-                };
-
                 // Add parentId if this item has a parent
                 if (item.ParentItemIndex.HasValue)
                 {
                     var parentItem = timelineItems[item.ParentItemIndex.Value];
                     if (parentItem.SmartsheetRowId.HasValue)
                     {
-                        rowRequest["parentId"] = parentItem.SmartsheetRowId.Value;
+                        row.ParentId = parentItem.SmartsheetRowId.Value;
                         _logger.LogInformation("Creating {ItemType} '{ItemId}' with parentId {ParentId}", 
                             item.Type, item.Id, parentItem.SmartsheetRowId.Value);
                     }
@@ -757,54 +750,18 @@ public class SmartSheetSyncService
                     }
                 }
 
-                // Send single row creation request
-                var requestArray = new[] { rowRequest };
-                var json = JsonSerializer.Serialize(requestArray, SmartSheetJsonOptions);
-                var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-                _httpClient.DefaultRequestHeaders.Clear();
-                _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-
-                var response = await _httpClient.PostAsync($"https://api.smartsheet.com/2.0/sheets/{sheetId}/rows", content);
-                var responseContent = await response.Content.ReadAsStringAsync();
-
-                if (response.IsSuccessStatusCode)
+                var ids = await _smartSheetService.AddRowsAsync(sheetId, new List<Row> { row });
+                if (ids.Count > 0)
                 {
-                    var result = JsonSerializer.Deserialize<SmartSheetRowResponse>(responseContent, new JsonSerializerOptions
-                    {
-                        PropertyNameCaseInsensitive = true
-                    });
-                    
-                    var rowId = result?.Result?.FirstOrDefault()?.Id;
-                    if (rowId.HasValue)
-                    {
-                        // Update the item's SmartsheetRowId immediately so children can reference it
-                        item.SmartsheetRowId = rowId.Value;
-                        
-                        // Also update the original entity
-                        if (item.Type == "TaskBlock" && item.Item is TaskBlock tb)
-                        {
-                            tb.SmartsheetRowId = rowId.Value;
-                        }
-                        else if (item.Type == "Event" && item.Item is ProjectEvent pe)
-                        {
-                            pe.SmartsheetRowId = rowId.Value;
-                        }
-                        
-                        results.Add(rowId.Value);
-                        _logger.LogDebug("Created {ItemType} '{ItemId}' with SmartsheetRowId {RowId}", 
-                            item.Type, item.Id, rowId.Value);
-                    }
-                    else
-                    {
-                        _logger.LogError("Successfully created row but couldn't parse row ID from response");
-                        results.Add(null);
-                    }
+                    var rowId = ids[0];
+                    item.SmartsheetRowId = rowId;
+                    if (item.Type == "TaskBlock" && item.Item is TaskBlock tb) tb.SmartsheetRowId = rowId;
+                    else if (item.Type == "Event" && item.Item is ProjectEvent pe) pe.SmartsheetRowId = rowId;
+                    results.Add(rowId);
+                    _logger.LogDebug("Created {ItemType} '{ItemId}' with SmartsheetRowId {RowId}", item.Type, item.Id, rowId);
                 }
                 else
                 {
-                    _logger.LogError("Failed to create Smartsheet row for {ItemType} '{ItemId}': {StatusCode} - {Content}", 
-                        item.Type, item.Id, response.StatusCode, responseContent);
                     results.Add(null);
                 }
             }
@@ -902,143 +859,57 @@ public class SmartSheetSyncService
     {
         try
         {
-            var rowRequests = new List<object>();
-
-            // Transform each item to a row request
+            var sdkRows = new List<Row>();
             foreach (var (item, index) in itemsInBatch)
             {
-                SmartSheetRow? row = null;
-                
+                Row? row = null;
                 if (item.Type == "TaskBlock" && item.Item is TaskBlock taskBlock)
-                {
                     row = await TransformTaskBlockToRowAsync(taskBlock, sheetId, accessToken);
-                }
                 else if (item.Type == "Event" && item.Item is ProjectEvent evt)
-                {
                     row = await TransformEventToRowAsync(evt, sheetId, accessToken);
-                }
 
                 if (row != null)
                 {
-                    var rowRequest = new Dictionary<string, object>
-                    {
-                        ["toBottom"] = true,
-                        ["cells"] = row.Cells
-                    };
-
-                    // Add parentId if this batch has a parent
-                    if (parentRowId.HasValue)
-                    {
-                        rowRequest["parentId"] = parentRowId.Value;
-                        _logger.LogDebug("Setting parentId {ParentId} for {ItemType} '{ItemId}'", 
-                            parentRowId.Value, item.Type, item.Id);
-                    }
-
-                    rowRequests.Add(rowRequest);
+                    if (parentRowId.HasValue) row.ParentId = parentRowId.Value;
+                    sdkRows.Add(row);
                 }
                 else
                 {
-                    _logger.LogWarning("Failed to transform timeline item {ItemType} '{ItemId}' to Smartsheet row", 
-                        item.Type, item.Id);
+                    _logger.LogWarning("Failed to transform timeline item {ItemType} '{ItemId}' to Smartsheet row", item.Type, item.Id);
                 }
             }
 
-            if (!rowRequests.Any())
+            if (!sdkRows.Any())
             {
                 _logger.LogWarning("No valid rows to create in batch");
                 return;
             }
 
-            // Send batch request
-            var json = JsonSerializer.Serialize(rowRequests, SmartSheetJsonOptions);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-            _httpClient.DefaultRequestHeaders.Clear();
-            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-
-            _logger.LogDebug("Sending batch request for {ItemCount} items", rowRequests.Count);
-            var response = await _httpClient.PostAsync($"https://api.smartsheet.com/2.0/sheets/{sheetId}/rows", content);
-            var responseContent = await response.Content.ReadAsStringAsync();
-
-            if (response.IsSuccessStatusCode)
+            var createdIds = await _smartSheetService.AddRowsAsync(sheetId, sdkRows);
+            if (createdIds.Count == itemsInBatch.Count)
             {
-                var result = JsonSerializer.Deserialize<SmartSheetRowResponse>(responseContent, new JsonSerializerOptions
+                for (int i = 0; i < itemsInBatch.Count; i++)
                 {
-                    PropertyNameCaseInsensitive = true
-                });
-                
-                var rowIds = result?.Result?.Select(r => (long?)r.Id).ToList() ?? new List<long?>();
-                
-                if (rowIds.Count == itemsInBatch.Count)
-                {
-                    // Update SmartsheetRowIds for both timeline items and original entities
-                    for (int i = 0; i < itemsInBatch.Count; i++)
-                    {
-                        var (item, index) = itemsInBatch[i];
-                        var rowId = rowIds[i];
-                        
-                        if (rowId.HasValue)
-                        {
-                            // Update timeline item
-                            item.SmartsheetRowId = rowId.Value;
-                            results[index] = rowId.Value;
-                            
-                            // Update original entity
-                            if (item.Type == "TaskBlock" && item.Item is TaskBlock tb)
-                            {
-                                tb.SmartsheetRowId = rowId.Value;
-                            }
-                            else if (item.Type == "Event" && item.Item is ProjectEvent pe)
-                            {
-                                pe.SmartsheetRowId = rowId.Value;
-                            }
-                            
-                            _logger.LogDebug("Batch created {ItemType} '{ItemId}' with SmartsheetRowId {RowId}", 
-                                item.Type, item.Id, rowId.Value);
-                        }
-                        else
-                        {
-                            results[index] = null;
-                            _logger.LogWarning("Batch creation returned null row ID for {ItemType} '{ItemId}'", 
-                                item.Type, item.Id);
-                        }
-                    }
-                    
-                    _logger.LogInformation("Successfully created batch of {ItemCount} rows", itemsInBatch.Count);
+                    var (item, index) = itemsInBatch[i];
+                    var rowId = createdIds[i];
+                    item.SmartsheetRowId = rowId;
+                    results[index] = rowId;
+                    if (item.Type == "TaskBlock" && item.Item is TaskBlock tb) tb.SmartsheetRowId = rowId;
+                    else if (item.Type == "Event" && item.Item is ProjectEvent pe) pe.SmartsheetRowId = rowId;
+                    _logger.LogDebug("Batch created {ItemType} '{ItemId}' with SmartsheetRowId {RowId}", item.Type, item.Id, rowId);
                 }
-                else
-                {
-                    _logger.LogError("Batch response returned {ReturnedCount} row IDs but expected {ExpectedCount}", 
-                        rowIds.Count, itemsInBatch.Count);
-                    
-                    // Mark all as failed
-                    foreach (var (item, index) in itemsInBatch)
-                    {
-                        results[index] = null;
-                    }
-                }
+                _logger.LogInformation("Successfully created batch of {ItemCount} rows", itemsInBatch.Count);
             }
             else
             {
-                _logger.LogError("Failed to create batch: {StatusCode} - {Content}", 
-                    response.StatusCode, responseContent);
-                
-                // Mark all as failed
-                foreach (var (item, index) in itemsInBatch)
-                {
-                    results[index] = null;
-                }
+                _logger.LogError("Batch response returned {ReturnedCount} row IDs but expected {ExpectedCount}", createdIds.Count, itemsInBatch.Count);
+                foreach (var (item, index) in itemsInBatch) { results[index] = null; }
             }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error creating batch with same parent");
-            
-            // Mark all as failed
-            foreach (var (item, index) in itemsInBatch)
-            {
-                results[index] = null;
-            }
+            foreach (var (item, index) in itemsInBatch) { results[index] = null; }
         }
     }
 
