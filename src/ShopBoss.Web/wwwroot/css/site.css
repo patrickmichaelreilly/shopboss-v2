@@ -21,6 +21,54 @@ body {
   margin-bottom: 60px;
 }
 
+/* TaskBlock Toolbox - Hover to expand buttons */
+.task-block-toolbox {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.toolbox-trigger {
+  z-index: 11;
+  position: relative;
+}
+
+.toolbox-buttons {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease-in-out;
+  background: white;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  padding: 4px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+  z-index: 10;
+  white-space: nowrap;
+}
+
+.toolbox-divider {
+  width: 1px;
+  height: 20px;
+  background-color: #dee2e6;
+  margin: 0 4px;
+}
+
+.task-block-toolbox:hover .toolbox-buttons {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.task-block-toolbox:hover .toolbox-trigger {
+  opacity: 0;
+}
+
 /* ShopBoss Primary Color Overrides */
 :root {
   --bs-primary: #004F00;

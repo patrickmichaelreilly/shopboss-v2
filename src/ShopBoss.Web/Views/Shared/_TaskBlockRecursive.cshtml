@@ -34,9 +34,12 @@
             }
             @* Removed event and nested counts for a cleaner header *@
         </div>
-        <div class="d-flex align-items-center gap-1">
-            <!-- Component Creation Buttons -->
-            <div class="btn-group btn-group-sm me-2" role="group">
+        <div class="task-block-toolbox">
+            <button class="toolbox-trigger btn btn-sm btn-outline-secondary" title="Actions">
+                <i class="fas fa-ellipsis-v"></i>
+            </button>
+            <div class="toolbox-buttons">
+                <!-- Component Creation Buttons -->
                 <button type="button" class="btn btn-outline-primary btn-sm" 
                         data-action="show-upload-file-modal" data-project-id="@Model.ProjectId" data-block-id="@Model.Id"
                         title="Upload File">
@@ -67,10 +70,11 @@
                         title="Add Nested Block">
                     <i class="fas fa-cube"></i>
                 </button>
-            </div>
-            
-            <!-- Block Management Buttons -->
-            <div class="btn-group btn-group-sm" role="group">
+                
+                <!-- Divider -->
+                <div class="toolbox-divider"></div>
+                
+                <!-- Block Management Buttons -->
                 <button type="button" class="btn btn-outline-secondary btn-sm" 
                         data-action="edit-task-block" data-block-id="@Model.Id" 
                         data-block-name="@Model.Name" data-block-description="@(Model.Description ?? "")"
