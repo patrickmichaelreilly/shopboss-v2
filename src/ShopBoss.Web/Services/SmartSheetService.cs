@@ -5,7 +5,7 @@ using ShopBoss.Web.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.SignalR;
 using ShopBoss.Web.Hubs;
-using Smartsheet.Api.Models; // SDK models
+//
 
 namespace ShopBoss.Web.Services;
 
@@ -214,8 +214,8 @@ public class SmartSheetService
             var smartsheet = GetSmartSheetClient();
             if (smartsheet == null) return result;
 
-            var includes = new List<SheetLevelInclusion> { SheetLevelInclusion.COLUMNS };
-            var sheet = await Task.Run(() => smartsheet.SheetResources.GetSheet(sheetId, includes, null, null, null, null, null, null));
+            // Columns are available on the Sheet object; no special include required
+            var sheet = await Task.Run(() => smartsheet.SheetResources.GetSheet(sheetId, null, null, null, null, null, null, null));
             if (sheet.Columns == null) return result;
 
             foreach (var col in sheet.Columns)
@@ -282,7 +282,7 @@ public class SmartSheetService
             };
 
             var copied = await Task.Run(() => smartsheet.SheetResources.CopySheet(templateSheetId, destination, include));
-            return copied?.Result?.Id;
+            return copied?.Id;
         }
         catch (Exception ex)
         {

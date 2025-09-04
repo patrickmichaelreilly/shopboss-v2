@@ -426,7 +426,7 @@ public class ShopBossDbContext : DbContext
             entity.Property(e => e.IsTemplate).IsRequired();
             
             entity.HasOne(e => e.Project)
-                .WithMany()
+                .WithMany(p => p.TaskBlocks)
                 .HasForeignKey(e => e.ProjectId)
                 .OnDelete(DeleteBehavior.Cascade);
                 
