@@ -36,6 +36,7 @@ public class TimelineService
                     .ThenInclude(child => child.Events)
                         .ThenInclude(e => e.Attachment)
                 .OrderBy(tb => tb.GlobalDisplayOrder ?? tb.DisplayOrder)
+                .AsSplitQuery()
                 .ToListAsync();
 
             // For deeper nesting, we need to recursively load child blocks
@@ -49,6 +50,7 @@ public class TimelineService
                     .ThenInclude(wo => wo.NestSheets)
                 .OrderBy(pe => pe.GlobalDisplayOrder ?? int.MaxValue)
                 .ThenBy(pe => pe.EventDate)
+                .AsSplitQuery()
                 .ToListAsync();
 
             // Separate events into blocked and unblocked (including nested block events)
@@ -355,6 +357,7 @@ public class TimelineService
                     .Include(child => child.Events)
                         .ThenInclude(e => e.Attachment)
                     .Include(child => child.ChildTaskBlocks)
+                    .AsSplitQuery()
                     .LoadAsync();
 
                 // Recursively load deeper levels

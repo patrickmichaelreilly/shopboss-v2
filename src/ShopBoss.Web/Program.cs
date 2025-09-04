@@ -63,11 +63,10 @@ builder.Services.AddDbContext<ShopBossDbContext>(options =>
     var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? "Data Source=shopboss.db;Cache=Shared;Foreign Keys=False";
     options.UseSqlite(connectionString);
     
-    // Warnings: ignore pending model changes; throw on multi-collection include to locate offenders
+    // Warnings: ignore pending model changes; keep MultipleCollectionIncludeWarning as a warning
     options.ConfigureWarnings(warnings =>
     {
         warnings.Ignore(RelationalEventId.PendingModelChangesWarning);
-        warnings.Throw(RelationalEventId.MultipleCollectionIncludeWarning);
     });
     
     // Enable sensitive data logging for debugging Entity Framework conflicts
