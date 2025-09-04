@@ -1242,7 +1242,8 @@ public class SmartSheetService
                     }
                 }
                 
-                _logger.LogInformation("Retrieved {FieldCount} summary fields from sheet {SheetId}", fieldMap.Count, sheetId);
+                _logger.LogInformation("Retrieved {FieldCount} summary fields from sheet {SheetId}: [{FieldNames}]", 
+                    fieldMap.Count, sheetId, string.Join(", ", fieldMap.Keys.Select(k => $"\"{k}\"")));
             }
             
             return fieldMap;
@@ -1253,6 +1254,7 @@ public class SmartSheetService
             return new Dictionary<string, long>();
         }
     }
+
 
     /// <summary>
     /// Update sheet summary fields with project data
@@ -1288,7 +1290,8 @@ public class SmartSheetService
                 if (!fieldMap.TryGetValue(fieldName, out var fieldId))
                 {
                     skippedCount++;
-                    _logger.LogDebug("Summary field '{FieldName}' not found in sheet {SheetId}, skipping", fieldName, sheetId);
+                    _logger.LogWarning("Summary field '{FieldName}' not found in sheet {SheetId}, skipping. Available fields: [{AvailableFields}]", 
+                        fieldName, sheetId, string.Join(", ", fieldMap.Keys.Select(k => $"\"{k}\"")));
                     continue;
                 }
 
@@ -1321,7 +1324,7 @@ public class SmartSheetService
                 }
                 else if (fieldValue is decimal decimalValue)
                 {
-                    summaryField.ObjectValue = new NumberObjectValue(decimalValue);
+                    summaryField.ObjectValue = new NumberObjectValue((double)decimalValue);
                 }
                 else
                 {
@@ -1339,20 +1342,16 @@ public class SmartSheetService
                 return true;
             }
 
-            // Update the fields with partial success allowed
+            _logger.LogInformation("Attempting to update {Count} summary fields on sheet {SheetId}: [{FieldsToUpdate}]", 
+                summaryFieldsToUpdate.Count, sheetId, 
+                string.Join(", ", summaryFieldsToUpdate.Select(f => $"ID:{f.Id}")));
+
+            // Update the fields using the working method
             var result = await Task.Run(() => client.SheetResources.SummaryResources
-                .UpdateSheetSummaryFieldsAllowPartialSuccess(sheetId, summaryFieldsToUpdate, false));
+                .UpdateSheetSummaryFields(sheetId, summaryFieldsToUpdate));
 
-            if (result.FailedItems != null && result.FailedItems.Any())
-            {
-                foreach (var failure in result.FailedItems)
-                {
-                    _logger.LogWarning("Failed to update summary field: {ErrorMessage}", failure.Error?.Message ?? "Unknown error");
-                }
-            }
-
-            _logger.LogInformation("Summary field update completed for sheet {SheetId}: {SuccessCount} updated, {SkippedCount} skipped, {FailedCount} failed", 
-                sheetId, successCount, skippedCount, result.FailedItems?.Count ?? 0);
+            _logger.LogInformation("Summary field update completed for sheet {SheetId}: {SuccessCount} updated, {SkippedCount} skipped", 
+                sheetId, successCount, skippedCount);
             
             return true;
         }

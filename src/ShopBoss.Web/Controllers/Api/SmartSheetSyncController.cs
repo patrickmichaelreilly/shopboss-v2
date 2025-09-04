@@ -18,6 +18,7 @@ public class SmartSheetSyncController : ControllerBase
         _logger = logger;
     }
 
+
     /// <summary>
     /// Trigger sync for a specific project
     /// </summary>

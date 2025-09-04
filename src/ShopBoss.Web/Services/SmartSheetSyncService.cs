@@ -1045,22 +1045,18 @@ public class SmartSheetSyncService
                 return false;
             }
 
-            // Map project fields to summary field updates
+            // Map project fields to summary field updates (only fields that exist in Smartsheet)
             var fieldUpdates = new Dictionary<string, object?>
             {
                 ["Project ID"] = project.ProjectId,
                 ["Project Name"] = project.ProjectName,
-                ["Target Install Date"] = project.TargetInstallDate,
+                ["Job Address"] = project.ProjectAddress,
+                ["GC"] = project.GeneralContractor,
+                ["Job Contact"] = project.ProjectContact,
+                ["Job Contact Phone"] = project.ProjectContactPhone,
+                ["Job Contact Email"] = project.ProjectContactEmail,
                 ["Project Manager"] = project.ProjectManager,
-                ["Project Contact"] = project.ProjectContact,
-                ["Project Contact Phone"] = project.ProjectContactPhone,
-                ["Project Contact Email"] = project.ProjectContactEmail,
-                ["Project Address"] = project.ProjectAddress,
-                ["General Contractor"] = project.GeneralContractor,
-                ["Installer"] = project.Installer,
-                ["Project Category"] = project.ProjectCategory.ToString(),
-                ["Bid Request Date"] = project.BidRequestDate,
-                ["Notes"] = project.Notes
+                ["Installer"] = project.Installer
             };
 
             _logger.LogInformation("Updating {FieldCount} summary fields for project {ProjectId} on sheet {SheetId}", 
@@ -1086,6 +1082,7 @@ public class SmartSheetSyncService
             return false;
         }
     }
+
 }
 
 // Response models for reading sheet
