@@ -95,6 +95,12 @@ else
         cp -r "$WINDOWS_TEST_PATH/temp/uploads" "$BACKUP_PATH/temp/" 2>/dev/null || true
     fi
     
+    # Backup keys directory if it exists and we're preserving data
+    if [ "$PRESERVE_DATA" = true ] && [ -d "$WINDOWS_TEST_PATH/keys" ]; then
+        echo "🔐 Backing up keys directory..."
+        cp -r "$WINDOWS_TEST_PATH/keys" "$BACKUP_PATH/" 2>/dev/null || true
+    fi
+    
     # Remove application files but keep directory structure
     echo "🗑️  Removing application files..."
     find "$WINDOWS_TEST_PATH" -name "*.exe" -delete 2>/dev/null || true
@@ -161,6 +167,13 @@ if [ "$PRESERVE_DATA" = true ] && [ -d "$BACKUP_PATH" ]; then
         mkdir -p "$WINDOWS_TEST_PATH/temp"
         cp -r "$BACKUP_PATH/temp/uploads" "$WINDOWS_TEST_PATH/temp/" 2>/dev/null || true
         echo "   ✅ Upload files preserved"
+    fi
+    
+    # Restore keys directory
+    if [ -d "$BACKUP_PATH/keys" ]; then
+        echo "🔐 Restoring keys directory..."
+        cp -r "$BACKUP_PATH/keys" "$WINDOWS_TEST_PATH/" 2>/dev/null || true
+        echo "   ✅ Keys directory preserved"
     fi
     
     # Clean up backup

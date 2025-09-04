@@ -1,6 +1,44 @@
 // Project Management JavaScript (Project list + CRUD only)
 let currentProjectId = null;
 
+// =============================
+// Persist expanded projects
+// =============================
+const EXPANDED_KEY = 'projects:expanded';
+function getExpandedProjects() {
+    try {
+        const arr = JSON.parse(localStorage.getItem(EXPANDED_KEY) || '[]');
+        return new Set(Array.isArray(arr) ? arr : []);
+    } catch {
+        return new Set();
+    }
+}
+function saveExpandedProjects(set) {
+    try {
+        localStorage.setItem(EXPANDED_KEY, JSON.stringify(Array.from(set)));
+    } catch {}
+}
+function hydrateExpandedProjects() {
+    const expanded = getExpandedProjects();
+    if (expanded.size === 0) return;
+    const table = document.getElementById('projects-table');
+    let anyExpanded = false;
+    const cleaned = new Set();
+    expanded.forEach(projectId => {
+        const details = document.getElementById(`details-${projectId}`);
+        const icon = document.getElementById(`expand-icon-${projectId}`);
+        if (details && icon) {
+            details.classList.remove('d-none');
+            icon.classList.remove('fa-chevron-right');
+            icon.classList.add('fa-chevron-down');
+            anyExpanded = true;
+            cleaned.add(projectId);
+        }
+    });
+    if (anyExpanded && table) table.classList.remove('table-hover');
+    if (cleaned.size !== expanded.size) saveExpandedProjects(cleaned);
+}
+
 // SmartSheet Sync Functions
 async function initializeSmartSheetSyncUI(projectId) {
     try {
@@ -86,11 +124,13 @@ function toggleProject(projectId) {
     const details = document.getElementById(`details-${projectId}`);
     const icon = document.getElementById(`expand-icon-${projectId}`);
     const table = document.getElementById('projects-table');
+    const expanded = getExpandedProjects();
     
     if (details.classList.contains('d-none')) {
         details.classList.remove('d-none');
         icon.classList.remove('fa-chevron-right');
         icon.classList.add('fa-chevron-down');
+        expanded.add(projectId);
         
         // Remove hover effect from table when any project is expanded
         table.classList.remove('table-hover');
@@ -98,6 +138,7 @@ function toggleProject(projectId) {
         details.classList.add('d-none');
         icon.classList.remove('fa-chevron-down');
         icon.classList.add('fa-chevron-right');
+        expanded.delete(projectId);
         
         // Check if any other projects are still expanded
         const anyExpanded = document.querySelector('tr[id^="details-"]:not(.d-none)');
@@ -106,6 +147,7 @@ function toggleProject(projectId) {
             table.classList.add('table-hover');
         }
     }
+    saveExpandedProjects(expanded);
 }
 
 // Filter functions
@@ -348,6 +390,8 @@ function saveProjectEdit(projectId) {
 
 function archiveProject(projectId) {
     if (confirm('Are you sure you want to archive this project?')) {
+        // Remove from expanded state immediately
+        const ex = getExpandedProjects(); ex.delete(projectId); saveExpandedProjects(ex);
         (typeof apiPostForm === 'function' ? apiPostForm('/Project/Archive', new URLSearchParams({ id: projectId })) : fetch('/Project/Archive', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: `id=${projectId}` }).then(r => r.json()))
         .then(data => {
             if (data.success) {
@@ -364,6 +408,8 @@ function archiveProject(projectId) {
 }
 
 function unarchiveProject(projectId) {
+    // Ensure not left in expanded set from prior sessions
+    const ex = getExpandedProjects(); ex.delete(projectId); saveExpandedProjects(ex);
     (typeof apiPostForm === 'function' ? apiPostForm('/Project/Unarchive', new URLSearchParams({ id: projectId })) : fetch('/Project/Unarchive', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: `id=${projectId}` }).then(r => r.json()))
     .then(data => {
         if (data.success) {
@@ -381,6 +427,7 @@ function unarchiveProject(projectId) {
 function deleteProject(projectId, buttonElement) {
     const projectName = buttonElement.getAttribute('data-project-name');
     if (confirm(`Are you sure you want to delete project "${projectName}"? This action cannot be undone.`)) {
+        const ex = getExpandedProjects(); ex.delete(projectId); saveExpandedProjects(ex);
         (typeof apiPostForm === 'function' ? apiPostForm('/Project/Delete', new URLSearchParams({ id: projectId })) : fetch('/Project/Delete', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: `id=${projectId}` }).then(r => r.json()))
         .then(data => {
             if (data.success) {
@@ -450,6 +497,13 @@ toggleProject = function(projectId) {
         }
     }
 };
+
+// Initialize expansion state on page load (only if projects table exists)
+document.addEventListener('DOMContentLoaded', () => {
+    if (document.getElementById('projects-table')) {
+        hydrateExpandedProjects();
+    }
+});
 
 // ============== END OF FILE ==============
 // Timeline management functions are in /js/timeline.js
