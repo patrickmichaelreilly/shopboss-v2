@@ -549,7 +549,7 @@ public class SmartSheetSyncService
 
         // Add unblocked events at root level
         var blockedEventIds = GetBlockedEventIds(rootBlocks);
-        var unblockedEvents = allEvents.Where(e => !blockedEventIds.Contains(e.Id))
+        var unblockedEvents = allEvents.Where(e => e.Id != null && !blockedEventIds.Contains(e.Id))
             .OrderBy(e => e.GlobalDisplayOrder ?? int.MaxValue)
             .ThenBy(e => e.EventDate);
 
