@@ -293,35 +293,11 @@ public class SmartSheetSyncService
     {
         try
         {
-            _httpClient.DefaultRequestHeaders.Clear();
-            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-
             var row = await TransformEventToRowAsync(eventItem, sheetId, accessToken);
             if (row == null) return null;
-            
-            if (parentRowId.HasValue)
-            {
-                row.ParentId = parentRowId.Value;
-            }
-            var addRowsRequest = new[] { new { toBottom = true, cells = row.Cells } };
-
-            var json = JsonSerializer.Serialize(addRowsRequest, SmartSheetJsonOptions);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-            var response = await _httpClient.PostAsync($"https://api.smartsheet.com/2.0/sheets/{sheetId}/rows", content);
-            var responseContent = await response.Content.ReadAsStringAsync();
-
-            if (response.IsSuccessStatusCode)
-            {
-                var result = JsonSerializer.Deserialize<SmartSheetRowResponse>(responseContent);
-                return result?.Result?.FirstOrDefault()?.Id;
-            }
-            else
-            {
-                _logger.LogError("Failed to create SmartSheet row: {StatusCode} - {Content}", 
-                    response.StatusCode, responseContent);
-                return null;
-            }
+            if (parentRowId.HasValue) row.ParentId = parentRowId.Value;
+            var ids = await _smartSheetService.AddRowsAsync(sheetId, new List<Row> { row });
+            return ids.FirstOrDefault();
         }
         catch (Exception ex)
         {
@@ -334,32 +310,11 @@ public class SmartSheetSyncService
     {
         try
         {
-            _httpClient.DefaultRequestHeaders.Clear();
-            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-
             var row = await TransformEventToRowAsync(eventItem, sheetId, accessToken);
             if (row == null) return false;
-            
-            row.Id = eventItem.SmartsheetRowId!.Value; // Set the row ID for update
-
-            var updateRowsRequest = new[] { new { id = row.Id, cells = row.Cells } };
-
-            var json = JsonSerializer.Serialize(updateRowsRequest, SmartSheetJsonOptions);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-            var response = await _httpClient.PutAsync($"https://api.smartsheet.com/2.0/sheets/{sheetId}/rows", content);
-
-            if (response.IsSuccessStatusCode)
-            {
-                return true;
-            }
-            else
-            {
-                var responseContent = await response.Content.ReadAsStringAsync();
-                _logger.LogError("Failed to update SmartSheet row: {StatusCode} - {Content}", 
-                    response.StatusCode, responseContent);
-                return false;
-            }
+            row.Id = eventItem.SmartsheetRowId!.Value;
+            var count = await _smartSheetService.UpdateRowsAsync(sheetId, new List<Row> { row });
+            return count > 0;
         }
         catch (Exception ex)
         {
@@ -926,91 +881,32 @@ public class SmartSheetSyncService
         {
             try
             {
-                // Transform the item to a Smartsheet row
-                SmartSheetRow? row = null;
-                
+                Row? row = null;
                 if (item.Type == "TaskBlock" && item.Item is TaskBlock taskBlock)
-                {
                     row = await TransformTaskBlockToRowAsync(taskBlock, sheetId, accessToken);
-                }
                 else if (item.Type == "Event" && item.Item is ProjectEvent evt)
-                {
                     row = await TransformEventToRowAsync(evt, sheetId, accessToken);
-                }
 
-                if (row == null)
-                {
-                    _logger.LogWarning("Failed to transform {ItemType} '{ItemId}' to Smartsheet row", item.Type, item.Id);
-                    results[index] = null;
-                    continue;
-                }
+                if (row == null) { results[index] = null; continue; }
 
-                // Prepare row request with parent reference if needed
-                var rowRequest = new Dictionary<string, object>
-                {
-                    ["toBottom"] = true,
-                    ["cells"] = row.Cells
-                };
-
-                // Add parentId if this item has a parent
                 if (item.ParentItemIndex.HasValue)
                 {
                     var parentItem = allTimelineItems[item.ParentItemIndex.Value];
                     if (parentItem.SmartsheetRowId.HasValue)
-                    {
-                        rowRequest["parentId"] = parentItem.SmartsheetRowId.Value;
-                    }
-                    else
-                    {
-                        _logger.LogError("Parent at index {ParentIndex} doesn't have SmartsheetRowId - this should not happen!", 
-                            item.ParentItemIndex.Value);
-                    }
+                        row.ParentId = parentItem.SmartsheetRowId.Value;
                 }
 
-                // Send single row creation request
-                var requestArray = new[] { rowRequest };
-                var json = JsonSerializer.Serialize(requestArray, SmartSheetJsonOptions);
-                var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-                _httpClient.DefaultRequestHeaders.Clear();
-                _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-
-                var response = await _httpClient.PostAsync($"https://api.smartsheet.com/2.0/sheets/{sheetId}/rows", content);
-                var responseContent = await response.Content.ReadAsStringAsync();
-
-                if (response.IsSuccessStatusCode)
+                var ids = await _smartSheetService.AddRowsAsync(sheetId, new List<Row> { row });
+                if (ids.Count > 0)
                 {
-                    var result = JsonSerializer.Deserialize<SmartSheetRowResponse>(responseContent, new JsonSerializerOptions
-                    {
-                        PropertyNameCaseInsensitive = true
-                    });
-                    
-                    var rowId = result?.Result?.FirstOrDefault()?.Id;
-                    if (rowId.HasValue)
-                    {
-                        // Update the item's SmartsheetRowId immediately so children can reference it
-                        item.SmartsheetRowId = rowId.Value;
-                        results[index] = rowId.Value;
-                        
-                        // Also update the original entity
-                        if (item.Type == "TaskBlock" && item.Item is TaskBlock tb)
-                        {
-                            tb.SmartsheetRowId = rowId.Value;
-                        }
-                        else if (item.Type == "Event" && item.Item is ProjectEvent pe)
-                        {
-                            pe.SmartsheetRowId = rowId.Value;
-                        }
-                    }
-                    else
-                    {
-                        results[index] = null;
-                    }
+                    var rowId = ids[0];
+                    item.SmartsheetRowId = rowId;
+                    results[index] = rowId;
+                    if (item.Type == "TaskBlock" && item.Item is TaskBlock tb) tb.SmartsheetRowId = rowId;
+                    else if (item.Type == "Event" && item.Item is ProjectEvent pe) pe.SmartsheetRowId = rowId;
                 }
                 else
                 {
-                    _logger.LogError("Failed to create Smartsheet row for {ItemType} '{ItemId}': {StatusCode} - {Content}", 
-                        item.Type, item.Id, response.StatusCode, responseContent);
                     results[index] = null;
                 }
             }
@@ -1163,51 +1059,6 @@ public class SmartSheetSyncResult
 
     public static SmartSheetSyncResult CreateError(string message) =>
         new() { Success = false, Message = message };
-}
-
-public class SmartSheetCreateResponse
-{
-    public string? Message { get; set; }
-    public int ResultCode { get; set; }
-    public SmartSheetResult? Result { get; set; }
-}
-
-public class SmartSheetResult
-{
-    public long Id { get; set; }
-    public string Name { get; set; } = string.Empty;
-    public string? AccessLevel { get; set; }
-    public string? Permalink { get; set; }
-}
-
-public class SmartSheetRowResponse
-{
-    public List<SmartSheetRowResult>? Result { get; set; }
-}
-
-public class SmartSheetSingleRowResponse
-{
-    public string? Message { get; set; }
-    public int ResultCode { get; set; }
-    public SmartSheetRowResult? Result { get; set; }
-}
-
-public class SmartSheetRowResult
-{
-    public long Id { get; set; }
-}
-
-public class SmartSheetRow
-{
-    public long? Id { get; set; }
-    public long? ParentId { get; set; }
-    public List<SmartSheetCell> Cells { get; set; } = new();
-}
-
-public class SmartSheetCell
-{
-    public long ColumnId { get; set; }
-    public object? Value { get; set; }
 }
 
 public class TimelineItem
