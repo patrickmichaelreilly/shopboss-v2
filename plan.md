@@ -1,62 +1,46 @@
-# Smartsheet Integration PRD (condensed)
+ # ShopBoss v2: Modern Inline Editing System with Direct File Upload
+ 
+ ## Vision
+ Transform the entire UI to support seamless inline editing where:
+ - Click any field to edit it in-place
+ - No layout shifts or mode switching  
+ - Direct file upload without modal
+ - Consistent experience across all editable content
+ 
+ ## Inline Attribute Editing
+ - Hover: Subtle highlight + edit icon
+ - Click: Convert to inline input with same dimensions
+ - Enter/blur: Save via AJAX
+ - Escape: Cancel edit
+ - Editing: Blue border, white background
+ - Saving: Brief spinner, then green checkmark
+ - Error: Red border with tooltip
+ - Save with per-field PATCH; optimistic UI with spinner then checkmark
 
-## Inputs Needed
-- Template sheet ID: 2455059368464260
-- Target workspace ID: 6590163225732996
+ ## Keyboard Navigation
+ - **Tab**: Move between editable fields
+ - **Enter**: Save current field
+ - **Escape**: Cancel current edit
 
-## Executive Summary
-Enable reliable bi‑directional sync between ShopBoss Projects and Smartsheet with secure auth, stable row mapping, batching, and conflict-safe updates.
-
-## Phase 0: Fix Import OAuth (0.5d)
-- Bug: Import modal shows “Authentication cancelled” after successful login.
-- Fix: In `smartsheet.js:triggerSmartSheetAuth()`
-  - Resolve/reject only on `postMessage` from popup; do not reject on manual close.
-  - Validate `event.source === popup` and `event.origin` whitelist.
-  - After popup closes, poll `/smartsheet/auth/status` (≤10s) to confirm session.
-
-## Phase 1: OAuth Attribution + UI (1d)
-- Attribution: On create (comments, attachments, PO/WO, TaskBlock), use Smartsheet `ss_user_id` and email from session; store both.
-- Behavior: Block authoring without Smartsheet session and prompt to connect.
-- UI: Project header shows Connect/Disconnect + connected user email; no auto-redirects.
-
-## Phase 2: Smartsheet Writes (2d)
-- Service: Add CreateSheet, AddRows, UpdateRows, AddComment, AttachFile.
-- Mapping: Use column IDs (not titles); no hidden columns in MVP; rely on DB `row_mappings`.
-- Batching: Batch rows (200–400/request). Exponential backoff on 429/5xx with jitter.
-- Attachments: Stream upload; retry small files; surface per-item status.
-- Observability: Set a change-agent header/marker for loop avoidance and audit.
-
-## Phase 3: Templates & Formatting (2d)
-- Columns: Project#, Name, Status, Dates, Amounts, Notes (as in provided template).
-- Entities → rows: Comment, Attachment, PO, WO, Custom WO; TaskBlock as parent rows.
-- Formatting: Minimal API-supported styles; hierarchy via parent/child rows.
-
-## Phase 4: Manual Sync UX (1d)
-- Timeline UI: Two buttons — `Sync to Smartsheet`, `Sync from Smartsheet` (with progress + summary).
-- Outbound: Diff latest ShopBoss events → batched Add/Update rows; update `row_mappings` with `rowId`,`rowVersion`.
-- Inbound: Read sheet (since last sync) → map via `row_mappings`; unknown rows summarized as Unmapped (ignored or manual action).
-- Conflicts: Last‑write‑wins; low user count → accept rare collisions.
-- No webhooks in MVP (future phase).
-
-## Architecture & Data Model
-- No hidden columns in MVP; rely on Smartsheet `rowId` and DB mapping.
-- Tables: `smartsheet_accounts`, `project_sheet_links`, `row_mappings (sheetId,rowId,entityId,rowVersion)`, `sync_log`.
-- Sheet provisioning: If unlinked, copy provided template to target workspace; persist link.
-
-## Security
-- OAuth: PKCE + CSRF `state`, short‑lived tokens with refresh; rotate on login; encrypt at rest.
-- postMessage: Strict origin + `event.source` checks; handle popup blockers.
-- Scopes: Minimum necessary Smartsheet scopes.
-
-## Acceptance Criteria
-- OAuth: Import modal updates within 2s; no false “cancelled”.
-- Writes: Batch adds/updates <1% retries; p95 <2s.
-- Manual sync: Two buttons visible; each completes with clear summary; 0 duplicates.
-- Provisioning: If no link, one‑click create/attach sheet with correct schema.
-
-## Timeline
-- Total: 6.5 days
-- P0: 0.5d; P1: 1d; P2: 2d; P3: 1.5d; P4: 1.5d
-
-## Non‑Goals (MVP)
-- Webhooks/real‑time sync, HMAC validation, and conflict UI workflows.
+ # Phase 1: Attachment System
+ 1. Add `Label` field to `ProjectAttachment` model
+ 2. Remove `Category` field from `ProjectAttachment` model (no migration; drop and discard)
+ 3. Simplify upload controller to handle direct file upload
+ 4. Set `Label` default to "Label" on upload; allow inline editing afterward
+ 5. Remove upload modal from _ProjectDetails.cshtml
+ 6. Update timeline-files.js for direct upload
+ 7. Implement inline label editing in _TimelineEvent.cshtml
+ 8. Add API endpoint for updating attachment label
+ 9. Update Attachment event appearance per sketch: line 1 = icon + Label + delete; line 2 = filename.ext + size; line 3 = timestamp + author
+ 
+ # Phase 2: Project Information Card  
+ 1. Remove Edit/Save/Cancel buttons
+ 2. Add `.inline-editable` class to all fields
+ 3. Implement field-specific editors (text, date, select)
+ 4. Create unified save API that updates individual fields
+ 
+ # Phase 3: Extend to All Areas
+ 1. Timeline event descriptions
+ 2. Task block names  
+ 3. Work order details
+ 4. Projects Index: Make `Project Name`, `Project ID`, and `Install Date` inline editable in the index table
