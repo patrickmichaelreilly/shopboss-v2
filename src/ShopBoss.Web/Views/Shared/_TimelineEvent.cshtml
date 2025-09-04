@@ -62,9 +62,12 @@ else
                 <a href="/Project/DownloadFile/@Model.Attachment.Id" class="text-decoration-none" title="Download @Model.Attachment.FileName">
                     <strong>@Model.Attachment.OriginalFileName</strong>
                 </a>
+                <span class="text-muted small ms-2">
+                    @((Model.Attachment.FileSize / 1024.0 / 1024.0).ToString("F2")) MB
+                </span>
                 @if (Model.RowNumber.HasValue)
                 {
-                    <span class="badge bg-primary row-badge">Row @Model.RowNumber</span>
+                    <span class="badge bg-primary row-badge ms-2">Row @Model.RowNumber</span>
                 }
             }
             else
@@ -89,13 +92,13 @@ else
     </div>
 
     <div class="event-secondary text-muted small mt-1">
-        @if (Model.EventType == "attachment" && Model.Attachment != null)
+        @if (Model.EventType != "attachment")
         {
-            <span>@((Model.Attachment.FileSize / 1024.0 / 1024.0).ToString("F2")) MB</span>
-        }
-        @if (!string.IsNullOrEmpty(Model.Description))
-        {
-            <div>@Model.Description</div>
+            @* Preserve existing secondary details for non-attachments *@
+            @if (!string.IsNullOrEmpty(Model.Description))
+            {
+                <div>@Model.Description</div>
+            }
         }
         <div>@Model.EventDate.ToString("yyyy-MM-dd HH:mm") by @(Model.CreatedBy ?? "Unknown")</div>
     </div>
