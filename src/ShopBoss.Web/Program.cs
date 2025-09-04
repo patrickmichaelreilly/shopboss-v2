@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using ShopBoss.Web.Data;
 using ShopBoss.Web.Hubs;
 using ShopBoss.Web.Services;
@@ -62,9 +63,12 @@ builder.Services.AddDbContext<ShopBossDbContext>(options =>
     var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? "Data Source=shopboss.db;Cache=Shared;Foreign Keys=False";
     options.UseSqlite(connectionString);
     
-    // Suppress pending model changes warning during status migration
+    // Warnings: ignore pending model changes; throw on multi-collection include to locate offenders
     options.ConfigureWarnings(warnings =>
-        warnings.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
+    {
+        warnings.Ignore(RelationalEventId.PendingModelChangesWarning);
+        warnings.Throw(RelationalEventId.MultipleCollectionIncludeWarning);
+    });
     
     // Enable sensitive data logging for debugging Entity Framework conflicts
     if (builder.Environment.IsDevelopment())

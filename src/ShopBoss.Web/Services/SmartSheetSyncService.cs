@@ -109,6 +109,21 @@ public class SmartSheetSyncService
                 _logger.LogInformation("Created {CreatedCount} new Smartsheet rows using per-level batching with proper hierarchy", created);
             }
 
+            // Update sheet summary with project data
+            try
+            {
+                _logger.LogInformation("Updating sheet summary fields for project {ProjectId}", projectId);
+                var summarySuccess = await UpdateSheetSummaryFromProjectAsync(projectId, sheetId.Value, accessToken);
+                if (!summarySuccess)
+                {
+                    _logger.LogWarning("Summary field update failed for project {ProjectId}, but continuing with sync", projectId);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Summary field update failed for project {ProjectId}, but continuing with sync", projectId);
+            }
+
             await _context.SaveChangesAsync();
 
             _logger.LogInformation("SmartSheet unified sync completed for project {ProjectId}: {Created} created with proper hierarchy", 
@@ -1015,6 +1030,60 @@ public class SmartSheetSyncService
         {
             _logger.LogError(ex, "Error ensuring valid token for sync");
             return Task.FromResult<string?>(null);
+        }
+    }
+
+    private async Task<bool> UpdateSheetSummaryFromProjectAsync(string projectId, long sheetId, string accessToken)
+    {
+        try
+        {
+            // Get the project with all necessary data
+            var project = await _context.Projects.FirstOrDefaultAsync(p => p.Id == projectId);
+            if (project == null)
+            {
+                _logger.LogWarning("Project {ProjectId} not found for summary sync", projectId);
+                return false;
+            }
+
+            // Map project fields to summary field updates
+            var fieldUpdates = new Dictionary<string, object?>
+            {
+                ["Project ID"] = project.ProjectId,
+                ["Project Name"] = project.ProjectName,
+                ["Target Install Date"] = project.TargetInstallDate,
+                ["Project Manager"] = project.ProjectManager,
+                ["Project Contact"] = project.ProjectContact,
+                ["Project Contact Phone"] = project.ProjectContactPhone,
+                ["Project Contact Email"] = project.ProjectContactEmail,
+                ["Project Address"] = project.ProjectAddress,
+                ["General Contractor"] = project.GeneralContractor,
+                ["Installer"] = project.Installer,
+                ["Project Category"] = project.ProjectCategory.ToString(),
+                ["Bid Request Date"] = project.BidRequestDate,
+                ["Notes"] = project.Notes
+            };
+
+            _logger.LogInformation("Updating {FieldCount} summary fields for project {ProjectId} on sheet {SheetId}", 
+                fieldUpdates.Count, projectId, sheetId);
+
+            // Use SmartSheetService to update the summary fields
+            var success = await _smartSheetService.UpdateSheetSummaryFieldsAsync(sheetId, fieldUpdates);
+            
+            if (success)
+            {
+                _logger.LogInformation("Successfully updated sheet summary for project {ProjectId}", projectId);
+            }
+            else
+            {
+                _logger.LogWarning("Failed to update sheet summary for project {ProjectId}", projectId);
+            }
+
+            return success;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating sheet summary for project {ProjectId}", projectId);
+            return false;
         }
     }
 }

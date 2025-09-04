@@ -1214,5 +1214,153 @@ public class SmartSheetService
             // Don't rethrow - this is a nice-to-have feature that shouldn't break the import
         }
     }
+
+    /// <summary>
+    /// Get sheet summary fields with their IDs and current values
+    /// </summary>
+    public async Task<Dictionary<string, long>> GetSheetSummaryFieldsAsync(long sheetId)
+    {
+        try
+        {
+            var client = await GetSmartSheetClientAsync();
+            if (client == null)
+            {
+                _logger.LogWarning("SmartSheet client not available for getting summary fields");
+                return new Dictionary<string, long>();
+            }
+
+            var summary = await Task.Run(() => client.SheetResources.SummaryResources.GetSheetSummary(sheetId, null, null));
+            var fieldMap = new Dictionary<string, long>();
+            
+            if (summary?.Fields != null)
+            {
+                foreach (var field in summary.Fields)
+                {
+                    if (!string.IsNullOrEmpty(field.Title) && field.Id.HasValue)
+                    {
+                        fieldMap[field.Title] = field.Id.Value;
+                    }
+                }
+                
+                _logger.LogInformation("Retrieved {FieldCount} summary fields from sheet {SheetId}", fieldMap.Count, sheetId);
+            }
+            
+            return fieldMap;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting summary fields for sheet {SheetId}", sheetId);
+            return new Dictionary<string, long>();
+        }
+    }
+
+    /// <summary>
+    /// Update sheet summary fields with project data
+    /// </summary>
+    public async Task<bool> UpdateSheetSummaryFieldsAsync(long sheetId, Dictionary<string, object?> fieldUpdates)
+    {
+        try
+        {
+            var client = await GetSmartSheetClientAsync();
+            if (client == null)
+            {
+                _logger.LogWarning("SmartSheet client not available for updating summary fields");
+                return false;
+            }
+
+            // Get existing summary fields to map names to IDs
+            var fieldMap = await GetSheetSummaryFieldsAsync(sheetId);
+            if (!fieldMap.Any())
+            {
+                _logger.LogWarning("No summary fields found for sheet {SheetId}", sheetId);
+                return false;
+            }
+
+            var summaryFieldsToUpdate = new List<SummaryField>();
+            int successCount = 0;
+            int skippedCount = 0;
+
+            foreach (var update in fieldUpdates)
+            {
+                var fieldName = update.Key;
+                var fieldValue = update.Value;
+
+                if (!fieldMap.TryGetValue(fieldName, out var fieldId))
+                {
+                    skippedCount++;
+                    _logger.LogDebug("Summary field '{FieldName}' not found in sheet {SheetId}, skipping", fieldName, sheetId);
+                    continue;
+                }
+
+                if (fieldValue == null)
+                {
+                    skippedCount++;
+                    _logger.LogDebug("Value for summary field '{FieldName}' is null, skipping", fieldName);
+                    continue;
+                }
+
+                var summaryField = new SummaryField();
+                summaryField.Id = fieldId;
+
+                // Set the appropriate ObjectValue based on the type
+                if (fieldValue is string stringValue)
+                {
+                    summaryField.ObjectValue = new StringObjectValue(stringValue);
+                }
+                else if (fieldValue is DateTime dateValue)
+                {
+                    summaryField.ObjectValue = new DateObjectValue(ObjectValueType.DATE, dateValue.ToString("yyyy-MM-dd"));
+                }
+                else if (fieldValue is bool boolValue)
+                {
+                    summaryField.ObjectValue = new BooleanObjectValue(boolValue);
+                }
+                else if (fieldValue is int intValue)
+                {
+                    summaryField.ObjectValue = new NumberObjectValue(intValue);
+                }
+                else if (fieldValue is decimal decimalValue)
+                {
+                    summaryField.ObjectValue = new NumberObjectValue(decimalValue);
+                }
+                else
+                {
+                    // Convert other types to string
+                    summaryField.ObjectValue = new StringObjectValue(fieldValue.ToString() ?? "");
+                }
+
+                summaryFieldsToUpdate.Add(summaryField);
+                successCount++;
+            }
+
+            if (!summaryFieldsToUpdate.Any())
+            {
+                _logger.LogInformation("No valid summary fields to update for sheet {SheetId}", sheetId);
+                return true;
+            }
+
+            // Update the fields with partial success allowed
+            var result = await Task.Run(() => client.SheetResources.SummaryResources
+                .UpdateSheetSummaryFieldsAllowPartialSuccess(sheetId, summaryFieldsToUpdate, false));
+
+            if (result.FailedItems != null && result.FailedItems.Any())
+            {
+                foreach (var failure in result.FailedItems)
+                {
+                    _logger.LogWarning("Failed to update summary field: {ErrorMessage}", failure.Error?.Message ?? "Unknown error");
+                }
+            }
+
+            _logger.LogInformation("Summary field update completed for sheet {SheetId}: {SuccessCount} updated, {SkippedCount} skipped, {FailedCount} failed", 
+                sheetId, successCount, skippedCount, result.FailedItems?.Count ?? 0);
+            
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating summary fields for sheet {SheetId}", sheetId);
+            return false;
+        }
+    }
 }
 

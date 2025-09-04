@@ -25,6 +25,7 @@ public class ProjectService
                 .Include(p => p.PurchaseOrders)
                 .Include(p => p.CustomWorkOrders)
                 .Include(p => p.Events)
+                .AsSplitQuery()
                 .AsQueryable();
 
             if (!includeArchived)
@@ -70,6 +71,7 @@ public class ProjectService
                 .Include(p => p.PurchaseOrders)
                 .Include(p => p.CustomWorkOrders)
                 .Include(p => p.Events)
+                .AsSplitQuery()
                 .FirstOrDefaultAsync(p => p.Id == id);
         }
         catch (Exception ex)
