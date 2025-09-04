@@ -4,6 +4,7 @@ using ShopBoss.Web.Models;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Text;
+using Smartsheet.Api.Models;
 
 namespace ShopBoss.Web.Services;
 
@@ -210,65 +211,18 @@ public class SmartSheetSyncService
     {
         try
         {
-            var templateSheetId = _configuration["SmartSheet:TemplateSheetId"] 
-                ?? throw new InvalidOperationException("SmartSheet:TemplateSheetId configuration is required");
-            var workspaceId = _configuration["SmartSheet:WorkspaceId"] 
-                ?? throw new InvalidOperationException("SmartSheet:WorkspaceId configuration is required");
+            var templateSheetId = long.Parse(_configuration["SmartSheet:TemplateSheetId"] 
+                ?? throw new InvalidOperationException("SmartSheet:TemplateSheetId configuration is required"));
+            var workspaceId = long.Parse(_configuration["SmartSheet:WorkspaceId"] 
+                ?? throw new InvalidOperationException("SmartSheet:WorkspaceId configuration is required"));
 
-            _httpClient.DefaultRequestHeaders.Clear();
-            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-
-            // First, verify we can access the workspace
-            var workspaceResponse = await _httpClient.GetAsync($"https://api.smartsheet.com/2.0/workspaces/{workspaceId}");
-            if (!workspaceResponse.IsSuccessStatusCode)
+            var includes = new List<SheetCopyInclusion> { SheetCopyInclusion.ATTACHMENTS, SheetCopyInclusion.DISCUSSIONS, SheetCopyInclusion.CELL_LINKS };
+            var newId = await _smartSheetService.CopySheetToWorkspaceAsync(templateSheetId, workspaceId, project.ProjectName, includes);
+            if (newId.HasValue)
             {
-                var workspaceError = await workspaceResponse.Content.ReadAsStringAsync();
-                _logger.LogError("Cannot access workspace {WorkspaceId}: {StatusCode} - {Content}", 
-                    workspaceId, workspaceResponse.StatusCode, workspaceError);
-                return null;
+                _logger.LogInformation("Created SmartSheet for project {ProjectName} with ID {SheetId}", project.ProjectName, newId.Value);
             }
-
-            // Verify we can access the template sheet
-            var templateResponse = await _httpClient.GetAsync($"https://api.smartsheet.com/2.0/sheets/{templateSheetId}");
-            if (!templateResponse.IsSuccessStatusCode)
-            {
-                var templateError = await templateResponse.Content.ReadAsStringAsync();
-                _logger.LogError("Cannot access template sheet {TemplateSheetId}: {StatusCode} - {Content}", 
-                    templateSheetId, templateResponse.StatusCode, templateError);
-                return null;
-            }
-
-            // Now try to create the sheet copy
-            var createRequest = new
-            {
-                name = project.ProjectName,
-                fromId = long.Parse(templateSheetId)
-            };
-
-            var json = JsonSerializer.Serialize(createRequest, SmartSheetJsonOptions);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-            var response = await _httpClient.PostAsync($"https://api.smartsheet.com/2.0/workspaces/{workspaceId}/sheets", content);
-            var responseContent = await response.Content.ReadAsStringAsync();
-
-            if (response.IsSuccessStatusCode)
-            {
-                var result = JsonSerializer.Deserialize<SmartSheetCreateResponse>(responseContent, new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                });
-                
-                var sheetId = result?.Result?.Id;
-                _logger.LogInformation("Created SmartSheet for project {ProjectName} with ID {SheetId}", 
-                    project.ProjectName, sheetId);
-                return sheetId;
-            }
-            else
-            {
-                _logger.LogError("Failed to create SmartSheet: {StatusCode} - {Content}", 
-                    response.StatusCode, responseContent);
-                return null;
-            }
+            return newId;
         }
         catch (Exception ex)
         {
@@ -287,25 +241,8 @@ public class SmartSheetSyncService
             var row = await TransformTaskBlockToRowAsync(taskBlock, sheetId, accessToken);
             if (row == null) return null;
             
-            var addRowsRequest = new[] { new { toBottom = true, cells = row.Cells } };
-
-            var json = JsonSerializer.Serialize(addRowsRequest, SmartSheetJsonOptions);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-            var response = await _httpClient.PostAsync($"https://api.smartsheet.com/2.0/sheets/{sheetId}/rows", content);
-            var responseContent = await response.Content.ReadAsStringAsync();
-
-            if (response.IsSuccessStatusCode)
-            {
-                var result = JsonSerializer.Deserialize<SmartSheetRowResponse>(responseContent);
-                return result?.Result?.FirstOrDefault()?.Id;
-            }
-            else
-            {
-                _logger.LogError("Failed to create SmartSheet TaskBlock row: {StatusCode} - {Content}", 
-                    response.StatusCode, responseContent);
-                return null;
-            }
+            var ids = await _smartSheetService.AddRowsAsync(sheetId, new List<Row> { row });
+            return ids.FirstOrDefault();
         }
         catch (Exception ex)
         {
@@ -431,52 +368,50 @@ public class SmartSheetSyncService
         }
     }
 
-    private async Task<SmartSheetRow?> TransformEventToRowAsync(ProjectEvent eventItem, long sheetId, string accessToken)
+    private async Task<Row?> TransformEventToRowAsync(ProjectEvent eventItem, long sheetId, string accessToken)
     {
         var columnMapping = await GetColumnMappingAsync(sheetId, accessToken);
         if (columnMapping == null) return null;
 
-        var cells = new List<SmartSheetCell>();
+        var cells = new List<Cell>();
 
         // Map columns by title
         if (columnMapping.TryGetValue("Task Name", out var taskNameCol))
-            cells.Add(new SmartSheetCell { ColumnId = taskNameCol, Value = GetTaskName(eventItem) });
+            cells.Add(new Cell { ColumnId = taskNameCol, Value = GetTaskName(eventItem) });
 
         if (columnMapping.TryGetValue("Status", out var statusCol))
-            cells.Add(new SmartSheetCell { ColumnId = statusCol, Value = "Open" });
+            cells.Add(new Cell { ColumnId = statusCol, Value = "Open" });
 
         if (columnMapping.TryGetValue("Start Date", out var startDateCol))
-            cells.Add(new SmartSheetCell { ColumnId = startDateCol, Value = eventItem.EventDate.ToString("yyyy-MM-dd") });
+            cells.Add(new Cell { ColumnId = startDateCol, Value = eventItem.EventDate.ToString("yyyy-MM-dd") });
 
         if (columnMapping.TryGetValue("Assigned To", out var assignedToCol))
-            cells.Add(new SmartSheetCell { ColumnId = assignedToCol, Value = eventItem.CreatedBy ?? "System" });
+            cells.Add(new Cell { ColumnId = assignedToCol, Value = eventItem.CreatedBy ?? "System" });
 
         if (columnMapping.TryGetValue("Notes", out var notesCol) || columnMapping.TryGetValue("Notes ", out notesCol))
-            cells.Add(new SmartSheetCell { ColumnId = notesCol, Value = GetEventNotes(eventItem) });
+            cells.Add(new Cell { ColumnId = notesCol, Value = GetEventNotes(eventItem) });
 
         if (columnMapping.TryGetValue("ShopBoss Type", out var typeCol))
-            cells.Add(new SmartSheetCell { ColumnId = typeCol, Value = eventItem.EventType });
-
-        return new SmartSheetRow { Cells = cells };
+            cells.Add(new Cell { ColumnId = typeCol, Value = eventItem.EventType });
+        return new Row { Cells = cells, ToBottom = true };
     }
 
-    private async Task<SmartSheetRow?> TransformTaskBlockToRowAsync(TaskBlock taskBlock, long sheetId, string accessToken)
+    private async Task<Row?> TransformTaskBlockToRowAsync(TaskBlock taskBlock, long sheetId, string accessToken)
     {
         var columnMapping = await GetColumnMappingAsync(sheetId, accessToken);
         if (columnMapping == null) return null;
 
-        var cells = new List<SmartSheetCell>();
+        var cells = new List<Cell>();
 
         if (columnMapping.TryGetValue("Task Name", out var taskNameCol))
-            cells.Add(new SmartSheetCell { ColumnId = taskNameCol, Value = taskBlock.Name });
+            cells.Add(new Cell { ColumnId = taskNameCol, Value = taskBlock.Name });
 
         if (columnMapping.TryGetValue("Status", out var statusCol))
-            cells.Add(new SmartSheetCell { ColumnId = statusCol, Value = "Open" });
+            cells.Add(new Cell { ColumnId = statusCol, Value = "Open" });
 
         if (columnMapping.TryGetValue("ShopBoss Type", out var typeCol))
-            cells.Add(new SmartSheetCell { ColumnId = typeCol, Value = "TaskBlock" });
-
-        return new SmartSheetRow { Cells = cells };
+            cells.Add(new Cell { ColumnId = typeCol, Value = "TaskBlock" });
+        return new Row { Cells = cells, ToBottom = true };
     }
 
 
@@ -515,31 +450,7 @@ public class SmartSheetSyncService
     {
         try
         {
-            _httpClient.DefaultRequestHeaders.Clear();
-            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-
-            // Get all rows in the sheet
-            var response = await _httpClient.GetAsync($"https://api.smartsheet.com/2.0/sheets/{sheetId}?include=rowIds");
-            if (!response.IsSuccessStatusCode)
-            {
-                _logger.LogError("Failed to get sheet rows for clearing: {StatusCode}", response.StatusCode);
-                return false;
-            }
-
-            var responseContent = await response.Content.ReadAsStringAsync();
-            var sheetData = JsonSerializer.Deserialize<JsonDocument>(responseContent);
-            
-            var rowIds = new List<long>();
-            if (sheetData?.RootElement.TryGetProperty("rows", out var rowsElement) == true)
-            {
-                foreach (var row in rowsElement.EnumerateArray())
-                {
-                    if (row.TryGetProperty("id", out var idElement) && idElement.TryGetInt64(out var id))
-                    {
-                        rowIds.Add(id);
-                    }
-                }
-            }
+            var rowIds = await _smartSheetService.GetAllRowIdsAsync(sheetId);
 
             if (!rowIds.Any())
             {
@@ -554,14 +465,8 @@ public class SmartSheetSyncService
             for (int i = 0; i < rowIds.Count; i += BATCH_SIZE)
             {
                 var batch = rowIds.Skip(i).Take(BATCH_SIZE);
-                var deleteUrl = $"https://api.smartsheet.com/2.0/sheets/{sheetId}/rows?ids={string.Join(",", batch)}";
-                
-                var deleteResponse = await _httpClient.DeleteAsync(deleteUrl);
-                if (!deleteResponse.IsSuccessStatusCode)
-                {
-                    _logger.LogError("Failed to delete row batch: {StatusCode}", deleteResponse.StatusCode);
-                    return false;
-                }
+                var ok = await _smartSheetService.DeleteRowsAsync(sheetId, batch.ToList());
+                if (!ok) return false;
             }
 
             _logger.LogInformation("Successfully cleared {RowCount} rows from sheet {SheetId}", rowIds.Count, sheetId);
@@ -1256,44 +1161,13 @@ public class SmartSheetSyncService
                 return cachedMapping;
             }
 
-            _httpClient.DefaultRequestHeaders.Clear();
-            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-
-            // Get sheet columns
-            var response = await _httpClient.GetAsync($"https://api.smartsheet.com/2.0/sheets/{sheetId}?include=columns");
-            var responseContent = await response.Content.ReadAsStringAsync();
-
-            if (!response.IsSuccessStatusCode)
-            {
-                _logger.LogError("Failed to get sheet columns: {StatusCode} - {Content}", response.StatusCode, responseContent);
-                return null;
-            }
-
-            var sheet = JsonSerializer.Deserialize<SmartSheetColumnResponse>(responseContent, new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true,
-                DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
-            });
-
-            if (sheet?.Columns == null)
+            var mapping = await _smartSheetService.GetColumnMapAsync(sheetId);
+            if (mapping.Count == 0)
             {
                 _logger.LogWarning("No columns returned from sheet {SheetId}", sheetId);
                 return null;
             }
-
-            // Build title -> ID mapping
-            var mapping = new Dictionary<string, long>();
-            foreach (var column in sheet.Columns)
-            {
-                if (!string.IsNullOrEmpty(column.Title))
-                {
-                    mapping[column.Title] = column.Id;
-                }
-            }
-
-            // Cache the mapping
             _columnCache[sheetId] = mapping;
-
             _logger.LogInformation("Cached column mapping for sheet {SheetId}: {Count} columns", sheetId, mapping.Count);
             return mapping;
         }
@@ -1314,36 +1188,8 @@ public class SmartSheetSyncService
     {
         try
         {
-            _httpClient.DefaultRequestHeaders.Clear();
-            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-
-            // Read all rows from the sheet
-            var response = await _httpClient.GetAsync($"https://api.smartsheet.com/2.0/sheets/{project.SmartsheetSheetId}");
-            var responseContent = await response.Content.ReadAsStringAsync();
-
-            if (!response.IsSuccessStatusCode)
-            {
-                _logger.LogError("Failed to read Smartsheet: {StatusCode} - {Content}", response.StatusCode, responseContent);
-                return -1;
-            }
-
-            var sheet = JsonSerializer.Deserialize<SmartSheetReadResponse>(responseContent, new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true
-            });
-
-            if (sheet?.Rows == null)
-            {
-                _logger.LogWarning("No rows returned from Smartsheet");
-                return 0;
-            }
-
-            // Build a map of SmartsheetRowId -> RowNumber
-            var rowIdToRowNumber = new Dictionary<long, int>();
-            foreach (var row in sheet.Rows)
-            {
-                rowIdToRowNumber[row.Id] = row.RowNumber;
-            }
+            if (!project.SmartsheetSheetId.HasValue) return 0;
+            var rowIdToRowNumber = await _smartSheetService.GetRowIdToRowNumberMapAsync(project.SmartsheetSheetId.Value);
 
             // Update RowNumber for all events and TaskBlocks with SmartsheetRowId
             int updated = 0;

@@ -5,6 +5,7 @@ using ShopBoss.Web.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.SignalR;
 using ShopBoss.Web.Hubs;
+using Smartsheet.Api.Models; // SDK models
 
 namespace ShopBoss.Web.Services;
 
@@ -199,6 +200,181 @@ public class SmartSheetService
         {
             _logger.LogError(ex, "Error getting SmartSheet info for sheet {SheetId}", sheetId);
             return null;
+        }
+    }
+
+    /// <summary>
+    /// Build a column title -> column ID map for a sheet using the Smartsheet SDK
+    /// </summary>
+    public async Task<Dictionary<string, long>> GetColumnMapAsync(long sheetId)
+    {
+        var result = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            var smartsheet = GetSmartSheetClient();
+            if (smartsheet == null) return result;
+
+            var includes = new List<SheetLevelInclusion> { SheetLevelInclusion.COLUMNS };
+            var sheet = await Task.Run(() => smartsheet.SheetResources.GetSheet(sheetId, includes, null, null, null, null, null, null));
+            if (sheet.Columns == null) return result;
+
+            foreach (var col in sheet.Columns)
+            {
+                if (!string.IsNullOrEmpty(col.Title) && col.Id.HasValue)
+                {
+                    result[col.Title!] = col.Id.Value;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error building column map for sheet {SheetId}", sheetId);
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// Build a rowId -> rowNumber map for a sheet using the Smartsheet SDK
+    /// </summary>
+    public async Task<Dictionary<long, int>> GetRowIdToRowNumberMapAsync(long sheetId)
+    {
+        var map = new Dictionary<long, int>();
+        try
+        {
+            var smartsheet = GetSmartSheetClient();
+            if (smartsheet == null) return map;
+
+            var sheet = await Task.Run(() => smartsheet.SheetResources.GetSheet(sheetId, null, null, null, null, null, null, null));
+            if (sheet.Rows == null) return map;
+
+            for (int i = 0; i < sheet.Rows.Count; i++)
+            {
+                var row = sheet.Rows[i];
+                if (row.Id.HasValue)
+                {
+                    var number = row.RowNumber ?? (i + 1);
+                    map[row.Id.Value] = number;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error building rowId->rowNumber map for sheet {SheetId}", sheetId);
+        }
+        return map;
+    }
+
+    /// <summary>
+    /// Copy a sheet into a workspace using the Smartsheet SDK and return new sheetId
+    /// </summary>
+    public async Task<long?> CopySheetToWorkspaceAsync(long templateSheetId, long workspaceId, string newName, IList<SheetCopyInclusion>? include = null)
+    {
+        try
+        {
+            var smartsheet = GetSmartSheetClient();
+            if (smartsheet == null) return null;
+
+            var destination = new ContainerDestination
+            {
+                DestinationType = DestinationType.WORKSPACE,
+                DestinationId = workspaceId,
+                NewName = newName
+            };
+
+            var copied = await Task.Run(() => smartsheet.SheetResources.CopySheet(templateSheetId, destination, include));
+            return copied?.Result?.Id;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error copying sheet {TemplateSheetId} to workspace {WorkspaceId}", templateSheetId, workspaceId);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Add rows to a sheet and return their IDs
+    /// </summary>
+    public async Task<List<long>> AddRowsAsync(long sheetId, IList<Row> rows)
+    {
+        var ids = new List<long>();
+        try
+        {
+            var smartsheet = GetSmartSheetClient();
+            if (smartsheet == null) return ids;
+
+            var resultRows = await Task.Run(() => smartsheet.SheetResources.RowResources.AddRows(sheetId, rows));
+            foreach (var r in resultRows ?? new List<Row>())
+            {
+                if (r.Id.HasValue) ids.Add(r.Id.Value);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error adding rows to sheet {SheetId}", sheetId);
+        }
+        return ids;
+    }
+
+    /// <summary>
+    /// Update rows on a sheet. Returns count updated.
+    /// </summary>
+    public async Task<int> UpdateRowsAsync(long sheetId, IList<Row> rows)
+    {
+        try
+        {
+            var smartsheet = GetSmartSheetClient();
+            if (smartsheet == null) return 0;
+
+            var resultRows = await Task.Run(() => smartsheet.SheetResources.RowResources.UpdateRows(sheetId, rows));
+            return resultRows?.Count ?? 0;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating rows on sheet {SheetId}", sheetId);
+            return 0;
+        }
+    }
+
+    /// <summary>
+    /// Get all row IDs for a sheet
+    /// </summary>
+    public async Task<List<long>> GetAllRowIdsAsync(long sheetId)
+    {
+        var ids = new List<long>();
+        try
+        {
+            var smartsheet = GetSmartSheetClient();
+            if (smartsheet == null) return ids;
+
+            var sheet = await Task.Run(() => smartsheet.SheetResources.GetSheet(sheetId, null, null, null, null, null, null, null));
+            foreach (var row in sheet.Rows ?? new List<Row>())
+            {
+                if (row.Id.HasValue) ids.Add(row.Id.Value);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching row IDs for sheet {SheetId}", sheetId);
+        }
+        return ids;
+    }
+
+    /// <summary>
+    /// Delete rows in a sheet via SDK (supports batching by caller)
+    /// </summary>
+    public async Task<bool> DeleteRowsAsync(long sheetId, IList<long> rowIds)
+    {
+        try
+        {
+            var smartsheet = GetSmartSheetClient();
+            if (smartsheet == null) return false;
+            await Task.Run(() => smartsheet.SheetResources.RowResources.DeleteRows(sheetId, rowIds));
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting rows from sheet {SheetId}", sheetId);
+            return false;
         }
     }
 
