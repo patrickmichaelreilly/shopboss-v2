@@ -4,6 +4,10 @@
     var projectId = Model.Project.Id;
     var timelineId = ViewData["TimelineId"]?.ToString() ?? $"timeline-{projectId}";
     
+    // Pass AllEvents through ViewData for recursive partials
+    ViewData["AllEvents"] = Model.AllEvents;
+    ViewData["AllBlocks"] = Model.AllBlocks;
+    
     // Use the unified timeline container for root level
     var containerModel = (Blocks: Model.RootBlocks, Events: Model.RootEvents, ParentId: (string?)null, NestingLevel: 0);
 }
