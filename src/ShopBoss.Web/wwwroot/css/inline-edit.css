@@ -18,6 +18,10 @@
     border: 2px solid #007bff !important;
     box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25) !important;
     background-color: white !important;
+    box-sizing: border-box !important;
+    padding: 2px 4px !important; /* Match the editable-label padding */
+    margin: 0 !important;
+    border-radius: 3px !important; /* Match editable-label border-radius */
 }
 
 .inline-editor:focus {

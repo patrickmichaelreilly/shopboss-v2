@@ -55,9 +55,24 @@
         const input = document.createElement('input');
         input.type = 'text';
         input.value = originalValue;
-        input.className = 'form-control form-control-sm inline-editor';
-        input.style.width = Math.max(100, element.offsetWidth) + 'px';
-        input.style.fontSize = window.getComputedStyle(element).fontSize;
+        input.className = 'inline-editor';
+        
+        // Get element's computed styles and position
+        const elementStyles = window.getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        
+        // Position input to exactly overlay the original element
+        input.style.position = 'absolute';
+        input.style.left = rect.left + window.scrollX + 'px';
+        input.style.top = rect.top + window.scrollY + 'px';
+        input.style.width = rect.width + 'px';
+        input.style.height = rect.height + 'px';
+        input.style.fontSize = elementStyles.fontSize;
+        input.style.fontFamily = elementStyles.fontFamily;
+        input.style.fontWeight = elementStyles.fontWeight;
+        input.style.lineHeight = elementStyles.lineHeight;
+        input.style.textAlign = elementStyles.textAlign;
+        input.style.zIndex = '1000';
         
         // Add blur event handler to save when focus is lost
         input.addEventListener('blur', function() {
@@ -74,9 +89,11 @@
             attachmentId: attachmentId
         };
         
-        // Replace element with input
-        element.style.display = 'none';
-        element.parentNode.insertBefore(input, element.nextSibling);
+        // Make original element invisible but keep its space
+        element.style.visibility = 'hidden';
+        
+        // Add input to document body (positioned absolutely)
+        document.body.appendChild(input);
         
         // Focus and select the input
         setTimeout(() => {
@@ -175,7 +192,7 @@
         editor.editor.remove();
         
         // Show the original element
-        editor.element.style.display = '';
+        editor.element.style.visibility = '';
     }
 
     // Show success feedback
