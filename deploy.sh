@@ -105,7 +105,8 @@ else
     echo "🗑️  Removing application files..."
     find "$WINDOWS_TEST_PATH" -name "*.exe" -delete 2>/dev/null || true
     find "$WINDOWS_TEST_PATH" -name "*.dll" -delete 2>/dev/null || true
-    find "$WINDOWS_TEST_PATH" -name "*.json" -delete 2>/dev/null || true
+    # Remove JSON files except configuration files
+    find "$WINDOWS_TEST_PATH" -name "*.json" -not -name "appsettings*.json" -delete 2>/dev/null || true
     find "$WINDOWS_TEST_PATH" -name "*.xml" -delete 2>/dev/null || true
     find "$WINDOWS_TEST_PATH" -name "*.pdb" -delete 2>/dev/null || true
     
