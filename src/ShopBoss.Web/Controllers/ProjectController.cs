@@ -211,7 +211,7 @@ public class ProjectController : Controller
     }
 
     [HttpPost]
-    public async Task<IActionResult> UploadFile(string projectId, string category, IFormFile file, string? comment = null, string? taskBlockId = null)
+    public async Task<IActionResult> UploadFile(string projectId, string label, IFormFile file, string? comment = null, string? taskBlockId = null)
     {
         try
         {
@@ -223,9 +223,9 @@ public class ProjectController : Controller
             // Get SmartSheet user from session for attribution, fallback to "Local User"
             var smartSheetUser = HttpContext.Session.GetString("ss_user") ?? "Local User";
 
-            var attachment = await _attachmentService.UploadAttachmentAsync(projectId, file, category, uploadedBy: smartSheetUser, comment: comment, taskBlockId: taskBlockId);
+            var attachment = await _attachmentService.UploadAttachmentAsync(projectId, file, label, uploadedBy: smartSheetUser, comment: comment, taskBlockId: taskBlockId);
             // Return a trimmed payload to avoid JSON cycles
-            return Json(new { success = true, attachment = new { attachment.Id, attachment.OriginalFileName, attachment.FileSize, attachment.Category } });
+            return Json(new { success = true, attachment = new { attachment.Id, attachment.OriginalFileName, attachment.FileSize, attachment.Label } });
         }
         catch (Exception ex)
         {
@@ -276,11 +276,11 @@ public class ProjectController : Controller
     }
 
     [HttpPost]
-    public async Task<IActionResult> UpdateFileCategory([FromBody] UpdateFileCategoryRequest request)
+    public async Task<IActionResult> UpdateAttachmentLabel([FromBody] UpdateAttachmentLabelRequest request)
     {
         try
         {
-            var success = await _attachmentService.UpdateAttachmentCategoryAsync(request.Id, request.Category);
+            var success = await _attachmentService.UpdateAttachmentLabelAsync(request.Id, request.Label);
             if (success)
             {
                 return Json(new { success = true });
@@ -290,8 +290,8 @@ public class ProjectController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error updating file category {FileId}", request.Id);
-            return Json(new { success = false, message = "Error updating file category" });
+            _logger.LogError(ex, "Error updating attachment label {AttachmentId}", request.Id);
+            return Json(new { success = false, message = "Error updating attachment label" });
         }
     }
 
@@ -755,10 +755,10 @@ public class ProjectController : Controller
         public string ProjectId { get; set; } = string.Empty;
     }
 
-    public class UpdateFileCategoryRequest
+    public class UpdateAttachmentLabelRequest
     {
         public string Id { get; set; } = string.Empty;
-        public string Category { get; set; } = string.Empty;
+        public string Label { get; set; } = string.Empty;
     }
 
     public class LinkProjectToSmartSheetRequest

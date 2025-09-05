@@ -175,47 +175,6 @@
     </div>
 </div>
 
-<!-- Upload File Modal -->
-<div class="modal fade" id="uploadFileModal-@Model.Id" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Upload Files</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <form id="uploadFileForm-@Model.Id" enctype="multipart/form-data">
-                    <div class="mb-3">
-                        <label for="fileInput-@Model.Id" class="form-label">Select Files</label>
-                        <input type="file" class="form-control" id="fileInput-@Model.Id" multiple required>
-                        <div class="form-text">You can select multiple files to upload.</div>
-                    </div>
-                    <div class="mb-3">
-                        <label for="fileCategory-@Model.Id" class="form-label">Category</label>
-                        <select class="form-select" id="fileCategory-@Model.Id">
-                            <option value="Schematic">Schematic</option>
-                            <option value="Correspondence">Correspondence</option>
-                            <option value="Invoice">Invoice</option>
-                            <option value="Proof">Proof</option>
-                            <option value="Other" selected>Other</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label for="fileComment-@Model.Id" class="form-label">Comment (Optional)</label>
-                        <textarea class="form-control" id="fileComment-@Model.Id" rows="2" 
-                                  placeholder="Add a comment about these files..."></textarea>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" data-action="upload-files-with-comment" data-project-id="@Model.Id">
-                    <i class="fas fa-upload me-1"></i>Upload Files
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
 
 <!-- Edit Attachment Comment Modal -->
 <div class="modal fade" id="editAttachmentCommentModal-@Model.Id" tabindex="-1">

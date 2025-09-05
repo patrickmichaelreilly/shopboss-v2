@@ -68,16 +68,22 @@ else
         <div>
             @if (Model.EventType == "attachment" && Model.Attachment != null)
             {
-                <a href="/Project/DownloadFile/@Model.Attachment.Id" class="text-decoration-none" title="Download @Model.Attachment.FileName">
-                    <strong>@Model.Attachment.OriginalFileName</strong>
-                </a>
-                <span class="text-muted small ms-2">
-                    @((Model.Attachment.FileSize / 1024.0 / 1024.0).ToString("F2")) MB
-                </span>
-                @if (Model.RowNumber.HasValue)
-                {
-                    <span class="badge bg-primary row-badge ms-2">Row @Model.RowNumber</span>
-                }
+                <div class="attachment-label-container d-flex align-items-center flex-wrap">
+                    <span class="attachment-label editable-label" 
+                          data-attachment-id="@Model.Attachment.Id" 
+                          data-original-value="@Model.Attachment.Label">@Model.Attachment.Label</span>
+                    @if (Model.RowNumber.HasValue)
+                    {
+                        <span class="badge bg-primary row-badge ms-2">Row @Model.RowNumber</span>
+                    }
+                    <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-2"
+                            data-action="delete-event" data-project-id="@projectId"
+                            data-event-id="@Model.Id"
+                            data-attachment-id="@Model.Attachment.Id"
+                            title="Delete">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
             }
             else
             {
@@ -97,27 +103,43 @@ else
             }
             }
 
-            <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-2"
-                    data-action="delete-event" data-project-id="@projectId"
-                    data-event-id="@Model.Id"
-                    @if (Model.Attachment != null) { <text>data-attachment-id="@Model.Attachment.Id"</text>; }
-                    @if (Model.PurchaseOrderId != null) { <text>data-po-id="@Model.PurchaseOrderId"</text> }
-                    @if (Model.CustomWorkOrderId != null) { <text>data-cwo-id="@Model.CustomWorkOrderId"</text> }
-                    title="Delete">
-                <i class="fas fa-times"></i>
-            </button>
+            @if (Model.EventType != "attachment")
+            {
+                <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-2"
+                        data-action="delete-event" data-project-id="@projectId"
+                        data-event-id="@Model.Id"
+                        @if (Model.PurchaseOrderId != null) { <text>data-po-id="@Model.PurchaseOrderId"</text> }
+                        @if (Model.CustomWorkOrderId != null) { <text>data-cwo-id="@Model.CustomWorkOrderId"</text> }
+                        title="Delete">
+                    <i class="fas fa-times"></i>
+                </button>
+            }
         </div>
     </div>
 
     <div class="event-secondary text-muted small mt-1">
-        @if (Model.EventType != "attachment")
+        @if (Model.EventType == "attachment" && Model.Attachment != null)
+        {
+            <div class="attachment-details">
+                <div class="attachment-file-info">
+                    <a href="/Project/DownloadFile/@Model.Attachment.Id" class="text-decoration-none text-muted" title="Download @Model.Attachment.FileName">
+                        @Model.Attachment.OriginalFileName
+                    </a>
+                    <span class="ms-2">@((Model.Attachment.FileSize / 1024.0 / 1024.0).ToString("F2")) MB</span>
+                </div>
+                <div class="attachment-meta event-metadata">
+                    @Model.EventDate.ToString("yyyy-MM-dd HH:mm") by @(Model.CreatedBy ?? "Unknown")
+                </div>
+            </div>
+        }
+        else
         {
             @* Preserve existing secondary details for non-attachments *@
             @if (!string.IsNullOrEmpty(Model.Description))
             {
                 <div>@Model.Description</div>
             }
+            <div class="event-metadata">@Model.EventDate.ToString("yyyy-MM-dd HH:mm") by @(Model.CreatedBy ?? "Unknown")</div>
         }
-        <div>@Model.EventDate.ToString("yyyy-MM-dd HH:mm") by @(Model.CreatedBy ?? "Unknown")</div>
     </div>
 }

@@ -17,7 +17,7 @@ public class ProjectAttachment
     
     public string ContentType { get; set; } = string.Empty;
     
-    public string Category { get; set; } = string.Empty; // "Schematic", "Correspondence", "Invoice", "Proof", "Other"
+    public string Label { get; set; } = string.Empty;
     
     public DateTime UploadedDate { get; set; } = DateTime.UtcNow;
     

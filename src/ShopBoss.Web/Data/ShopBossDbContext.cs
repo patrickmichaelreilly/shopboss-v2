@@ -327,7 +327,7 @@ public class ShopBossDbContext : DbContext
             entity.Property(e => e.OriginalFileName).IsRequired().HasMaxLength(500);
             entity.Property(e => e.FileSize).IsRequired();
             entity.Property(e => e.ContentType).IsRequired().HasMaxLength(100);
-            entity.Property(e => e.Category).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.Label).IsRequired().HasMaxLength(100);
             entity.Property(e => e.UploadedDate).IsRequired();
             
             entity.HasOne(e => e.Project)
@@ -336,7 +336,7 @@ public class ShopBossDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
                 
             entity.HasIndex(e => e.ProjectId);
-            entity.HasIndex(e => e.Category);
+            entity.HasIndex(e => e.Label);
             entity.HasIndex(e => e.UploadedDate);
         });
 

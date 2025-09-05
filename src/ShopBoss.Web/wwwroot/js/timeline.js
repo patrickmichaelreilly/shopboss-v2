@@ -348,7 +348,7 @@ if (!window.__globalActionDelegationInitialized) {
                 if (typeof showSmartSheetLinking === 'function') showSmartSheetLinking(projectId);
                 break;
             case 'show-upload-file-modal':
-                if (window.Timeline?.Files?.showUploadFileModal) Timeline.Files.showUploadFileModal(projectId, blockId);
+                if (window.Timeline?.Files?.triggerFileUpload) Timeline.Files.triggerFileUpload(projectId, blockId);
                 break;
             case 'show-create-purchase-order':
                 if (window.Timeline?.Purchases?.showCreatePurchaseOrder) Timeline.Purchases.showCreatePurchaseOrder(projectId, blockId);
@@ -618,7 +618,40 @@ function initializeSortableContainer(container, projectId) {
                         });
                         
                         if (reorderedItems.length > 0) {
-                            reorderMixedTimelineItems(projectId, reorderedItems);
+                            // For items within a TaskBlock, we need to update BlockDisplayOrder, not GlobalDisplayOrder
+                            // Separate events and nested blocks
+                            const eventIds = reorderedItems.filter(item => item.Type === 'Event').map(item => item.Id);
+                            const nestedBlockIds = reorderedItems.filter(item => item.Type === 'TaskBlock').map(item => item.Id);
+                            
+                            const promises = [];
+                            
+                            // Update event order within the block (uses BlockDisplayOrder)
+                            if (eventIds.length > 0) {
+                                promises.push(
+                                    apiPostJson('/Timeline/ReorderEventsInBlock', {
+                                        BlockId: parentBlockId,
+                                        EventIds: eventIds
+                                    })
+                                );
+                            }
+                            
+                            // Update nested block order (uses DisplayOrder within parent)
+                            if (nestedBlockIds.length > 0) {
+                                promises.push(
+                                    apiPostJson('/Timeline/ReorderBlocks', {
+                                        ProjectId: projectId,
+                                        BlockIds: nestedBlockIds
+                                    })
+                                );
+                            }
+                            
+                            Promise.all(promises).then(() => {
+                                console.log('Successfully reordered items within TaskBlock');
+                            }).catch(error => {
+                                console.error('Error reordering items within TaskBlock:', error);
+                                showNotification('Error reordering items', 'error');
+                                loadTimelineForProject(projectId);
+                            });
                         }
                     }
                 } else {

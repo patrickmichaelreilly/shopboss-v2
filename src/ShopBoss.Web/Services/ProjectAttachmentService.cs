@@ -26,7 +26,7 @@ public class ProjectAttachmentService
         string originalFileName,
         byte[] fileContent,
         string contentType,
-        string category,
+        string label,
         string? uploadedBy = null,
         DateTime? uploadDate = null,
         string? comment = null,
@@ -56,7 +56,7 @@ public class ProjectAttachmentService
                 OriginalFileName = originalFileName, // Store the original filename
                 FileSize = fileContent.Length,
                 ContentType = contentType,
-                Category = category,
+                Label = label,
                 UploadedDate = uploadDate ?? DateTime.UtcNow,
                 UploadedBy = uploadedBy
             };
@@ -107,7 +107,7 @@ public class ProjectAttachmentService
         return fileName;
     }
 
-    public async Task<ProjectAttachment> UploadAttachmentAsync(string projectId, IFormFile file, string category, string? uploadedBy = null, string? comment = null, string? taskBlockId = null)
+    public async Task<ProjectAttachment> UploadAttachmentAsync(string projectId, IFormFile file, string label, string? uploadedBy = null, string? comment = null, string? taskBlockId = null)
     {
         try
         {
@@ -122,7 +122,7 @@ public class ProjectAttachmentService
                 file.FileName,
                 fileContent,
                 file.ContentType,
-                category,
+                label,
                 uploadedBy,
                 comment: comment,
                 taskBlockId: taskBlockId);
@@ -221,27 +221,27 @@ public class ProjectAttachmentService
         }
     }
 
-    public async Task<bool> UpdateAttachmentCategoryAsync(string attachmentId, string newCategory)
+    public async Task<bool> UpdateAttachmentLabelAsync(string attachmentId, string newLabel)
     {
         try
         {
             var attachment = await _context.ProjectAttachments.FindAsync(attachmentId);
             if (attachment == null) return false;
 
-            // Only update database category (no file moving needed with simplified structure)
-            if (attachment.Category != newCategory)
+            // Update the label
+            if (attachment.Label != newLabel)
             {
-                attachment.Category = newCategory;
+                attachment.Label = newLabel;
                 await _context.SaveChangesAsync();
 
-                _logger.LogInformation("Updated attachment {AttachmentId} category to {Category}", attachmentId, newCategory);
+                _logger.LogInformation("Updated attachment {AttachmentId} label to {Label}", attachmentId, newLabel);
             }
 
             return true;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error updating attachment {AttachmentId} category", attachmentId);
+            _logger.LogError(ex, "Error updating attachment {AttachmentId} label", attachmentId);
             throw;
         }
     }

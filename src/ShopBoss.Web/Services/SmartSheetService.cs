@@ -1063,7 +1063,7 @@ public class SmartSheetService
                     attachment.Name,
                     fileBytes,
                     attachment.MimeType ?? "application/octet-stream",
-                    "Smartsheet Import",
+                    "Label",
                     attachment.CreatedBy ?? "Smartsheet Import", // Use Smartsheet author, not import user
                     attachment.CreatedAt,
                     $"Imported from Smartsheet row {attachment.RowNumber}",

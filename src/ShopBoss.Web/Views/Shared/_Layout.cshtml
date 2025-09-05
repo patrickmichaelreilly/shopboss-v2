@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/inline-edit.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/ShopBoss.Web.styles.css" asp-append-version="true" />
     @await RenderSectionAsync("Styles", required: false)
 </head>
@@ -118,6 +119,9 @@
     <script src="~/js/timeline-files.js" asp-append-version="true"></script>
     <script src="~/js/timeline-purchases.js" asp-append-version="true"></script>
     <script src="~/js/timeline-workorders.js" asp-append-version="true"></script>
+    
+    <!-- Inline editing system -->
+    <script src="~/js/inline-edit.js" asp-append-version="true"></script>
     
     <!-- SignalR -->
     <script src="~/lib/signalr/dist/browser/signalr.js"></script>
