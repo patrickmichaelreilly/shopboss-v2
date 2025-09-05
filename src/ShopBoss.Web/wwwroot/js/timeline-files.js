@@ -48,7 +48,6 @@
                 document.getElementById(`fileCategory-${projectId}`).value = 'Other';
                 document.getElementById(`fileComment-${projectId}`).value = '';
                 
-                showNotification('File uploaded successfully', 'success');
                 loadTimelineForProject(projectId);
             } else {
                 showNotification(data.message || 'Error uploading files', 'error');
@@ -76,7 +75,6 @@
 
         apiPostForm('/Project/UploadFile', formData).then(data => {
             if (data.success) {
-                showNotification('File uploaded successfully', 'success');
                 fileInput.value = ''; // Clear the file input
                 
                 // Refresh timeline to show the new attachment event
@@ -95,7 +93,6 @@
     Timeline.Files.updateFileCategory = function(fileId, category) {
         apiPostJson('/Project/UpdateFileCategory', { id: fileId, category: category }).then(data => {
             if (data.success) {
-                showNotification('Category updated', 'success');
             } else {
                 showNotification(data.message || 'Error updating category', 'error');
             }
@@ -110,7 +107,6 @@
     Timeline.Files.deleteFile = function(fileId, projectId) {
         apiPostForm('/Project/DeleteFile', new URLSearchParams({ id: fileId })).then(data => {
             if (data.success) {
-                showNotification('File deleted successfully', 'success');
                 
                 // Refresh timeline to show the file deletion event
                 loadTimelineForProject(projectId);

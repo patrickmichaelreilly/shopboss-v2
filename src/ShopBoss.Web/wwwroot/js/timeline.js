@@ -67,7 +67,6 @@ function createTaskBlock(projectId, name, description = null) {
     apiPostJson('/Timeline/CreateBlock', requestData)
     .then(data => {
         if (data.success) {
-            showNotification('Task block created successfully', 'success');
             loadTimelineForProject(projectId);
         } else {
             showNotification(data.message || 'Error creating task block', 'error');
@@ -100,7 +99,6 @@ function createNestedTaskBlock(projectId, parentBlockId) {
         })
         .then(data => {
             if (data.success) {
-                showNotification('Nested block created successfully', 'success');
                 loadTimelineForProject(projectId);
             } else {
                 showNotification(data.message || 'Error nesting block', 'error');
@@ -157,7 +155,6 @@ function updateTaskBlock(blockId, name, description) {
     apiPutJson('/Timeline/UpdateBlock', requestData)
     .then(data => {
         if (data.success) {
-            showNotification('Task block updated successfully', 'success');
             // Find the project ID from the block element and reload timeline
             const blockElement = document.querySelector(`[data-block-id="${blockId}"]`);
             if (blockElement) {
@@ -186,7 +183,6 @@ function deleteTaskBlock(blockId) {
     apiDeleteJson(`/Timeline/DeleteBlock?blockId=${blockId}`)
     .then(data => {
         if (data.success) {
-            showNotification('Task block deleted successfully', 'success');
             // Find the project ID and reload timeline
             const blockElement = document.querySelector(`[data-block-id="${blockId}"]`);
             if (blockElement) {
@@ -245,7 +241,6 @@ function initializeDelegatedTimelineEvents(projectId) {
         updateEventDescription(eventId, description)
             .then((ok) => {
                 if (ok) {
-                    showNotification('Comment updated', 'success');
                 } else {
                     showNotification('Error updating comment', 'error');
                 }
@@ -428,7 +423,6 @@ if (!window.__globalActionDelegationInitialized) {
                 deleteComment(eventId)
                     .then((ok) => {
                         if (ok) {
-                            showNotification('Deleted successfully', 'success');
                             loadTimelineForProject(projectId);
                         } else {
                             showNotification('Error deleting item', 'error');
@@ -541,7 +535,6 @@ function initializeSortableContainer(container, projectId) {
                     nestTaskBlock(draggedBlockId, targetParentId)
                         .then(() => {
                             const action = targetParentId ? 'nested' : 'unnested';
-                            showNotification(`TaskBlock ${action} successfully`, 'success');
                             loadTimelineForProject(projectId);
                         })
                         .catch(error => {
@@ -572,7 +565,6 @@ function initializeSortableContainer(container, projectId) {
                         // Moved into a TaskBlock
                         assignEventsToBlock(targetBlockId, [eventId])
                             .then(() => {
-                                showNotification('Event assigned to block successfully', 'success');
                                 loadTimelineForProject(projectId);
                             })
                             .catch(error => {
@@ -584,7 +576,6 @@ function initializeSortableContainer(container, projectId) {
                         // Moved out of a TaskBlock to unblocked
                         unassignEventsFromBlocks([eventId])
                             .then(() => {
-                                showNotification('Event moved to unblocked section', 'success');
                                 loadTimelineForProject(projectId);
                             })
                             .catch(error => {
@@ -680,7 +671,6 @@ function reorderTaskBlocks(projectId, blockIds) {
     apiPostJson('/Timeline/ReorderBlocks', requestData)
     .then(data => {
         if (data.success) {
-            showNotification('Task blocks reordered successfully', 'success');
         } else {
             showNotification(data.message || 'Error reordering task blocks', 'error');
             // Reload timeline to reset state
@@ -705,7 +695,6 @@ function reorderEventsInBlock(blockId, eventIds) {
     apiPostJson('/Timeline/ReorderEventsInBlock', requestData)
     .then(data => {
         if (data.success) {
-            showNotification('Events reordered successfully', 'success');
         } else {
             showNotification(data.message || 'Error reordering events', 'error');
         }
@@ -751,7 +740,6 @@ function saveComment(projectId) {
             document.getElementById(`commentDate-${projectId}`).value = new Date().toISOString().slice(0, 16);
             document.getElementById(`commentAuthor-${projectId}`).value = '';
             
-            showNotification('Comment added successfully', 'success');
             loadTimelineForProject(projectId);
         } else {
             showNotification(data.message || 'Error adding comment', 'error');
@@ -794,7 +782,6 @@ function saveAttachmentComment(projectId) {
             document.getElementById(`editAttachmentCommentText-${projectId}`).value = '';
             currentEditingEventId = null;
             
-            showNotification('Comment updated successfully', 'success');
             loadTimelineForProject(projectId);
         } else {
             showNotification(data.message || 'Error updating comment', 'error');
@@ -858,7 +845,6 @@ function reorderMixedTimelineItems(projectId, items) {
     apiPostJson('/Timeline/ReorderMixedItems', requestData)
     .then(data => {
         if (data.success) {
-            showNotification('Timeline reordered successfully', 'success');
         } else {
             showNotification(data.message || 'Error reordering timeline', 'error');
             // Reload timeline to reset state

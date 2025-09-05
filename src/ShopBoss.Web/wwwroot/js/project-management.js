@@ -33,6 +33,14 @@ function hydrateExpandedProjects() {
             icon.classList.add('fa-chevron-down');
             anyExpanded = true;
             cleaned.add(projectId);
+            
+            // Load timeline and SmartSheet status for restored expanded projects
+            if (typeof initializeSmartSheetSyncUI === 'function') {
+                initializeSmartSheetSyncUI(projectId);
+            }
+            if (typeof loadTimelineForProject === 'function') {
+                loadTimelineForProject(projectId);
+            }
         }
     });
     if (anyExpanded && table) table.classList.remove('table-hover');

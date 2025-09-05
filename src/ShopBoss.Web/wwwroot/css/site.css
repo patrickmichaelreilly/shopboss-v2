@@ -67,6 +67,7 @@ body {
 
 .task-block-toolbox:hover .toolbox-trigger {
   opacity: 0;
+  pointer-events: none;
 }
 
 /* ShopBoss Primary Color Overrides */
