@@ -470,7 +470,7 @@ public class SmartSheetSyncService
             .Include(tb => tb.ChildTaskBlocks)
                 .ThenInclude(child => child.Events)
                     .ThenInclude(e => e.Attachment)
-            .OrderBy(tb => tb.GlobalDisplayOrder ?? tb.DisplayOrder)
+            .OrderBy(tb => tb.DisplayOrder)
             .AsSplitQuery()
             .ToListAsync();
 
@@ -483,7 +483,7 @@ public class SmartSheetSyncService
             .Include(pe => pe.Attachment)
             .Include(pe => pe.WorkOrder!)
                 .ThenInclude(wo => wo.NestSheets)
-            .OrderBy(pe => pe.GlobalDisplayOrder ?? int.MaxValue)
+            .OrderBy(pe => pe.DisplayOrder)
             .ThenBy(pe => pe.EventDate)
             .AsSplitQuery()
             .ToListAsync();
@@ -495,7 +495,7 @@ public class SmartSheetSyncService
         // Add unblocked events at root level
         var blockedEventIds = GetBlockedEventIds(rootBlocks);
         var unblockedEvents = allEvents.Where(e => e.Id != null && !blockedEventIds.Contains(e.Id))
-            .OrderBy(e => e.GlobalDisplayOrder ?? int.MaxValue)
+            .OrderBy(e => e.DisplayOrder)
             .ThenBy(e => e.EventDate);
 
         foreach (var evt in unblockedEvents)
@@ -558,23 +558,23 @@ public class SmartSheetSyncService
         // Add TaskBlocks
         foreach (var block in taskBlocks)
         {
-            mixedItems.Add((block, block.GlobalDisplayOrder ?? block.DisplayOrder, "TaskBlock"));
+            mixedItems.Add((block, block.DisplayOrder, "TaskBlock"));
         }
 
         // Add Events that belong to the current level (unblocked at this level)
         var currentLevelEvents = allEvents.Where(e => 
-            string.IsNullOrEmpty(e.TaskBlockId) && hierarchyLevel == 0 || // Root level events
-            taskBlocks.Any(tb => tb.Id == e.TaskBlockId) // Events in current TaskBlocks
+            string.IsNullOrEmpty(e.ParentBlockId) && hierarchyLevel == 0 || // Root level events
+            taskBlocks.Any(tb => tb.Id == e.ParentBlockId) // Events in current TaskBlocks
         );
 
         foreach (var evt in currentLevelEvents)
         {
-            if (!string.IsNullOrEmpty(evt.TaskBlockId))
+            if (!string.IsNullOrEmpty(evt.ParentBlockId))
             {
                 // This event belongs to a TaskBlock - it will be handled when we process that TaskBlock
                 continue;
             }
-            mixedItems.Add((evt, evt.GlobalDisplayOrder ?? int.MaxValue, "Event"));
+            mixedItems.Add((evt, evt.DisplayOrder, "Event"));
         }
 
         // Sort mixed items by display order
@@ -601,8 +601,8 @@ public class SmartSheetSyncService
                 });
 
                 // Add events within this TaskBlock
-                var blockEvents = allEvents.Where(e => e.TaskBlockId == taskBlock.Id)
-                    .OrderBy(e => e.BlockDisplayOrder ?? 0)
+                var blockEvents = allEvents.Where(e => e.ParentBlockId == taskBlock.Id)
+                    .OrderBy(e => e.DisplayOrder)
                     .ThenBy(e => e.EventDate)
                     .ToList();
 

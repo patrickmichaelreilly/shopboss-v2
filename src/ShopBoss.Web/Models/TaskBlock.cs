@@ -26,8 +26,6 @@ public class TaskBlock
     [Required]
     public int DisplayOrder { get; set; }
     
-    // Global timeline ordering (for mixed TaskBlock/Event ordering)
-    public int? GlobalDisplayOrder { get; set; }
     
     // Nesting support - self-referencing relationship
     public string? ParentTaskBlockId { get; set; }

@@ -94,48 +94,14 @@
     <div class="collapse show" id="collapse-@Model.Id">
         <div class="task-block-content mt-1" data-block-id="@Model.Id">
             @{
-                // Create a unified list of items (events and child blocks) for mixed ordering
-                var allItems = new List<object>();
+                // Get child blocks and events that belong to this block
+                var childBlocks = Model.ChildTaskBlocks?.ToList() ?? new List<TaskBlock>();
+                var blockEvents = Model.Events?.Where(e => e.ParentBlockId == Model.Id).ToList() ?? new List<ProjectEvent>();
                 
-                // Add events
-                foreach (var evt in Model.Events.OrderBy(e => e.BlockDisplayOrder ?? 0).ThenBy(e => e.EventDate))
-                {
-                    allItems.Add(new { Type = "Event", Item = evt, Order = evt.BlockDisplayOrder ?? 0 });
-                }
-                
-                // Add child TaskBlocks  
-                foreach (var childBlock in Model.ChildTaskBlocks.OrderBy(cb => cb.DisplayOrder))
-                {
-                    allItems.Add(new { Type = "TaskBlock", Item = childBlock, Order = childBlock.DisplayOrder });
-                }
-                
-                // Sort by order for mixed display
-                allItems = allItems.OrderBy(item => ((dynamic)item).Order).ToList();
+                // Use the unified timeline container for nested content
+                var containerModel = (Blocks: childBlocks, Events: blockEvents, ParentId: Model.Id, NestingLevel: nestingLevel + 1);
             }
-            
-            @foreach (var item in allItems)
-            {
-                @if (((dynamic)item).Type == "Event")
-                {
-                    var evt = (ShopBoss.Web.Models.ProjectEvent)((dynamic)item).Item;
-                    <div class="timeline-event blocked-event" data-event-id="@evt.Id">
-                        <div class="event-content">
-                            <div class="event-description">
-                                @{
-                                    var viewData = new ViewDataDictionary(ViewData) { ["ProjectId"] = Model.ProjectId };
-                                }
-                                @await Html.PartialAsync("_TimelineEvent", evt, viewData)
-                            </div>
-                        </div>
-                    </div>
-                }
-                else if (((dynamic)item).Type == "TaskBlock")
-                {
-                    var childBlock = (ShopBoss.Web.Models.TaskBlock)((dynamic)item).Item;
-                    ViewData["NestingLevel"] = nestingLevel + 1;
-                    @await Html.PartialAsync("_TaskBlockRecursive", childBlock, ViewData)
-                }
-            }
+            @await Html.PartialAsync("_TimelineContainer", containerModel, ViewData)
         </div>
     </div>
 </div>

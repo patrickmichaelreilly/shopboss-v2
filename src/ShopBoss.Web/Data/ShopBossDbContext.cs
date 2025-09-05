@@ -399,21 +399,24 @@ public class ShopBossDbContext : DbContext
             entity.Property(e => e.EventType).IsRequired().HasMaxLength(50);
             entity.Property(e => e.Description).IsRequired();
             entity.Property(e => e.CreatedBy).HasMaxLength(100);
+            entity.Property(e => e.DisplayOrder).IsRequired();
             
             entity.HasOne(e => e.Project)
                 .WithMany(p => p.Events)
                 .HasForeignKey(e => e.ProjectId)
                 .OnDelete(DeleteBehavior.Cascade);
                 
-            entity.HasOne(e => e.TaskBlock)
+            entity.HasOne(e => e.ParentBlock)
                 .WithMany(tc => tc.Events)
-                .HasForeignKey(e => e.TaskBlockId)
+                .HasForeignKey(e => e.ParentBlockId)
                 .OnDelete(DeleteBehavior.SetNull);
                 
             entity.HasIndex(e => e.ProjectId);
             entity.HasIndex(e => e.EventDate);
             entity.HasIndex(e => e.EventType);
-            entity.HasIndex(e => e.TaskBlockId);
+            entity.HasIndex(e => e.ParentBlockId);
+            entity.HasIndex(e => e.DisplayOrder);
+            entity.HasIndex(e => new { e.ParentBlockId, e.DisplayOrder });
         });
 
         modelBuilder.Entity<TaskBlock>(entity =>

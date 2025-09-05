@@ -54,6 +54,11 @@ public class CustomWorkOrderService
 
             _context.CustomWorkOrders.Add(customWorkOrder);
             
+            // Get the next display order for the target container
+            var maxOrder = await _context.ProjectEvents
+                .Where(pe => pe.ProjectId == customWorkOrder.ProjectId && pe.ParentBlockId == taskBlockId)
+                .MaxAsync(pe => (int?)pe.DisplayOrder) ?? 0;
+
             // Create timeline event for custom work order creation
             var customWorkOrderEvent = new ProjectEvent
             {
@@ -63,7 +68,8 @@ public class CustomWorkOrderService
                 Description = customWorkOrder.Name,
                 CreatedBy = createdBy,
                 CustomWorkOrderId = customWorkOrder.Id,
-                TaskBlockId = taskBlockId
+                ParentBlockId = taskBlockId,
+                DisplayOrder = maxOrder + 1
             };
             _context.ProjectEvents.Add(customWorkOrderEvent);
             

@@ -41,12 +41,11 @@ public class ProjectEvent
     // Optional custom work order reference for custom work order events
     public string? CustomWorkOrderId { get; set; }
     
-    // TaskBlock relationship (optional - events can exist without being in a block)
-    public string? TaskBlockId { get; set; }
-    public int? BlockDisplayOrder { get; set; }
+    // Parent container relationship (null = root level, otherwise references TaskBlock)
+    public string? ParentBlockId { get; set; }
     
-    // Global timeline ordering (for mixed TaskBlock/Event ordering)
-    public int? GlobalDisplayOrder { get; set; }
+    // Display order within parent container (works for both root and TaskBlocks)
+    public int DisplayOrder { get; set; }
     
     // Navigation properties
     public Project Project { get; set; } = null!;
@@ -54,5 +53,5 @@ public class ProjectEvent
     public PurchaseOrder? PurchaseOrder { get; set; }
     public WorkOrder? WorkOrder { get; set; }
     public CustomWorkOrder? CustomWorkOrder { get; set; }
-    public TaskBlock? TaskBlock { get; set; }
+    public TaskBlock? ParentBlock { get; set; }
 }

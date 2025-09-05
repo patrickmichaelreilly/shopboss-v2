@@ -63,6 +63,11 @@ public class ProjectAttachmentService
 
             _context.ProjectAttachments.Add(attachment);
             
+            // Get the next display order for the target container
+            var maxOrder = await _context.ProjectEvents
+                .Where(pe => pe.ProjectId == projectId && pe.ParentBlockId == taskBlockId)
+                .MaxAsync(pe => (int?)pe.DisplayOrder) ?? 0;
+
             // Create timeline event for file upload
             // Store only the user comment in Description; file info comes from Attachment object
             var projectEvent = new ProjectEvent
@@ -74,7 +79,8 @@ public class ProjectAttachmentService
                 CreatedBy = uploadedBy,
                 AttachmentId = attachment.Id,
                 RowNumber = rowNumber,
-                TaskBlockId = taskBlockId
+                ParentBlockId = taskBlockId,
+                DisplayOrder = maxOrder + 1
             };
             _context.ProjectEvents.Add(projectEvent);
             

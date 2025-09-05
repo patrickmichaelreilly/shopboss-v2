@@ -1,0 +1,63 @@
+@model (List<TaskBlock> Blocks, List<ProjectEvent> Events, string? ParentId, int NestingLevel)
+
+@{
+    var blocks = Model.Blocks ?? new List<TaskBlock>();
+    var events = Model.Events ?? new List<ProjectEvent>();
+    var parentId = Model.ParentId;
+    var nestingLevel = Model.NestingLevel;
+    
+    var containerId = parentId != null ? $"container-{parentId}" : "timeline-root";
+    var containerClass = parentId != null ? "nested-container" : "timeline-container border rounded p-3";
+}
+
+<div id="@containerId" class="@containerClass sortable-container" data-parent-id="@(parentId ?? "")">
+    @if (blocks.Any() || events.Any())
+    {
+        // Create mixed timeline items properly ordered by DisplayOrder
+        var mixedItems = new List<dynamic>();
+            
+        // Add TaskBlocks with their display order
+        foreach (var block in blocks.OrderBy(b => b.DisplayOrder))
+        {
+            mixedItems.Add(new { Item = block, Order = block.DisplayOrder, Type = "TaskBlock" });
+        }
+        
+        // Add Events with their display order  
+        foreach (var evt in events.OrderBy(e => e.DisplayOrder))
+        {
+            mixedItems.Add(new { Item = evt, Order = evt.DisplayOrder, Type = "Event" });
+        }
+        
+        // Sort by display order
+        var sortedMixedItems = mixedItems.OrderBy(item => item.Order).ToList();
+
+        <!-- Mixed Timeline Items (TaskBlocks and Events properly ordered) -->
+        @foreach (var mixedItem in sortedMixedItems)
+        {
+            if (mixedItem.Type == "TaskBlock")
+            {
+                var block = (TaskBlock)mixedItem.Item;
+                ViewData["NestingLevel"] = nestingLevel;
+                @await Html.PartialAsync("_TaskBlockRecursive", block, ViewData)
+            }
+            else if (mixedItem.Type == "Event")
+            {
+                var evt = (ProjectEvent)mixedItem.Item;
+                <div class="timeline-event" data-event-id="@evt.Id" data-parent-id="@(parentId ?? "")">
+                    @{
+                        var viewData = new ViewDataDictionary(ViewData) { ["ProjectId"] = evt.ProjectId };
+                    }
+                    @await Html.PartialAsync("_TimelineEvent", evt, viewData)
+                </div>
+            }
+        }
+    }
+    @if (parentId == null && !blocks.Any() && !events.Any())
+    {
+        <div class="text-center text-muted py-4">
+            <i class="fas fa-history fa-2x mb-2"></i>
+            <p>No timeline events found</p>
+            <small>Events will appear here after Smartsheet data is imported</small>
+        </div>
+    }
+</div>

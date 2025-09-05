@@ -473,40 +473,36 @@ function initializeTimelineDragDrop(projectId) {
     const timelineContainer = document.getElementById(`timeline-container-${projectId}`);
     if (!timelineContainer) return;
     
-    // Initialize TaskBlock reordering and unblocked event handling
-    initializeTaskBlockReordering(projectId);
-    
-    // Initialize event reordering within blocks
-    initializeEventReordering(projectId);
+    // Initialize unified drag-drop for all sortable containers
+    initializeUnifiedDragDrop(projectId);
 }
 
-// Initialize TaskBlock drag-drop reordering
-function initializeTaskBlockReordering(projectId) {
-    // Find the inner timeline container where TaskBlocks actually live
-    const innerTimeline = document.getElementById(`timeline-${projectId}`);
-    if (!innerTimeline) return;
+// Initialize unified drag-drop for all timeline containers
+function initializeUnifiedDragDrop(projectId) {
+    // Find all sortable containers in the timeline
+    const timelineContainer = document.getElementById(`timeline-container-${projectId}`);
+    if (!timelineContainer) return;
     
-    // Initialize sortable for main timeline
-    initializeSortableContainer(innerTimeline, projectId);
-    
-    // Initialize sortable for all TaskBlock content containers (now unified)
-    const taskBlockContainers = innerTimeline.querySelectorAll('.task-block-content');
-    taskBlockContainers.forEach(container => {
-        initializeSortableContainer(container, projectId);
+    // Initialize sortable for all containers with the sortable-container class
+    const sortableContainers = timelineContainer.querySelectorAll('.sortable-container');
+    sortableContainers.forEach(container => {
+        initializeUnifiedSortableContainer(container, projectId);
     });
 }
 
-// Initialize sortable functionality for a specific container
-function initializeSortableContainer(container, projectId) {
+// Initialize unified sortable functionality for a container
+function initializeUnifiedSortableContainer(container, projectId) {
+    const parentId = container.dataset.parentId || null; // null for root, TaskBlock ID for nested
+    
     new Sortable(container, {
-        draggable: '.task-block, .timeline-event', // Include all timeline events, not just unblocked ones
+        draggable: '.task-block, .timeline-event',
         handle: '.block-icon, .event-icon',
         ghostClass: 'sortable-ghost',
         chosenClass: 'sortable-chosen',
         dragClass: 'sortable-drag',
         animation: 150,
         group: {
-            name: `timeline-${projectId}`, // Unified group for all containers
+            name: `timeline-${projectId}`,
             pull: true,
             put: true
         },
@@ -515,68 +511,46 @@ function initializeSortableContainer(container, projectId) {
             const fromContainer = evt.from;
             const toContainer = evt.to;
             
-            // Handle TaskBlock nesting
-            if (draggedElement.classList.contains('task-block')) {
-                const draggedBlockId = draggedElement.dataset.blockId;
-                
-                // Check if moved between different containers (nesting/unnesting)
-                if (fromContainer !== toContainer) {
-                    let targetParentId = null;
-                    
-                    // If moved to a task-block-content container, find the parent TaskBlock
-                    if (toContainer.classList.contains('task-block-content')) {
-                        const parentBlock = toContainer.closest('.task-block[data-block-id]');
-                        if (parentBlock) {
-                            targetParentId = parentBlock.dataset.blockId;
-                        }
-                    }
-                    
-                    // Nest or unnest the block
-                    nestTaskBlock(draggedBlockId, targetParentId)
+            const fromParentId = fromContainer.dataset.parentId || null;
+            const toParentId = toContainer.dataset.parentId || null;
+            
+            // Handle movement between different containers (cross-container drag)
+            if (fromContainer !== toContainer) {
+                if (draggedElement.classList.contains('task-block')) {
+                    // TaskBlock moved to different container - update parent relationship
+                    const draggedBlockId = draggedElement.dataset.blockId;
+                    nestTaskBlock(draggedBlockId, toParentId)
                         .then(() => {
-                            const action = targetParentId ? 'nested' : 'unnested';
-                            loadTimelineForProject(projectId);
+                            reorderItemsInContainer(toContainer, toParentId);
+                            reorderItemsInContainer(fromContainer, fromParentId);
                         })
                         .catch(error => {
-                            console.error('Error nesting/unnesting TaskBlock:', error);
+                            console.error('Error nesting TaskBlock:', error);
                             showNotification('Error moving TaskBlock', 'error');
                             loadTimelineForProject(projectId);
                         });
-                }
-            }
-            
-            // Handle Event movement
-            if (draggedElement.classList.contains('timeline-event')) {
-                const eventId = draggedElement.dataset.eventId;
-                let targetBlockId = null;
-                
-                // Determine target block
-                if (toContainer.classList.contains('task-block-content') || toContainer.closest('.task-block-content')) {
-                    const parentBlock = toContainer.closest('.task-block[data-block-id]');
-                    if (parentBlock) {
-                        targetBlockId = parentBlock.dataset.blockId;
-                    }
+                    return;
                 }
                 
-                // Handle different event movement scenarios
-                if (fromContainer !== toContainer) {
-                    // Event moved between containers
-                    if (targetBlockId) {
-                        // Moved into a TaskBlock
-                        assignEventsToBlock(targetBlockId, [eventId])
+                if (draggedElement.classList.contains('timeline-event')) {
+                    // Event moved to different container - update parent relationship
+                    const eventId = draggedElement.dataset.eventId;
+                    if (toParentId) {
+                        // Assign to block
+                        assignEventsToBlock(toParentId, [eventId])
                             .then(() => {
-                                loadTimelineForProject(projectId);
+                                reorderItemsInContainer(toContainer, toParentId);
                             })
                             .catch(error => {
                                 console.error('Error assigning event to block:', error);
-                                showNotification('Error assigning event to block', 'error');
+                                showNotification('Error moving event', 'error');
                                 loadTimelineForProject(projectId);
                             });
                     } else {
-                        // Moved out of a TaskBlock to unblocked
+                        // Unassign from block (move to root)
                         unassignEventsFromBlocks([eventId])
                             .then(() => {
-                                loadTimelineForProject(projectId);
+                                reorderItemsInContainer(toContainer, toParentId);
                             })
                             .catch(error => {
                                 console.error('Error unassigning event:', error);
@@ -584,159 +558,59 @@ function initializeSortableContainer(container, projectId) {
                                 loadTimelineForProject(projectId);
                             });
                     }
+                    return;
                 }
             }
             
-            // Update mixed ordering if items stayed in same container
-            if (fromContainer === toContainer) {
-                // Handle mixed ordering within TaskBlocks or at root level
-                if (toContainer.classList.contains('task-block-content')) {
-                    // Reordering within a TaskBlock - handle mixed events and nested TaskBlocks
-                    const parentBlock = toContainer.closest('.task-block[data-block-id]');
-                    const parentBlockId = parentBlock?.dataset.blockId;
-                    
-                    if (parentBlockId) {
-                        const allItems = Array.from(toContainer.children);
-                        const reorderedItems = [];
-                        
-                        allItems.forEach((item, index) => {
-                            if (item.classList.contains('task-block')) {
-                                // Nested TaskBlock
-                                reorderedItems.push({
-                                    Type: 'TaskBlock',
-                                    Id: item.dataset.blockId,
-                                    Order: index + 1
-                                });
-                            } else if (item.classList.contains('timeline-event')) {
-                                // Event within the TaskBlock
-                                reorderedItems.push({
-                                    Type: 'Event',
-                                    Id: item.dataset.eventId,
-                                    Order: index + 1
-                                });
-                            }
-                        });
-                        
-                        if (reorderedItems.length > 0) {
-                            // For items within a TaskBlock, we need to update BlockDisplayOrder, not GlobalDisplayOrder
-                            // Separate events and nested blocks
-                            const eventIds = reorderedItems.filter(item => item.Type === 'Event').map(item => item.Id);
-                            const nestedBlockIds = reorderedItems.filter(item => item.Type === 'TaskBlock').map(item => item.Id);
-                            
-                            const promises = [];
-                            
-                            // Update event order within the block (uses BlockDisplayOrder)
-                            if (eventIds.length > 0) {
-                                promises.push(
-                                    apiPostJson('/Timeline/ReorderEventsInBlock', {
-                                        BlockId: parentBlockId,
-                                        EventIds: eventIds
-                                    })
-                                );
-                            }
-                            
-                            // Update nested block order (uses DisplayOrder within parent)
-                            if (nestedBlockIds.length > 0) {
-                                promises.push(
-                                    apiPostJson('/Timeline/ReorderBlocks', {
-                                        ProjectId: projectId,
-                                        BlockIds: nestedBlockIds
-                                    })
-                                );
-                            }
-                            
-                            Promise.all(promises).then(() => {
-                                console.log('Successfully reordered items within TaskBlock');
-                            }).catch(error => {
-                                console.error('Error reordering items within TaskBlock:', error);
-                                showNotification('Error reordering items', 'error');
-                                loadTimelineForProject(projectId);
-                            });
-                        }
-                    }
-                } else {
-                    // Reordering at root timeline level
-                    const allItems = Array.from(toContainer.children);
-                    const reorderedItems = [];
-                    
-                    allItems.forEach((item, index) => {
-                        if (item.classList.contains('task-block')) {
-                            reorderedItems.push({
-                                Type: 'TaskBlock',
-                                Id: item.dataset.blockId,
-                                Order: index + 1
-                            });
-                        } else if (item.classList.contains('timeline-event')) {
-                            reorderedItems.push({
-                                Type: 'Event',
-                                Id: item.dataset.eventId,
-                                Order: index + 1
-                            });
-                        }
-                    });
-                    
-                    if (reorderedItems.length > 0) {
-                        reorderMixedTimelineItems(projectId, reorderedItems);
-                    }
-                }
+            // Handle reordering within the same container
+            reorderItemsInContainer(toContainer, toParentId);
+        }
+    });
+}
+
+// Helper function to reorder items within a container using the unified API
+function reorderItemsInContainer(container, parentId) {
+    const allItems = Array.from(container.children);
+    const reorderedItems = [];
+    
+    allItems.forEach((item, index) => {
+        if (item.classList.contains('task-block')) {
+            reorderedItems.push({
+                Type: 'TaskBlock',
+                Id: item.dataset.blockId,
+                Order: index + 1
+            });
+        } else if (item.classList.contains('timeline-event')) {
+            reorderedItems.push({
+                Type: 'Event',
+                Id: item.dataset.eventId,
+                Order: index + 1
+            });
+        }
+    });
+    
+    if (reorderedItems.length > 0) {
+        const requestData = {
+            ParentId: parentId,
+            Items: reorderedItems
+        };
+        
+        apiPostJson('/Timeline/ReorderItems', requestData)
+        .then(data => {
+            if (!data.success) {
+                console.error('Error reordering items:', data.message);
+                showNotification('Error reordering items', 'error');
             }
-        }
-    });
-}
-
-// Initialize event drag-drop reordering within TaskBlocks
-// Note: This is now handled by the unified initializeSortableContainer function
-// since events and TaskBlocks are mixed in the same containers
-function initializeEventReordering(projectId) {
-    // This function is deprecated - mixed ordering is now handled
-    // by initializeSortableContainer which manages both events and TaskBlocks
-    // in the unified .task-block-content containers
+        })
+        .catch(error => {
+            console.error('Error reordering items:', error);
+            showNotification('Network error occurred', 'error');
+        });
+    }
 }
 
 
-// API call to reorder TaskBlocks
-function reorderTaskBlocks(projectId, blockIds) {
-    const requestData = {
-        ProjectId: projectId,
-        BlockIds: blockIds
-    };
-    
-    apiPostJson('/Timeline/ReorderBlocks', requestData)
-    .then(data => {
-        if (data.success) {
-        } else {
-            showNotification(data.message || 'Error reordering task blocks', 'error');
-            // Reload timeline to reset state
-            loadTimelineForProject(projectId);
-        }
-    })
-    .catch(error => {
-        console.error('Error reordering task blocks:', error);
-        showNotification('Network error occurred', 'error');
-        // Reload timeline to reset state  
-        loadTimelineForProject(projectId);
-    });
-}
 
-// API call to reorder events within a TaskBlock
-function reorderEventsInBlock(blockId, eventIds) {
-    const requestData = {
-        BlockId: blockId,
-        EventIds: eventIds
-    };
-    
-    apiPostJson('/Timeline/ReorderEventsInBlock', requestData)
-    .then(data => {
-        if (data.success) {
-        } else {
-            showNotification(data.message || 'Error reordering events', 'error');
-        }
-    })
-    .catch(error => {
-        console.error('Error reordering events:', error);
-        showNotification('Network error occurred', 'error');
-    });
-}
 
 // Comment functionality
 let currentCommentBlockId = null; // Store blockId for comment creation
@@ -868,29 +742,6 @@ function initializeTaskBlockCollapse(projectId) {
     });
 }
 
-// API call to reorder mixed timeline items (TaskBlocks and unblocked events)
-function reorderMixedTimelineItems(projectId, items) {
-    const requestData = {
-        ProjectId: projectId,
-        Items: items
-    };
-    
-    apiPostJson('/Timeline/ReorderMixedItems', requestData)
-    .then(data => {
-        if (data.success) {
-        } else {
-            showNotification(data.message || 'Error reordering timeline', 'error');
-            // Reload timeline to reset state
-            loadTimelineForProject(projectId);
-        }
-    })
-    .catch(error => {
-        console.error('Error reordering mixed timeline items:', error);
-        showNotification('Network error occurred', 'error');
-        // Reload timeline to reset state  
-        loadTimelineForProject(projectId);
-    });
-}
 
 // API call to nest a TaskBlock under another TaskBlock
 function nestTaskBlock(childBlockId, parentBlockId) {

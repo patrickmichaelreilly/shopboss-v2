@@ -54,6 +54,11 @@ public class PurchaseOrderService
 
             _context.PurchaseOrders.Add(purchaseOrder);
             
+            // Get the next display order for the target container
+            var maxOrder = await _context.ProjectEvents
+                .Where(pe => pe.ProjectId == purchaseOrder.ProjectId && pe.ParentBlockId == taskBlockId)
+                .MaxAsync(pe => (int?)pe.DisplayOrder) ?? 0;
+
             // Create timeline event for purchase order creation
             var createEvent = new ProjectEvent
             {
@@ -63,7 +68,8 @@ public class PurchaseOrderService
                 Description = $"Purchase Order created: {purchaseOrder.PurchaseOrderNumber} - {purchaseOrder.VendorName}",
                 CreatedBy = createdBy,
                 PurchaseOrderId = purchaseOrder.Id,
-                TaskBlockId = taskBlockId
+                ParentBlockId = taskBlockId,
+                DisplayOrder = maxOrder + 1
             };
             _context.ProjectEvents.Add(createEvent);
             
@@ -112,6 +118,11 @@ public class PurchaseOrderService
             existingPurchaseOrder.Status = purchaseOrder.Status;
             existingPurchaseOrder.Notes = purchaseOrder.Notes;
 
+            // Get the next display order for root level (null parent)
+            var maxOrder = await _context.ProjectEvents
+                .Where(pe => pe.ProjectId == existingPurchaseOrder.ProjectId && pe.ParentBlockId == null)
+                .MaxAsync(pe => (int?)pe.DisplayOrder) ?? 0;
+
             // Create timeline event
             ProjectEvent timelineEvent;
             if (statusChanged)
@@ -123,7 +134,9 @@ public class PurchaseOrderService
                     EventType = "purchase_order",
                     Description = $"Purchase Order status changed: {purchaseOrder.PurchaseOrderNumber} - {oldStatus} → {purchaseOrder.Status}",
                     CreatedBy = null,
-                    PurchaseOrderId = purchaseOrder.Id
+                    PurchaseOrderId = purchaseOrder.Id,
+                    ParentBlockId = null,
+                    DisplayOrder = maxOrder + 1
                 };
             }
             else
@@ -135,7 +148,9 @@ public class PurchaseOrderService
                     EventType = "purchase_order",
                     Description = $"Purchase Order updated: {purchaseOrder.PurchaseOrderNumber} - {purchaseOrder.VendorName}",
                     CreatedBy = null,
-                    PurchaseOrderId = purchaseOrder.Id
+                    PurchaseOrderId = purchaseOrder.Id,
+                    ParentBlockId = null,
+                    DisplayOrder = maxOrder + 1
                 };
             }
             _context.ProjectEvents.Add(timelineEvent);
@@ -166,6 +181,11 @@ public class PurchaseOrderService
                 return false;
             }
 
+            // Get the next display order for root level (null parent)
+            var maxOrder = await _context.ProjectEvents
+                .Where(pe => pe.ProjectId == purchaseOrder.ProjectId && pe.ParentBlockId == null)
+                .MaxAsync(pe => (int?)pe.DisplayOrder) ?? 0;
+
             // Create timeline event for purchase order deletion
             var deleteEvent = new ProjectEvent
             {
@@ -173,7 +193,9 @@ public class PurchaseOrderService
                 EventDate = DateTime.UtcNow,
                 EventType = "purchase_order",
                 Description = $"Purchase Order deleted: {purchaseOrder.PurchaseOrderNumber} - {purchaseOrder.VendorName}",
-                CreatedBy = null
+                CreatedBy = null,
+                ParentBlockId = null,
+                DisplayOrder = maxOrder + 1
                 // Note: Don't set PurchaseOrderId since the PO will be deleted
             };
             _context.ProjectEvents.Add(deleteEvent);

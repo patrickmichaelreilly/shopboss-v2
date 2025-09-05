@@ -206,6 +206,13 @@ public class ProjectService
                 .Where(w => workOrderIds.Contains(w.Id))
                 .ToListAsync();
 
+            // Get the next display order for root level (work order associations go to root)
+            var maxOrder = await _context.ProjectEvents
+                .Where(pe => pe.ProjectId == projectId && pe.ParentBlockId == null)
+                .MaxAsync(pe => (int?)pe.DisplayOrder) ?? 0;
+            
+            var orderCounter = maxOrder;
+            
             foreach (var workOrder in workOrders)
             {
                 workOrder.ProjectId = projectId;
@@ -218,7 +225,9 @@ public class ProjectService
                     EventType = "work_order",
                     Description = workOrder.Name,
                     CreatedBy = null, // Could be passed as parameter if needed
-                    WorkOrderId = workOrder.Id
+                    WorkOrderId = workOrder.Id,
+                    ParentBlockId = null, // Work order associations go to root level
+                    DisplayOrder = ++orderCounter
                 };
                 _context.ProjectEvents.Add(workOrderEvent);
             }

@@ -1163,7 +1163,7 @@ public class SmartSheetService
 
             // Get all events with row numbers that aren't already assigned to blocks
             var eventsWithRows = await _context.ProjectEvents
-                .Where(pe => pe.ProjectId == projectId && pe.RowNumber.HasValue && pe.TaskBlockId == null)
+                .Where(pe => pe.ProjectId == projectId && pe.RowNumber.HasValue && pe.ParentBlockId == null)
                 .OrderBy(pe => pe.RowNumber)
                 .ThenBy(pe => pe.EventDate)
                 .ToListAsync();

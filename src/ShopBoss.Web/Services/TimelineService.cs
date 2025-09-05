@@ -27,41 +27,40 @@ public class TimelineService
             if (project == null)
                 throw new ArgumentException($"Project not found: {projectId}", nameof(projectId));
 
-            // Get only root-level blocks (no parent) with their full hierarchy
-            var blocks = await _context.TaskBlocks
-                .Where(tb => tb.ProjectId == projectId && tb.ParentTaskBlockId == null)
+            // Get all blocks for this project with their events
+            var allBlocks = await _context.TaskBlocks
+                .Where(tb => tb.ProjectId == projectId)
                 .Include(tb => tb.Events)
                     .ThenInclude(e => e.Attachment)
                 .Include(tb => tb.ChildTaskBlocks)
-                    .ThenInclude(child => child.Events)
-                        .ThenInclude(e => e.Attachment)
-                .OrderBy(tb => tb.GlobalDisplayOrder ?? tb.DisplayOrder)
                 .AsSplitQuery()
                 .ToListAsync();
 
-            // For deeper nesting, we need to recursively load child blocks
-            await LoadAllChildrenRecursively(blocks);
-
-            // Get all events for this project, ordered by GlobalDisplayOrder, then chronologically
+            // Get all events for this project
             var allEvents = await _context.ProjectEvents
                 .Where(pe => pe.ProjectId == projectId)
                 .Include(pe => pe.Attachment)
                 .Include(pe => pe.WorkOrder!)
                     .ThenInclude(wo => wo.NestSheets)
-                .OrderBy(pe => pe.GlobalDisplayOrder ?? int.MaxValue)
-                .ThenBy(pe => pe.EventDate)
                 .AsSplitQuery()
                 .ToListAsync();
 
-            // Separate events into blocked and unblocked (including nested block events)
-            var blockedEventIds = GetAllEventsFromBlocksRecursively(blocks).Select(e => e.Id).ToHashSet();
-            var unblockedEvents = allEvents.Where(e => !blockedEventIds.Contains(e.Id)).ToList();
+            // Build the hierarchical structure
+            var rootBlocks = allBlocks.Where(tb => tb.ParentTaskBlockId == null)
+                .OrderBy(tb => tb.DisplayOrder)
+                .ToList();
+
+            var rootEvents = allEvents.Where(pe => pe.ParentBlockId == null)
+                .OrderBy(pe => pe.DisplayOrder)
+                .ToList();
 
             return new TimelineData
             {
                 Project = project,
-                TaskBlocks = blocks,
-                UnblockedEvents = unblockedEvents
+                RootBlocks = rootBlocks,
+                RootEvents = rootEvents,
+                AllBlocks = allBlocks,
+                AllEvents = allEvents
             };
         }
         catch (Exception ex)
@@ -139,8 +138,8 @@ public class TimelineService
             // Unassign all events from this block (don't delete the events)
             foreach (var evt in block.Events)
             {
-                evt.TaskBlockId = null;
-                evt.BlockDisplayOrder = null;
+                evt.ParentBlockId = null;
+                evt.DisplayOrder = 0;
             }
 
             _context.TaskBlocks.Remove(block);
@@ -156,36 +155,8 @@ public class TimelineService
         }
     }
 
-    public async Task<bool> ReorderTaskBlocksAsync(string projectId, List<string> blockIdsInOrder)
-    {
-        try
-        {
-            var blocks = await _context.TaskBlocks
-                .Where(tb => tb.ProjectId == projectId && blockIdsInOrder.Contains(tb.Id))
-                .ToListAsync();
 
-            for (int i = 0; i < blockIdsInOrder.Count; i++)
-            {
-                var block = blocks.FirstOrDefault(tb => tb.Id == blockIdsInOrder[i]);
-                if (block != null)
-                {
-                    block.DisplayOrder = i + 1;
-                }
-            }
-
-            await _context.SaveChangesAsync();
-
-            _logger.LogInformation("Reordered {Count} TaskBlocks for project: {ProjectId}", blocks.Count, projectId);
-            return true;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error reordering TaskBlocks for project: {ProjectId}", projectId);
-            throw;
-        }
-    }
-
-    // Event assignment operations
+    // Event assignment operations (now handled by ReorderItemsAsync)
     public async Task<bool> AssignEventsToBlockAsync(string blockId, List<string> eventIds)
     {
         try
@@ -194,15 +165,15 @@ public class TimelineService
                 .Where(pe => eventIds.Contains(pe.Id))
                 .ToListAsync();
 
-            // Get the next block display order for each event
+            // Get the next display order for each event
             var maxOrder = await _context.ProjectEvents
-                .Where(pe => pe.TaskBlockId == blockId)
-                .MaxAsync(pe => (int?)pe.BlockDisplayOrder) ?? 0;
+                .Where(pe => pe.ParentBlockId == blockId)
+                .MaxAsync(pe => (int?)pe.DisplayOrder) ?? 0;
 
             for (int i = 0; i < events.Count; i++)
             {
-                events[i].TaskBlockId = blockId;
-                events[i].BlockDisplayOrder = maxOrder + i + 1;
+                events[i].ParentBlockId = blockId;
+                events[i].DisplayOrder = maxOrder + i + 1;
             }
 
             await _context.SaveChangesAsync();
@@ -227,8 +198,8 @@ public class TimelineService
 
             foreach (var evt in events)
             {
-                evt.TaskBlockId = null;
-                evt.BlockDisplayOrder = null;
+                evt.ParentBlockId = null;
+                evt.DisplayOrder = 0;
             }
 
             await _context.SaveChangesAsync();
@@ -243,36 +214,12 @@ public class TimelineService
         }
     }
 
-    public async Task<bool> ReorderEventsInBlockAsync(string blockId, List<string> eventIdsInOrder)
-    {
-        try
-        {
-            var events = await _context.ProjectEvents
-                .Where(pe => pe.TaskBlockId == blockId && eventIdsInOrder.Contains(pe.Id))
-                .ToListAsync();
-
-            for (int i = 0; i < eventIdsInOrder.Count; i++)
-            {
-                var evt = events.FirstOrDefault(pe => pe.Id == eventIdsInOrder[i]);
-                if (evt != null)
-                {
-                    evt.BlockDisplayOrder = i + 1;
-                }
-            }
-
-            await _context.SaveChangesAsync();
-
-            _logger.LogInformation("Reordered {Count} events in TaskBlock: {BlockId}", events.Count, blockId);
-            return true;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error reordering events in TaskBlock: {BlockId}", blockId);
-            throw;
-        }
-    }
-
-    public async Task<bool> ReorderMixedTimelineItemsAsync(string projectId, List<(string Type, string Id, int Order)> items)
+    /// <summary>
+    /// Unified method to reorder any items within a parent container
+    /// </summary>
+    /// <param name="parentBlockId">Parent TaskBlock ID, or null for root level</param>
+    /// <param name="items">List of items with Type ("TaskBlock" or "Event"), Id, and Order</param>
+    public async Task<bool> ReorderItemsAsync(string? parentBlockId, List<(string Type, string Id, int Order)> items)
     {
         try
         {
@@ -281,25 +228,39 @@ public class TimelineService
                 if (type == "TaskBlock")
                 {
                     var block = await _context.TaskBlocks.FindAsync(id);
-                    if (block != null) block.GlobalDisplayOrder = order;
+                    if (block != null)
+                    {
+                        block.DisplayOrder = order;
+                        // Ensure parent relationship is correct
+                        block.ParentTaskBlockId = parentBlockId;
+                    }
                 }
                 else if (type == "Event")
                 {
                     var evt = await _context.ProjectEvents.FindAsync(id);
-                    if (evt != null) evt.GlobalDisplayOrder = order;
+                    if (evt != null)
+                    {
+                        evt.DisplayOrder = order;
+                        // Ensure parent relationship is correct
+                        evt.ParentBlockId = parentBlockId;
+                    }
                 }
             }
 
             await _context.SaveChangesAsync();
-            _logger.LogInformation("Reordered {Count} mixed timeline items for project: {ProjectId}", items.Count, projectId);
+            
+            var containerName = parentBlockId != null ? $"TaskBlock: {parentBlockId}" : "root level";
+            _logger.LogInformation("Reordered {Count} items in {Container}", items.Count, containerName);
             return true;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error reordering mixed timeline items for project: {ProjectId}", projectId);
+            var containerName = parentBlockId != null ? $"TaskBlock: {parentBlockId}" : "root level";
+            _logger.LogError(ex, "Error reordering items in {Container}", containerName);
             throw;
         }
     }
+
 
     public async Task<bool> NestTaskBlockAsync(string childBlockId, string? parentBlockId)
     {
@@ -344,46 +305,14 @@ public class TimelineService
         return false;
     }
 
-    private async Task LoadAllChildrenRecursively(IEnumerable<TaskBlock> taskBlocks)
-    {
-        foreach (var block in taskBlocks)
-        {
-            if (block.ChildTaskBlocks.Any())
-            {
-                // Load next level of children for each child block
-                await _context.Entry(block)
-                    .Collection(b => b.ChildTaskBlocks)
-                    .Query()
-                    .Include(child => child.Events)
-                        .ThenInclude(e => e.Attachment)
-                    .Include(child => child.ChildTaskBlocks)
-                    .AsSplitQuery()
-                    .LoadAsync();
-
-                // Recursively load deeper levels
-                await LoadAllChildrenRecursively(block.ChildTaskBlocks);
-            }
-        }
-    }
-
-    private IEnumerable<ProjectEvent> GetAllEventsFromBlocksRecursively(IEnumerable<TaskBlock> blocks)
-    {
-        var allEvents = new List<ProjectEvent>();
-        
-        foreach (var block in blocks)
-        {
-            allEvents.AddRange(block.Events);
-            allEvents.AddRange(GetAllEventsFromBlocksRecursively(block.ChildTaskBlocks));
-        }
-        
-        return allEvents;
-    }
 }
 
 // View model for timeline data
 public class TimelineData
 {
     public Project Project { get; set; } = null!;
-    public List<TaskBlock> TaskBlocks { get; set; } = new();
-    public List<ProjectEvent> UnblockedEvents { get; set; } = new();
+    public List<TaskBlock> RootBlocks { get; set; } = new();
+    public List<ProjectEvent> RootEvents { get; set; } = new();
+    public List<TaskBlock> AllBlocks { get; set; } = new();
+    public List<ProjectEvent> AllEvents { get; set; } = new();
 }

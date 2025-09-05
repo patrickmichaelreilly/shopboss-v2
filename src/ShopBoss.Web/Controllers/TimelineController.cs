@@ -143,58 +143,24 @@ public class TimelineController : Controller
     }
 
     [HttpPost]
-    public async Task<IActionResult> ReorderBlocks([FromBody] ReorderBlocksRequest request)
+    public async Task<IActionResult> ReorderItems([FromBody] ReorderItemsRequest request)
     {
         try
         {
-            if (request.BlockIds == null || !request.BlockIds.Any())
+            if (request.Items == null || !request.Items.Any())
             {
-                return Json(new { success = false, message = "No blocks specified." });
+                return Json(new { success = false, message = "No items specified." });
             }
 
-            var success = await _timelineService.ReorderTaskBlocksAsync(request.ProjectId, request.BlockIds);
-            return Json(new { success });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error reordering TaskBlocks for project: {ProjectId}", request.ProjectId);
-            return Json(new { success = false, message = "Error reordering blocks. Please try again." });
-        }
-    }
-
-    [HttpPost]
-    public async Task<IActionResult> ReorderEventsInBlock([FromBody] ReorderEventsRequest request)
-    {
-        try
-        {
-            if (request.EventIds == null || !request.EventIds.Any())
-            {
-                return Json(new { success = false, message = "No events specified." });
-            }
-
-            var success = await _timelineService.ReorderEventsInBlockAsync(request.BlockId, request.EventIds);
-            return Json(new { success });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error reordering events in TaskBlock: {BlockId}", request.BlockId);
-            return Json(new { success = false, message = "Error reordering events. Please try again." });
-        }
-    }
-
-    [HttpPost]
-    public async Task<IActionResult> ReorderMixedItems([FromBody] ReorderMixedItemsRequest request)
-    {
-        try
-        {
             var items = request.Items.Select(i => (i.Type, i.Id, i.Order)).ToList();
-            await _timelineService.ReorderMixedTimelineItemsAsync(request.ProjectId, items);
-            return Json(new { success = true });
+            var success = await _timelineService.ReorderItemsAsync(request.ParentId, items);
+            return Json(new { success });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error reordering mixed timeline items for project: {ProjectId}", request.ProjectId);
-            return Json(new { success = false, message = "Error reordering timeline items. Please try again." });
+            var containerName = request.ParentId != null ? $"TaskBlock: {request.ParentId}" : "root level";
+            _logger.LogError(ex, "Error reordering items in {Container}", containerName);
+            return Json(new { success = false, message = "Error reordering items. Please try again." });
         }
     }
 
@@ -247,25 +213,13 @@ public class UnassignEventsRequest
     public List<string> EventIds { get; set; } = new();
 }
 
-public class ReorderBlocksRequest
+public class ReorderItemsRequest
 {
-    public string ProjectId { get; set; } = string.Empty;
-    public List<string> BlockIds { get; set; } = new();
+    public string? ParentId { get; set; } // null for root level, TaskBlock ID for nested
+    public List<TimelineItemOrder> Items { get; set; } = new();
 }
 
-public class ReorderEventsRequest
-{
-    public string BlockId { get; set; } = string.Empty;
-    public List<string> EventIds { get; set; } = new();
-}
-
-public class ReorderMixedItemsRequest
-{
-    public string ProjectId { get; set; } = string.Empty;
-    public List<MixedTimelineItemOrder> Items { get; set; } = new();
-}
-
-public class MixedTimelineItemOrder
+public class TimelineItemOrder
 {
     public string Type { get; set; } = string.Empty; // "TaskBlock" or "Event"
     public string Id { get; set; } = string.Empty;

@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using ShopBoss.Web.Services;
 using ShopBoss.Web.Models;
 using ShopBoss.Web.Data;
@@ -12,6 +13,7 @@ public class ProjectController : Controller
     private readonly ProjectAttachmentService _attachmentService;
     private readonly PurchaseOrderService _purchaseOrderService;
     private readonly CustomWorkOrderService _customWorkOrderService;
+    private readonly CommentService _commentService;
     private readonly SmartSheetService _smartSheetService;
     private readonly ShopBossDbContext _context;
     private readonly ILogger<ProjectController> _logger;
@@ -21,6 +23,7 @@ public class ProjectController : Controller
         ProjectAttachmentService attachmentService,
         PurchaseOrderService purchaseOrderService,
         CustomWorkOrderService customWorkOrderService,
+        CommentService commentService,
         SmartSheetService smartSheetService,
         ShopBossDbContext context,
         ILogger<ProjectController> logger)
@@ -29,6 +32,7 @@ public class ProjectController : Controller
         _attachmentService = attachmentService;
         _purchaseOrderService = purchaseOrderService;
         _customWorkOrderService = customWorkOrderService;
+        _commentService = commentService;
         _smartSheetService = smartSheetService;
         _context = context;
         _logger = logger;
@@ -310,7 +314,7 @@ public class ProjectController : Controller
             // Check SmartSheet authentication for event attribution, fallback to "Local User"
             var smartSheetUser = HttpContext.Session.GetString("ss_user") ?? "Local User";
 
-            var createdPurchaseOrder = await _purchaseOrderService.CreatePurchaseOrderAsync(request.PurchaseOrder, request.TaskBlockId, smartSheetUser);
+            var createdPurchaseOrder = await _purchaseOrderService.CreatePurchaseOrderAsync(request.PurchaseOrder, request.ParentBlockId, smartSheetUser);
             return Json(new { success = true, purchaseOrder = createdPurchaseOrder });
         }
         catch (Exception ex)
@@ -380,7 +384,7 @@ public class ProjectController : Controller
             // Check SmartSheet authentication for event attribution, fallback to "Local User"
             var smartSheetUser = HttpContext.Session.GetString("ss_user") ?? "Local User";
 
-            var createdCustomWorkOrder = await _customWorkOrderService.CreateCustomWorkOrderAsync(request.CustomWorkOrder, request.TaskBlockId, smartSheetUser);
+            var createdCustomWorkOrder = await _customWorkOrderService.CreateCustomWorkOrderAsync(request.CustomWorkOrder, request.ParentBlockId, smartSheetUser);
             return Json(new { success = true, customWorkOrder = createdCustomWorkOrder });
         }
         catch (Exception ex)
@@ -692,18 +696,14 @@ public class ProjectController : Controller
             // Get Smartsheet user from session for attribution, fallback to "Local User"
             var smartSheetUser = HttpContext.Session.GetString("ss_user") ?? "Local User";
 
-            // Create new ProjectEvent for the comment
-            var projectEvent = new ProjectEvent
-            {
-                ProjectId = request.ProjectId,
-                EventDate = request.EventDate,
-                EventType = "comment",
-                Description = request.Description,
-                CreatedBy = smartSheetUser, // Use SmartSheet user instead of client-provided value
-                TaskBlockId = request.TaskBlockId
-            };
-
-            var success = await _projectService.AddProjectEventAsync(projectEvent);
+            // Create comment using the dedicated service
+            var success = await _commentService.CreateCommentAsync(
+                request.ProjectId,
+                request.Description,
+                request.EventDate,
+                smartSheetUser,
+                request.ParentBlockId
+            );
             
             if (success)
             {
@@ -731,14 +731,11 @@ public class ProjectController : Controller
                 return Json(new { success = false, message = "Event ID is required" });
             }
 
-            var projectEvent = await _context.ProjectEvents.FindAsync(request.EventId);
-            if (projectEvent == null)
+            var success = await _commentService.UpdateCommentAsync(request.EventId, request.Description ?? "");
+            if (!success)
             {
-                return Json(new { success = false, message = "Event not found" });
+                return Json(new { success = false, message = "Comment not found or could not be updated" });
             }
-
-            projectEvent.Description = request.Description ?? "";
-            await _context.SaveChangesAsync();
 
             return Json(new { success = true, message = "Comment updated successfully" });
         }
@@ -779,7 +776,7 @@ public class ProjectController : Controller
         public string Description { get; set; } = string.Empty;
         public DateTime EventDate { get; set; }
         public string? CreatedBy { get; set; }
-        public string? TaskBlockId { get; set; }
+        public string? ParentBlockId { get; set; }
     }
 
     public class UpdateEventDescriptionRequest
@@ -798,19 +795,11 @@ public class ProjectController : Controller
                 return Json(new { success = false, message = "Event ID is required" });
             }
 
-            var projectEvent = await _context.ProjectEvents.FindAsync(request.EventId);
-            if (projectEvent == null)
+            var success = await _commentService.DeleteCommentAsync(request.EventId);
+            if (!success)
             {
-                return Json(new { success = false, message = "Event not found" });
+                return Json(new { success = false, message = "Comment not found or could not be deleted" });
             }
-
-            if (!string.Equals(projectEvent.EventType, "comment", StringComparison.OrdinalIgnoreCase))
-            {
-                return Json(new { success = false, message = "Unsupported event type for this endpoint" });
-            }
-
-            _context.ProjectEvents.Remove(projectEvent);
-            await _context.SaveChangesAsync();
             return Json(new { success = true });
         }
         catch (Exception ex)
@@ -828,13 +817,13 @@ public class ProjectController : Controller
     public class CreateCustomWorkOrderRequest
     {
         public CustomWorkOrder CustomWorkOrder { get; set; } = new();
-        public string? TaskBlockId { get; set; }
+        public string? ParentBlockId { get; set; }
     }
 
     public class CreatePurchaseOrderRequest
     {
         public PurchaseOrder PurchaseOrder { get; set; } = new();
-        public string? TaskBlockId { get; set; }
+        public string? ParentBlockId { get; set; }
     }
 
     /// <summary>
