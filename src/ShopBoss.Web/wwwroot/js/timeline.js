@@ -638,7 +638,7 @@ function saveComment(projectId) {
     
     const modal = bootstrap.Modal.getInstance(document.getElementById(`addCommentModal-${projectId}`));
     
-    apiPostJson('/Project/CreateComment', { projectId, description: commentText, eventDate: commentDate, createdBy: commentAuthor || null, taskBlockId: currentCommentBlockId })
+    apiPostJson('/Project/CreateComment', { projectId, description: commentText, eventDate: commentDate, createdBy: commentAuthor || null, parentBlockId: currentCommentBlockId })
     .then(data => {
         if (data.success) {
             modal.hide();

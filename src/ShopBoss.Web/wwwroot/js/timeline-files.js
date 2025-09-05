@@ -28,6 +28,11 @@
         formData.append('projectId', projectId);
         formData.append('label', 'Label'); // Set default label
         
+        // Include the taskBlockId if one was specified
+        if (Timeline.Files.currentBlockId) {
+            formData.append('taskBlockId', Timeline.Files.currentBlockId);
+        }
+        
         for (let i = 0; i < fileInput.files.length; i++) {
             formData.append('file', fileInput.files[i]);
         }
