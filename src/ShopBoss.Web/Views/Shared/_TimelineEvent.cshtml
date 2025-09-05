@@ -46,7 +46,10 @@ else if (Model.EventType == "custom_work_order" && Model.CustomWorkOrder != null
     <div class="event-primary d-flex align-items-center">
         <i class="fas fa-clipboard-list event-icon text-muted" title="Custom Work Order"></i>
         <div>
-            <strong>@Model.Description</strong>
+            <strong class="editable-field" 
+                    data-custom-work-order-id="@Model.CustomWorkOrder.Id" 
+                    data-field="Name" 
+                    data-original-value="@Model.CustomWorkOrder.Name">@Model.CustomWorkOrder.Name</strong>
             @if (Model.RowNumber.HasValue)
             {
                 <span class="badge bg-primary row-badge">Row @Model.RowNumber</span>
@@ -63,7 +66,11 @@ else if (Model.EventType == "custom_work_order" && Model.CustomWorkOrder != null
     <div class="event-secondary text-muted small mt-1">
         @if (!string.IsNullOrEmpty(Model.CustomWorkOrder.Description))
         {
-            <div>@Model.CustomWorkOrder.Description</div>
+            <div class="editable-field" 
+                 data-custom-work-order-id="@Model.CustomWorkOrder.Id" 
+                 data-field="Description" 
+                 data-type="textarea" 
+                 data-original-value="@Model.CustomWorkOrder.Description">@Model.CustomWorkOrder.Description</div>
         }
         <div class="event-metadata">@Model.EventDate.ToString("yyyy-MM-dd HH:mm") by @(Model.CreatedBy ?? "Unknown")</div>
     </div>
@@ -73,7 +80,10 @@ else if (Model.EventType == "comment")
     <div class="event-primary d-flex align-items-center">
         <i class="fas fa-comment event-icon text-muted" title="Comment"></i>
         <div>
-            <strong>@(Model.Label ?? "Comment")</strong>
+            <strong class="editable-label" 
+                    data-event-id="@Model.Id" 
+                    data-field="Label" 
+                    data-original-value="@(Model.Label ?? "Comment")">@(Model.Label ?? "Comment")</strong>
             @if (Model.RowNumber.HasValue)
             {
                 <span class="badge bg-primary row-badge ms-2">Row @Model.RowNumber</span>
@@ -89,7 +99,11 @@ else if (Model.EventType == "comment")
     <div class="event-secondary text-muted small mt-1">
         @if (!string.IsNullOrEmpty(Model.Description))
         {
-            <div>@Model.Description</div>
+            <div class="editable-field" 
+                 data-event-id="@Model.Id" 
+                 data-field="Description" 
+                 data-type="textarea" 
+                 data-original-value="@Model.Description">@Model.Description</div>
         }
         <div class="event-metadata">@Model.EventDate.ToString("yyyy-MM-dd HH:mm") by @(Model.CreatedBy ?? "Unknown")</div>
     </div>
@@ -99,7 +113,17 @@ else if (Model.EventType == "purchase_order" && Model.PurchaseOrder != null)
     <div class="event-primary d-flex align-items-center">
         <i class="fas fa-shopping-cart event-icon text-muted" title="Purchase Order"></i>
         <div>
-            <strong>@Model.Description</strong>
+            <strong>
+                <span class="editable-field" 
+                      data-purchase-order-id="@Model.PurchaseOrder.Id" 
+                      data-field="PurchaseOrderNumber" 
+                      data-original-value="@Model.PurchaseOrder.PurchaseOrderNumber">@Model.PurchaseOrder.PurchaseOrderNumber</span>
+                - 
+                <span class="editable-field" 
+                      data-purchase-order-id="@Model.PurchaseOrder.Id" 
+                      data-field="VendorName" 
+                      data-original-value="@Model.PurchaseOrder.VendorName">@Model.PurchaseOrder.VendorName</span>
+            </strong>
             @if (Model.RowNumber.HasValue)
             {
                 <span class="badge bg-primary row-badge">Row @Model.RowNumber</span>
@@ -116,7 +140,11 @@ else if (Model.EventType == "purchase_order" && Model.PurchaseOrder != null)
     <div class="event-secondary text-muted small mt-1">
         @if (!string.IsNullOrEmpty(Model.PurchaseOrder.Description))
         {
-            <div>@Model.PurchaseOrder.Description</div>
+            <div class="editable-field" 
+                 data-purchase-order-id="@Model.PurchaseOrder.Id" 
+                 data-field="Description" 
+                 data-type="textarea" 
+                 data-original-value="@Model.PurchaseOrder.Description">@Model.PurchaseOrder.Description</div>
         }
         <div class="event-metadata">@Model.EventDate.ToString("yyyy-MM-dd HH:mm") by @(Model.CreatedBy ?? "Unknown")</div>
     </div>

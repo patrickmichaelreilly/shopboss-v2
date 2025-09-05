@@ -29,9 +29,12 @@
         }
     }
 
-    // Handle keyboard events during editing
+    // Handle keyboard events during editing (backup handler for cases where input handler doesn't fire)
     function handleKeyDown(event) {
         if (!currentEditor) return;
+        
+        // Only handle if the event didn't come from our input element (backup)
+        if (event.target === currentEditor.editor) return;
 
         switch(event.key) {
             case 'Enter':
@@ -51,6 +54,10 @@
         const originalValue = element.dataset.originalValue || element.dataset.value || element.textContent.trim();
         const attachmentId = element.dataset.attachmentId;
         const projectId = element.dataset.projectId;
+        const eventId = element.dataset.eventId;
+        const blockId = element.dataset.blockId;
+        const purchaseOrderId = element.dataset.purchaseOrderId;
+        const customWorkOrderId = element.dataset.customWorkOrderId;
         const fieldName = element.dataset.field;
         const fieldType = element.dataset.type || 'text';
         
@@ -107,6 +114,25 @@
             }
         });
         
+        // Add keydown handler specifically for this input to handle Alt+Enter
+        input.addEventListener('keydown', function(event) {
+            switch(event.key) {
+                case 'Enter':
+                    // Alt+Enter allows line breaks in textarea fields
+                    if (event.altKey && fieldType === 'textarea') {
+                        // Allow the default behavior (insert line break)
+                        return;
+                    }
+                    event.preventDefault();
+                    saveEdit();
+                    break;
+                case 'Escape':
+                    event.preventDefault();
+                    cancelEdit();
+                    break;
+            }
+        });
+        
         // Store editor info
         currentEditor = {
             element: element,
@@ -114,6 +140,10 @@
             originalValue: originalValue,
             attachmentId: attachmentId,
             projectId: projectId,
+            eventId: eventId,
+            blockId: blockId,
+            purchaseOrderId: purchaseOrderId,
+            customWorkOrderId: customWorkOrderId,
             fieldName: fieldName,
             fieldType: fieldType
         };
@@ -173,6 +203,14 @@
             // Call appropriate update function based on field type
             if (editor.attachmentId) {
                 success = await updateAttachmentLabel(editor.attachmentId, newValue);
+            } else if (editor.eventId && editor.fieldName) {
+                success = await updateEventField(editor.eventId, editor.fieldName, newValue);
+            } else if (editor.blockId && editor.fieldName) {
+                success = await updateTaskBlockField(editor.blockId, editor.fieldName, newValue);
+            } else if (editor.purchaseOrderId && editor.fieldName) {
+                success = await updatePurchaseOrderField(editor.purchaseOrderId, editor.fieldName, newValue);
+            } else if (editor.customWorkOrderId && editor.fieldName) {
+                success = await updateCustomWorkOrderField(editor.customWorkOrderId, editor.fieldName, newValue);
             } else if (editor.projectId && editor.fieldName) {
                 success = await updateProjectField(editor.projectId, editor.fieldName, newValue);
             }
@@ -224,11 +262,15 @@
     function finishEditWithEditor(editor) {
         if (!editor) return;
         
-        // Remove the input field
-        editor.editor.remove();
+        // Remove the input field if it still exists in the DOM
+        if (editor.editor && editor.editor.parentNode) {
+            editor.editor.remove();
+        }
         
         // Show the original element
-        editor.element.style.visibility = '';
+        if (editor.element) {
+            editor.element.style.visibility = '';
+        }
     }
 
     // Show success feedback
@@ -317,6 +359,142 @@
             }
         } catch (error) {
             console.error('Error updating project field:', error);
+            if (typeof showNotification === 'function') {
+                showNotification('Network error occurred', 'error');
+            }
+            return false;
+        }
+    }
+
+    // Update event field via API
+    async function updateEventField(eventId, fieldName, value) {
+        try {
+            const response = await fetch('/Project/UpdateEventField', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    eventId: eventId,
+                    fieldName: fieldName,
+                    value: value
+                })
+            });
+
+            const data = await response.json();
+            
+            if (data.success) {
+                return true;
+            } else {
+                if (typeof showNotification === 'function') {
+                    showNotification(data.message || 'Error updating event field', 'error');
+                }
+                return false;
+            }
+        } catch (error) {
+            console.error('Error updating event field:', error);
+            if (typeof showNotification === 'function') {
+                showNotification('Network error occurred', 'error');
+            }
+            return false;
+        }
+    }
+
+    // Update task block field via API
+    async function updateTaskBlockField(blockId, fieldName, value) {
+        try {
+            const response = await fetch('/Timeline/UpdateTaskBlockField', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    blockId: blockId,
+                    fieldName: fieldName,
+                    value: value
+                })
+            });
+
+            const data = await response.json();
+            
+            if (data.success) {
+                return true;
+            } else {
+                if (typeof showNotification === 'function') {
+                    showNotification(data.message || 'Error updating task block field', 'error');
+                }
+                return false;
+            }
+        } catch (error) {
+            console.error('Error updating task block field:', error);
+            if (typeof showNotification === 'function') {
+                showNotification('Network error occurred', 'error');
+            }
+            return false;
+        }
+    }
+
+    // Update purchase order field via API
+    async function updatePurchaseOrderField(purchaseOrderId, fieldName, value) {
+        try {
+            const response = await fetch('/Project/UpdatePurchaseOrderField', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    purchaseOrderId: purchaseOrderId,
+                    fieldName: fieldName,
+                    value: value
+                })
+            });
+
+            const data = await response.json();
+            
+            if (data.success) {
+                return true;
+            } else {
+                if (typeof showNotification === 'function') {
+                    showNotification(data.message || 'Error updating purchase order field', 'error');
+                }
+                return false;
+            }
+        } catch (error) {
+            console.error('Error updating purchase order field:', error);
+            if (typeof showNotification === 'function') {
+                showNotification('Network error occurred', 'error');
+            }
+            return false;
+        }
+    }
+
+    // Update custom work order field via API
+    async function updateCustomWorkOrderField(customWorkOrderId, fieldName, value) {
+        try {
+            const response = await fetch('/Project/UpdateCustomWorkOrderField', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    customWorkOrderId: customWorkOrderId,
+                    fieldName: fieldName,
+                    value: value
+                })
+            });
+
+            const data = await response.json();
+            
+            if (data.success) {
+                return true;
+            } else {
+                if (typeof showNotification === 'function') {
+                    showNotification(data.message || 'Error updating custom work order field', 'error');
+                }
+                return false;
+            }
+        } catch (error) {
+            console.error('Error updating custom work order field:', error);
             if (typeof showNotification === 'function') {
                 showNotification('Network error occurred', 'error');
             }

@@ -167,4 +167,48 @@ public class CustomWorkOrderService
             throw;
         }
     }
+
+    public async Task<bool> UpdateCustomWorkOrderFieldAsync(string customWorkOrderId, string fieldName, string? value)
+    {
+        try
+        {
+            var customWorkOrder = await _context.CustomWorkOrders.FindAsync(customWorkOrderId);
+            if (customWorkOrder == null)
+            {
+                _logger.LogWarning("CustomWorkOrder not found for field update: {CustomWorkOrderId}", customWorkOrderId);
+                return false;
+            }
+
+            // Update the specific field based on fieldName
+            switch (fieldName)
+            {
+                case "Name":
+                    if (string.IsNullOrWhiteSpace(value))
+                    {
+                        _logger.LogWarning("CustomWorkOrder name cannot be empty: {CustomWorkOrderId}", customWorkOrderId);
+                        return false;
+                    }
+                    customWorkOrder.Name = value;
+                    break;
+                case "Description":
+                    customWorkOrder.Description = value ?? string.Empty;
+                    break;
+                case "AssignedTo":
+                    customWorkOrder.AssignedTo = value;
+                    break;
+                default:
+                    _logger.LogWarning("Unknown field name for CustomWorkOrder update: {FieldName}", fieldName);
+                    return false;
+            }
+
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Updated CustomWorkOrder field {FieldName} for CWO {CustomWorkOrderId}", fieldName, customWorkOrderId);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating CustomWorkOrder field {FieldName} for CWO {CustomWorkOrderId}", fieldName, customWorkOrderId);
+            throw;
+        }
+    }
 }

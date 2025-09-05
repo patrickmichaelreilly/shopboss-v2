@@ -213,4 +213,62 @@ public class PurchaseOrderService
             throw;
         }
     }
+
+    public async Task<bool> UpdatePurchaseOrderFieldAsync(string purchaseOrderId, string fieldName, string? value)
+    {
+        try
+        {
+            var purchaseOrder = await _context.PurchaseOrders.FindAsync(purchaseOrderId);
+            if (purchaseOrder == null)
+            {
+                _logger.LogWarning("PurchaseOrder not found for field update: {PurchaseOrderId}", purchaseOrderId);
+                return false;
+            }
+
+            // Update the specific field based on fieldName
+            switch (fieldName)
+            {
+                case "PurchaseOrderNumber":
+                    if (string.IsNullOrWhiteSpace(value))
+                    {
+                        _logger.LogWarning("PurchaseOrder number cannot be empty: {PurchaseOrderId}", purchaseOrderId);
+                        return false;
+                    }
+                    purchaseOrder.PurchaseOrderNumber = value;
+                    break;
+                case "VendorName":
+                    if (string.IsNullOrWhiteSpace(value))
+                    {
+                        _logger.LogWarning("Vendor name cannot be empty: {PurchaseOrderId}", purchaseOrderId);
+                        return false;
+                    }
+                    purchaseOrder.VendorName = value;
+                    break;
+                case "Description":
+                    purchaseOrder.Description = value ?? string.Empty;
+                    break;
+                case "VendorContact":
+                    purchaseOrder.VendorContact = value;
+                    break;
+                case "VendorPhone":
+                    purchaseOrder.VendorPhone = value;
+                    break;
+                case "VendorEmail":
+                    purchaseOrder.VendorEmail = value;
+                    break;
+                default:
+                    _logger.LogWarning("Unknown field name for PurchaseOrder update: {FieldName}", fieldName);
+                    return false;
+            }
+
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Updated PurchaseOrder field {FieldName} for PO {PurchaseOrderId}", fieldName, purchaseOrderId);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating PurchaseOrder field {FieldName} for PO {PurchaseOrderId}", fieldName, purchaseOrderId);
+            throw;
+        }
+    }
 }

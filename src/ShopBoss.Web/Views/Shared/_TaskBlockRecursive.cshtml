@@ -18,15 +18,12 @@
                  aria-controls="collapse-@Model.Id">
                 <i class="fas fa-chevron-down collapse-icon text-muted transition-transform" title="Collapse/Expand block"></i>
             </div>
-            <div class="d-flex align-items-center"
-                 data-bs-toggle="collapse"
-                 data-bs-target="#collapse-@Model.Id"
-                 role="button"
-                 style="cursor: pointer;"
-                 aria-expanded="true"
-                 aria-controls="collapse-@Model.Id">
+            <div class="d-flex align-items-center">
                 <i class="@blockIcon block-icon me-2 text-primary" title="Drag to reorder block"></i>
-                <h6 class="mb-0 fw-bold">@Model.Name</h6>
+                <h6 class="mb-0 fw-bold editable-field" 
+                    data-block-id="@Model.Id" 
+                    data-field="Name" 
+                    data-original-value="@Model.Name">@Model.Name</h6>
             </div>
             @if (!string.IsNullOrEmpty(Model.Description))
             {

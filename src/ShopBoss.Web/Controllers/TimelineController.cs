@@ -82,6 +82,31 @@ public class TimelineController : Controller
         }
     }
 
+    [HttpPost]
+    public async Task<IActionResult> UpdateTaskBlockField([FromBody] UpdateTaskBlockFieldRequest request)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(request.BlockId) || string.IsNullOrWhiteSpace(request.FieldName))
+            {
+                return Json(new { success = false, message = "Block ID and field name are required" });
+            }
+
+            var success = await _timelineService.UpdateTaskBlockFieldAsync(request.BlockId, request.FieldName, request.Value);
+            if (success)
+            {
+                return Json(new { success = true });
+            }
+            
+            return Json(new { success = false, message = "Block not found or field could not be updated" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating TaskBlock field {FieldName} for block {BlockId}", request.FieldName, request.BlockId);
+            return Json(new { success = false, message = "Error updating task block field" });
+        }
+    }
+
     [HttpDelete]
     public async Task<IActionResult> DeleteBlock(string blockId)
     {
@@ -230,4 +255,11 @@ public class NestTaskBlockRequest
 {
     public string ChildBlockId { get; set; } = string.Empty;
     public string? ParentBlockId { get; set; } // null to unnest (move to root)
+}
+
+public class UpdateTaskBlockFieldRequest
+{
+    public string BlockId { get; set; } = string.Empty;
+    public string FieldName { get; set; } = string.Empty;
+    public string? Value { get; set; }
 }

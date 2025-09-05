@@ -820,6 +820,56 @@ public class ProjectController : Controller
     }
 
     [HttpPost]
+    public async Task<IActionResult> UpdatePurchaseOrderField([FromBody] UpdatePurchaseOrderFieldRequest request)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(request.PurchaseOrderId) || string.IsNullOrWhiteSpace(request.FieldName))
+            {
+                return Json(new { success = false, message = "Purchase Order ID and field name are required" });
+            }
+
+            var success = await _purchaseOrderService.UpdatePurchaseOrderFieldAsync(request.PurchaseOrderId, request.FieldName, request.Value);
+            if (success)
+            {
+                return Json(new { success = true });
+            }
+            
+            return Json(new { success = false, message = "Purchase order not found or field could not be updated" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating purchase order field {FieldName} for PO {PurchaseOrderId}", request.FieldName, request.PurchaseOrderId);
+            return Json(new { success = false, message = "Error updating purchase order field" });
+        }
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> UpdateCustomWorkOrderField([FromBody] UpdateCustomWorkOrderFieldRequest request)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(request.CustomWorkOrderId) || string.IsNullOrWhiteSpace(request.FieldName))
+            {
+                return Json(new { success = false, message = "Custom Work Order ID and field name are required" });
+            }
+
+            var success = await _customWorkOrderService.UpdateCustomWorkOrderFieldAsync(request.CustomWorkOrderId, request.FieldName, request.Value);
+            if (success)
+            {
+                return Json(new { success = true });
+            }
+            
+            return Json(new { success = false, message = "Custom work order not found or field could not be updated" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating custom work order field {FieldName} for CWO {CustomWorkOrderId}", request.FieldName, request.CustomWorkOrderId);
+            return Json(new { success = false, message = "Error updating custom work order field" });
+        }
+    }
+
+    [HttpPost]
     public async Task<IActionResult> UpdateEventDescription([FromBody] UpdateEventDescriptionRequest request)
     {
         try
@@ -888,6 +938,20 @@ public class ProjectController : Controller
     public class UpdateEventFieldRequest
     {
         public string EventId { get; set; } = string.Empty;
+        public string FieldName { get; set; } = string.Empty;
+        public string? Value { get; set; }
+    }
+
+    public class UpdatePurchaseOrderFieldRequest
+    {
+        public string PurchaseOrderId { get; set; } = string.Empty;
+        public string FieldName { get; set; } = string.Empty;
+        public string? Value { get; set; }
+    }
+
+    public class UpdateCustomWorkOrderFieldRequest
+    {
+        public string CustomWorkOrderId { get; set; } = string.Empty;
         public string FieldName { get; set; } = string.Empty;
         public string? Value { get; set; }
     }

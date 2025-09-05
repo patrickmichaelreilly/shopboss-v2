@@ -125,6 +125,47 @@ public class TimelineService
         }
     }
 
+    public async Task<bool> UpdateTaskBlockFieldAsync(string blockId, string fieldName, string? value)
+    {
+        try
+        {
+            var block = await _context.TaskBlocks.FindAsync(blockId);
+            if (block == null)
+            {
+                _logger.LogWarning("TaskBlock not found for field update: {BlockId}", blockId);
+                return false;
+            }
+
+            // Update the specific field based on fieldName
+            switch (fieldName)
+            {
+                case "Name":
+                    if (string.IsNullOrWhiteSpace(value))
+                    {
+                        _logger.LogWarning("TaskBlock name cannot be empty: {BlockId}", blockId);
+                        return false;
+                    }
+                    block.Name = value;
+                    break;
+                case "Description":
+                    block.Description = value;
+                    break;
+                default:
+                    _logger.LogWarning("Unknown field name for TaskBlock update: {FieldName}", fieldName);
+                    return false;
+            }
+
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Updated TaskBlock field {FieldName} for block {BlockId}", fieldName, blockId);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating TaskBlock field {FieldName} for block {BlockId}", fieldName, blockId);
+            throw;
+        }
+    }
+
     public async Task<bool> DeleteTaskBlockAsync(string blockId)
     {
         try
