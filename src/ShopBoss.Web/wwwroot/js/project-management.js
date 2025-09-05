@@ -91,8 +91,8 @@ async function syncToSmartSheet(projectId) {
             }
             
             // Update SmartSheet field display if sync established a connection
-            if (data.sheetId) {
-                updateSmartSheetDisplay(projectId, data.sheetId);
+            if (data.smartsheetUrl) {
+                updateSmartSheetDisplay(projectId, data.smartsheetUrl);
             }
         }
     } catch (error) {
@@ -519,7 +519,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Update SmartSheet display after successful sync
-function updateSmartSheetDisplay(projectId, smartSheetId) {
+function updateSmartSheetDisplay(projectId, smartsheetUrl) {
     const smartSheetCell = document.querySelector(`#details-${projectId} td:contains('Smartsheet:') + td`);
     if (!smartSheetCell) return;
     
@@ -538,10 +538,10 @@ function updateSmartSheetDisplay(projectId, smartSheetId) {
         if (smartSheetDisplayCell) break;
     }
     
-    if (smartSheetDisplayCell && smartSheetId) {
-        // Update to show hyperlink
+    if (smartSheetDisplayCell && smartsheetUrl) {
+        // Update to show hyperlink with full URL
         smartSheetDisplayCell.innerHTML = `
-            <a href="https://app.smartsheet.com/sheets/${smartSheetId}?view=grid" 
+            <a href="${smartsheetUrl}" 
                target="_blank" 
                class="text-decoration-none">
                 <i class="fas fa-external-link-alt me-1"></i>View Sheet

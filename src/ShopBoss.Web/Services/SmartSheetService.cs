@@ -431,43 +431,6 @@ public class SmartSheetService
         }
     }
 
-    /// <summary>
-    /// Link a project to a SmartSheet
-    /// </summary>
-    public async Task<bool> LinkProjectToSheetAsync(string projectId, long sheetId)
-    {
-        try
-        {
-            var project = await _context.Projects.FirstOrDefaultAsync(p => p.Id == projectId);
-            if (project == null)
-            {
-                _logger.LogWarning("Project {ProjectId} not found when linking to SmartSheet {SheetId}", projectId, sheetId);
-                return false;
-            }
-
-            // Verify the sheet exists and is accessible
-            var sheetInfo = await GetSheetInfoAsync(sheetId);
-            if (sheetInfo == null)
-            {
-                _logger.LogWarning("SmartSheet {SheetId} not accessible when linking to project {ProjectId}", sheetId, projectId);
-                return false;
-            }
-
-            project.SmartSheetId = sheetId;
-            project.SmartSheetLastSync = DateTime.UtcNow;
-
-            await _context.SaveChangesAsync();
-
-            _logger.LogInformation("Linked project {ProjectId} to SmartSheet {SheetId}", projectId, sheetId);
-
-            return true;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error linking project {ProjectId} to SmartSheet {SheetId}", projectId, sheetId);
-            return false;
-        }
-    }
 
     /// <summary>
     /// Unlink a project from its SmartSheet
@@ -483,8 +446,9 @@ public class SmartSheetService
                 return false;
             }
 
-            var previousSheetId = project.SmartSheetId;
-            project.SmartSheetId = null;
+            var previousSheetId = project.SmartsheetSheetId;
+            project.SmartsheetSheetId = null;
+            project.SmartsheetUrl = null;
             project.SmartSheetLastSync = null;
 
             await _context.SaveChangesAsync();
@@ -507,7 +471,7 @@ public class SmartSheetService
     public async Task<List<Project>> GetLinkedProjectsAsync()
     {
         return await _context.Projects
-            .Where(p => p.SmartSheetId.HasValue && !p.IsArchived)
+            .Where(p => p.SmartsheetSheetId.HasValue && !p.IsArchived)
             .OrderBy(p => p.ProjectName)
             .ToListAsync();
     }
@@ -554,6 +518,42 @@ public class SmartSheetService
         {
             _logger.LogError(ex, "Error getting accessible workspaces");
             return new List<object>();
+        }
+    }
+
+    /// <summary>
+    /// Link a project to an existing Smartsheet by ID and store its permalink.
+    /// </summary>
+    public async Task<bool> LinkProjectToSheetAsync(string projectId, long sheetId)
+    {
+        try
+        {
+            var project = await _context.Projects.FirstOrDefaultAsync(p => p.Id == projectId);
+            if (project == null)
+            {
+                _logger.LogWarning("Project {ProjectId} not found when linking to Smartsheet", projectId);
+                return false;
+            }
+
+            // Validate access and fetch permalink via API
+            var sheetInfo = await GetSheetInfoAsync(sheetId);
+            if (sheetInfo == null)
+            {
+                _logger.LogWarning("Sheet {SheetId} not accessible when linking project {ProjectId}", sheetId, projectId);
+                return false;
+            }
+
+            project.SmartsheetSheetId = sheetId;
+            project.SmartsheetUrl = sheetInfo.Permalink;
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Linked project {ProjectId} to Smartsheet {SheetId}", projectId, sheetId);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error linking project {ProjectId} to Smartsheet {SheetId}", projectId, sheetId);
+            return false;
         }
     }
 
@@ -964,7 +964,7 @@ public class SmartSheetService
                 TargetInstallDate = projectData.TargetInstallDate,
                 ProjectCategory = projectData.ProjectCategory,
                 CreatedDate = DateTime.Now,
-                SmartSheetId = sheetId
+                SmartsheetSheetId = sheetId
             };
 
             _context.Projects.Add(project);

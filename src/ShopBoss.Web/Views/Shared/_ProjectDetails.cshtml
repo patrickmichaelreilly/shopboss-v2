@@ -46,9 +46,9 @@
                         <td class="editable-field" data-field="ProjectContactPhone" data-type="tel" data-project-id="@Model.Id" data-value="@(Model.ProjectContactPhone ?? "")">@(Model.ProjectContactPhone ?? "-")</td>
                         <td class="text-muted">Smartsheet:</td>
                         <td>
-                            @if (Model.SmartSheetId.HasValue)
+                            @if (!string.IsNullOrEmpty(Model.SmartsheetUrl))
                             {
-                                <a href="https://app.smartsheet.com/sheets/@Model.SmartSheetId?view=grid" 
+                                <a href="@Model.SmartsheetUrl" 
                                    target="_blank" 
                                    class="text-decoration-none">
                                     <i class="fas fa-external-link-alt me-1"></i>View Sheet

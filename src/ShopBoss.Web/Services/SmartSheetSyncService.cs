@@ -129,7 +129,7 @@ public class SmartSheetSyncService
             _logger.LogInformation("SmartSheet unified sync completed for project {ProjectId}: {Created} created with proper hierarchy", 
                 projectId, created);
 
-            return SmartSheetSyncResult.CreateSuccess(created, 0, sheetId.Value);
+            return SmartSheetSyncResult.CreateSuccess(created, 0, sheetId.Value, project.SmartsheetUrl);
         }
         catch (Exception ex)
         {
@@ -167,7 +167,7 @@ public class SmartSheetSyncService
                 await _context.SaveChangesAsync();
                 _logger.LogInformation("Smartsheet inbound sync completed for project {ProjectId}: {Updated} updated", 
                     projectId, updated);
-                return SmartSheetSyncResult.CreateSuccess(0, updated, project.SmartsheetSheetId.Value);
+                return SmartSheetSyncResult.CreateSuccess(0, updated, project.SmartsheetSheetId.Value, project.SmartsheetUrl);
             }
             else
             {
@@ -208,6 +208,14 @@ public class SmartSheetSyncService
             if (sheetId.HasValue)
             {
                 project.SmartsheetSheetId = sheetId.Value;
+                
+                // Fetch and store the permalink for web URLs
+                var sheetInfo = await _smartSheetService.GetSheetInfoAsync(sheetId.Value);
+                if (sheetInfo?.Permalink != null)
+                {
+                    project.SmartsheetUrl = sheetInfo.Permalink;
+                }
+                
                 await _context.SaveChangesAsync();
                 _logger.LogInformation("Created and linked new SmartSheet {SheetId} for project {ProjectId}", 
                     sheetId.Value, project.Id);
@@ -1120,9 +1128,10 @@ public class SmartSheetSyncResult
     public int Created { get; set; }
     public int Updated { get; set; }
     public long? SheetId { get; set; }
+    public string? SmartsheetUrl { get; set; }
 
-    public static SmartSheetSyncResult CreateSuccess(int created, int updated, long sheetId) =>
-        new() { Success = true, Created = created, Updated = updated, SheetId = sheetId };
+    public static SmartSheetSyncResult CreateSuccess(int created, int updated, long sheetId, string? smartsheetUrl = null) =>
+        new() { Success = true, Created = created, Updated = updated, SheetId = sheetId, SmartsheetUrl = smartsheetUrl };
 
     public static SmartSheetSyncResult CreateError(string message) =>
         new() { Success = false, Message = message };

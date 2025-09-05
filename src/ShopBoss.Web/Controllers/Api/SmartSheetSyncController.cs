@@ -61,7 +61,8 @@ public class SmartSheetSyncController : ControllerBase
                     message = $"Sync completed: {result.Created} created, {result.Updated} updated",
                     created = result.Created,
                     updated = result.Updated,
-                    sheetId = result.SheetId
+                    sheetId = result.SheetId,
+                    smartsheetUrl = result.SmartsheetUrl
                 });
             }
             else

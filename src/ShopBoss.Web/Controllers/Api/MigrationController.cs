@@ -239,6 +239,38 @@ public class MigrationController : ControllerBase
         }
     }
 
+    [HttpPost("execute")]
+    public async Task<IActionResult> ExecuteSql([FromBody] ExecuteSqlRequest request)
+    {
+        if (!IsMigrationApiEnabled())
+            return Forbid("Migration API is disabled");
+
+        try
+        {
+            using var connection = _context.Database.GetDbConnection();
+            await connection.OpenAsync();
+            
+            using var command = connection.CreateCommand();
+            command.CommandText = request.Sql;
+            
+            var result = await command.ExecuteNonQueryAsync();
+
+            _logger.LogInformation("SQL executed: {Sql}, rows affected: {RowsAffected}", request.Sql, result);
+
+            return Ok(new 
+            { 
+                Success = true,
+                Sql = request.Sql,
+                RowsAffected = result
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "SQL execution failed: {Sql}", request.Sql);
+            return StatusCode(500, $"SQL execution failed: {ex.Message}");
+        }
+    }
+
     [HttpGet("validate")]
     public async Task<IActionResult> ValidateMigration()
     {
@@ -617,4 +649,9 @@ public class CustomCopyRequest
     public string TableName { get; set; } = string.Empty;
     public string SelectQuery { get; set; } = string.Empty;
     public bool ClearTargetFirst { get; set; } = false;
+}
+
+public class ExecuteSqlRequest
+{
+    public string Sql { get; set; } = string.Empty;
 }

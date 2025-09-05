@@ -39,8 +39,8 @@ public class Project
     
     public DateTime? ArchivedDate { get; set; }
     
-    // SmartSheet integration fields
-    public long? SmartSheetId { get; set; }
+    // SmartSheet integration fields - stores web URL for viewing sheet
+    public string? SmartsheetUrl { get; set; }
     
     // SmartSheet linked project sheet ID (separate from imported sheet)
     public long? SmartsheetSheetId { get; set; }
