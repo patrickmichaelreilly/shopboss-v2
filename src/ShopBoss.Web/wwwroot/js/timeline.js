@@ -137,45 +137,6 @@ function expandAllBlocks(projectId) {
     });
 }
 
-// Edit TaskBlock
-function editTaskBlock(blockId, currentName, currentDescription) {
-    const newName = prompt('Enter new name for Task Block:', currentName);
-    if (newName && newName.trim() && newName.trim() !== currentName) {
-        const newDescription = prompt('Enter description (optional):', currentDescription || '');
-        updateTaskBlock(blockId, newName.trim(), newDescription);
-    }
-}
-
-// Update TaskBlock
-function updateTaskBlock(blockId, name, description) {
-    const requestData = {
-        BlockId: blockId,
-        Name: name,
-        Description: description
-    };
-    
-    apiPutJson('/Timeline/UpdateBlock', requestData)
-    .then(data => {
-        if (data.success) {
-            // Find the project ID from the block element and reload timeline
-            const blockElement = document.querySelector(`[data-block-id="${blockId}"]`);
-            if (blockElement) {
-                const timelineContainer = blockElement.closest('[id^="timeline-container-"]');
-                if (timelineContainer) {
-                    const projectId = timelineContainer.id.replace('timeline-container-', '');
-                    loadTimelineForProject(projectId);
-                }
-            }
-        } else {
-            showNotification(data.message || 'Error updating task block', 'error');
-        }
-    })
-    .catch(error => {
-        console.error('Error updating task block:', error);
-        showNotification('Network error occurred', 'error');
-    });
-}
-
 // Delete TaskBlock
 function deleteTaskBlock(blockId) {
     if (!confirm('Are you sure you want to delete this Task Block? Events will be moved back to the unblocked section.')) {
@@ -343,12 +304,6 @@ if (!window.__globalActionDelegationInitialized) {
             case 'project-cancel':
                 if (typeof cancelProjectEdit === 'function') cancelProjectEdit(projectId);
                 break;
-            case 'unlink-smartsheet':
-                if (typeof unlinkSmartSheet === 'function') unlinkSmartSheet(projectId);
-                break;
-            case 'link-smartsheet':
-                if (typeof showSmartSheetLinking === 'function') showSmartSheetLinking(projectId);
-                break;
             case 'show-upload-file-modal':
                 if (window.Timeline?.Files?.triggerFileUpload) Timeline.Files.triggerFileUpload(projectId, blockId);
                 break;
@@ -376,12 +331,6 @@ if (!window.__globalActionDelegationInitialized) {
             case 'expand-all-blocks':
                 if (typeof expandAllBlocks === 'function') expandAllBlocks(projectId);
                 break;
-            case 'edit-task-block': {
-                const currentName = el.getAttribute('data-block-name') || (el.closest('.task-block')?.querySelector('h6')?.textContent?.trim()) || '';
-                const currentDescription = el.getAttribute('data-block-description') || '';
-                if (typeof editTaskBlock === 'function') editTaskBlock(blockId, currentName, currentDescription);
-                break;
-            }
             case 'delete-task-block':
                 if (typeof deleteTaskBlock === 'function') deleteTaskBlock(blockId);
                 break;
@@ -402,22 +351,25 @@ if (!window.__globalActionDelegationInitialized) {
                 const cwoId = el.getAttribute('data-cwo-id');
                 if (!eventId) return;
 
-                if (!confirm('Are you sure you want to delete this item?')) return;
-
                 // Dispatch by available identifiers
                 if (attachmentId && window.Timeline?.Files?.deleteFile) {
+                    // File deletion needs confirmation since Timeline.Files.deleteFile doesn't have its own
+                    if (!confirm('Are you sure you want to delete this file?')) return;
                     Timeline.Files.deleteFile(attachmentId, projectId);
                     break;
                 }
                 if (poId && window.Timeline?.Purchases?.deletePurchaseOrder) {
+                    // Purchase Order deletion has its own confirmation
                     Timeline.Purchases.deletePurchaseOrder(poId, projectId);
                     break;
                 }
                 if (cwoId && window.Timeline?.WorkOrders?.deleteCustomWorkOrder) {
+                    // Custom Work Order deletion has its own confirmation
                     Timeline.WorkOrders.deleteCustomWorkOrder(cwoId, projectId);
                     break;
                 }
                 if (woId && window.Timeline?.WorkOrders?.detachWorkOrder) {
+                    // Work Order detachment has its own confirmation
                     Timeline.WorkOrders.detachWorkOrder(woId, projectId);
                     break;
                 }
@@ -466,8 +418,11 @@ function updateEventDescription(eventId, description) {
 
 // Helper to delete a comment event
 function deleteComment(eventId) {
-    return apiPostJson('/Project/DeleteComment', { eventId })
-        .then(res => !!res.success);
+    if (confirm('Are you sure you want to delete this comment?')) {
+        return apiPostJson('/Project/DeleteComment', { eventId })
+            .then(res => !!res.success);
+    }
+    return Promise.resolve(false);
 }
 
 // Initialize drag-drop functionality for timeline reordering

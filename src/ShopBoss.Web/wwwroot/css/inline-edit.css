@@ -90,6 +90,11 @@
     line-height: 1.3;
 }
 
+/* Native hyperlink hover styling for attachment download links */
+.attachment-file-info a:hover {
+    text-decoration: underline !important;
+}
+
 .attachment-file-info {
     margin-bottom: 2px;
 }

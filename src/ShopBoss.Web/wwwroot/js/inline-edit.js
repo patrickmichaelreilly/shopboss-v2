@@ -248,6 +248,30 @@
     // Cancel the edit
     function cancelEdit() {
         if (!currentEditor) return;
+        
+        // Restore the original value
+        const originalValue = currentEditor.element.dataset.originalValue || currentEditor.element.dataset.value || '';
+        
+        // Update the element's content to original value
+        if (currentEditor.element.tagName.toLowerCase() === 'select') {
+            // For select elements, find and select the original option
+            const options = currentEditor.element.querySelectorAll('option');
+            for (let option of options) {
+                if (option.value === originalValue || option.textContent.trim() === originalValue) {
+                    option.selected = true;
+                    break;
+                }
+            }
+            // Update the visible text
+            const selectedOption = currentEditor.element.querySelector('option:checked');
+            if (selectedOption) {
+                currentEditor.element.textContent = selectedOption.textContent;
+            }
+        } else {
+            // For text content, restore original value
+            currentEditor.element.textContent = originalValue;
+        }
+        
         finishEdit();
     }
 
@@ -315,15 +339,32 @@
             const categoryName = categoryNames[categoryIndex] || 'Unknown';
             element.innerHTML = `<span class="badge bg-secondary">${categoryName}</span>`;
         } else if (fieldType === 'date' && value) {
-            // Format date for display
+            // Format date for display - ensure proper parsing from YYYY-MM-DD format
             try {
-                const date = new Date(value);
-                const formattedDate = date.toLocaleDateString('en-US', { 
-                    month: '2-digit', 
-                    day: '2-digit', 
-                    year: '2-digit' 
-                });
-                element.textContent = formattedDate;
+                // Parse the date string directly as YYYY-MM-DD to avoid timezone issues
+                const dateParts = value.split('-');
+                if (dateParts.length === 3) {
+                    const year = parseInt(dateParts[0]);
+                    const month = parseInt(dateParts[1]) - 1; // Month is 0-indexed in JS Date
+                    const day = parseInt(dateParts[2]);
+                    const date = new Date(year, month, day);
+                    
+                    const formattedDate = date.toLocaleDateString('en-US', { 
+                        month: '2-digit', 
+                        day: '2-digit', 
+                        year: '2-digit' 
+                    });
+                    element.textContent = formattedDate;
+                } else {
+                    // Fallback to original parsing if format is unexpected
+                    const date = new Date(value);
+                    const formattedDate = date.toLocaleDateString('en-US', { 
+                        month: '2-digit', 
+                        day: '2-digit', 
+                        year: '2-digit' 
+                    });
+                    element.textContent = formattedDate;
+                }
             } catch (e) {
                 element.textContent = displayValue;
             }

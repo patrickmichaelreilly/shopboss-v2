@@ -48,21 +48,15 @@
                         <td>
                             @if (Model.SmartSheetId.HasValue)
                             {
-                                <div class="d-flex align-items-center">
-                                    <span class="badge bg-success me-2" style="font-size: 0.7em;">Linked</span>
-                                    <button type="button" class="btn btn-sm btn-outline-danger" data-action="unlink-smartsheet" data-project-id="@Model.Id">
-                                        <i class="fas fa-unlink me-1"></i>Unlink
-                                    </button>
-                                </div>
+                                <a href="https://app.smartsheet.com/sheets/@Model.SmartSheetId?view=grid" 
+                                   target="_blank" 
+                                   class="text-decoration-none">
+                                    <i class="fas fa-external-link-alt me-1"></i>View Sheet
+                                </a>
                             }
                             else
                             {
-                                <div class="d-flex align-items-center">
-                                    <span class="badge bg-secondary me-2" style="font-size: 0.7em;">Not Linked</span>
-                                    <button type="button" class="btn btn-sm btn-outline-primary" data-action="link-smartsheet" data-project-id="@Model.Id">
-                                        <i class="fas fa-link me-1"></i>Link
-                                    </button>
-                                </div>
+                                <span class="badge bg-secondary" style="font-size: 0.7em;">Not Linked</span>
                             }
                         </td>
                     </tr>

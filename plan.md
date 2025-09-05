@@ -47,7 +47,7 @@ Establish consistent styling based on position in event, not content type:
 - **Secondary line**: Supporting details (muted) - file info, PO details, descriptions
 - **Tertiary line**: Metadata (small, muted) - timestamps, authors
 
-## Phase 3C: Bug Fixes (Priority 1)
+## Phase 3C: Bug Fixes (Priority 1) ✅
 **Critical issues affecting current functionality**
 1. **Fix TaskBlock association for Custom Work Orders** - Ensure custom work orders created in TaskBlocks stay nested (not root level)
 2. **Fix TaskBlock association for Work Orders** - Same issue for regular work orders attached to TaskBlocks
@@ -55,7 +55,7 @@ Establish consistent styling based on position in event, not content type:
 4. **Notes field overflow** - Constrain textarea resize within Project Information card boundaries
 5. **Custom Work Order icon consistency** - Use clipboard icon everywhere (timeline & create button)
 
-## Phase 3B: Projects Index Table Editing (Priority 2)
+## Phase 3B: Projects Index Table Editing (Priority 2) ✅
 **Extend inline editing to the projects table view**
 1. **Project Name** - Direct editing in table cell
 2. **Project ID** - Inline editable with uniqueness validation
@@ -83,3 +83,8 @@ Establish consistent styling based on position in event, not content type:
 2. In the Task Block Header collabsible tools pane, remove the Edit button since it is deprecated. Be sure to clean up all code associated.
 3. In the Task Block Header collabsible tools pane, move the trash button to the left, followed by the spacer, followed by the rest of the buttons. To prevent acccidental clicks.
 4. I get a double confirmation box for deleting a Custom Work Order from the timeline, should just be one.
+
+## Phase 5:
+1. While edititing a field, pressing escape correctly exits the edit mode, but it also submits the edit, the same behavior as an Enter or a blur. The desired behavior would be to discard the edit and revert to the original text.
+2. When using the date selectors, I type or click a date, then when it closes it displays the date of the day before the one i chose. But then when I refresh it changes back correctly to the one i actually chose/typed.
+3. The Smartsheet field in the Summary Card is not changing from Not Linked even after I sync the Project (successfully) to Smartsheet. The desired behavior is: Projects are created with no smartsheet link, Syncing establishes a connection and stores the smartsheet id associated with the Project entity. Then the controller just checks - if there is no associated Smartsheet id display the Not Linked badge. If there is, construct the url and make a hyperlink to the smartsheet.

@@ -36,6 +36,16 @@
                 <i class="fas fa-ellipsis-v"></i>
             </button>
             <div class="toolbox-buttons">
+                <!-- Block Management Buttons - Trash first for safety -->
+                <button type="button" class="btn btn-outline-danger btn-sm" 
+                        data-action="delete-task-block" data-block-id="@Model.Id"
+                        title="Delete block">
+                    <i class="fas fa-trash"></i>
+                </button>
+                
+                <!-- Divider -->
+                <div class="toolbox-divider"></div>
+                
                 <!-- Component Creation Buttons -->
                 <button type="button" class="btn btn-outline-primary btn-sm" 
                         data-action="show-upload-file-modal" data-project-id="@Model.ProjectId" data-block-id="@Model.Id"
@@ -66,22 +76,6 @@
                         data-action="create-nested-task-block" data-project-id="@Model.ProjectId" data-block-id="@Model.Id"
                         title="Add Nested Block">
                     <i class="fas fa-cube"></i>
-                </button>
-                
-                <!-- Divider -->
-                <div class="toolbox-divider"></div>
-                
-                <!-- Block Management Buttons -->
-                <button type="button" class="btn btn-outline-secondary btn-sm" 
-                        data-action="edit-task-block" data-block-id="@Model.Id" 
-                        data-block-name="@Model.Name" data-block-description="@(Model.Description ?? "")"
-                        title="Edit block">
-                    <i class="fas fa-edit"></i>
-                </button>
-                <button type="button" class="btn btn-outline-danger btn-sm" 
-                        data-action="delete-task-block" data-block-id="@Model.Id"
-                        title="Delete block">
-                    <i class="fas fa-trash"></i>
                 </button>
             </div>
         </div>

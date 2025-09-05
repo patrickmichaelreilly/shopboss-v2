@@ -163,10 +163,12 @@ public class ProjectService
                     project.Notes = value;
                     break;
                 case "BidRequestDate":
-                    if (DateTime.TryParse(value, out var bidDate))
-                        project.BidRequestDate = bidDate;
-                    else if (string.IsNullOrEmpty(value))
+                    if (string.IsNullOrEmpty(value))
                         project.BidRequestDate = null;
+                    else if (DateTime.TryParseExact(value, "yyyy-MM-dd", null, System.Globalization.DateTimeStyles.None, out var bidDate))
+                        project.BidRequestDate = bidDate.Date; // Ensure date-only without time component
+                    else if (DateTime.TryParse(value, out bidDate))
+                        project.BidRequestDate = bidDate.Date; // Fallback with date-only
                     else
                         return false; // Invalid date format
                     break;
@@ -183,10 +185,12 @@ public class ProjectService
                     project.ProjectName = value ?? string.Empty;
                     break;
                 case "TargetInstallDate":
-                    if (DateTime.TryParse(value, out var installDate))
-                        project.TargetInstallDate = installDate;
-                    else if (string.IsNullOrEmpty(value))
+                    if (string.IsNullOrEmpty(value))
                         project.TargetInstallDate = null;
+                    else if (DateTime.TryParseExact(value, "yyyy-MM-dd", null, System.Globalization.DateTimeStyles.None, out var installDate))
+                        project.TargetInstallDate = installDate.Date; // Ensure date-only without time component
+                    else if (DateTime.TryParse(value, out installDate))
+                        project.TargetInstallDate = installDate.Date; // Fallback with date-only
                     else
                         return false; // Invalid date format
                     break;

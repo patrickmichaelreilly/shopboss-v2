@@ -89,6 +89,11 @@ async function syncToSmartSheet(projectId) {
             if (typeof loadTimelineForProject === 'function') {
                 loadTimelineForProject(projectId);
             }
+            
+            // Update SmartSheet field display if sync established a connection
+            if (data.sheetId) {
+                updateSmartSheetDisplay(projectId, data.sheetId);
+            }
         }
     } catch (error) {
         console.error('Error syncing to SmartSheet:', error);
@@ -512,6 +517,38 @@ document.addEventListener('DOMContentLoaded', () => {
         hydrateExpandedProjects();
     }
 });
+
+// Update SmartSheet display after successful sync
+function updateSmartSheetDisplay(projectId, smartSheetId) {
+    const smartSheetCell = document.querySelector(`#details-${projectId} td:contains('Smartsheet:') + td`);
+    if (!smartSheetCell) return;
+    
+    // Find the cell containing the smartsheet display (it's the next td after the one with "Smartsheet:" text)
+    const rows = document.querySelectorAll(`#details-${projectId} tr`);
+    let smartSheetDisplayCell = null;
+    
+    for (let row of rows) {
+        const cells = row.querySelectorAll('td');
+        for (let i = 0; i < cells.length - 1; i++) {
+            if (cells[i].textContent.trim() === 'Smartsheet:') {
+                smartSheetDisplayCell = cells[i + 1];
+                break;
+            }
+        }
+        if (smartSheetDisplayCell) break;
+    }
+    
+    if (smartSheetDisplayCell && smartSheetId) {
+        // Update to show hyperlink
+        smartSheetDisplayCell.innerHTML = `
+            <a href="https://app.smartsheet.com/sheets/${smartSheetId}?view=grid" 
+               target="_blank" 
+               class="text-decoration-none">
+                <i class="fas fa-external-link-alt me-1"></i>View Sheet
+            </a>
+        `;
+    }
+}
 
 // ============== END OF FILE ==============
 // Timeline management functions are in /js/timeline.js

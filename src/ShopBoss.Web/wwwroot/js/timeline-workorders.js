@@ -73,7 +73,6 @@
         .then(data => {
             if (data.success) {
                 bootstrap.Modal.getInstance(document.getElementById('associateWorkOrdersModal')).hide();
-                showNotification('Work orders associated successfully', 'success');
                 
                 // Refresh timeline to show new work order events
                 loadTimelineForProject(currentProjectId);
@@ -95,8 +94,6 @@
             apiPostForm('/Project/DetachWorkOrder', new URLSearchParams({ workOrderId }))
             .then(data => {
                 if (data.success) {
-                    showNotification('Work order detached successfully', 'success');
-                    
                     // Refresh timeline to remove the work order event
                     loadTimelineForProject(projectId);
                 } else {
@@ -194,7 +191,6 @@
         apiPostJson('/Project/CreateCustomWorkOrder', requestData)
         .then(data => {
             if (data.success) {
-                showNotification('Custom work order created successfully', 'success');
                 bootstrap.Modal.getInstance(document.getElementById('createCustomWorkOrderModal')).hide();
                 
                 // Refresh timeline to show new custom work order event
@@ -251,8 +247,6 @@
             apiPostForm('/Project/DeleteCustomWorkOrder', new URLSearchParams({ id: customWorkOrderId }))
             .then(data => {
                 if (data.success) {
-                    showNotification('Custom work order deleted successfully', 'success');
-                    
                     // Refresh timeline to remove the custom work order event
                     loadTimelineForProject(projectId);
                 } else {

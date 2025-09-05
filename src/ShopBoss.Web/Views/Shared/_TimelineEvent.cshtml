@@ -10,7 +10,7 @@
         <div>
             @if (!string.IsNullOrEmpty(Model.WorkOrderId))
             {
-                <a href="/Admin/ModifyWorkOrder/@Model.WorkOrderId" class="text-decoration-none" title="Open Work Order">
+                <a href="/Admin/ModifyWorkOrder/@Model.WorkOrderId" class="text-decoration-none text-body" title="Open Work Order">
                     <strong>@Model.Description</strong>
                 </a>
             }
@@ -165,9 +165,9 @@ else
             @if (Model.EventType == "attachment" && Model.Attachment != null)
             {
                 <div class="attachment-label-container d-flex align-items-center flex-wrap">
-                    <span class="attachment-label editable-label" 
-                          data-attachment-id="@Model.Attachment.Id" 
-                          data-original-value="@Model.Attachment.Label">@Model.Attachment.Label</span>
+                    <strong class="editable-label" 
+                            data-attachment-id="@Model.Attachment.Id" 
+                            data-original-value="@Model.Attachment.Label">@Model.Attachment.Label</strong>
                     @if (Model.RowNumber.HasValue)
                     {
                         <span class="badge bg-primary row-badge ms-2">Row @Model.RowNumber</span>
@@ -185,7 +185,7 @@ else
             {
                 @if (Model.EventType == "work_order" && !string.IsNullOrEmpty(Model.WorkOrderId))
                 {
-                    <a href="/Admin/ModifyWorkOrder/@Model.WorkOrderId" class="text-decoration-none" title="Open Work Order">
+                    <a href="/Admin/ModifyWorkOrder/@Model.WorkOrderId" class="text-decoration-none text-body" title="Open Work Order">
                         <strong>@(String.IsNullOrEmpty(Model.Description) ? Model.EventType : Model.Description.Split('\n')[0])</strong>
                     </a>
                 }
