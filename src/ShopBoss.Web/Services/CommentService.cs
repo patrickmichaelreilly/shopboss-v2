@@ -40,6 +40,7 @@ public class CommentService
                 EventDate = eventDate,
                 EventType = "comment",
                 Description = description,
+                Label = "Comment", // Default label, will be editable inline
                 CreatedBy = createdBy,
                 ParentBlockId = parentBlockId,
                 DisplayOrder = maxOrder + 1

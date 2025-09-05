@@ -100,6 +100,8 @@ function createNestedTaskBlock(projectId, parentBlockId) {
         .then(data => {
             if (data.success) {
                 loadTimelineForProject(projectId);
+                // Update visual nesting indicators after timeline reload
+                setTimeout(() => updateTaskBlockNestingVisuals(projectId), 100);
             } else {
                 showNotification(data.message || 'Error nesting block', 'error');
             }
@@ -523,6 +525,7 @@ function initializeUnifiedSortableContainer(container, projectId) {
                         .then(() => {
                             reorderItemsInContainer(toContainer, toParentId);
                             reorderItemsInContainer(fromContainer, fromParentId);
+                            // Visual nesting indicators disabled - no longer needed
                         })
                         .catch(error => {
                             console.error('Error nesting TaskBlock:', error);
@@ -564,6 +567,7 @@ function initializeUnifiedSortableContainer(container, projectId) {
             
             // Handle reordering within the same container
             reorderItemsInContainer(toContainer, toParentId);
+            // Visual nesting indicators disabled - no longer needed
         }
     });
 }
@@ -609,8 +613,13 @@ function reorderItemsInContainer(container, parentId) {
     }
 }
 
-
-
+// Update TaskBlock visual nesting indicators after nesting changes
+// Simplified version - removed color styling per user request due to complexity
+function updateTaskBlockNestingVisuals(projectId) {
+    // Function kept for compatibility but no longer applies visual styling
+    // All TaskBlocks now have consistent appearance regardless of nesting level
+    console.log(`TaskBlock nesting updated for project ${projectId} - visual styling disabled`);
+}
 
 // Comment functionality
 let currentCommentBlockId = null; // Store blockId for comment creation

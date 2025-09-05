@@ -1,16 +1,24 @@
 /* Inline Editing Styles */
 
-/* Editable labels - subtle hover effect */
-.editable-label {
+/* Editable labels and fields - subtle hover effect */
+.editable-label,
+.editable-field {
     cursor: pointer;
     border-radius: 3px;
     padding: 2px 4px;
     transition: background-color 0.2s ease;
+    min-height: 1.2em;
 }
 
-.editable-label:hover {
+.editable-label:hover,
+.editable-field:hover {
     background-color: #f8f9fa;
     box-shadow: inset 0 0 0 1px #e9ecef;
+}
+
+/* Special styling for badge content in select fields */
+.editable-field .badge {
+    pointer-events: none; /* Prevent clicking on badge from interfering */
 }
 
 /* Inline editor input field */
@@ -19,15 +27,37 @@
     box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25) !important;
     background-color: white !important;
     box-sizing: border-box !important;
-    padding: 2px 4px !important; /* Match the editable-label padding */
+    padding: 2px 4px !important; /* Match the editable-field padding */
     margin: 0 !important;
-    border-radius: 3px !important; /* Match editable-label border-radius */
+    border-radius: 3px !important; /* Match editable-field border-radius */
+    font-family: inherit !important;
+    font-size: inherit !important;
 }
 
 .inline-editor:focus {
     border-color: #007bff !important;
     box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25) !important;
     outline: none !important;
+}
+
+/* Textarea specific styling */
+.inline-editor textarea,
+.inline-editor[rows] {
+    /* min-height removed - JavaScript sets exact height to match original element */
+    resize: none !important; /* Disable resize handle to prevent overflow */
+    /* max-height removed - JavaScript sets appropriate max-height based on container */
+    overflow-y: auto !important; /* Add scrollbar if content exceeds max height */
+}
+
+/* Select specific styling */
+.inline-editor select {
+    padding-right: 20px !important; /* Space for dropdown arrow */
+}
+
+/* Date input specific styling */
+.inline-editor[type="date"] {
+    width: auto !important;
+    min-width: 140px !important;
 }
 
 /* Saving state */

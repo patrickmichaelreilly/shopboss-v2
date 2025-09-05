@@ -90,25 +90,39 @@ else
                             <i class="fas fa-chevron-right expand-icon" id="expand-icon-@project.Id" 
                                data-action="toggle-project" data-project-id="@project.Id" style="cursor: pointer;"></i>
                         </td>
-                        <td class="text-muted small">@project.ProjectId</td>
+                        <td class="text-muted small">
+                            <span class="editable-field" 
+                                  data-project-id="@project.Id" 
+                                  data-field="ProjectId" 
+                                  data-original-value="@project.ProjectId">@project.ProjectId</span>
+                        </td>
                         <td>
                             <div class="d-flex align-items-center">
                                 @if (project.IsArchived)
                                 {
                                     <i class="fas fa-archive text-muted me-2" title="Archived Project"></i>
                                 }
-                                <strong>@project.ProjectName</strong>
+                                <strong class="editable-field" 
+                                        data-project-id="@project.Id" 
+                                        data-field="ProjectName" 
+                                        data-original-value="@project.ProjectName">@project.ProjectName</strong>
                             </div>
                         </td>
                         <td>
-                            @if (project.TargetInstallDate.HasValue)
-                            {
-                                @project.TargetInstallDate.Value.ToString("MM/dd/yy")
-                            }
-                            else
-                            {
-                                <span class="text-muted">-</span>
-                            }
+                            <span class="editable-field" 
+                                  data-project-id="@project.Id" 
+                                  data-field="TargetInstallDate" 
+                                  data-type="date" 
+                                  data-original-value="@(project.TargetInstallDate?.ToString("yyyy-MM-dd") ?? "")">
+                                @if (project.TargetInstallDate.HasValue)
+                                {
+                                    @project.TargetInstallDate.Value.ToString("MM/dd/yy")
+                                }
+                                else
+                                {
+                                    <span class="text-muted">-</span>
+                                }
+                            </span>
                         </td>
                         <td>
                             <span class="badge bg-info">@project.WorkOrders.Count</span>
@@ -352,6 +366,8 @@ else
     <script src="~/js/smartsheet-auth.js" asp-append-version="true"></script>
     <script src="~/js/smartsheet.js" asp-append-version="true"></script>
     <script src="~/js/timeline.js" asp-append-version="true"></script>
+    <script src="~/js/inline-edit.js" asp-append-version="true"></script>
+    <link href="~/css/inline-edit.css" rel="stylesheet" asp-append-version="true" />
 }
 
 <style>

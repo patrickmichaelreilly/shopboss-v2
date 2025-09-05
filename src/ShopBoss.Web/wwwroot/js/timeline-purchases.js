@@ -87,7 +87,7 @@
 
         const requestData = {
             PurchaseOrder: purchaseOrder,
-            TaskBlockId: Timeline.Purchases.currentBlockId
+            ParentBlockId: Timeline.Purchases.currentBlockId
         };
 
         apiPostJson('/Project/CreatePurchaseOrder', requestData)

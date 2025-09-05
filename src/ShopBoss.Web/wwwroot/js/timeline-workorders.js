@@ -8,8 +8,9 @@
 
     // ==================== REGULAR WORK ORDER FUNCTIONS ====================
 
-    Timeline.WorkOrders.showAssociateWorkOrders = function(projectId) {
+    Timeline.WorkOrders.showAssociateWorkOrders = function(projectId, blockId = null) {
         currentProjectId = projectId;
+        Timeline.WorkOrders.currentBlockId = blockId;
         
         // Fetch fresh unassigned work orders
         apiGetJson('/Project/GetUnassignedWorkOrders')
@@ -64,7 +65,8 @@
 
         const request = {
             ProjectId: currentProjectId,
-            WorkOrderIds: workOrderIds
+            WorkOrderIds: workOrderIds,
+            ParentBlockId: Timeline.WorkOrders.currentBlockId
         };
 
         apiPostJson('/Project/AttachWorkOrders', request)
@@ -186,7 +188,7 @@
 
         const requestData = {
             CustomWorkOrder: customWorkOrder,
-            TaskBlockId: Timeline.WorkOrders.currentBlockId
+            ParentBlockId: Timeline.WorkOrders.currentBlockId
         };
         
         apiPostJson('/Project/CreateCustomWorkOrder', requestData)

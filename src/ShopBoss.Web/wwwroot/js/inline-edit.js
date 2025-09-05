@@ -11,12 +11,12 @@
         document.addEventListener('keydown', handleKeyDown);
     }
 
-    // Handle clicks on editable labels
+    // Handle clicks on editable labels and fields
     function handleLabelClick(event) {
         const target = event.target;
         
-        // Check if clicked element is an editable label
-        if (target.classList.contains('editable-label')) {
+        // Check if clicked element is an editable label or field
+        if (target.classList.contains('editable-label') || target.classList.contains('editable-field')) {
             event.preventDefault();
             event.stopPropagation();
             
@@ -48,12 +48,25 @@
 
     // Start editing an element
     function startEditing(element) {
-        const originalValue = element.dataset.originalValue || element.textContent.trim();
+        const originalValue = element.dataset.originalValue || element.dataset.value || element.textContent.trim();
         const attachmentId = element.dataset.attachmentId;
+        const projectId = element.dataset.projectId;
+        const fieldName = element.dataset.field;
+        const fieldType = element.dataset.type || 'text';
         
-        // Create input field
-        const input = document.createElement('input');
-        input.type = 'text';
+        // Create appropriate input based on field type
+        let input;
+        if (fieldType === 'textarea') {
+            input = document.createElement('textarea');
+            input.rows = 3;
+        } else if (fieldType === 'select') {
+            input = document.createElement('select');
+            setupSelectOptions(input, fieldName);
+        } else {
+            input = document.createElement('input');
+            input.type = fieldType;
+        }
+        
         input.value = originalValue;
         input.className = 'inline-editor';
         
@@ -74,6 +87,19 @@
         input.style.textAlign = elementStyles.textAlign;
         input.style.zIndex = '1000';
         
+        // For textareas, ensure they match the original element size exactly
+        if (fieldType === 'textarea') {
+            // Override CSS min-height to match original element exactly
+            input.style.minHeight = rect.height + 'px';
+            // Find the containing card to constrain maximum growth
+            const card = element.closest('.card');
+            if (card) {
+                const cardRect = card.getBoundingClientRect();
+                const maxHeight = cardRect.bottom - rect.top - 20; // 20px padding from bottom
+                input.style.maxHeight = Math.max(maxHeight, rect.height) + 'px';
+            }
+        }
+        
         // Add blur event handler to save when focus is lost
         input.addEventListener('blur', function() {
             if (currentEditor) {
@@ -86,7 +112,10 @@
             element: element,
             editor: input,
             originalValue: originalValue,
-            attachmentId: attachmentId
+            attachmentId: attachmentId,
+            projectId: projectId,
+            fieldName: fieldName,
+            fieldType: fieldType
         };
         
         // Make original element invisible but keep its space
@@ -122,8 +151,9 @@
             return;
         }
         
-        // Validate input
-        if (newValue.length === 0) {
+        // Validate input based on field type
+        if (editor.attachmentId && newValue.length === 0) {
+            // Attachment labels cannot be empty
             if (typeof showNotification === 'function') {
                 showNotification('Label cannot be empty', 'error');
             }
@@ -138,12 +168,18 @@
         editor.editor.classList.add('saving');
         
         try {
-            // Call the update function
-            const success = await updateAttachmentLabel(editor.attachmentId, newValue);
+            let success = false;
+            
+            // Call appropriate update function based on field type
+            if (editor.attachmentId) {
+                success = await updateAttachmentLabel(editor.attachmentId, newValue);
+            } else if (editor.projectId && editor.fieldName) {
+                success = await updateProjectField(editor.projectId, editor.fieldName, newValue);
+            }
             
             if (success) {
-                // Update the original element
-                editor.element.textContent = newValue;
+                // Update the original element based on field type
+                updateElementDisplay(editor.element, newValue, editor.fieldType);
                 editor.element.dataset.originalValue = newValue;
                 
                 // Show success feedback
@@ -204,6 +240,88 @@
         setTimeout(() => {
             element.classList.remove('edit-success');
         }, 2000);
+    }
+
+    // Setup select options for dropdown fields
+    function setupSelectOptions(select, fieldName) {
+        if (fieldName === 'ProjectCategory') {
+            // Add ProjectCategory options (from enum)
+            const options = [
+                { value: 0, text: 'Residential' },
+                { value: 1, text: 'Commercial' },
+                { value: 2, text: 'Industrial' },
+                { value: 3, text: 'Other' }
+            ];
+            
+            options.forEach(option => {
+                const optionElement = document.createElement('option');
+                optionElement.value = option.value;
+                optionElement.textContent = option.text;
+                select.appendChild(optionElement);
+            });
+        }
+    }
+
+    // Update element display after successful save
+    function updateElementDisplay(element, value, fieldType) {
+        const displayValue = value || "-";
+        
+        if (fieldType === 'select' && element.dataset.field === 'ProjectCategory') {
+            // Update category badge
+            const categoryNames = ['Residential', 'Commercial', 'Industrial', 'Other'];
+            const categoryIndex = parseInt(value) || 0;
+            const categoryName = categoryNames[categoryIndex] || 'Unknown';
+            element.innerHTML = `<span class="badge bg-secondary">${categoryName}</span>`;
+        } else if (fieldType === 'date' && value) {
+            // Format date for display
+            try {
+                const date = new Date(value);
+                const formattedDate = date.toLocaleDateString('en-US', { 
+                    month: '2-digit', 
+                    day: '2-digit', 
+                    year: '2-digit' 
+                });
+                element.textContent = formattedDate;
+            } catch (e) {
+                element.textContent = displayValue;
+            }
+        } else {
+            element.textContent = displayValue;
+        }
+    }
+
+    // Update project field via API
+    async function updateProjectField(projectId, fieldName, value) {
+        try {
+            const response = await fetch('/Project/UpdateProjectField', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    projectId: projectId,
+                    fieldName: fieldName,
+                    value: value
+                })
+            });
+
+            const data = await response.json();
+            
+            if (data.success) {
+                return true;
+            } else {
+                if (typeof showNotification === 'function') {
+                    showNotification(data.message || 'Error updating field', 'error');
+                }
+                return false;
+            }
+        } catch (error) {
+            console.error('Error updating project field:', error);
+            if (typeof showNotification === 'function') {
+                showNotification('Network error occurred', 'error');
+            }
+            return false;
+        }
     }
 
     // Initialize when DOM is ready

@@ -124,6 +124,88 @@ public class ProjectService
         }
     }
 
+    public async Task<bool> UpdateProjectFieldAsync(string projectId, string fieldName, string? value)
+    {
+        try
+        {
+            var project = await _context.Projects.FindAsync(projectId);
+            if (project == null)
+            {
+                _logger.LogWarning("Project not found for field update: {ProjectId}", projectId);
+                return false;
+            }
+
+            // Update the specific field based on fieldName
+            switch (fieldName)
+            {
+                case "ProjectAddress":
+                    project.ProjectAddress = value;
+                    break;
+                case "GeneralContractor":
+                    project.GeneralContractor = value;
+                    break;
+                case "ProjectContact":
+                    project.ProjectContact = value;
+                    break;
+                case "ProjectContactEmail":
+                    project.ProjectContactEmail = value;
+                    break;
+                case "ProjectContactPhone":
+                    project.ProjectContactPhone = value;
+                    break;
+                case "ProjectManager":
+                    project.ProjectManager = value;
+                    break;
+                case "Installer":
+                    project.Installer = value;
+                    break;
+                case "Notes":
+                    project.Notes = value;
+                    break;
+                case "BidRequestDate":
+                    if (DateTime.TryParse(value, out var bidDate))
+                        project.BidRequestDate = bidDate;
+                    else if (string.IsNullOrEmpty(value))
+                        project.BidRequestDate = null;
+                    else
+                        return false; // Invalid date format
+                    break;
+                case "ProjectCategory":
+                    if (int.TryParse(value, out var categoryInt) && Enum.IsDefined(typeof(ProjectCategory), categoryInt))
+                        project.ProjectCategory = (ProjectCategory)categoryInt;
+                    else
+                        return false; // Invalid category value
+                    break;
+                case "ProjectId":
+                    project.ProjectId = value ?? string.Empty;
+                    break;
+                case "ProjectName":
+                    project.ProjectName = value ?? string.Empty;
+                    break;
+                case "TargetInstallDate":
+                    if (DateTime.TryParse(value, out var installDate))
+                        project.TargetInstallDate = installDate;
+                    else if (string.IsNullOrEmpty(value))
+                        project.TargetInstallDate = null;
+                    else
+                        return false; // Invalid date format
+                    break;
+                default:
+                    _logger.LogWarning("Unknown field name for project update: {FieldName}", fieldName);
+                    return false;
+            }
+
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Updated project field {FieldName} for project {ProjectId}", fieldName, projectId);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating project field {FieldName} for project {ProjectId}", fieldName, projectId);
+            throw;
+        }
+    }
+
     public async Task<bool> ArchiveProjectAsync(string id)
     {
         try
@@ -198,7 +280,7 @@ public class ProjectService
         }
     }
 
-    public async Task<bool> AttachWorkOrdersToProjectAsync(List<string> workOrderIds, string projectId)
+    public async Task<bool> AttachWorkOrdersToProjectAsync(List<string> workOrderIds, string projectId, string? parentBlockId = null)
     {
         try
         {
@@ -206,9 +288,9 @@ public class ProjectService
                 .Where(w => workOrderIds.Contains(w.Id))
                 .ToListAsync();
 
-            // Get the next display order for root level (work order associations go to root)
+            // Get the next display order for the target container (root or TaskBlock)
             var maxOrder = await _context.ProjectEvents
-                .Where(pe => pe.ProjectId == projectId && pe.ParentBlockId == null)
+                .Where(pe => pe.ProjectId == projectId && pe.ParentBlockId == parentBlockId)
                 .MaxAsync(pe => (int?)pe.DisplayOrder) ?? 0;
             
             var orderCounter = maxOrder;
@@ -226,7 +308,7 @@ public class ProjectService
                     Description = workOrder.Name,
                     CreatedBy = null, // Could be passed as parameter if needed
                     WorkOrderId = workOrder.Id,
-                    ParentBlockId = null, // Work order associations go to root level
+                    ParentBlockId = parentBlockId, // Respect the specified parent block
                     DisplayOrder = ++orderCounter
                 };
                 _context.ProjectEvents.Add(workOrderEvent);

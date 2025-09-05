@@ -358,8 +358,6 @@ body {
 .task-block-events { background-color: #fff; padding: 8px; border-radius: 0 0 6px 6px; }
 .collapse-icon { transition: transform 0.3s ease; }
 .task-block-header[aria-expanded="false"] .collapse-icon { transform: rotate(-90deg); }
-.task-block[data-nesting-level="1"] { border-left: 3px solid #007bff; }
-.task-block[data-nesting-level="2"] { border-left: 3px solid #28a745; }
-.task-block[data-nesting-level="3"] { border-left: 3px solid #ffc107; }
+/* TaskBlock color bar styling removed per user request */
 .nested-task-blocks { border-left: 2px solid #dee2e6; margin-left: 10px; padding-left: 10px; }
 .section-header { border-bottom: 1px solid #e9ecef; padding-bottom: 4px; }

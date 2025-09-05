@@ -4,6 +4,7 @@ using ShopBoss.Web.Services;
 using ShopBoss.Web.Models;
 using ShopBoss.Web.Data;
 using System.Text.Json;
+using System.IO;
 
 namespace ShopBoss.Web.Controllers;
 
@@ -110,6 +111,31 @@ public class ProjectController : Controller
     }
 
     [HttpPost]
+    public async Task<IActionResult> UpdateProjectField([FromBody] UpdateProjectFieldRequest request)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(request.ProjectId) || string.IsNullOrWhiteSpace(request.FieldName))
+            {
+                return Json(new { success = false, message = "Project ID and field name are required" });
+            }
+
+            var success = await _projectService.UpdateProjectFieldAsync(request.ProjectId, request.FieldName, request.Value);
+            if (success)
+            {
+                return Json(new { success = true });
+            }
+            
+            return Json(new { success = false, message = "Project not found or field could not be updated" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating project field {FieldName} for project {ProjectId}", request.FieldName, request.ProjectId);
+            return Json(new { success = false, message = "Error updating project field" });
+        }
+    }
+
+    [HttpPost]
     public async Task<IActionResult> Archive(string id)
     {
         try
@@ -179,7 +205,7 @@ public class ProjectController : Controller
     {
         try
         {
-            var success = await _projectService.AttachWorkOrdersToProjectAsync(request.WorkOrderIds, request.ProjectId);
+            var success = await _projectService.AttachWorkOrdersToProjectAsync(request.WorkOrderIds, request.ProjectId, request.ParentBlockId);
             if (success)
             {
                 return Json(new { success = true });
@@ -224,6 +250,13 @@ public class ProjectController : Controller
                 return Json(new { success = false, message = "No file selected" });
             }
 
+            // Fail-fast filename validation: keep human-readable naming, no silent renames
+            var filenameError = ValidateIncomingFileName(file.FileName);
+            if (filenameError != null)
+            {
+                return Json(new { success = false, message = filenameError });
+            }
+
             // Get SmartSheet user from session for attribution, fallback to "Local User"
             var smartSheetUser = HttpContext.Session.GetString("ss_user") ?? "Local User";
 
@@ -236,6 +269,32 @@ public class ProjectController : Controller
             _logger.LogError(ex, "Error uploading file for project {ProjectId}", projectId);
             return Json(new { success = false, message = "Error uploading file" });
         }
+    }
+
+    // Validate the incoming filename; return error message string or null if OK
+    private static string? ValidateIncomingFileName(string originalFileName)
+    {
+        if (string.IsNullOrWhiteSpace(originalFileName))
+            return "Invalid filename";
+
+        var safeName = Path.GetFileName(originalFileName);
+
+        // Reject path separators or traversal
+        if (!string.Equals(safeName, originalFileName, StringComparison.Ordinal))
+            return "Invalid filename: must not contain path separators";
+        if (safeName.Contains(".."))
+            return "Invalid filename: '..' not allowed";
+
+        // Reject invalid filesystem characters
+        var invalidChars = Path.GetInvalidFileNameChars();
+        if (safeName.IndexOfAny(invalidChars) >= 0)
+            return "Invalid filename: contains unsupported characters";
+
+        // Limit filename length to a safe bound
+        if (safeName.Length > 200)
+            return "Invalid filename: too long (max 200 characters)";
+
+        return null;
     }
 
     [HttpGet]
@@ -722,6 +781,45 @@ public class ProjectController : Controller
     }
 
     [HttpPost]
+    public async Task<IActionResult> UpdateEventField([FromBody] UpdateEventFieldRequest request)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(request.EventId) || string.IsNullOrWhiteSpace(request.FieldName))
+            {
+                return Json(new { success = false, message = "Event ID and field name are required" });
+            }
+
+            var eventItem = await _context.ProjectEvents.FindAsync(request.EventId);
+            if (eventItem == null)
+            {
+                return Json(new { success = false, message = "Event not found" });
+            }
+
+            // Update the specific field
+            switch (request.FieldName)
+            {
+                case "Label":
+                    eventItem.Label = request.Value;
+                    break;
+                case "Description":
+                    eventItem.Description = request.Value ?? string.Empty;
+                    break;
+                default:
+                    return Json(new { success = false, message = $"Field '{request.FieldName}' is not supported" });
+            }
+
+            await _context.SaveChangesAsync();
+            return Json(new { success = true });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating event field {FieldName} for event {EventId}", request.FieldName, request.EventId);
+            return Json(new { success = false, message = "Error updating event field" });
+        }
+    }
+
+    [HttpPost]
     public async Task<IActionResult> UpdateEventDescription([FromBody] UpdateEventDescriptionRequest request)
     {
         try
@@ -750,12 +848,20 @@ public class ProjectController : Controller
     {
         public List<string> WorkOrderIds { get; set; } = new();
         public string ProjectId { get; set; } = string.Empty;
+        public string? ParentBlockId { get; set; }
     }
 
     public class UpdateAttachmentLabelRequest
     {
         public string Id { get; set; } = string.Empty;
         public string Label { get; set; } = string.Empty;
+    }
+
+    public class UpdateProjectFieldRequest
+    {
+        public string ProjectId { get; set; } = string.Empty;
+        public string FieldName { get; set; } = string.Empty;
+        public string? Value { get; set; }
     }
 
     public class LinkProjectToSmartSheetRequest
@@ -777,6 +883,13 @@ public class ProjectController : Controller
         public DateTime EventDate { get; set; }
         public string? CreatedBy { get; set; }
         public string? ParentBlockId { get; set; }
+    }
+
+    public class UpdateEventFieldRequest
+    {
+        public string EventId { get; set; } = string.Empty;
+        public string FieldName { get; set; } = string.Empty;
+        public string? Value { get; set; }
     }
 
     public class UpdateEventDescriptionRequest

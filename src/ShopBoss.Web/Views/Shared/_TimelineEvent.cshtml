@@ -41,24 +41,92 @@
         @* Intentionally omit date/author line for Work Orders *@
     </div>
 }
+else if (Model.EventType == "custom_work_order" && Model.CustomWorkOrder != null)
+{
+    <div class="event-primary d-flex align-items-center">
+        <i class="fas fa-clipboard-list event-icon text-muted" title="Custom Work Order"></i>
+        <div>
+            <strong>@Model.Description</strong>
+            @if (Model.RowNumber.HasValue)
+            {
+                <span class="badge bg-primary row-badge">Row @Model.RowNumber</span>
+            }
+            <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-2"
+                    data-action="delete-event" data-project-id="@projectId"
+                    data-event-id="@Model.Id"
+                    data-cwo-id="@Model.CustomWorkOrderId"
+                    title="Delete">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    </div>
+    <div class="event-secondary text-muted small mt-1">
+        @if (!string.IsNullOrEmpty(Model.CustomWorkOrder.Description))
+        {
+            <div>@Model.CustomWorkOrder.Description</div>
+        }
+        <div class="event-metadata">@Model.EventDate.ToString("yyyy-MM-dd HH:mm") by @(Model.CreatedBy ?? "Unknown")</div>
+    </div>
+}
+else if (Model.EventType == "comment")
+{
+    <div class="event-primary d-flex align-items-center">
+        <i class="fas fa-comment event-icon text-muted" title="Comment"></i>
+        <div>
+            <strong>@(Model.Label ?? "Comment")</strong>
+            @if (Model.RowNumber.HasValue)
+            {
+                <span class="badge bg-primary row-badge ms-2">Row @Model.RowNumber</span>
+            }
+            <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-2"
+                    data-action="delete-event" data-project-id="@projectId"
+                    data-event-id="@Model.Id"
+                    title="Delete">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    </div>
+    <div class="event-secondary text-muted small mt-1">
+        @if (!string.IsNullOrEmpty(Model.Description))
+        {
+            <div>@Model.Description</div>
+        }
+        <div class="event-metadata">@Model.EventDate.ToString("yyyy-MM-dd HH:mm") by @(Model.CreatedBy ?? "Unknown")</div>
+    </div>
+}
+else if (Model.EventType == "purchase_order" && Model.PurchaseOrder != null)
+{
+    <div class="event-primary d-flex align-items-center">
+        <i class="fas fa-shopping-cart event-icon text-muted" title="Purchase Order"></i>
+        <div>
+            <strong>@Model.Description</strong>
+            @if (Model.RowNumber.HasValue)
+            {
+                <span class="badge bg-primary row-badge">Row @Model.RowNumber</span>
+            }
+            <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-2"
+                    data-action="delete-event" data-project-id="@projectId"
+                    data-event-id="@Model.Id"
+                    data-po-id="@Model.PurchaseOrderId"
+                    title="Delete">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    </div>
+    <div class="event-secondary text-muted small mt-1">
+        @if (!string.IsNullOrEmpty(Model.PurchaseOrder.Description))
+        {
+            <div>@Model.PurchaseOrder.Description</div>
+        }
+        <div class="event-metadata">@Model.EventDate.ToString("yyyy-MM-dd HH:mm") by @(Model.CreatedBy ?? "Unknown")</div>
+    </div>
+}
 else
 {
     <div class="event-primary d-flex align-items-center">
         @if (Model.EventType == "attachment")
         {
             <i class="fas fa-paperclip event-icon text-muted" title="Attachment"></i>
-        }
-        else if (Model.EventType == "comment")
-        {
-            <i class="fas fa-comment event-icon text-muted" title="Comment"></i>
-        }
-        else if (Model.EventType == "purchase-order")
-        {
-            <i class="fas fa-shopping-cart event-icon text-muted" title="Purchase Order"></i>
-        }
-        else if (Model.EventType == "work_order")
-        {
-            <i class="fas fa-cog event-icon text-muted" title="Work Order"></i>
         }
         else
         {
@@ -134,7 +202,7 @@ else
         }
         else
         {
-            @* Preserve existing secondary details for non-attachments *@
+            @* Standard secondary details for remaining event types *@
             @if (!string.IsNullOrEmpty(Model.Description))
             {
                 <div>@Model.Description</div>

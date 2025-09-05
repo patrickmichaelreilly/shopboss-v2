@@ -65,7 +65,7 @@ public class PurchaseOrderService
                 ProjectId = purchaseOrder.ProjectId,
                 EventDate = DateTime.UtcNow,
                 EventType = "purchase_order",
-                Description = $"Purchase Order created: {purchaseOrder.PurchaseOrderNumber} - {purchaseOrder.VendorName}",
+                Description = $"{purchaseOrder.PurchaseOrderNumber} - {purchaseOrder.VendorName}",
                 CreatedBy = createdBy,
                 PurchaseOrderId = purchaseOrder.Id,
                 ParentBlockId = taskBlockId,

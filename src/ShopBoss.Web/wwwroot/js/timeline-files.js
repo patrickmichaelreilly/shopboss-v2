@@ -26,7 +26,7 @@
 
         const formData = new FormData();
         formData.append('projectId', projectId);
-        formData.append('label', 'Label'); // Set default label
+        formData.append('label', 'Attachment'); // Set default label
         
         // Include the taskBlockId if one was specified
         if (Timeline.Files.currentBlockId) {

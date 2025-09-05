@@ -8,19 +8,6 @@
                 <i class="fas fa-info-circle me-2 text-muted"></i>
                 <small class="fw-bold">Project Information</small>
             </div>
-            <div id="display-buttons-@Model.Id">
-                <button type="button" class="btn btn-sm btn-outline-primary" data-action="project-edit" data-project-id="@Model.Id">
-                    <i class="fas fa-edit me-1"></i>Edit
-                </button>
-            </div>
-            <div id="edit-buttons-@Model.Id" class="d-none">
-                <button type="button" class="btn btn-sm btn-success me-1" data-action="project-save" data-project-id="@Model.Id">
-                    <i class="fas fa-save me-1"></i>Save
-                </button>
-                <button type="button" class="btn btn-sm btn-secondary" data-action="project-cancel" data-project-id="@Model.Id">
-                    <i class="fas fa-times me-1"></i>Cancel
-                </button>
-            </div>
         </div>
         
         <!-- Project Information Table (supports inline editing) -->
@@ -30,33 +17,33 @@
                     <!-- Left: Customer Info, Right: Internal Info -->
                     <tr>
                         <td width="120" class="text-muted ps-3">Address:</td>
-                        <td class="editable-field" data-field="ProjectAddress" data-type="textarea">@(Model.ProjectAddress ?? "-")</td>
+                        <td class="editable-field" data-field="ProjectAddress" data-type="textarea" data-project-id="@Model.Id" data-value="@(Model.ProjectAddress ?? "")">@(Model.ProjectAddress ?? "-")</td>
                         <td width="120" class="text-muted">Bid Date:</td>
-                        <td class="editable-field" data-field="BidRequestDate" data-type="date" data-value="@(Model.BidRequestDate?.ToString("yyyy-MM-dd"))">@(Model.BidRequestDate?.ToString("MM/dd/yy") ?? "-")</td>
+                        <td class="editable-field" data-field="BidRequestDate" data-type="date" data-project-id="@Model.Id" data-value="@(Model.BidRequestDate?.ToString("yyyy-MM-dd") ?? "")">@(Model.BidRequestDate?.ToString("MM/dd/yy") ?? "-")</td>
                     </tr>
                     <tr>
                         <td class="text-muted ps-3">Contractor:</td>
-                        <td class="editable-field" data-field="GeneralContractor" data-type="text">@(Model.GeneralContractor ?? "-")</td>
+                        <td class="editable-field" data-field="GeneralContractor" data-type="text" data-project-id="@Model.Id" data-value="@(Model.GeneralContractor ?? "")">@(Model.GeneralContractor ?? "-")</td>
                         <td class="text-muted">PM:</td>
-                        <td class="editable-field" data-field="ProjectManager" data-type="text">@(Model.ProjectManager ?? "-")</td>
+                        <td class="editable-field" data-field="ProjectManager" data-type="text" data-project-id="@Model.Id" data-value="@(Model.ProjectManager ?? "")">@(Model.ProjectManager ?? "-")</td>
                     </tr>
                     <tr>
                         <td class="text-muted ps-3">Contact:</td>
-                        <td class="editable-field" data-field="ProjectContact" data-type="text">@(Model.ProjectContact ?? "-")</td>
+                        <td class="editable-field" data-field="ProjectContact" data-type="text" data-project-id="@Model.Id" data-value="@(Model.ProjectContact ?? "")">@(Model.ProjectContact ?? "-")</td>
                         <td class="text-muted">Installer:</td>
-                        <td class="editable-field" data-field="Installer" data-type="text">@(Model.Installer ?? "-")</td>
+                        <td class="editable-field" data-field="Installer" data-type="text" data-project-id="@Model.Id" data-value="@(Model.Installer ?? "")">@(Model.Installer ?? "-")</td>
                     </tr>
                     <tr>
                         <td class="text-muted ps-3">Email:</td>
-                        <td class="editable-field" data-field="ProjectContactEmail" data-type="email">@(Model.ProjectContactEmail ?? "-")</td>
+                        <td class="editable-field" data-field="ProjectContactEmail" data-type="email" data-project-id="@Model.Id" data-value="@(Model.ProjectContactEmail ?? "")">@(Model.ProjectContactEmail ?? "-")</td>
                         <td class="text-muted">Category:</td>
-                        <td class="editable-field" data-field="ProjectCategory" data-type="select" data-value="@((int)Model.ProjectCategory)">
+                        <td class="editable-field" data-field="ProjectCategory" data-type="select" data-project-id="@Model.Id" data-value="@((int)Model.ProjectCategory)">
                             <span class="badge bg-secondary">@Model.ProjectCategory</span>
                         </td>
                     </tr>
                     <tr>
                         <td class="text-muted ps-3">Phone:</td>
-                        <td class="editable-field" data-field="ProjectContactPhone" data-type="tel">@(Model.ProjectContactPhone ?? "-")</td>
+                        <td class="editable-field" data-field="ProjectContactPhone" data-type="tel" data-project-id="@Model.Id" data-value="@(Model.ProjectContactPhone ?? "")">@(Model.ProjectContactPhone ?? "-")</td>
                         <td class="text-muted">Smartsheet:</td>
                         <td>
                             @if (Model.SmartSheetId.HasValue)
@@ -85,7 +72,7 @@
                         <tr><td colspan="4" class="py-2"></td></tr>
                         <tr>
                             <td class="text-muted align-top ps-3">Notes:</td>
-                            <td colspan="3" class="editable-field" data-field="Notes" data-type="textarea">@(Model.Notes ?? "-")</td>
+                            <td colspan="3" class="editable-field" data-field="Notes" data-type="textarea" data-project-id="@Model.Id" data-value="@(Model.Notes ?? "")">@(Model.Notes ?? "-")</td>
                         </tr>
                     }
                 </tbody>

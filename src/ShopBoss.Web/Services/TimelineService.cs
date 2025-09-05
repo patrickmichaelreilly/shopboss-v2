@@ -129,23 +129,79 @@ public class TimelineService
     {
         try
         {
+            // Load block with direct children (events and child blocks)
             var block = await _context.TaskBlocks
                 .Include(tb => tb.Events)
+                .Include(tb => tb.ChildTaskBlocks)
                 .FirstOrDefaultAsync(tb => tb.Id == blockId);
 
             if (block == null) return false;
 
-            // Unassign all events from this block (don't delete the events)
-            foreach (var evt in block.Events)
+            var parentId = block.ParentTaskBlockId; // null for root
+            var insertionOrder = block.DisplayOrder;
+
+            // Build mixed ordered children (by DisplayOrder within the block)
+            var childBlocks = (block.ChildTaskBlocks ?? new List<TaskBlock>())
+                .OrderBy(b => b.DisplayOrder)
+                .ToList();
+            var childEvents = (block.Events ?? new List<ProjectEvent>())
+                .OrderBy(e => e.DisplayOrder)
+                .ToList();
+
+            var mixedChildren = new List<(string Type, object Entity)>();
+            int i = 0, j = 0;
+            while (i < childBlocks.Count || j < childEvents.Count)
             {
-                evt.ParentBlockId = null;
-                evt.DisplayOrder = 0;
+                var nextIsBlock = j >= childEvents.Count || (i < childBlocks.Count && childBlocks[i].DisplayOrder <= childEvents[j].DisplayOrder);
+                if (nextIsBlock)
+                {
+                    mixedChildren.Add(("TaskBlock", childBlocks[i++]));
+                }
+                else
+                {
+                    mixedChildren.Add(("Event", childEvents[j++]));
+                }
             }
 
+            // Compute shift: children replacing the deleted block at its index
+            var shift = Math.Max(mixedChildren.Count - 1, 0);
+
+            // Shift siblings after the block forward by 'shift'
+            if (shift > 0)
+            {
+                // Sibling blocks under same parent (exclude the block itself)
+                var siblingBlocks = _context.TaskBlocks.Where(tb => tb.ProjectId == block.ProjectId && tb.ParentTaskBlockId == parentId && tb.Id != block.Id);
+                await siblingBlocks.Where(tb => tb.DisplayOrder > insertionOrder).ForEachAsync(tb => tb.DisplayOrder += shift);
+
+                // Sibling events under same parent
+                var siblingEvents = _context.ProjectEvents.Where(pe => pe.ProjectId == block.ProjectId && pe.ParentBlockId == parentId);
+                await siblingEvents.Where(pe => pe.DisplayOrder > insertionOrder).ForEachAsync(pe => pe.DisplayOrder += shift);
+            }
+
+            // Reparent children into the parent's container at the block's position
+            var order = insertionOrder;
+            foreach (var (type, entity) in mixedChildren)
+            {
+                if (type == "TaskBlock")
+                {
+                    var child = (TaskBlock)entity;
+                    child.ParentTaskBlockId = parentId;
+                    child.DisplayOrder = order++;
+                }
+                else // Event
+                {
+                    var evt = (ProjectEvent)entity;
+                    evt.ParentBlockId = parentId;
+                    evt.DisplayOrder = order++;
+                }
+            }
+
+            // Finally, remove the block itself
             _context.TaskBlocks.Remove(block);
+
             await _context.SaveChangesAsync();
 
-            _logger.LogInformation("Deleted TaskBlock: {BlockId}", blockId);
+            _logger.LogInformation("Deleted TaskBlock {BlockId} and spliced {Count} children into parent", blockId, mixedChildren.Count);
             return true;
         }
         catch (Exception ex)

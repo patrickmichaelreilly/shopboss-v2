@@ -20,6 +20,9 @@ public class ProjectEvent
     [Required]
     public string Description { get; set; } = string.Empty;
     
+    [MaxLength(200)]
+    public string? Label { get; set; }
+    
     [MaxLength(100)]
     public string? CreatedBy { get; set; }
     
